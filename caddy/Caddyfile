@@ -1,0 +1,68 @@
+{
+    # Global options block
+    log {
+        output stdout
+        level {env.LOG_LEVEL}
+    }
+    storage file_system {
+        root {env.STORAGE_ROOT}
+    }
+}
+
+{env.TURN_SERVER_DOMAIN}, {env.LIVEKIT_SERVER_DOMAIN}, {env.CONTROL_SERVER_DOMAIN}, {env.PEEKAVIEW_DOMAIN} {
+    tls {
+        # Automate certificate management
+    }
+}
+
+:443 {
+    # TURN-Server
+    @turn {
+        tls {
+            sni {env.TURN_SERVER_DOMAIN}
+        }
+    }
+    handle @turn {
+        tls
+        reverse_proxy localhost:5349
+    }
+
+    # LiveKit-WebSocket (Backend)
+    @backend {
+        tls {
+            sni {env.LIVEKIT_SERVER_DOMAIN}
+        }
+    }
+    handle @backend {
+        tls {
+            alpn http/1.1 h2
+        }
+        reverse_proxy localhost:7880
+    }
+
+    # App-WebApp (PHP)
+    @webapp {
+        tls {
+            sni {env.PEEKAVIEW_DOMAIN}
+        }
+    }
+    handle @webapp {
+        tls {
+            alpn http/1.1 h2
+        }
+        reverse_proxy localhost:8881
+    }
+
+    # App-API (PHP-API)
+    @webapp {
+        tls {
+            sni {env.API_DOMAIN}
+        }
+    }
+    handle @webapp {
+        tls {
+            alpn http/1.1 h2
+        }
+        reverse_proxy localhost:8881
+    }
+}

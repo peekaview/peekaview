@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+
+  caddy:
+    build: ./caddy
+    image: ${CADDY_IMAGE:-your-dockerhub-username/caddy}:${GITHUB_SHA:-latest}
+    restart: unless-stopped
+    environment:
+      - TURN_SERVER_DOMAIN=${TURN_SERVER_DOMAIN}
+      - KEY3=${KEY3}
+    network_mode: "host"
+    volumes:
+      - caddy_data:/data
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    environment:
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_PUBLIC_KEY=${LIVEKIT_PUBLIC_KEY}
+    network_mode: "host"
+
+  api:
+    build: ./api
+    image: ${API_IMAGE:-your-dockerhub-username/api}:${GITHUB_SHA:-latest}
+    restart: unless-stopped
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - VIDEO_SERVERS=${VIDEO_SERVERS}
+      - CONTROL_SERVERS=${CONTROL_SERVERS}
+    ports:
+      - "8080:80"
+    networks:
+      - internal
+
+  controlserver:
+    build: ./controlserver
+    image: ${CONTROLSERVER_IMAGE:-your-dockerhub-username/controlserver}:${GITHUB_SHA:-latest}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - internal
+
+  app:
+    build: ./app
+    image: ${APP_IMAGE:-your-dockerhub-username/app}:${GITHUB_SHA:-latest}
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    networks:
+      - internal
+
+volumes:
+  caddy_data:
+    # Optional: specify additional volume options here
+
+networks:
+  internal:
+    driver: bridge
