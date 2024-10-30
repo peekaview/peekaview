@@ -2,14 +2,13 @@
 FROM node:20-alpine as build
 
 WORKDIR /app
-COPY package*.json ./
+
 RUN npm install
 
 # Copy source files
-COPY resources/ ./src/
-COPY public/ ./public/
+COPY resources/ .
 
-RUN npm run build
+RUN npm run prod
 
 # Production stage
 FROM nginx:alpine
