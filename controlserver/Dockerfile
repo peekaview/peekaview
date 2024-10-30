@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy source code
-COPY ressources/ ./src/
+COPY resources/ ./src/
 
 # Expose the port your server runs on (adjust if needed)
 EXPOSE 3000
