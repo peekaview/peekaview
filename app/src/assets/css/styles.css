@@ -65,6 +65,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow-y: auto;
+  margin-bottom: 60px;
 }
 
 .content-wrapper {
@@ -386,7 +387,7 @@ body {
 /* Responsive Adjustments */
 @media (max-width: 640px) {
   .main-container {
-      height: calc(100vh - 65px);
+      height: calc(100vh - 125px);
   }
   
   .main-header {
@@ -410,4 +411,40 @@ body {
   .start-sharing-info {
       padding: 1.5rem;
   }
+}
+
+/* Footer Styles */
+.main-footer {
+  background: rgba(255, 255, 255, 0.95);
+  color: #2c3e50;
+  padding: 0.75rem 0;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  backdrop-filter: blur(5px);
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.footer-content p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.footer-content a {
+  color: #2c3e50;
+  text-decoration: none;
+}
+
+.footer-content a:hover {
+  color: #1a73e8;
 }
