@@ -20,7 +20,7 @@ $(SERVICES):
 	@if [ -f $@/Makefile ]; then \
 		$(MAKE) -C $@ build || exit 1; \
 	else \
-		docker buildx build \
+		docker build \
 			--build-arg GIT_COMMIT=$(GIT_SHA) \
 			--build-arg BUILD_DATE=$(BUILD_DATE) \
 			-t $@:$(GIT_SHA) \
