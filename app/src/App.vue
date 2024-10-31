@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Swal from 'sweetalert2'
 
+import Modal from './components/Modal.vue'
 import Viewer from './components/Viewer.vue'
 import Share from './components/Share.vue'
 import ScreenShare from './components/ScreenShare.vue'
@@ -9,6 +10,7 @@ import ScreenShare from './components/ScreenShare.vue'
 import PeekaviewLogo from './assets/img/peekaviewlogo.png'
 
 import type { ScreenShareData } from './types';
+import About from './components/About.vue'
 
 const params = new URLSearchParams(window.location.search)
 const action = params.get('action') ?? 'view'
@@ -17,6 +19,7 @@ const email = params.get('email') ?? undefined
 
 const sessionActive = ref(false)
 const screenShareData = ref<ScreenShareData>()
+const showAbout = ref(false)
 
 async function handleLogout() {
   const result = await Swal.fire({
@@ -81,4 +84,14 @@ async function handleLogout() {
   <div v-if="screenShareData" id="appContainer" class="app-container fade-in">
     <ScreenShare v-bind="screenShareData" />
   </div>
+
+  <Modal :show="!!showAbout" @click="showAbout = false" hide-header hide-footer>
+    <About />
+  </Modal>
+
+  <footer class="main-footer">
+    <div class="footer-content">
+      <p>&copy; 2024 Peekaview | <a href="#" @click="showAbout = true">Impressum</a></p>
+    </div>
+  </footer>
 </template>

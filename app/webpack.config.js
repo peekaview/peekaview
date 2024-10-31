@@ -5,6 +5,8 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const { VueLoaderPlugin } = require('vue-loader')
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 
+const packageJson = require('./package.json')
+
 module.exports = (env, argv) => {
   const dev = argv.mode === 'development';
 
@@ -70,6 +72,18 @@ module.exports = (env, argv) => {
       assetModuleFilename: 'img/[hash][ext][query]'
     },
     plugins: [
+      new webpack.DefinePlugin({
+        APP_VERSION: JSON.stringify(packageJson.version),
+        WEBPACK_DEVMODE: dev,
+        WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
+
+        __VUE_OPTIONS_API__: false,
+        __VUE_PROD_DEVTOOLS__: false,
+        __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+        __VUE_I18N_FULL_INSTALL__: true,
+        __VUE_I18N_LEGACY_API__: false,
+        __INTLIFY_PROD_DEVTOOLS__: false,
+      }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
       }),

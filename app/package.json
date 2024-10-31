@@ -5,8 +5,7 @@
   "description": "Simple screen sharing application",
   "private": "true",
   "scripts": {
-    "devbuild": "webpack --mode=development",
-    "dev": "webpack serve --mode=development",
+    "dev": "webpack --mode=development",
     "prod": "webpack --mode=production",
     "tsc": "vue-tsc --noEmit"
   },
