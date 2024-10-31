@@ -65,7 +65,7 @@ module.exports = (env, argv) => {
       ],
     },
     output: {
-      path: path.resolve(__dirname, '../build'),
+      path: path.resolve(__dirname, 'build'),
       filename: 'js/[name].js',
       assetModuleFilename: 'img/[hash][ext][query]'
     },
