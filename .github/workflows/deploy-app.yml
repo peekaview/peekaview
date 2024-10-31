@@ -48,4 +48,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy app/build --project-name=peekaview --branch=${{ steps.set-branch.outputs.branch }}
+          command: pages deploy app/build --project-name=peekaview --branch=${{ github.ref_name }}
