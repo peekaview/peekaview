@@ -5,18 +5,12 @@ on:
     branches:
       - main
       - develop
-    paths:
-      - 'app/**'
+#    paths:
+#      - 'app/**'
 
-  pull_request:
-    branches:
-      - main
-      - develop
-    paths:
-      - 'app/**'
-    
+ 
   # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -42,7 +36,7 @@ jobs:
           node-version: '20'
           
       - name: Install dependencies
-        run: npm ci
+        run: npm install
         
       - name: Build production
         run: npm run prod
