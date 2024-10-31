@@ -4,7 +4,7 @@ FROM dunglas/frankenphp:latest
 WORKDIR /app
 
 # Copy PHP file into container
-COPY resources/api.php /app/public/
+COPY api.php /app/public/
 
 # Set permissions
 RUN chown -R www-data:www-data /app \
