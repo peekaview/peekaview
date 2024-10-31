@@ -3,12 +3,13 @@ version: '3.8'
 services:
 
   caddy:
-    build: ./caddy
-    image: ${CADDY_IMAGE:-your-dockerhub-username/caddy}:${GITHUB_SHA:-latest}
+    image: peekaview/caddy
     restart: unless-stopped
     environment:
       - TURN_SERVER_DOMAIN=${TURN_SERVER_DOMAIN}
-      - KEY3=${KEY3}
+      - LIVEKIT_SERVER_DOMAIN=${LIVEKIT_SERVER_DOMAIN}
+      - CONTROL_SERVER_DOMAIN=${CONTROL_SERVER_DOMAIN}
+      - PEEKAVIEW_DOMAIN=${PEEKAVIEW_DOMAIN}
     network_mode: "host"
     volumes:
       - caddy_data:/data
@@ -23,23 +24,21 @@ services:
     network_mode: "host"
 
   api:
-    build: ./api
-    image: ${API_IMAGE:-your-dockerhub-username/api}:${GITHUB_SHA:-latest}
+    image: peekaview/api
     restart: unless-stopped
     environment:
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - LIVEKIT_URL=${LIVEKIT_URL}
       - VIDEO_SERVERS=${VIDEO_SERVERS}
       - CONTROL_SERVERS=${CONTROL_SERVERS}
     ports:
       - "8080:80"
+      - "8443:443"
     networks:
       - internal
 
   controlserver:
-    build: ./controlserver
-    image: ${CONTROLSERVER_IMAGE:-your-dockerhub-username/controlserver}:${GITHUB_SHA:-latest}
+    image: peekaview/controlserver
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -47,8 +46,7 @@ services:
       - internal
 
   app:
-    build: ./app
-    image: ${APP_IMAGE:-your-dockerhub-username/app}:${GITHUB_SHA:-latest}
+    image: peekaview/app
     restart: unless-stopped
     ports:
       - "8082:80"

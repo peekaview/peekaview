@@ -14,10 +14,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header('Content-Type: application/json');
 
 // Configuration
-define('LIVEKIT_API_KEY', $_ENV['LIVEKIT_API_KEY']);
-define('LIVEKIT_API_SECRET', $_ENV['LIVEKIT_API_SECRET']);
-define('CONTROL_SERVERS', array_map('trim', explode(',', $_ENV['CONTROL_SERVERS'])));
-define('VIDEO_SERVERS', array_map('trim', explode(',', $_ENV['VIDEO_SERVERS'])));
+$envVars = [
+    'LIVEKIT_API_KEY' => getenv('LIVEKIT_API_KEY'),
+    'LIVEKIT_API_SECRET' => getenv('LIVEKIT_API_SECRET'),
+    'CONTROL_SERVERS' => getenv('CONTROL_SERVERS'),
+    'VIDEO_SERVERS' => getenv('VIDEO_SERVERS')
+];
+
+// Validate required environment variables
+foreach (['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'] as $required) {
+    if (!$envVars[$required]) {
+        die(json_encode(['error' => "Missing required environment variable: $required"]));
+    }
+}
+
+define('LIVEKIT_API_KEY', $envVars['LIVEKIT_API_KEY']);
+define('LIVEKIT_API_SECRET', $envVars['LIVEKIT_API_SECRET']);
+define('CONTROL_SERVERS', array_filter(array_map('trim', explode(',', $envVars['CONTROL_SERVERS']))));
+define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', $envVars['VIDEO_SERVERS']))));
 define('STORAGE_PATH', 'storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds

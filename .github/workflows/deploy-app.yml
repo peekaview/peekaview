@@ -5,8 +5,8 @@ on:
     branches:
       - main
       - develop
-#    paths:
-#      - 'app/**'
+    paths:
+      - 'app/**'
 
  
   # Allows you to run this workflow manually from the Actions tab
