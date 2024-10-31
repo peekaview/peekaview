@@ -36,9 +36,11 @@ jobs:
           node-version: '20'
           
       - name: Install dependencies
+        working-directory: ./app
         run: npm install
         
       - name: Build production
+        working-directory: ./app
         run: npm run prod
 
       - name: Deploy
