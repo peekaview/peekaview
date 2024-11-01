@@ -3,12 +3,13 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
+# Copy source files
+COPY src/ ./src/
+COPY *.json ./
+COPY webpack.config.js ./
+
 RUN npm install
 
-# Copy source files
-COPY src/ .
-COPY *.json .
-COPY webpack.config.js .
 
 RUN npm run prod
 
