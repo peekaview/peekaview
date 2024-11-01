@@ -1,7 +1,6 @@
 # Global build variables
 GIT_SHA := $(shell git rev-parse --short HEAD)
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
-#PLATFORM := linux/amd64,linux/arm64
 
 # List of all services
 SERVICES := caddy livekit api controlserver app website webserver
@@ -23,8 +22,9 @@ $(SERVICES):
 		docker build \
 			--build-arg GIT_COMMIT=$(GIT_SHA) \
 			--build-arg BUILD_DATE=$(BUILD_DATE) \
-			-t $@:$(GIT_SHA) \
-			-t $@:testing \
+			-t peekaview/$@:$(GIT_SHA) \
+			-t peekaview/$@:testing \
+			-t peekaview/$@ \
 			./$@ || exit 1; \
 	fi
 
