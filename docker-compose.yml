@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-
   caddy:
     image: peekaview/caddy:${DOCKER_TAG}
     restart: unless-stopped

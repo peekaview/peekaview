@@ -10,8 +10,5 @@ COPY api.php /app/public/
 RUN chown -R www-data:www-data /app \
     && chmod -R 755 /app
 
-# Expose ports 80 443
-EXPOSE 80 443
-
 # Start FrankenPHP in production mode
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

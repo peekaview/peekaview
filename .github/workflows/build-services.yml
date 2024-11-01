@@ -8,6 +8,8 @@ on:
         paths:
             - 'api/**'
             - 'app/**'
+            - 'controlserver/**'
+            - 'caddy/**'
     pull_request:
         branches:
             - 'master'
@@ -17,7 +19,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                service: [api, app]
+                service: [api, app, controlserver, caddy]
         steps:
             - uses: actions/checkout@v4
               with:
