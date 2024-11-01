@@ -3,7 +3,7 @@ version: '3.8'
 services:
 
   caddy:
-    image: peekaview/caddy
+    image: peekaview/caddy:${DOCKER_TAG}
     restart: unless-stopped
     environment:
       - TURN_SERVER_DOMAIN=${TURN_SERVER_DOMAIN}
@@ -24,7 +24,7 @@ services:
     network_mode: "host"
 
   api:
-    image: peekaview/api
+    image: peekaview/api:${DOCKER_TAG}
     restart: unless-stopped
     environment:
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
@@ -38,7 +38,7 @@ services:
       - internal
 
   controlserver:
-    image: peekaview/controlserver
+    image: peekaview/controlserver:${DOCKER_TAG}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -46,7 +46,7 @@ services:
       - internal
 
   app:
-    image: peekaview/app
+    image: peekaview/app:${DOCKER_TAG}
     restart: unless-stopped
     ports:
       - "8082:80"

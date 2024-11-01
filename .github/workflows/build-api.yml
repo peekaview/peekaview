@@ -1,62 +1,52 @@
-name: build api
+name: Build and Push to DockerHub
 
 on:
     push:
-      branches:
-        - main
-        - develop
-    #  paths:
-    #    - 'app/**'
+        branches:
+            - main
+            - develop
+        paths:
+            - 'api/**'
+            - 'app/**'
     pull_request:
         branches:
             - 'master'
-    
-    # Allows you to run this workflow manually from the Actions tab
-    workflow_dispatch:
-        inputs:
-            logLevel:
-                description: 'Log level'
-                required: true
-                default: 'warning'
-                type: choice
-                options:
-                - info
-                - warning
-                - debug
-            tags:
-                description: 'Test scenario tags'
-                required: false
-                type: boolean
-            environment:
-                description: 'Environment to run tests against'
-                type: environment
-                required: true
 
 jobs:
     docker:
         runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                service: [api, app]
         steps:
-        -
-            name: Checkout
-            uses: actions/checkout@v4
-        -
-            name: Docker meta
-            id: meta
-            uses: docker/metadata-action@v5
-            with:
-                images: peekaview/api
-        -
-            name: Login to DockerHub
-            if: github.event_name != 'pull_request'
-            uses: docker/login-action@v3
-            with:
-                username: ${{ secrets.DOCKERHUB_USERNAME }}
-                password: ${{ secrets.DOCKERHUB_TOKEN }}
-        -
-            name: Build and push
-            uses: docker/build-push-action@v5
-            with:
-                context: ./api
-                push: ${{ github.event_name != 'pull_request' }}
-                tags: ${{ steps.meta.outputs.tags }}
-                labels: ${{ steps.meta.outputs.labels }}
+            - uses: actions/checkout@v4
+            
+            - uses: dorny/paths-filter@v2
+              id: changes
+              with:
+                  filters: |
+                      service:
+                        - '${{ matrix.service }}/**'
+            
+            - name: Docker meta
+              id: meta
+              if: steps.changes.outputs.service == 'true'
+              uses: docker/metadata-action@v5
+              with:
+                  images: peekaview/${{ matrix.service }}
+            
+            - name: Login to DockerHub
+              if: steps.changes.outputs.service == 'true' && github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+            
+            - name: Build and push
+              if: steps.changes.outputs.service == 'true'
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./${{ matrix.service }}
+                  push: ${{ github.event_name != 'pull_request' }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
