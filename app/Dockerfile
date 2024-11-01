@@ -6,7 +6,9 @@ WORKDIR /app
 RUN npm install
 
 # Copy source files
-COPY resources/ .
+COPY src/ .
+COPY *.json .
+COPY webpack.config.js .
 
 RUN npm run prod
 
