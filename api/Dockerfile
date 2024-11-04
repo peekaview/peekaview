@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy PHP file into container
 COPY api.php /app/public/index.php
 
-ENV SERVER_NAME=:80
+ENV SERVER_NAME=127.0.0.1:80
 # Start FrankenPHP in production mode
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
+
