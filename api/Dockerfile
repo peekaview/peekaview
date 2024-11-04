@@ -10,6 +10,9 @@ COPY api.php /app/public/
 RUN echo "{ \
     auto_https off \
     admin off \
+    servers { \
+    protocol http \
+    } \
     } \
     \
     :80 { \
