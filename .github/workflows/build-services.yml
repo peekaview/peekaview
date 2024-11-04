@@ -30,7 +30,7 @@ jobs:
               with:
                   filters: |
                       service:
-                        - '(^/|^${{ matrix.service }}/)'
+                        - '${{ matrix.service }}/**'
             
             - name: Docker meta
               id: meta
