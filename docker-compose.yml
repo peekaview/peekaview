@@ -52,7 +52,7 @@ services:
       - internal
 
 volumes:
-  caddy_data:
+  ingress_data:
   api_storage:
     # Optional: specify additional volume options here
 
