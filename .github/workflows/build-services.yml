@@ -19,7 +19,8 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                service: [api, app, controlserver, ingress]
+                #service: [api, app, controlserver, ingress]
+                service: [ingress]
         steps:
             - uses: actions/checkout@v4
               with:
@@ -28,7 +29,6 @@ jobs:
             - uses: dorny/paths-filter@v3
               id: changes
               with:
-                  ref: ${{ github.ref }}
                   filters: |
                       service:
                         - '${{ matrix.service }}/**'

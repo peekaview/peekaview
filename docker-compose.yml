@@ -1,6 +1,7 @@
 services:
   ingress:
     image: peekaview/ingress:${DOCKER_TAG}
+    command: run --config /etc/caddy.yaml --adapter yaml
     restart: unless-stopped
     environment:
       - API_DOMAIN=${API_DOMAIN}

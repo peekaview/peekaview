@@ -2,4 +2,5 @@
 FROM livekit/caddyl4:latest
 
 # Copy the Caddyfile to the appropriate location
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY caddy.yaml /etc/caddy.yaml
+
