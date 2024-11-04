@@ -11,7 +11,7 @@
 
 api.peekaview.com, v1.peekaview.com {
     tls {
-        automate api.peekaview.com v1.peekaview.com
+        # TLS options (if any)
     }
 }
 
