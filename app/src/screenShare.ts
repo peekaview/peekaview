@@ -4,14 +4,48 @@ export async function publishTrack(room: Room, sourceId?: string, shareAudio = f
   console.debug('Starting publishTrack with sourceId:', sourceId)
   let screenStream: MediaStream
 
-  console.log('Browser environment detected')
-  // Browser environment
-  console.log('Attempting to get display media in browser')
-  screenStream = await navigator.mediaDevices.getDisplayMedia({
-    video: true,
-    audio: shareAudio
-  })
-  console.log('Successfully obtained screen stream in browser')
+  if (window.electronAPI) {
+    console.log('Electron environment detected')
+    // Electron environment
+    if (!sourceId) {
+      console.log('No sourceId provided, opening screen source selection')
+      await window.electronAPI.openScreenSourceSelection()
+      return
+    }
+
+    console.debug('Selected sourceId:', sourceId)
+    console.log('Attempting to get user media in Electron')
+    screenStream = await navigator.mediaDevices.getUserMedia({
+      ...(shareAudio ? {
+        audio: {
+          mandatory: {
+            chromeMediaSource: 'desktop'
+          }
+        }
+      }
+      : {}),
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sourceId,
+          minWidth: 1280,
+          maxWidth: 1920,
+          minHeight: 720,
+          maxHeight: 1080
+        }
+      }
+    })
+    console.log('Successfully obtained screen stream in Electron')
+  } else {
+    console.log('Browser environment detected')
+    // Browser environment
+    console.log('Attempting to get display media in browser')
+    screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: shareAudio
+    })
+    console.log('Successfully obtained screen stream in browser')
+  }
 
   const screenTrack = screenStream.getVideoTracks()[0]
 

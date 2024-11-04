@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
@@ -7,14 +8,12 @@ const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 
 const packageJson = require('./package.json')
 
-module.exports = (env, argv) => {
-  const dev = argv.mode === 'development';
-
-  const cspPolicy = `
+function getCspPolicy(dev = false) {
+  return `
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval';
     style-src 'self' 'unsafe-inline';
-    connect-src 'self' https://*.meetzi.de wss://*.meetzi.de;
+    connect-src 'self' ${process.env.CONNECT_SRC} ${process.env.API_URL};
     img-src 'self' data:;
     font-src 'self';
     object-src 'none';
@@ -24,13 +23,43 @@ module.exports = (env, argv) => {
     block-all-mixed-content;
     upgrade-insecure-requests;
   `.replace(/\s+/g, ' ').trim();
+}
+
+module.exports = (env, argv) => {
+  const dev = argv.mode === 'development';
+  const forWeb = env.WEBPACK_BUNDLE; // true if building for web, false if building for electron  
+
+  const cspPolicy = getCspPolicy(dev)
+
+  const entry = {
+    app: './src/app.ts',
+  }
+
+  if (!forWeb)
+    entry.sources = './src/sources/sources.ts'
 
   return {
-    watch: dev,
+    watch: dev && forWeb,
     mode: argv.mode,
-    entry: {
-      app: './src/app.ts',
+    devServer: forWeb ? undefined : {
+      historyApiFallback: true,
+      headers: {
+        'Content-Security-Policy': cspPolicy,
+      },
+      static: {
+        directory: path.join(__dirname, 'public'),
+      },
+      port: 8843,
+      server: {
+        type: 'https',
+        options: {
+          key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
+          cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
+        },
+      },
+      hot: true,
     },
+    entry,
     target: 'web',
     resolve: {
       extensions: ['.ts', '.js', '.vue'],
@@ -68,7 +97,7 @@ module.exports = (env, argv) => {
     },
     output: {
       path: path.resolve(__dirname, 'build'),
-      filename: 'js/[name].js',
+      filename: `js/[name]${dev ? '' : '.[contenthash]'}.js`,
       assetModuleFilename: 'img/[hash][ext][query]'
     },
     plugins: [
@@ -76,6 +105,8 @@ module.exports = (env, argv) => {
         APP_VERSION: JSON.stringify(packageJson.version),
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
+
+        API_URL: JSON.stringify(process.env.API_URL),
 
         __VUE_OPTIONS_API__: false,
         __VUE_PROD_DEVTOOLS__: false,
@@ -107,7 +138,7 @@ module.exports = (env, argv) => {
         async: false,
       }),
       new MiniCssExtractPlugin({
-        filename: 'css/[name].css',
+        filename: `css/[name]${dev ? '' : '.[contenthash]'}.css`,
       }),
     ],
   };

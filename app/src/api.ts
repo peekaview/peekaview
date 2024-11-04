@@ -1,3 +1,5 @@
+declare const API_URL: string
+
 export type ApiRequestParams = {
   action: "showMeYourScreen"
   email: string;
@@ -15,6 +17,6 @@ export type ApiRequestParams = {
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
-  const response = await fetch(`api.php?${new URLSearchParams(params).toString()}`)
+  const response = await fetch(`${API_URL}?${new URLSearchParams(params).toString()}`)
   return (await response.json()) as TResponse
 }
