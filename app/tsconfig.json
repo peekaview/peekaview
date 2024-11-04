@@ -108,6 +108,6 @@
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
   },
   "files": ["./src/vue-shims.d.ts"],
-  "include": ["src/**/*.ts", "src/**/*.vue"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "src/helpers.js"],
   "exclude": ["node_modules"]
 }

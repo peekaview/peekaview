@@ -26,6 +26,7 @@ Thumbs.db
 *.bak
 
 # Build directories
+.webpack/
 dist/
 build/
 *.log

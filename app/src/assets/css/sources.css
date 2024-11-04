@@ -1,0 +1,16 @@
+#sourceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.source-item {
+  border: 1px solid #ccc;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.source-item.selected {
+  border-color: blue;
+  background-color: #dddddd;
+}

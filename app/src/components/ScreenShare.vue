@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from "vue"
+import { ref, computed, onMounted, reactive, onBeforeUnmount } from "vue"
 import { Participant, RoomEvent, Track, type Room } from "livekit-client"
 
 import { joinRoom, publishTrack } from "../screenShare"
@@ -18,6 +18,19 @@ const remoteScreens = reactive<Record<string, Screen>>({})
 const localScreen = ref<Screen>()
 const allScreens = computed(() => [...(localScreen.value ? [localScreen.value] : []), ...Object.values(remoteScreens)])
 const focusedScreenId = ref<string>()
+
+window.electronAPI?.onSendScreenSourceId((id) => {
+  sharingRoom.value && handleScreenSharing(sharingRoom.value, id)
+})
+
+// Handle window closing
+window.onbeforeunload = async (e: BeforeUnloadEvent) => {
+  e.preventDefault() // Prevents immediate window closing
+  e.returnValue = '' // Required for some browsers
+
+  await sharingRoom.value?.disconnect()
+  await window.electronAPI?.handleAppClosing()
+}
 
 onMounted(async () => {
   try {
@@ -70,6 +83,8 @@ onMounted(async () => {
     console.error("There was an error connecting to the room:", error.message)
   }
 })
+
+onBeforeUnmount(() => sharingRoom.value?.disconnect())
 
 async function handleScreenSharing(room: Room, sourceId?: string, shareAudio = false) {
   console.log("handleScreenSharing")
