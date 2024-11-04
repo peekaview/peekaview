@@ -2,7 +2,6 @@ FROM dunglas/frankenphp:latest
 
 # Set working directory in container
 WORKDIR /app
-
 # Copy PHP file into container
 COPY api.php /app/public/index.php
 
