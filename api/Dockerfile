@@ -4,26 +4,8 @@ FROM dunglas/frankenphp:latest
 WORKDIR /app
 
 # Copy PHP file into container
-COPY api.php /app/public/
+COPY api.php /app/public/index.php
 
-# Create custom Caddyfile
-RUN echo "{ \
-    auto_https off \
-    admin off \
-    servers { \
-    protocol http \
-    } \
-    } \
-    \
-    :80 { \
-    root * /app/public \
-    php_server \
-    try_files {path} /api.php \
-    }" > /etc/caddy/Caddyfile
-
-# Set permissions
-RUN chown -R www-data:www-data /app \
-    && chmod -R 755 /app
-
+ENV SERVER_NAME=:80
 # Start FrankenPHP in production mode
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
