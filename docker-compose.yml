@@ -3,10 +3,7 @@ services:
     image: peekaview/ingress:${DOCKER_TAG}
     restart: unless-stopped
     environment:
-      - TURN_SERVER_DOMAIN=${TURN_SERVER_DOMAIN}
-      - LIVEKIT_SERVER_DOMAIN=${LIVEKIT_SERVER_DOMAIN}
-      - CONTROL_SERVER_DOMAIN=${CONTROL_SERVER_DOMAIN}
-      - PEEKAVIEW_DOMAIN=${PEEKAVIEW_DOMAIN}
+      - API_DOMAIN=${API_DOMAIN}
     network_mode: "host"
     volumes:
       - ingress_data:/data
