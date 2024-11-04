@@ -32,7 +32,7 @@ define('LIVEKIT_API_KEY', $envVars['LIVEKIT_API_KEY']);
 define('LIVEKIT_API_SECRET', $envVars['LIVEKIT_API_SECRET']);
 define('CONTROL_SERVERS', array_filter(array_map('trim', explode(',', $envVars['CONTROL_SERVERS']))));
 define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', $envVars['VIDEO_SERVERS']))));
-define('STORAGE_PATH', 'storage');
+define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
 

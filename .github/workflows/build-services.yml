@@ -9,7 +9,7 @@ on:
             - 'api/**'
             - 'app/**'
             - 'controlserver/**'
-            - 'caddy/**'
+            - 'ingress/**'
     pull_request:
         branches:
             - 'master'
@@ -19,7 +19,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                service: [api, app, controlserver, caddy]
+                service: [api, app, controlserver, ingress]
         steps:
             - uses: actions/checkout@v4
               with:

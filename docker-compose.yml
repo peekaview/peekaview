@@ -1,6 +1,6 @@
 services:
-  caddy:
-    image: peekaview/caddy:${DOCKER_TAG}
+  ingress:
+    image: peekaview/ingress:${DOCKER_TAG}
     restart: unless-stopped
     environment:
       - TURN_SERVER_DOMAIN=${TURN_SERVER_DOMAIN}
@@ -9,7 +9,7 @@ services:
       - PEEKAVIEW_DOMAIN=${PEEKAVIEW_DOMAIN}
     network_mode: "host"
     volumes:
-      - caddy_data:/data
+      - ingress_data:/data
 
   livekit:
     image: livekit/livekit-server:latest
@@ -28,9 +28,10 @@ services:
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - VIDEO_SERVERS=${VIDEO_SERVERS}
       - CONTROL_SERVERS=${CONTROL_SERVERS}
+    volumes:
+      - api_storage:/storage
     ports:
       - "8080:80"
-      - "8443:443"
     networks:
       - internal
 
@@ -52,6 +53,7 @@ services:
 
 volumes:
   caddy_data:
+  api_storage:
     # Optional: specify additional volume options here
 
 networks:
