@@ -443,6 +443,14 @@ function registerMyEmail() {
             $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
             file_put_contents($userFile, $userData);
             
+            require_once __DIR__.'/helper/EmailHelper.php';
+            $emailHelper = new EmailHelper();
+            $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
+            if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
+                $requestData[3] = 'email_sent';
+                file_put_contents($requestFile, implode(',', $requestData));
+            }
+
             echo json_encode([
                 'success' => true,
                 'token' => $token
