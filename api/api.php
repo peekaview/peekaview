@@ -274,12 +274,11 @@ function showMeYourScreen() {
             if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
                 
                 $token = $userData[1];
-                $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
-                
                 // Update status to not answered and send email
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
                     require_once __DIR__.'/helper/EmailHelper.php';
                     $emailHelper = new EmailHelper();
+                    $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
                     if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
                         $requestData[3] = 'email_sent';
                         file_put_contents($requestFile, implode(',', $requestData));
@@ -293,10 +292,6 @@ function showMeYourScreen() {
                         'message' => "$email ist leider gerade offline<br>Wir haben den Benutzer per Email benachrichtigt",
                         'user_status' => $userStatus,
                         'last_seen' => $lastSeen,
-                        // this is for development purposes, otherwise the share link is not accessible
-                        'share_link' => VIDEO_SERVERS[0] == 'video.peekaview.local' ? 
-                            $shareLink : 
-                            null
                     ]);
                     return;
                 } else {

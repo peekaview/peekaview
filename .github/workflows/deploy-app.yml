@@ -34,6 +34,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+    
+      - name: Setup Environment
+        working-directory: ./app
+        run: |
+          echo "CONNECT_SRC=*.peekaview.de" >> .env
+          echo "API_DOMAIN=api.peekaview.de" >> .env
+          echo "API_URL=https://api.peekaview.de" >> .env
           
       - name: Install dependencies
         working-directory: ./app

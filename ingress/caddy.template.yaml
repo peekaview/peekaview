@@ -10,13 +10,13 @@ storage:
 apps:
   tls:
     certificates:
+      # Add load_files before automate section
       automate:
         - REPLACE_API_DOMAIN
         - REPLACE_LIVEKIT_DOMAIN
         - REPLACE_TURN_DOMAIN
         - REPLACE_APP_DOMAIN
         - REPLACE_CONTROL_DOMAIN
-
   layer4:
     servers:
       main:

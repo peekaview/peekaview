@@ -39,6 +39,34 @@ for domain in "${DOMAINS[@]}"; do
     add_domain_to_hosts "$domain"
 done
 
+# start ingress container to get the CA certificate
+echo "Building and starting ingress... to get the CA certificate"
+docker-compose build --no-cache ingress
+docker-compose up -d ingress
+
+# Wait for certificates to be generated
+echo "Waiting for certificates to be generated..."
+while ! docker exec peekaview_ingress_1 test -f "/data/certificates/local/${APP_DOMAIN}/${APP_DOMAIN}.crt"; do
+    echo "Waiting for certificates..."
+    sleep 5
+done
+echo "Certificates generated successfully!"
+
+# Copy certificates to local CA certificates directory
+echo "Copying certificates to local CA certificates directory..."
+mkdir -p ~/.local/share/ca-certificates
+for domain in "${DOMAINS[@]}"; do
+    docker cp "peekaview_ingress_1:/data/certificates/local/${domain}/${domain}.crt" \
+        "~/.local/share/ca-certificates/${domain}.crt"
+done
+
+# Update CA certificates
+echo "Updating CA certificates..."
+sudo update-ca-certificates --fresh
+
+# Remove the ingress container
+echo "Stopping ingress container..."
+docker rm -f peekaview_ingress_1
 
 # Start Docker Compose build
 echo "Building Docker Compose..."

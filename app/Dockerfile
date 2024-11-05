@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Add ARG for build-time environment variable
 ARG API_DOMAIN
+ARG CONNECT_SRC
 ENV API_URL=https://${API_DOMAIN}
 
 # Copy source files

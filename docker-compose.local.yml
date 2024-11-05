@@ -75,6 +75,7 @@ services:
       context: ./app
       args:
         - API_DOMAIN=${API_DOMAIN}  # Build-time argument
+        - CONNECT_SRC=${CONNECT_SRC}
     image: peekaview/app:latest
     restart: unless-stopped
     ports:

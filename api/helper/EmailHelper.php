@@ -30,30 +30,68 @@ class EmailHelper {
         }
         
         // Read server greeting
-        $this->getResponse($socket);
+        $response = $this->getResponse($socket);
+        if (!$this->checkResponse($response, '220')) {
+            error_log("SMTP Error: Invalid greeting: " . $response);
+            return false;
+        }
         
         // Send EHLO
-        $this->sendCommand($socket, "EHLO " . $_SERVER['SERVER_NAME']);
+        if (!$this->checkResponse($this->sendCommand($socket, "EHLO " . $this->smtpHost), '250')) {
+            error_log("SMTP Error: EHLO failed");
+            return false;
+        }
         
         // Start TLS
-        $this->sendCommand($socket, "STARTTLS");
-        stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        if (!$this->checkResponse($this->sendCommand($socket, "STARTTLS"), '220')) {
+            error_log("SMTP Error: STARTTLS failed");
+            return false;
+        }
+        
+        if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            error_log("SMTP Error: TLS negotiation failed");
+            return false;
+        }
         
         // Send EHLO again after TLS
-        $this->sendCommand($socket, "EHLO " . $_SERVER['SERVER_NAME']);
+        if (!$this->checkResponse($this->sendCommand($socket, "EHLO " . $this->smtpHost), '250')) {
+            error_log("SMTP Error: Second EHLO failed");
+            return false;
+        }
         
         // Authentication
-        $this->sendCommand($socket, "AUTH LOGIN");
-        $this->sendCommand($socket, base64_encode($this->smtpUser));
-        $this->sendCommand($socket, base64_encode($this->smtpPass));
+        if (!$this->checkResponse($this->sendCommand($socket, "AUTH LOGIN"), '334')) {
+            error_log("SMTP Error: AUTH LOGIN failed");
+            return false;
+        }
+        if (!$this->checkResponse($this->sendCommand($socket, base64_encode($this->smtpUser)), '334')) {
+            error_log("SMTP Error: Username rejected");
+            return false;
+        }
+        if (!$this->checkResponse($this->sendCommand($socket, base64_encode($this->smtpPass)), '235')) {
+            error_log("SMTP Error: Authentication failed");
+            return false;
+        }
         
         // Send email
-        $this->sendCommand($socket, "MAIL FROM:<{$this->fromEmail}>");
-        $this->sendCommand($socket, "RCPT TO:<$to>");
-        $this->sendCommand($socket, "DATA");
+        if (!$this->checkResponse($this->sendCommand($socket, "MAIL FROM:<{$this->fromEmail}>"), '250')) {
+            error_log("SMTP Error: MAIL FROM rejected");
+            return false;
+        }
+        if (!$this->checkResponse($this->sendCommand($socket, "RCPT TO:<$to>"), '250')) {
+            error_log("SMTP Error: RCPT TO rejected");
+            return false;
+        }
+        if (!$this->checkResponse($this->sendCommand($socket, "DATA"), '354')) {
+            error_log("SMTP Error: DATA command failed");
+            return false;
+        }
         
         // Send headers and message
-        $this->sendCommand($socket, $headers . "\r\n" . $message . "\r\n.");
+        if (!$this->checkResponse($this->sendCommand($socket, $headers . "\r\n" . $message . "\r\n."), '250')) {
+            error_log("SMTP Error: Message content rejected");
+            return false;
+        }
         
         // Close connection
         $this->sendCommand($socket, "QUIT");
@@ -74,6 +112,11 @@ class EmailHelper {
             if (substr($str, 3, 1) == ' ') break;
         }
         return $response;
+    }
+    
+    private function checkResponse($response, $expectedCode) {
+        $code = substr($response, 0, 3);
+        return $code === $expectedCode;
     }
     
     public function sendShareRequest($email, $requesterName, $shareLink) {
@@ -128,29 +171,26 @@ TEXT;
         // Generate a boundary
         $boundary = md5(time());
 
-        // Prepare headers differently for SMTP
-        $headers = "MIME-Version: 1.0\r\n";
+        // Modify headers to include Date and Message-ID
+        $headers = "Date: " . date("r") . "\r\n";
+        $headers .= "Message-ID: <" . time() . rand(1000, 9999) . "@" . parse_url($shareLink, PHP_URL_HOST) . ">\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
         $headers .= "From: {$this->fromName} <{$this->fromEmail}>\r\n";
         $headers .= "Reply-To: {$this->fromEmail}\r\n";
-        $headers .= "Subject: =?UTF-8?B?" . base64_encode("$requesterName möchte Ihren Bildschirm sehen") . "?=\r\n";
+        $headers .= "To: <$email>\r\n";  // Add To header
         $headers .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
         
-        // Email body with both HTML and plain text
-        $message = <<<EMAIL
---{$boundary}
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-{$textMessage}
-
---{$boundary}
-Content-Type: text/html; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-{$htmlMessage}
-
---{$boundary}--
-EMAIL;
+        // Modify message format to ensure proper line endings and structure
+        $message = "This is a multi-part message in MIME format.\r\n\r\n";
+        $message .= "--{$boundary}\r\n";
+        $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= $textMessage . "\r\n\r\n";
+        $message .= "--{$boundary}\r\n";
+        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= $htmlMessage . "\r\n\r\n";
+        $message .= "--{$boundary}--\r\n";
 
         // Use SMTP instead of mail()
         $success = $this->sendSMTP($email, $subject, $message, $headers);
