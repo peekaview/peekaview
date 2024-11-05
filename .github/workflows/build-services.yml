@@ -13,14 +13,12 @@ on:
     pull_request:
         branches:
             - 'master'
-
 jobs:
     docker:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                #service: [api, app, controlserver, ingress]
-                service: [ingress]
+                service: [api, app, controlserver, ingress]
         steps:
             - uses: actions/checkout@v4
               with:
@@ -29,6 +27,7 @@ jobs:
             - uses: dorny/paths-filter@v3
               id: changes
               with:
+                  base: ${{ github.ref_name }}
                   filters: |
                       service:
                         - '${{ matrix.service }}/**'
