@@ -36,6 +36,7 @@ define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
 
+
 // Input validation functions
 function validateEmail($email) {
     $email = filter_var(trim($email), FILTER_VALIDATE_EMAIL);
@@ -278,11 +279,12 @@ function showMeYourScreen() {
             
             // if request is not accepted in time or user seems to be offline
             if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
+                
+                $token = $userData[1];
+                $shareLink = "https://meetdev.meetzi.de/index.php?action=share&email=$email&token=$token&request_id=$requestId";
+                
                 // Update status to not answered and send email
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
-                    $token = $userData[1];
-                    $shareLink = "https://meetdev.meetzi.de/index.php?action=share&email=$email&token=$token&request_id=$requestId";
-                    
                     require_once __DIR__.'/helper/EmailHelper.php';
                     $emailHelper = new EmailHelper();
                     if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
@@ -297,7 +299,11 @@ function showMeYourScreen() {
                         'status' => 'request_notified',
                         'message' => "$email ist leider gerade offline<br>Wir haben den Benutzer per Email benachrichtigt",
                         'user_status' => $userStatus,
-                        'last_seen' => $lastSeen
+                        'last_seen' => $lastSeen,
+                        // this is for development purposes, otherwise the share link is not accessible
+                        'share_link' => VIDEO_SERVERS[0] == 'video.peekaview.local' ? 
+                            $shareLink : 
+                            null
                     ]);
                     return;
                 } else {
@@ -329,7 +335,7 @@ function showMeYourScreen() {
             'status' => 'request_open',
             'request_id' => $requestId,
             'user_status' => $userStatus,
-            'last_seen' => $lastSeen
+            'last_seen' => $lastSeen,
         ]);
         
     } catch (Exception $e) {

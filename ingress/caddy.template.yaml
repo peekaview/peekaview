@@ -1,0 +1,86 @@
+logging:
+  logs:
+    default:
+      level: INFO
+
+storage:
+  module: file_system
+  root: /data
+
+apps:
+  tls:
+    certificates:
+      automate:
+        - REPLACE_API_DOMAIN
+        - REPLACE_LIVEKIT_DOMAIN
+        - REPLACE_TURN_DOMAIN
+        - REPLACE_APP_DOMAIN
+        - REPLACE_CONTROL_DOMAIN
+
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          # TURN-Server
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_TURN_DOMAIN"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:5349"]
+
+          # LiveKit-WebSocket (Backend)
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_LIVEKIT_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:7880"]
+
+          # MeetDev API (PHP)
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_API_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["REPLACE_API_DOMAIN:8080"]
+
+          # MeetDev WebApp (Static)
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_APP_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["REPLACE_APP_DOMAIN:8082"]
+          
+          # Controlserver (Node.js)
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_CONTROL_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["REPLACE_CONTROL_DOMAIN:8081"]

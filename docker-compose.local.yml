@@ -7,21 +7,34 @@ services:
       - API_DOMAIN=${API_DOMAIN}
       - LIVEKIT_DOMAIN=${LIVEKIT_DOMAIN}
       - TURN_DOMAIN=${TURN_DOMAIN}
+      - APP_DOMAIN=${APP_DOMAIN}
+      - CONTROL_DOMAIN=${CONTROL_DOMAIN}
     network_mode: "host"
     volumes:
       - ingress_data:/data
-    
+    extra_hosts:
+      - "${LIVEKIT_DOMAIN}:127.0.0.1"
+      - "${TURN_DOMAIN}:127.0.0.1"
+      - "${API_DOMAIN}:127.0.0.1"
+      - "${APP_DOMAIN}:127.0.0.1"
+      - "${CONTROL_DOMAIN}:127.0.0.1"
 
   livekit:
-    image: livekit/livekit-server:latest
+    build: ./livekit
+    image: peekaview/livekit:latest
     restart: unless-stopped
     environment:
       - LIVEKIT_URL=${LIVEKIT_URL}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_PUBLIC_KEY=${LIVEKIT_PUBLIC_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_TURN_DOMAIN=${TURN_DOMAIN}
     network_mode: "host"
+    volumes:
+      - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
+      - ./livekit/start.sh:/usr/local/bin/start.sh
 
   api:
+    build: ./api
     image: peekaview/api:latest
     restart: unless-stopped
     environment:
@@ -35,22 +48,35 @@ services:
       - "8080:80"
     networks:
       - internal
+    extra_hosts:
+      - "${API_DOMAIN}:127.0.0.1"
 
   controlserver:
-    image: peekaview/controlserver:${DOCKER_TAG}
+    build: ./controlserver
+    image: peekaview/controlserver:latest
     restart: unless-stopped
+    environment:
+      - CONTROL_DOMAIN=${CONTROL_DOMAIN}
     ports:
       - "8081:3000"
     networks:
       - internal
+    extra_hosts:
+      - "${CONTROL_DOMAIN}:127.0.0.1"
 
   app:
-    image: peekaview/app:${DOCKER_TAG}
+    build: 
+      context: ./app
+      args:
+        - API_DOMAIN=${API_DOMAIN}  # Build-time argument
+    image: peekaview/app:latest
     restart: unless-stopped
     ports:
       - "8082:80"
     networks:
       - internal
+    extra_hosts:
+      - "${APP_DOMAIN}:127.0.0.1"
 
 volumes:
   ingress_data:

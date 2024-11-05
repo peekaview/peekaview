@@ -3,6 +3,10 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
+# Add ARG for build-time environment variable
+ARG API_DOMAIN
+ENV API_URL=https://${API_DOMAIN}
+
 # Copy source files
 COPY src/ ./src/
 COPY *.json ./
