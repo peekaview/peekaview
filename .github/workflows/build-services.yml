@@ -18,8 +18,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                #service: [api, app, controlserver, ingress]
-                service: [ingress]
+                service: [api, app, controlserver, ingress]
         steps:
             - uses: actions/checkout@v4
               with:
