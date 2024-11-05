@@ -44,5 +44,8 @@ done
 echo "Building Docker Compose..."
 docker-compose build --no-cache
 
+echo "================================================"
 echo "Setup complete!" 
 echo "Run 'docker-compose up -d' to start the services"
+echo "You can than access the app at https://${APP_DOMAIN}"
+echo "================================================"

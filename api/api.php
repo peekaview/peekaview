@@ -13,25 +13,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 header('Content-Type: application/json');
 
-// Configuration
-$envVars = [
-    'LIVEKIT_API_KEY' => getenv('LIVEKIT_API_KEY'),
-    'LIVEKIT_API_SECRET' => getenv('LIVEKIT_API_SECRET'),
-    'CONTROL_SERVERS' => getenv('CONTROL_SERVERS'),
-    'VIDEO_SERVERS' => getenv('VIDEO_SERVERS')
-];
-
 // Validate required environment variables
-foreach (['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'] as $required) {
-    if (!$envVars[$required]) {
+foreach (['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as $required) {
+    if (!getenv($required)) {
         die(json_encode(['error' => "Missing required environment variable: $required"]));
     }
 }
 
-define('LIVEKIT_API_KEY', $envVars['LIVEKIT_API_KEY']);
-define('LIVEKIT_API_SECRET', $envVars['LIVEKIT_API_SECRET']);
-define('CONTROL_SERVERS', array_filter(array_map('trim', explode(',', $envVars['CONTROL_SERVERS']))));
-define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', $envVars['VIDEO_SERVERS']))));
+define('LIVEKIT_API_KEY', getenv('LIVEKIT_API_KEY'));
+define('LIVEKIT_API_SECRET', getenv('LIVEKIT_API_SECRET'));
+define('APP_DOMAIN', getenv('APP_DOMAIN'));
+define('CONTROL_SERVERS', array_filter(array_map('trim', explode(',', getenv('CONTROL_SERVERS')))));
+define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', getenv('VIDEO_SERVERS')))));
 define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
@@ -98,7 +91,7 @@ function generateJWT($email, $roomId) {
     
     // Payload
     $payload = [
-        'iss' => API_KEY,
+        'iss' => LIVEKIT_API_KEY,
         'sub' => $email,
         'exp' => time() + 3600,
         'video' => [
@@ -117,7 +110,7 @@ function generateJWT($email, $roomId) {
     
     // Create signature
     $unsignedToken = "$headerEncoded.$payloadEncoded";
-    $signature = hash_hmac('sha256', $unsignedToken, API_SECRET, true);
+    $signature = hash_hmac('sha256', $unsignedToken, LIVEKIT_API_SECRET, true);
     $signatureEncoded = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
     
     // Combine all parts
@@ -281,7 +274,7 @@ function showMeYourScreen() {
             if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
                 
                 $token = $userData[1];
-                $shareLink = "https://meetdev.meetzi.de/index.php?action=share&email=$email&token=$token&request_id=$requestId";
+                $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
                 
                 // Update status to not answered and send email
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
@@ -411,6 +404,73 @@ function youAreAllowedToSeeMyScreen() {
     }
 }
 
+function youAreNotAllowedToSeeMyScreen() {
+    try {
+        $email = validateEmail($_GET['email'] ?? '');
+        $token = validateToken($_GET['token'] ?? '');
+        $requestId = validateRequestId($_GET['request_id'] ?? '');
+        
+        $userFile = getEmailFilename($email);
+        if (!file_exists($userFile)) {
+            throw new Exception('User not found');
+        }
+        
+        $userData = explode(';', file_get_contents($userFile));
+        $storedToken = $userData[1] ?? '';
+        
+        if ($token !== $storedToken) {
+            throw new Exception('Unauthorized');
+        }
+        
+        $requestFile = getRequestFilename($email, $requestId);
+        if (file_exists($requestFile)) {
+            $requestData = explode(',', file_get_contents($requestFile));
+            $requestData[2] = 'request_denied';
+            file_put_contents($requestFile, implode(',', $requestData));
+            echo json_encode(['success' => true]);
+        } else {
+            throw new Exception('Request not found');
+        }
+        
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+}
+
+function registerMyEmail() {
+    try {
+        $email = validateEmail($_GET['email'] ?? '');
+        
+        $userFile = getEmailFilename($email);
+        if (!file_exists($userFile)) {
+            $token = generateRandomString(16);
+            $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
+            file_put_contents($userFile, $userData);
+            
+            echo json_encode([
+                'success' => true,
+                'token' => $token
+            ]);
+            return;
+        }
+        
+        // User already exists
+        echo json_encode([
+            'success' => false,
+            'error' => 'Email already registered'
+        ]);
+        
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
+
 // Route requests with error handling
 try {
     $action = $_GET['action'] ?? '';
@@ -426,6 +486,12 @@ try {
             break;
         case 'youAreAllowedToSeeMyScreen':
             youAreAllowedToSeeMyScreen();
+            break;
+        case 'youAreNotAllowedToSeeMyScreen':
+            youAreNotAllowedToSeeMyScreen();
+            break;
+        case 'registerMyEmail':
+            registerMyEmail();
             break;
         default:
             throw new Exception('Invalid action');

@@ -31,7 +31,6 @@ services:
     network_mode: "host"
     volumes:
       - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
-      - ./livekit/start.sh:/usr/local/bin/start.sh
 
   api:
     build: ./api
@@ -42,6 +41,13 @@ services:
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - VIDEO_SERVERS=${VIDEO_SERVERS}
       - CONTROL_SERVERS=${CONTROL_SERVERS}
+      - APP_DOMAIN=${APP_DOMAIN}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - FROM_NAME=${FROM_NAME}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
     volumes:
       - api_storage:/storage
     ports:

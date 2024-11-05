@@ -2,8 +2,79 @@
 // Neue Datei: email_helper.php
 
 class EmailHelper {
-    private $fromEmail = 'noreply@peekaview.de';
-    private $fromName = 'Peekaview';
+    private $fromEmail;
+    private $fromName;
+    private $smtpHost;
+    private $smtpPort;
+    private $smtpUser;
+    private $smtpPass;
+    
+    public function __construct() {
+        $this->fromEmail = getenv('FROM_EMAIL');
+        $this->fromName = getenv('FROM_NAME');
+        $this->smtpHost = getenv('SMTP_HOST');
+        $this->smtpPort = getenv('SMTP_PORT');
+        $this->smtpUser = getenv('SMTP_USER');
+        $this->smtpPass = getenv('SMTP_PASS');
+    }
+    
+    private function sendSMTP($to, $subject, $message, $headers) {
+        $errno = 0;
+        $errstr = '';
+        
+        // Connect to SMTP server
+        $socket = fsockopen($this->smtpHost, $this->smtpPort, $errno, $errstr, 30);
+        if (!$socket) {
+            error_log("SMTP Connection Failed: $errstr ($errno)");
+            return false;
+        }
+        
+        // Read server greeting
+        $this->getResponse($socket);
+        
+        // Send EHLO
+        $this->sendCommand($socket, "EHLO " . $_SERVER['SERVER_NAME']);
+        
+        // Start TLS
+        $this->sendCommand($socket, "STARTTLS");
+        stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        
+        // Send EHLO again after TLS
+        $this->sendCommand($socket, "EHLO " . $_SERVER['SERVER_NAME']);
+        
+        // Authentication
+        $this->sendCommand($socket, "AUTH LOGIN");
+        $this->sendCommand($socket, base64_encode($this->smtpUser));
+        $this->sendCommand($socket, base64_encode($this->smtpPass));
+        
+        // Send email
+        $this->sendCommand($socket, "MAIL FROM:<{$this->fromEmail}>");
+        $this->sendCommand($socket, "RCPT TO:<$to>");
+        $this->sendCommand($socket, "DATA");
+        
+        // Send headers and message
+        $this->sendCommand($socket, $headers . "\r\n" . $message . "\r\n.");
+        
+        // Close connection
+        $this->sendCommand($socket, "QUIT");
+        fclose($socket);
+        
+        return true;
+    }
+    
+    private function sendCommand($socket, $command) {
+        fwrite($socket, $command . "\r\n");
+        return $this->getResponse($socket);
+    }
+    
+    private function getResponse($socket) {
+        $response = '';
+        while ($str = fgets($socket, 515)) {
+            $response .= $str;
+            if (substr($str, 3, 1) == ' ') break;
+        }
+        return $response;
+    }
     
     public function sendShareRequest($email, $requesterName, $shareLink) {
         $subject = "=?UTF-8?B?" . base64_encode("$requesterName möchte Ihren Bildschirm sehen") . "?=";
@@ -57,15 +128,13 @@ TEXT;
         // Generate a boundary
         $boundary = md5(time());
 
-        // Email headers
-        $headers = array(
-            'MIME-Version: 1.0',
-            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-            'From: ' . $this->fromName . ' <' . $this->fromEmail . '>',
-            'Reply-To: ' . $this->fromEmail,
-            'X-Mailer: PHP/' . phpversion()
-        );
-
+        // Prepare headers differently for SMTP
+        $headers = "MIME-Version: 1.0\r\n";
+        $headers .= "From: {$this->fromName} <{$this->fromEmail}>\r\n";
+        $headers .= "Reply-To: {$this->fromEmail}\r\n";
+        $headers .= "Subject: =?UTF-8?B?" . base64_encode("$requesterName möchte Ihren Bildschirm sehen") . "?=\r\n";
+        $headers .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
+        
         // Email body with both HTML and plain text
         $message = <<<EMAIL
 --{$boundary}
@@ -83,11 +152,11 @@ Content-Transfer-Encoding: 8bit
 --{$boundary}--
 EMAIL;
 
-        // Send email
-        $success = @mail($email, $subject, $message, implode("\r\n", $headers));
+        // Use SMTP instead of mail()
+        $success = $this->sendSMTP($email, $subject, $message, $headers);
         
         if (!$success) {
-            error_log("Failed to send email to $email: " . @error_get_last()['message']);
+            error_log("Failed to send email to $email");
         }
         
         return $success;
