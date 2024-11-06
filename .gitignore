@@ -29,6 +29,7 @@ Thumbs.db
 .webpack/
 dist/
 build/
+out/
 *.log
 
 # Cache

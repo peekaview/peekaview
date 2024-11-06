@@ -8,22 +8,7 @@ const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 
 const packageJson = require('./package.json')
 
-function getCspPolicy(dev = false) {
-  return `
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval';
-    style-src 'self' 'unsafe-inline';
-    connect-src 'self' ${process.env.CONNECT_SRC} ${process.env.API_URL};
-    img-src 'self' data:;
-    font-src 'self';
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-ancestors 'none';
-    block-all-mixed-content;
-    upgrade-insecure-requests;
-  `.replace(/\s+/g, ' ').trim();
-}
+const { getCspPolicy } = require('./webpack.util.js')
 
 module.exports = (env, argv) => {
   const dev = argv.mode === 'development';
@@ -90,7 +75,7 @@ module.exports = (env, argv) => {
           ],
         },
         {
-          test: /\.(png|jpe?g|gif)$/i,
+          test: /\.(png|jpe?g|gif|ico)$/i,
           type: 'asset/resource'  
         }
       ],

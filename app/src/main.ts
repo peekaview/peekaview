@@ -1,4 +1,8 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, session } from "electron"
+import path from 'path'
+import url from 'url'
+import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session } from "electron"
+
+import PeekaviewLogo from './assets/img/peekaview.png'
 
 declare const APP_WEBPACK_ENTRY: string
 declare const APP_PRELOAD_WEBPACK_ENTRY: string
@@ -19,8 +23,13 @@ if (require("electron-squirrel-startup")) {
 let appWindow: BrowserWindow
 let sourcesWindow: BrowserWindow
 
-const createAppWindow = () => { // (roomName: string, jwtToken: string, serverUrl: string) => {
+let isQuitting = false
+
+const createAppWindow = (show = false) => { // (roomName: string, jwtToken: string, serverUrl: string) => {
   appWindow = new BrowserWindow({
+    title: 'Peekaview',
+    icon: path.join(__dirname, PeekaviewLogo),
+    show,
     width: 1280,
     height: 720,
     webPreferences: {
@@ -29,6 +38,12 @@ const createAppWindow = () => { // (roomName: string, jwtToken: string, serverUr
       //webSecurity: false, // Make sure this is off only for development, adjust for production.
       //allowRunningInsecureContent: true,
       preload: APP_PRELOAD_WEBPACK_ENTRY,
+    }
+  })
+  appWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      appWindow.hide()
     }
   })
 
@@ -42,6 +57,32 @@ const createAppWindow = () => { // (roomName: string, jwtToken: string, serverUr
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  const trayIconPath = path.join(__dirname, PeekaviewLogo)
+  const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
+
+  if (!app.isDefaultProtocolClient('peekaview'))
+    app.setAsDefaultProtocolClient('peekaview')
+
+  protocol.handle('peekaview', (request) => {
+    const filePath = request.url.slice('peekaview://'.length)
+    console.log(request.url)
+    return net.fetch(url.pathToFileURL(path.join(__dirname, filePath)).toString())
+  })
+  
+  const tray = new Tray(trayIcon)
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Beenden', type: 'normal', click: () => {
+      isQuitting = true
+      app.quit()
+    }},
+  ])
+  tray.setToolTip('Peekaview')
+  tray.setContextMenu(contextMenu)
+
+  tray.on('click', () => {
+    appWindow.show()
+  })
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -53,29 +94,21 @@ app.whenReady().then(() => {
     })
   })
 
-  createAppWindow()
+  createAppWindow(!app.isPackaged)
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createAppWindow()
+      createAppWindow(true)
     }
   })
-})
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit()
-  }
 })
 
 // Handle graceful shutdown
 ipcMain.handle('handle-app-closing', async () => {
   console.log('Handling app closing');
   // Perform any necessary cleanup here
+  isQuitting = true
   app.quit()
 
   // Force quit after a timeout if app.quit() doesn't work

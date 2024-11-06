@@ -3,22 +3,7 @@ const webpack = require('webpack');
 
 const packageJson = require('./package.json')
 
-function getCspPolicy(dev = false) {
-  return `
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval';
-    style-src 'self' 'unsafe-inline';
-    connect-src 'self' ${process.env.CONNECT_SRC} ${process.env.API_URL};
-    img-src 'self' data:;
-    font-src 'self';
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-ancestors 'none';
-    block-all-mixed-content;
-    upgrade-insecure-requests;
-  `.replace(/\s+/g, ' ').trim();
-}
+const { getCspPolicy } = require('./webpack.util.js')
 
 module.exports = (env, argv) => {
   const dev = argv.mode === 'development';
@@ -27,8 +12,8 @@ module.exports = (env, argv) => {
     mode: argv.mode,
     entry: './src/main.ts',
     output: {
-      path: path.join(__dirname, 'dist'),
-      filename: 'main.js'
+      path: path.join(__dirname, '.webpack/main'),
+      filename: 'index.js'
     },
     target: 'electron-main',
     module: {
@@ -37,6 +22,10 @@ module.exports = (env, argv) => {
           test: /\.tsx?$/,
           use: 'ts-loader',
           exclude: /node_modules/,
+        },
+        {
+          test: /\.(png|jpe?g|gif|ico)$/i,
+          type: 'asset/resource'  
         },
       ],
     },

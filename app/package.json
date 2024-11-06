@@ -1,14 +1,18 @@
 {
   "name": "peekaview",
+  "author": "Limtec GmbH",
   "productName": "Peek-A-View",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Simple screen sharing application",
+  "license": "AGPL-3.0",
   "private": "true",
-  "main": "dist/main.js",
+  "main": "./.webpack/main",
   "scripts": {
-    "dev": "webpack --mode=development",
-    "prod": "webpack --mode=production",
-    "start": "dotenvx run --env-file=.env.local -- electron-forge start",
+    "web-dev": "dotenvx run --env-file=.env.local -- webpack --mode=development",
+    "web-build": "dotenvx run --env-file=.env.local -- webpack --mode=production",
+    "electron-dev": "dotenvx run --env-file=.env -- electron-forge start",
+    "electron-build": "dotenvx run --env-file=.env.local -- electron-forge make",
+    "package": "dotenvx run --env-file=.env.local -- electron-forge package",
     "tsc": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -29,12 +33,13 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "@electron-forge/plugin-fuses": "^7.4.0",
     "@electron-forge/plugin-webpack": "^7.5.0",
+    "@electron/asar": "^3.2.16",
     "@electron/fuses": "^1.8.0",
     "@electron/typescript-definitions": "^9.0.0",
     "@types/electron": "^1.6.10",
     "@types/node": "^22.7.4",
     "css-loader": "^7.1.2",
-    "electron": "30.0.8",
+    "electron": "^32.0.0",
     "fork-ts-checker-webpack-plugin": "^9.0.2",
     "html-webpack-plugin": "^5.6.0",
     "mini-css-extract-plugin": "^2.9.1",
@@ -48,5 +53,37 @@
     "webpack": "^5.95.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.1.0"
+  },
+  "build": {
+    "appId": "de.limtec.peekaview",
+    "protocols": [
+      {
+        "name": "Peekaview Protocol",
+        "schemes": [
+          "peekaview"
+        ]
+      }
+    ],
+    "linux": {
+      "target": ["deb"],
+      "desktop": {
+        "MimeType": "x-scheme-handler/peekaview"
+      },
+      "extraFiles": [
+        {
+          "from": "src/assets/linux",
+          "to": "usr/share/applications",
+          "filter": ["*.desktop"]
+        },
+        {
+          "from": "src/assets/linux",
+          "to": "usr/share/mime/packages",
+          "filter": ["*.xml"]
+        }
+      ],
+      "deb": {
+        "afterInstall": "src/assets/linux/postinstall"
+      }
+    }
   }
 }
