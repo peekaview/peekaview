@@ -26,7 +26,7 @@ module.exports = (env, argv) => {
   return {
     watch: dev && forWeb,
     mode: argv.mode,
-    devServer: forWeb ? undefined : {
+    devServer: (forWeb || !dev) ? undefined : {
       historyApiFallback: true,
       headers: {
         'Content-Security-Policy': cspPolicy,
