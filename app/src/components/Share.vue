@@ -118,6 +118,7 @@ async function createRoom() {
       roomName: data.roomId,
       jwtToken: data.jwt,
       serverUrl: data.videoServer,
+      isSharer: true,
     })
   } catch (error) {
     console.error('Error creating room:', error);
@@ -239,3 +240,144 @@ function shareViaApp() {
     </template>
   </Modal>
 </template>
+
+<style>
+/* Share Options Styles */
+.share-options-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.8);
+}
+
+.share-option {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.share-option:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.share-option.primary {
+  border: 2px solid #1a73e8;
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.share-option h3 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+}
+
+.share-option p {
+  color: #64748b;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+
+/* Divider Styles */
+.divider {
+  text-align: center;
+  position: relative;
+  padding: 0.5rem 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 45%;
+  height: 1px;
+  background-color: rgba(0,0,0,0.1);
+}
+
+.divider::before {
+  left: 0;
+}
+
+.divider::after {
+  right: 0;
+}
+
+.divider span {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0 1rem;
+  color: #64748b;
+  font-size: 0.9rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* Download Option Styles */
+.download-option {
+  text-align: center;
+  padding: 1rem;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  margin-top: 1rem;
+}
+
+.download-option p {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #64748b;
+}
+
+.download-link {
+  color: #1a73e8;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.download-link:hover {
+  text-decoration: underline;
+}
+
+/* Session Status Styles */
+.session-status {
+  max-width: 400px;
+  margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.start-sharing-info {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.8);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Active Session Info */
+#activeSessionInfo {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .share-options-stack,
+  .start-sharing-info {
+      padding: 1.5rem;
+  }
+}
+</style>

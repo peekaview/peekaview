@@ -3,21 +3,32 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
   packagerConfig: {
+    executableName: 'peekaview',
+    icon: './src/assets/img/peekaview',
     asar: true,
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        options: {
+          iconUrl: '/peekaview.ico',
+          setupIcon: './src/assets/img/peekaview.ico',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      platforms: ['darwin', 'linux'],
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          icon: './src/assets/img/peekaview.png',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',

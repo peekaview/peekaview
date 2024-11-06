@@ -132,6 +132,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
       roomName: data.roomId,
       jwtToken: data.jwt,
       serverUrl: data.videoServer,
+      isSharer: false,
     })
   }, 300);
 }

@@ -9,4 +9,5 @@ export type ScreenShareData = {
   roomName: string
   jwtToken: string
   serverUrl: string
+  isSharer: boolean
 }

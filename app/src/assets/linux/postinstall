@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Update desktop database and register protocol handler
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+    update-desktop-database
+    xdg-mime default peekaview.desktop x-scheme-handler/peekaview
+fi
+
+exit 0
