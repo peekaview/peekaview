@@ -10,19 +10,19 @@ storage:
 apps:
   tls:
     certificates:
-      # Add load_files before automate section
       automate:
-        - REPLACE_API_DOMAIN
         - REPLACE_LIVEKIT_DOMAIN
         - REPLACE_TURN_DOMAIN
+        - REPLACE_API_DOMAIN
         - REPLACE_APP_DOMAIN
         - REPLACE_CONTROL_DOMAIN
+
   layer4:
     servers:
       main:
         listen: [":443"]
         routes:
-          # TURN-Server
+          ### BEGIN TURN ###
           - match:
               - tls:
                   sni:
@@ -32,8 +32,9 @@ apps:
               - handler: proxy
                 upstreams:
                   - dial: ["127.0.0.1:5349"]
+          ### END TURN ###
 
-          # LiveKit-WebSocket (Backend)
+          ### BEGIN LIVEKIT ###
           - match:
               - tls:
                   sni:
@@ -45,8 +46,9 @@ apps:
               - handler: proxy
                 upstreams:
                   - dial: ["127.0.0.1:7880"]
+          ### END LIVEKIT ###
 
-          # MeetDev API (PHP)
+          ### BEGIN API ###
           - match:
               - tls:
                   sni:
@@ -58,8 +60,9 @@ apps:
               - handler: proxy
                 upstreams:
                   - dial: ["127.0.0.1:8080"]
+          ### END API ###
 
-          # MeetDev WebApp (Static)
+          ### BEGIN APP ###
           - match:
               - tls:
                   sni:
@@ -70,9 +73,10 @@ apps:
                   - alpn: ["http/1.1", "h2"]
               - handler: proxy
                 upstreams:
-                  - dial: ["REPLACE_APP_DOMAIN:8082"]
+                  - dial: ["127.0.0.1:8082"]
+          ### END APP ###
 
-          # Controlserver (Node.js)
+          ### BEGIN CONTROL ###
           - match:
               - tls:
                   sni:
@@ -83,4 +87,5 @@ apps:
                   - alpn: ["http/1.1", "h2"]
               - handler: proxy
                 upstreams:
-                  - dial: ["REPLACE_CONTROL_DOMAIN:8081"]
+                  - dial: ["127.0.0.1:8081"]
+          ### END CONTROL ###

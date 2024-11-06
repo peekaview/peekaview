@@ -9,6 +9,7 @@ services:
       - TURN_DOMAIN=${TURN_DOMAIN}
       - APP_DOMAIN=${APP_DOMAIN}
       - CONTROL_DOMAIN=${CONTROL_DOMAIN}
+      - INGRESS_SERVICES=${INGRESS_SERVICES}
     network_mode: "host"
     volumes:
       - ingress_data:/data

@@ -54,10 +54,10 @@ echo "Certificates generated successfully!"
 
 # Copy certificates to local CA certificates directory
 echo "Copying certificates to local CA certificates directory..."
-mkdir -p ~/.local/share/ca-certificates
+mkdir -p $HOME/.local/share/ca-certificates
 for domain in "${DOMAINS[@]}"; do
     docker cp "peekaview_ingress_1:/data/certificates/local/${domain}/${domain}.crt" \
-        "~/.local/share/ca-certificates/${domain}.crt"
+        "$HOME/.local/share/ca-certificates/${domain}.crt"
 done
 
 # Update CA certificates
