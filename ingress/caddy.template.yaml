@@ -9,13 +9,24 @@ storage:
 
 apps:
   tls:
+    ### BEGIN LOCAL CERTIFICATES ###
+    certificates:
+      load_files:
+        - certificate: /etc/caddy/certificates/peekaview.crt
+          key: /etc/caddy/certificates/peekaview.key
+    automation:
+      policies:
+        - on_demand: true
+    ### END LOCAL CERTIFICATES ###
+    ### BEGIN AUTOMATIC CERTIFICATES ###
     certificates:
       automate:
-        - REPLACE_LIVEKIT_DOMAIN
-        - REPLACE_TURN_DOMAIN
-        - REPLACE_API_DOMAIN
-        - REPLACE_APP_DOMAIN
-        - REPLACE_CONTROL_DOMAIN
+        - "REPLACE_LIVEKIT_DOMAIN"
+        - "REPLACE_TURN_DOMAIN"
+        - "REPLACE_API_DOMAIN"
+        - "REPLACE_APP_DOMAIN"
+        - "REPLACE_CONTROL_DOMAIN"
+    ### END AUTOMATIC CERTIFICATES ###
 
   layer4:
     servers:

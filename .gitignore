@@ -60,3 +60,4 @@ logs/
 *.log 
 
 todo.txt
+mkcert

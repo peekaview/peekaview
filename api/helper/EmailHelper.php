@@ -88,7 +88,11 @@ class EmailHelper {
         }
         
         // Send headers and message
-        if (!$this->checkResponse($this->sendCommand($socket, $headers . "\r\n" . $message . "\r\n."), '250')) {
+        $fullMessage = $headers;
+        $fullMessage .= "\r\n";
+        $fullMessage .= $message;
+        
+        if (!$this->checkResponse($this->sendCommand($socket, $fullMessage . "\r\n."), '250')) {
             error_log("SMTP Error: Message content rejected");
             return false;
         }
@@ -119,86 +123,105 @@ class EmailHelper {
         return $code === $expectedCode;
     }
     
+    private function sendEmail($to, $subject, $htmlContent, $textContent) {
+        $boundary = md5(time());
+        
+        // Headers
+        $headers = "Date: " . date("r") . "\r\n";
+        $headers .= "Message-ID: <" . time() . rand(1000, 9999) . "@" . $_SERVER['HTTP_HOST'] . ">\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "From: {$this->fromName} <{$this->fromEmail}>\r\n";
+        $headers .= "Reply-To: {$this->fromEmail}\r\n";
+        $headers .= "To: <$to>\r\n";
+        $headers .= "Subject: $subject\r\n";
+        $headers .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
+        
+        // Message
+        $message = "This is a multi-part message in MIME format.\r\n\r\n";
+        $message .= "--{$boundary}\r\n";
+        $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= $textContent . "\r\n\r\n";
+        $message .= "--{$boundary}\r\n";
+        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $message .= $htmlContent . "\r\n\r\n";
+        $message .= "--{$boundary}--\r\n";
+
+        return $this->sendSMTP($to, $subject, $message, $headers);
+    }
+    
     public function sendShareRequest($email, $requesterName, $shareLink) {
         $subject = "=?UTF-8?B?" . base64_encode("$requesterName möchte Ihren Bildschirm sehen") . "?=";
         
-        // HTML Email Body
-        $htmlMessage = <<<HTML
+        $htmlContent = <<<HTML
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-</head>
+<head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
         <h2 style="color: #333;">Bildschirmfreigabe-Anfrage</h2>
         <p>Hallo,</p>
         <p><strong>{$requesterName}</strong> möchte Ihren Bildschirm sehen.</p>
-        <p>Um die Anfrage zu akzeptieren und Ihren Bildschirm freizugeben, klicken Sie bitte auf den folgenden Link:</p>
-        <p>
-            <a href="{$shareLink}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">
-                Bildschirm freigeben
-            </a>
-        </p>
-        <p>Oder kopieren Sie diesen Link in Ihren Browser:</p>
-        <p style="word-break: break-all;">{$shareLink}</p>
+        <p><a href="{$shareLink}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Bildschirm freigeben</a></p>
+        <p>Oder nutzen Sie diesen Link: {$shareLink}</p>
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
-            <p>Dies ist eine automatisch generierte E-Mail. Bitte antworten Sie nicht darauf.</p>
-            <p>Falls Sie diese Anfrage nicht erwartet haben, können Sie diese E-Mail ignorieren.</p>
+            <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
         </div>
     </div>
 </body>
 </html>
 HTML;
 
-        // Plain text version
-        $textMessage = <<<TEXT
+        $textContent = <<<TEXT
 Bildschirmfreigabe-Anfrage
 
 Hallo,
 
 {$requesterName} möchte Ihren Bildschirm sehen.
 
-Um die Anfrage zu akzeptieren und Ihren Bildschirm freizugeben, öffnen Sie bitte den folgenden Link in Ihrem Browser:
+Nutzen Sie diesen Link zur Freigabe: {$shareLink}
 
-{$shareLink}
-
-Falls Sie diese Anfrage nicht erwartet haben, können Sie diese E-Mail ignorieren.
-
-Dies ist eine automatisch generierte E-Mail. Bitte antworten Sie nicht darauf.
+Dies ist eine automatische E-Mail. Bitte nicht antworten.
 TEXT;
 
-        // Generate a boundary
-        $boundary = md5(time());
+        return $this->sendEmail($email, $subject, $htmlContent, $textContent);
+    }
+    
+    public function sendRegistrationConfirmation($email, $confirmLink) {
+        $subject = "=?UTF-8?B?" . base64_encode("Bestätigen Sie Ihre Registrierung") . "?=";
+        
+        $htmlContent = <<<HTML
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+        <h2 style="color: #333;">Registrierung bestätigen</h2>
+        <p>Hallo und willkommen bei Peekaview,</p>
+        <p>vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
+        <p><a href="{$confirmLink}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
+        <p>Oder nutzen Sie diesen Link: {$confirmLink}</p>
+        <div style="margin-top: 30px; font-size: 12px; color: #666;">
+            <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
 
-        // Modify headers to include Date and Message-ID
-        $headers = "Date: " . date("r") . "\r\n";
-        $headers .= "Message-ID: <" . time() . rand(1000, 9999) . "@" . parse_url($shareLink, PHP_URL_HOST) . ">\r\n";
-        $headers .= "MIME-Version: 1.0\r\n";
-        $headers .= "From: {$this->fromName} <{$this->fromEmail}>\r\n";
-        $headers .= "Reply-To: {$this->fromEmail}\r\n";
-        $headers .= "To: <$email>\r\n";  // Add To header
-        $headers .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
-        
-        // Modify message format to ensure proper line endings and structure
-        $message = "This is a multi-part message in MIME format.\r\n\r\n";
-        $message .= "--{$boundary}\r\n";
-        $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
-        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-        $message .= $textMessage . "\r\n\r\n";
-        $message .= "--{$boundary}\r\n";
-        $message .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $message .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-        $message .= $htmlMessage . "\r\n\r\n";
-        $message .= "--{$boundary}--\r\n";
+        $textContent = <<<TEXT
+Registrierung bestätigen
 
-        // Use SMTP instead of mail()
-        $success = $this->sendSMTP($email, $subject, $message, $headers);
-        
-        if (!$success) {
-            error_log("Failed to send email to $email");
-        }
-        
-        return $success;
+Hallo und willkommen bei Peekaview,
+
+vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse über diesen Link:
+
+{$confirmLink}
+
+Dies ist eine automatische E-Mail. Bitte nicht antworten.
+TEXT;
+
+        return $this->sendEmail($email, $subject, $htmlContent, $textContent);
     }
 }

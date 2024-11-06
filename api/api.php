@@ -36,7 +36,7 @@ function validateEmail($email) {
     if (!$email) {
         throw new InvalidArgumentException('Invalid email format');
     }
-    return $email;
+    return strtolower($email);
 }
 
 function validateToken($token) {
@@ -278,7 +278,7 @@ function showMeYourScreen() {
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
                     require_once __DIR__.'/helper/EmailHelper.php';
                     $emailHelper = new EmailHelper();
-                    $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
+                    $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token&v=".base64_encode("action=share&email=$email&token=$token");
                     if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
                         $requestData[3] = 'email_sent';
                         file_put_contents($requestFile, implode(',', $requestData));
@@ -445,15 +445,14 @@ function registerMyEmail() {
             
             require_once __DIR__.'/helper/EmailHelper.php';
             $emailHelper = new EmailHelper();
-            $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token";
-            if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
+            $registrationLink = "https://".APP_DOMAIN."/?action=register&email=$email&token=$token&v=".base64_encode("action=register&email=$email&token=$token");
+            if ($emailHelper->sendRegistrationConfirmation($email, $registrationLink)) {
                 $requestData[3] = 'email_sent';
                 file_put_contents($requestFile, implode(',', $requestData));
             }
 
             echo json_encode([
-                'success' => true,
-                'token' => $token
+                'success' => true
             ]);
             return;
         }

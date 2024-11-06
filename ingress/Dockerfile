@@ -5,8 +5,8 @@ RUN apk add --no-cache nss-tools
 
 # Copy the Caddyfile to the appropriate location
 COPY ./caddy.template.yaml /etc/caddy.yaml
-#COPY ./peekaview.key /etc/caddy/certificates/peekaview.key
-#COPY ./peekaview.crt /etc/caddy/certificates/peekaview.crt
+COPY ./peekaview.key /etc/caddy/certificates/peekaview.key
+COPY ./peekaview.crt /etc/caddy/certificates/peekaview.crt
 
 # Copy the entrypoint script and make it executable
 COPY ./docker-entrypoint.sh /docker-entrypoint.sh
