@@ -48,7 +48,6 @@ const emit = defineEmits<{
 const email = defineModel<string>('email')
 const name = defineModel<string>('name')
 
-const requestInterval = ref<number>()
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
@@ -75,7 +74,6 @@ async function handleSubmit(e: Event) {
     // waitingMessage.value = `We've sent an email to ${email.value}. You can keep this window open.`
   }, 20000)
   
-  clearInterval(requestInterval.value)
   requestStatus.value = undefined
 
   const params = {
@@ -84,7 +82,6 @@ async function handleSubmit(e: Event) {
     request_id: generateRequestId(),
   }
   requestScreen(params, true)
-  requestInterval.value = window.setInterval(() => requestScreen(params), 2000);
 }
 
 async function requestScreen(params: RequestParams, initial = false) {
@@ -109,12 +106,16 @@ async function requestScreen(params: RequestParams, initial = false) {
             controlServer: data.controlServer,
             roomId: data.roomId,
           })
-          break;
+          return;
         case 'request_open':
           if (!requestStatus.value)
             waitingMessage.value = `Warten auf Antwort von ${email.value}...`
           break;
       }
+
+      window.setTimeout(() => {
+        requestScreen(params)
+      }, 1000);
     }
   } catch (error) {
     console.error('Error during polling:', error);
@@ -123,7 +124,6 @@ async function requestScreen(params: RequestParams, initial = false) {
 }
     
 function handleRequestAccepted(data: AcceptedRequestData) {
-  clearInterval(requestInterval.value)
   waitingMessage.value = undefined
   requestStatus.value = undefined
   
@@ -138,7 +138,6 @@ function handleRequestAccepted(data: AcceptedRequestData) {
 }
 
 function handleError(error) {
-  clearInterval(requestInterval.value);
   waitingMessage.value = undefined
   requestStatus.value = undefined
   

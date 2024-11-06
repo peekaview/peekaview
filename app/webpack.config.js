@@ -32,7 +32,7 @@ module.exports = (env, argv) => {
         'Content-Security-Policy': cspPolicy,
       },
       static: {
-        directory: path.join(__dirname, 'public'),
+        directory: path.join(__dirname, 'build'),
       },
       port: 8843,
       server: {

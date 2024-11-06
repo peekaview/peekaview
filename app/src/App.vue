@@ -49,12 +49,14 @@ async function handleLogout() {
   <header class="main-header">
     <div class="header-content">
       <div class="logo-container">
-        <img :src="PeekaviewLogo" alt="Logo" class="logo">
+        <a href="/">
+          <img :src="PeekaviewLogo" alt="Logo" class="logo">
+        </a>
       </div>
       <h1 class="header-title">
-        <b>Screen Sharing</b>
+        <b>SHARE</b>YOUR<b>SCREEN</b>
         <br>
-        <small>the simple way</small>
+        <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
       </h1>
       <div class="header-actions">
         <button v-if="action === 'share' && token" id="logoutBtn" class="btn btn-outline-light" @click="handleLogout">Logout</button>
@@ -105,7 +107,7 @@ async function handleLogout() {
 
 /* Header Styles */
 .main-header {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.5);
   color: #2c3e50;
   padding: 0.75rem 0;
   height: 90px;
@@ -171,8 +173,7 @@ async function handleLogout() {
 
 /* Common Title Styles */
 .centered-section h3 {
-  color: #1f2937;
-  font-weight: 600;
+  color: #998472;
 }
 
 /* Main Container Layout */
@@ -252,7 +253,7 @@ async function handleLogout() {
 
 /* Footer Styles */
 .main-footer {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.5);
   color: #2c3e50;
   padding: 0.75rem 0;
   box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
