@@ -12,8 +12,8 @@ apps:
     ### BEGIN LOCAL CERTIFICATES ###
     certificates:
       load_files:
-        - certificate: /etc/caddy/certificates/peekaview.crt
-          key: /etc/caddy/certificates/peekaview.key
+        - certificate: /etc/caddy/certificates/custom/peekaview.crt
+          key: /etc/caddy/certificates/custom/peekaview.key
     automation:
       policies:
         - on_demand: true

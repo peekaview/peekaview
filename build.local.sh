@@ -68,7 +68,7 @@ fi
 
 # Generate local development certificates
 echo "Generating local development certificates..."
-./mkcert --cert-file ingress/peekaview.crt --key-file ingress/peekaview.key peekaview 127.0.0.1 ::1 peekaview.local "*.peekaview.local"
+./mkcert --cert-file ingress/certs/peekaview.crt --key-file ingress/certs/peekaview.key peekaview 127.0.0.1 ::1 peekaview.local "*.peekaview.local"
 ./mkcert -install
 
 # Start Docker Compose build
