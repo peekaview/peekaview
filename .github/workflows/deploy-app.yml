@@ -48,7 +48,7 @@ jobs:
         
       - name: Build production
         working-directory: ./app
-        run: npm run prod
+        run: npm run web-build
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
