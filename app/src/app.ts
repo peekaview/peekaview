@@ -1,5 +1,9 @@
 import { createApp } from 'vue'
+import { createI18n } from 'vue-i18n'
 import { modalControllerPlugin } from 'bootstrap-vue-next'
+
+import en from './locales/en.json'
+import de from './locales/de.json'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
@@ -11,4 +15,14 @@ import './assets/css/styles.css'
 const app = createApp(App)
 app.use(modalControllerPlugin)
 
+const i18n = createI18n({
+  locale: 'en',
+  fallbackLocale: 'en',
+  messages: {
+    en,
+    de
+  }
+})
+
+app.use(i18n)
 app.mount('#app')

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
 import About from './components/About.vue'
@@ -12,28 +13,37 @@ import PeekaviewLogo from './assets/img/peekaviewlogo.png'
 
 import type { ScreenShareData } from './types'
 
-const user = new URLSearchParams(atob(localStorage.getItem('user') ?? ''))
-
-const params = new URLSearchParams(window.location.search)
-const action = params.get('action') ?? 'view'
-const token = params.get('token') ?? user.get('token') ?? undefined
-const email = (params.get('email') ?? user.get('email'))?.toLowerCase() ?? undefined
-
-if (email && token)
-  localStorage.setItem('user', btoa(new URLSearchParams({ email, token }).toString()))
+const { t } = useI18n()
 
 const sessionActive = ref(false)
 const screenShareData = ref<ScreenShareData>()
 const showAbout = ref(false)
 
+const action = ref<string>('view')
+const token = ref<string | undefined>()
+const email = ref<string | undefined>()
+
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  const v = params.get('v')
+  if (v) {
+    const vParams = new URLSearchParams(atob(v))
+    action.value = vParams.get('action') ?? 'view'
+    token.value = vParams.get('token') ?? localStorage.getItem('token') ?? undefined
+    email.value = vParams.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
+    token.value && localStorage.setItem('token', token.value)
+    email.value && localStorage.setItem('email', email.value)
+  }
+})
+
 async function handleLogout() {
   const result = await Swal.fire({
-    title: 'Logout',
-    text: 'Are you sure you want to logout?',
+    title: t("app.logout"),
+    text: t("app.confirmLogout"),
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'Yes, logout',
-    cancelButtonText: 'Cancel',
+    confirmButtonText: t("general.yes"),
+    cancelButtonText: t("general.cancel"),
     customClass: {
       popup: 'animate__animated animate__fadeIn'
     }
@@ -59,7 +69,9 @@ async function handleLogout() {
         <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
       </h1>
       <div class="header-actions">
-        <button v-if="action === 'share' && token" id="logoutBtn" class="btn btn-outline-light" @click="handleLogout">Logout</button>
+        <button v-if="action === 'share' && token" id="logoutBtn" class="btn btn-outline-light" @click="handleLogout">
+          {{ $t('app.logout') }}
+        </button>
       </div>
     </div>
   </header>
@@ -98,7 +110,7 @@ async function handleLogout() {
 
   <footer class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 Peekaview | <a href="#" @click="showAbout = true">Impressum</a></p>
+      <p>&copy; 2024 Peekaview | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a></p>
     </div>
   </footer>
 </template>
@@ -152,13 +164,7 @@ async function handleLogout() {
 
 /* App Container */
 .app-container {
-  position: fixed;
-  top: 73px;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background: rgba(0,0,0,0.8);
-  z-index: 1000;
 }
 
 /* Content Card */

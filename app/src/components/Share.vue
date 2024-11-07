@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Swal from 'sweetalert2'
+import { useI18n } from 'vue-i18n'
 
 import Modal from './Modal.vue'
 
@@ -11,6 +12,8 @@ interface Request {
   request_id: string
   name: string
 }
+
+type WaitingStatus = 'checking' | 'noRequests' | 'requestReceived'
 
 const props = defineProps<{
   email: string
@@ -23,11 +26,15 @@ const emit = defineEmits<{
   (e: 'handleError', error: Error): void
 }>()
 
+const { t } = useI18n()
+
+const downloadLink = ref('downloads/PeekAView.exe')
+
 const sessionActive = defineModel<boolean>('sessionActive')
 
 const latestRequest = ref<Request>()
 
-const waitingMessage = ref<string | undefined>()
+const waitingStatus = ref<WaitingStatus>()
 
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
@@ -42,7 +49,7 @@ document.addEventListener('visibilitychange', () => {
 
 function listenForRequests() {
   listeningForRequests.value = true
-  waitingMessage.value = 'Prüfen auf Teilnehmeranfragen...'
+  waitingStatus.value = 'checking'
 
   window.setInterval(async () => {
     try {
@@ -56,7 +63,7 @@ function listenForRequests() {
       })
       
       if (requests.length > 0) {
-        waitingMessage.value = undefined
+        waitingStatus.value = undefined
         latestRequest.value = requests[0];
       }
     } catch (error) {
@@ -85,21 +92,42 @@ async function updateOnlineStatus() {
   }
 }
 
-async function acceptRequest(request: Request) {
+async function acceptRequest() {
+  if (!latestRequest.value)
+    return
+
   try {
-    latestRequest.value = undefined
-    
     await callApi({
       action: 'youAreAllowedToSeeMyScreen',
       email: props.email,
       token: props.token,
-      request_id: request.request_id,
+      request_id: latestRequest.value.request_id,
     })
 
+    latestRequest.value = undefined
     if (!sessionActive.value)
       await createRoom()
   } catch (error) {
     console.error('Error accepting request:', error)
+    handleError(error)
+  }
+}
+
+async function denyRequest() {
+  if (!latestRequest.value)
+    return
+
+  try {
+    await callApi({
+      action: 'youAreNotAllowedToSeeMyScreen',
+      email: props.email,
+      token: props.token,
+      request_id: latestRequest.value.request_id,
+    })
+
+    latestRequest.value = undefined
+  } catch (error) {
+    console.error('Error denying request:', error)
     handleError(error)
   }
 }
@@ -130,7 +158,7 @@ function handleError(error) {
   Swal.fire({
     icon: 'error',
     title: 'Error',
-    text: 'There was a problem processing your request. Please try again.',
+    text: t('share.requestError'),
     customClass: {
       popup: 'animate__animated animate__fadeIn'
     }
@@ -144,14 +172,14 @@ function shareViaApp() {
   // Show backup dialog after a short delay
   setTimeout(async () => {
     const result = await Swal.fire({
-      title: 'PeekAView App',
+      title: t('share.appDialog.title'),
       html: 
-        'If the app doesn\'t open automatically, please make sure you have it installed.<br><br>' +
-        'You can <a href="downloads/PeekAView.exe" class="alert-link">download it here</a>.',
+        t('share.appDialog.message') + '<br><br>' +
+        t('share.appDialog.download', { link: downloadLink }),
       icon: 'info',
       showCancelButton: true,
-      confirmButtonText: 'Try Again',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('share.appDialog.tryAgain'),
+      cancelButtonText: t('share.appDialog.cancel'),
       customClass: {
         popup: 'animate__animated animate__fadeIn'
       }
@@ -165,77 +193,78 @@ function shareViaApp() {
 
 <template>
   <template v-if="token && !listeningForRequests">
-    <h3 class="text-center mb-4">How would you like to share your screen?</h3>
+    <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
     
     <div class="share-options-stack">
       <div class="share-option primary">
         <div class="option-content">
-          <h3>Share with PeekAView App</h3>
-          <p>Recommended: Full remote access and drawing capabilities</p>
+          <h3>{{ $t('share.appOption.title') }}</h3>
+          <p>{{ $t('share.appOption.description') }}</p>
           <button class="btn btn-primary btn-lg w-100" @click="shareViaApp">
-            Open in PeekAView App
+            {{ $t('share.appOption.button') }}
           </button>
         </div>
       </div>
       
       <div class="divider">
-        <span>or</span>
+        <span>{{ $t('share.or') }}</span>
       </div>
       
       <div class="share-option secondary">
         <div class="option-content">
-          <h3>Share in Browser</h3>
-          <p>Basic screen sharing through your web browser</p>
+          <h3>{{ $t('share.browserOption.title') }}</h3>
+          <p>{{ $t('share.browserOption.description') }}</p>
           <button class="btn btn-outline-primary btn-lg w-100" @click="listenForRequests()">
-            Continue in Browser
+            {{ $t('share.browserOption.button') }}
           </button>
         </div>
       </div>
       
       <div class="download-option">
-        <p class="text-muted mb-2">Don't have the PeekAView App yet?</p>
-        <a href="downloads/PeekAView.exe" class="btn btn-link download-link" download>
+        <p class="text-muted mb-2">{{ t('share.download.prompt') }}</p>
+        <a :href="downloadLink" class="btn btn-link download-link" download>
           <i class="mdi mdi-download me-2"></i>
-          Download PeekAView for Windows
+          {{ $t('share.download.button') }}
         </a>
       </div>
     </div>
     
   </template>
   <div v-else-if="sessionActive" id="activeSessionInfo">
-    <h3 class="mb-4">Active Sharing Session</h3>
+    <h3 class="mb-4">{{ $t('share.activeSession.title') }}</h3>
     <div class="session-status alert alert-success">
       <i class="mdi mdi-cast me-2"></i>
-      Your screen is ready to be shared
+      {{ $t('share.activeSession.status') }}
     </div>
   </div>
   <div v-else id="noActiveSession" class="start-sharing-info">
-    <h3 class="mb-4">Start Screen Sharing</h3>
+    <h3 class="mb-4">{{ $t('share.startSharing.title') }}</h3>
     <p class="text-muted">
-      Your screen will automatically be shared when someone requests access.
+      {{ $t('share.startSharing.description') }}
     </p>
   </div>
 
   <Modal :show="!!latestRequest">
-    <template #header>
-      Screen Share Request
-    </template>
     <template #default>
-      <p id="requestMessage">{{ latestRequest?.name }} wants to see your screen. Do you want to accept?</p>
+      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
     </template>
     <template #ok>
-      <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="acceptRequest(latestRequest!)">Accept</button>
+      <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="acceptRequest">
+        {{ $t('share.requestAccess.accept') }}
+      </button>
     </template>
     <template #cancel>
-      <button type="button" class="btn btn-secondary" @click="latestRequest = undefined">Reject</button>
+      <button type="button" class="btn btn-secondary" @click="denyRequest">
+        {{ $t('share.requestAccess.deny') }}
+      </button>
     </template>
   </Modal>
 
-  <Modal :show="!!waitingMessage" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
+  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
     <template #default>
       <div class="text-center">
         <div class="waiting-spinner"></div>
-        <h4 class="mt-3" id="waitingMessage">{{ waitingMessage }}</h4>
+        <h4 class="mt-3" id="waitingMessage">{{ $t(`share.waitingStatus.${waitingStatus}`) }}</h4>
       </div>
     </template>
   </Modal>

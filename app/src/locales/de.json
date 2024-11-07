@@ -1,0 +1,85 @@
+{
+  "general": {
+    "ok": "Okay",
+    "cancel": "Abbrechen"
+  },
+  "app": {
+    "logout": "Logout",
+    "confirmLogout": "Möchten Sie sich wirklich ausloggen?",
+    "about": "Impressum"
+  },
+  "viewer": {
+    "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "emailLabel": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten",
+    "nameLabel": "Ihr Name",
+    "requestAccess": "Zugriff anfordern",
+    "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
+    "waitingStatus": {
+      "establishing": "Verbindung wird aufgebaut...",
+      "notified": "Wir haben eine E-Mail an {email} gesendet. Sie können das Fenster geöffnet lassen.",
+      "waiting": "Warten auf Antwort von {email}..."
+    },
+    "userStatus": {
+      "online": "Benutzer online (zuletzt aktiv {lastSeen})",
+      "away": "Benutzer abwesend (zuletzt aktiv {lastSeen})",
+      "offline": "Benutzer offline",
+      "inactive": "Benutzer inaktiv oder offline"
+    },
+    "lastSeen": {
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {minutes} {minutes === 1 ? 'Minute' : 'Minuten'}",
+      "hoursAgo": "vor {hours} {hours === 1 ? 'Stunde' : 'Stunden'}",
+      "daysAgo": "vor {days} {days === 1 ? 'Tag' : 'Tagen'}"
+    },
+    "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
+    "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "share": {
+    "howToShare": "Wie möchten Sie Ihren Bildschirm teilen?",
+    "appOption": {
+      "title": "Mit PeekAView App teilen",
+      "description": "Empfohlen: Voller Fernzugriff und Zeichenfunktionen",
+      "button": "In PeekAView App öffnen"
+    },
+    "or": "oder",
+    "browserOption": {
+      "title": "Im Browser teilen",
+      "description": "Einfache Bildschirmfreigabe über Ihren Webbrowser",
+      "button": "Im Browser fortfahren"
+    },
+    "download": {
+      "prompt": "Sie haben die PeekAView App noch nicht?",
+      "button": "PeekAView für Windows herunterladen"
+    },
+    "activeSession": {
+      "title": "Aktive Freigabesitzung",
+      "status": "Ihr Bildschirm ist bereit zum Teilen"
+    },
+    "startSharing": {
+      "title": "Bildschirmfreigabe starten",
+      "description": "Ihr Bildschirm wird automatisch geteilt, wenn jemand Zugriff anfordert."
+    },
+    "requestAccess": {
+      "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
+      "accept": "Akzeptieren",
+      "deny": "Ablehnen"
+    },
+    "waitingStatus": {
+      "checking": "Prüfen auf Teilnehmeranfragen..."
+    },
+    "appDialog": {
+      "title": "PeekAView App",
+      "message": "Wenn sich die App nicht automatisch öffnet, stellen Sie sicher, dass sie installiert ist.",
+      "download": "Sie können sie <a href=\"{link}\" class=\"alert-link\">hier herunterladen</a>.",
+      "tryAgain": "Erneut versuchen",
+      "cancel": "Abbrechen"
+    },
+    "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "screenShare": {
+    "title": "Bildschirmfreigabe-Sitzung",
+    "shareButton": "Meinen Bildschirm teilen",
+    "localParticipant": "Ich",
+    "connectionError": "Beim Verbinden mit dem Raum ist ein Fehler aufgetreten: {error}"
+  }
+} 

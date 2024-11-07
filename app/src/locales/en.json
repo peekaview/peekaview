@@ -1,0 +1,86 @@
+{
+  "general": {
+    "ok": "Okay",
+    "yes": "Yes",
+    "cancel": "Cancel"
+  },
+  "app": {
+    "logout": "Logout",
+    "confirmLogout": "Are you sure you want to logout?",
+    "about": "About"
+  },
+  "viewer": {
+    "requestScreenShare": "Request Screen Share Access",
+    "emailLabel": "Email address of user to connect with",
+    "nameLabel": "Your Name",
+    "requestAccess": "Request Access",
+    "requestDenied": "{email} has denied your request.",
+    "waitingStatus": {
+      "establishing": "Establishing connection...",
+      "notified": "We've sent a mail to {email}. You can keep this window open.",
+      "waiting": "Waiting for a response from {email}..."
+    },
+    "userStatus": {
+      "online": "User online (last active {lastSeen})",
+      "away": "User away (last active {lastSeen})",
+      "offline": "User offline",
+      "inactive": "User inactive or offline"
+    },
+    "lastSeen": {
+      "justNow": "just now",
+      "minutesAgo": "{minutes} {minutes === 1 ? 'minute' : 'minutes'} ago",
+      "hoursAgo": "{hours} {hours === 1 ? 'hour' : 'hours'} ago",
+      "daysAgo": "{days} {days === 1 ? 'day' : 'days'} ago"
+    },
+    "keepWindowOpen": "You can keep this window open. Once your request is accepted, the connection will be established automatically.",
+    "connectionError": "There was a problem connecting to the server. Please try again."
+  },
+  "share": {
+    "howToShare": "How would you like to share your screen?",
+    "appOption": {
+      "title": "Share with PeekAView App",
+      "description": "Recommended: Full remote access and drawing capabilities",
+      "button": "Open in PeekAView App"
+    },
+    "or": "or",
+    "browserOption": {
+      "title": "Share in Browser",
+      "description": "Basic screen sharing through your web browser",
+      "button": "Continue in Browser"
+    },
+    "download": {
+      "prompt": "Don't have the PeekAView App yet?",
+      "button": "Download PeekAView for Windows"
+    },
+    "activeSession": {
+      "title": "Active Sharing Session",
+      "status": "Your screen is ready to be shared"
+    },
+    "startSharing": {
+      "title": "Start Screen Sharing",
+      "description": "Your screen will automatically be shared when someone requests access."
+    },
+    "requestAccess": {
+      "message": "{name} wants to see your screen. Do you want to accept?",
+      "accept": "Accept",
+      "deny": "Deny"
+    },
+    "waitingStatus": {
+      "checking": "Checking for participant requests..."
+    },
+    "appDialog": {
+      "title": "PeekAView App",
+      "message": "If the app doesn't open automatically, please make sure you have it installed.",
+      "download": "You can <a href=\"{link}\" class=\"alert-link\">download it here</a>.",
+      "tryAgain": "Try Again",
+      "cancel": "Cancel"
+    },
+    "requestError": "There was a problem processing your request. Please try again."
+  },
+  "screenShare": {
+    "title": "Screen Sharing Session",
+    "shareButton": "Share my screen",
+    "localParticipant": "Me",
+    "connectionError": "There was an error connecting to the room: {error}"
+  }
+} 

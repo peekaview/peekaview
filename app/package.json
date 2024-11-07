@@ -23,7 +23,9 @@
     "electron-squirrel-startup": "^1.0.1",
     "livekit-client": "2.1.5",
     "sweetalert2": "^11.14.4",
-    "vue": "^3.5.12"
+    "update-electron-app": "^3.0.0",
+    "vue": "^3.5.12",
+    "vue-i18n": "^10.0.4"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.21.1",

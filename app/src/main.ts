@@ -1,6 +1,7 @@
 import path from 'path'
 import url from 'url'
 import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
+import { updateElectronApp } from 'update-electron-app'
 
 import PeekaviewLogo from './assets/img/peekaview.png'
 
@@ -11,6 +12,8 @@ declare const SOURCES_WEBPACK_ENTRY: string
 declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
 
 declare const CSP_POLICY: string
+
+updateElectronApp()
 
 // allow superhigh cpu usage for faster video-encoding
 app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
