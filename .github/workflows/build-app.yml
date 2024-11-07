@@ -30,6 +30,7 @@ jobs:
           sudo ln -sf /usr/bin/wine /usr/bin/wine64
 
       - name: Install Dependencies
+        working-directory: ./app
         run: npm install
 
       - name: Set build version
