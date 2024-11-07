@@ -1,0 +1,80 @@
+name: Build and Release Electron App
+
+on:
+    push:
+        branches:
+            - develop
+        paths:
+            - 'app/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+            ref: ${{ github.ref }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Wine and dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y wine wine64 mono-devel
+          sudo ln -sf /usr/bin/wine /usr/bin/wine64
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Set build version
+        id: set_version
+        working-directory: ./app
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION-$COMMIT_SHA" >> $GITHUB_OUTPUT
+
+      # Build for all platforms
+      - name: Build Electron App
+        working-directory: ./app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_VERSION: ${{ steps.set_version.outputs.version }}
+        run: npm run electron-build
+
+      # Create GitHub Pre-release
+      - name: Create Pre-release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: pre-release
+          name: Pre-release ${{ steps.set_version.outputs.version }}
+          body: |
+            Pre-release build from develop branch
+            Version: ${{ steps.set_version.outputs.version }}
+            Built from commit: ${{ github.sha }}
+            Build date: $(date +'%Y-%m-%d %H:%M:%S')
+          prerelease: true
+          draft: false
+          files: |
+            app/dist/*/peekaview*.exe
+            app/dist/*/peekaview*.deb
+            app/dist/*/peekaview*.AppImage
+            app/dist/*/peekaview*.dmg
+          target_commitish: ${{ github.sha }}
+
+      # Clean up old pre-releases
+      - name: Clean up old pre-releases
+        run: |
+          gh api repos/${{ github.repository }}/releases \
+            --jq '.[] | select(.prerelease==true and .tag_name!="pre-release") | .id' \
+            | xargs -I {} gh api repos/${{ github.repository }}/releases/{} -X DELETE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

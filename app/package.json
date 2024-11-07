@@ -14,7 +14,8 @@
     "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
     "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix",
     "package": "dotenvx run -- electron-forge package",
-    "tsc": "vue-tsc --noEmit"
+    "tsc": "vue-tsc --noEmit",
+    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
