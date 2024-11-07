@@ -11,7 +11,7 @@
     "web-dev": "dotenvx run -- webpack serve --mode=development",
     "web-build": "dotenvx run -- webpack --mode=production",
     "electron-dev": "dotenvx run -- electron-forge start",
-    "electron-build": "dotenvx run -- electron-forge make",
+    "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
     "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix",
     "package": "dotenvx run -- electron-forge package",
     "tsc": "vue-tsc --noEmit"

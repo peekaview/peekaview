@@ -5,7 +5,7 @@ import Swal from 'sweetalert2'
 import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShareData } from '../types'
-import { callApi } from '../api';
+import { callApi } from '../api'
 
 type RequestStatus = "request_accepted" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -55,16 +55,16 @@ const requestLastSeen = ref<number>()
 const waitingMessage = ref<string | undefined>()
 
 function generateRequestId(length = 8) {
-  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
+  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
+    result += characters.charAt(Math.floor(Math.random() * characters.length))
   }
-  return result;
+  return result
 }
     
 async function handleSubmit(e: Event) {
-  e.preventDefault();
+  e.preventDefault()
 
   if (!email.value || !name.value)
     return
@@ -106,20 +106,18 @@ async function requestScreen(params: RequestParams, initial = false) {
             controlServer: data.controlServer,
             roomId: data.roomId,
           })
-          return;
+          return
         case 'request_open':
           if (!requestStatus.value)
             waitingMessage.value = `Warten auf Antwort von ${email.value}...`
-          break;
+          break
       }
-
-      window.setTimeout(() => {
-        requestScreen(params)
-      }, 1000);
     }
+
+    window.setTimeout(() => requestScreen(params), 1000)
   } catch (error) {
-    console.error('Error during polling:', error);
-    handleError(error);
+    console.error('Error during polling:', error)
+    handleError(error)
   }
 }
     
@@ -134,7 +132,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
       serverUrl: data.videoServer,
       isSharer: false,
     })
-  }, 300);
+  }, 300)
 }
 
 function handleError(error) {
@@ -148,27 +146,27 @@ function handleError(error) {
     customClass: {
         popup: 'animate__animated animate__fadeIn'
     }
-  });
+  })
 }
 
 function formatLastSeen(timestamp) {
-  const seconds = Math.floor((Date.now() / 1000) - timestamp);
+  const seconds = Math.floor((Date.now() / 1000) - timestamp)
   
   if (seconds < 60)
     return 'gerade eben'
   
   if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    return `vor ${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`;
+    const minutes = Math.floor(seconds / 60)
+    return `vor ${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`
   }
   
   if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    return `vor ${hours} ${hours === 1 ? 'Stunde' : 'Stunden'}`;
+    const hours = Math.floor(seconds / 3600)
+    return `vor ${hours} ${hours === 1 ? 'Stunde' : 'Stunden'}`
   }
   
-  const days = Math.floor(seconds / 86400);
-  return `vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}`;
+  const days = Math.floor(seconds / 86400)
+  return `vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}`
 }
 </script>
 
