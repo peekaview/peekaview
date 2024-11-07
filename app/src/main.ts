@@ -1,6 +1,6 @@
 import path from 'path'
 import url from 'url'
-import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session } from "electron"
+import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
 
 import PeekaviewLogo from './assets/img/peekaview.png'
 
@@ -40,6 +40,12 @@ const createAppWindow = (show = false) => { // (roomName: string, jwtToken: stri
       preload: APP_PRELOAD_WEBPACK_ENTRY,
     }
   })
+
+  appWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
   appWindow.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault()
@@ -47,11 +53,14 @@ const createAppWindow = (show = false) => { // (roomName: string, jwtToken: stri
     }
   })
 
-  appWindow.loadURL(APP_WEBPACK_ENTRY)// + '?' + (new URLSearchParams({ email: roomName, jwt: jwtToken, url: serverUrl}).toString()))
+  appWindow.loadURL(APP_WEBPACK_ENTRY)// + '?' + (new URLSearchParams({ email: roomName, jwt: jwtToken, url: serverUrl }).toString()))
 
   // Open the DevTools.
   !app.isPackaged && appWindow.webContents.openDevTools()
 }
+
+if (!app.isDefaultProtocolClient('peekaview'))
+  app.setAsDefaultProtocolClient('peekaview')
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -59,15 +68,6 @@ const createAppWindow = (show = false) => { // (roomName: string, jwtToken: stri
 app.whenReady().then(() => {
   const trayIconPath = path.join(__dirname, PeekaviewLogo)
   const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-
-  if (!app.isDefaultProtocolClient('peekaview'))
-    app.setAsDefaultProtocolClient('peekaview')
-
-  protocol.handle('peekaview', (request) => {
-    const filePath = request.url.slice('peekaview://'.length)
-    console.log(request.url)
-    return net.fetch(url.pathToFileURL(path.join(__dirname, filePath)).toString())
-  })
   
   const tray = new Tray(trayIcon)
   const contextMenu = Menu.buildFromTemplate([
@@ -81,6 +81,12 @@ app.whenReady().then(() => {
 
   tray.on('click', () => {
     appWindow.show()
+  })
+
+  protocol.handle('peekaview', (request) => {
+    const filePath = request.url.slice('peekaview://'.length)
+    console.log(request.url)
+    return net.fetch(url.pathToFileURL(path.join(__dirname, filePath)).toString())
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

@@ -16,7 +16,7 @@ const user = new URLSearchParams(atob(localStorage.getItem('user') ?? ''))
 
 const params = new URLSearchParams(window.location.search)
 const action = params.get('action') ?? 'view'
-const token = (params.get('token') ?? user.get('token'))?.toLowerCase() ?? undefined
+const token = params.get('token') ?? user.get('token') ?? undefined
 const email = (params.get('email') ?? user.get('email'))?.toLowerCase() ?? undefined
 
 if (email && token)

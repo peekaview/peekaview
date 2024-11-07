@@ -53,7 +53,7 @@ const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
 const waitingMessage = ref<string | undefined>()
-    
+
 function generateRequestId(length = 8) {
   const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -178,7 +178,7 @@ function formatLastSeen(timestamp) {
   <form id="viewerForm" class="section-form" @submit="handleSubmit">
     <div class="form-content">
       <div class="mb-4">
-        <label for="email" class="form-label">Email of person to connect with</label>
+        <label for="email" class="form-label">Email address of user to connect with</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
           v-model="email"
           placeholder="example@email.com" required>

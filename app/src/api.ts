@@ -14,6 +14,9 @@ export type ApiRequestParams = {
   email: string
   token: string
   request_id: string
+} | {
+  action: "register"
+  email: string
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
