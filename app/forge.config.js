@@ -103,15 +103,14 @@ module.exports = {
         fs.rmSync('out', { recursive: true })
     },
     postMake: async (_forgeConfig, options) => {
-      const outputDir = path.join('dist', 'releases')
-      if (!fs.existsSync(outputDir))
-        fs.mkdirSync(outputDir, { recursive: true })
+      if (!fs.existsSync('dist'))
+        fs.mkdirSync('dist', { recursive: true })
 
       for (const option of options) {
         for (const artifact of option.artifacts) {
           const platform = option.platform
           const arch = option.arch
-          const destDir = path.join(outputDir, `${platform}-${arch}`)
+          const destDir = path.join('dist', `${platform}-${arch}`)
           
           if (!fs.existsSync(destDir))
             fs.mkdirSync(destDir, { recursive: true })
