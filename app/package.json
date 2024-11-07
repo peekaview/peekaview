@@ -5,13 +5,14 @@
   "version": "0.0.1",
   "description": "Simple screen sharing application",
   "license": "AGPL-3.0",
-  "private": "true",
+  "private": true,
   "main": "./.webpack/main",
   "scripts": {
     "web-dev": "dotenvx run -- webpack serve --mode=development",
     "web-build": "dotenvx run -- webpack --mode=production",
     "electron-dev": "dotenvx run -- electron-forge start",
-    "electron-build": "dotenvx run -- electron-forge make --platform=win32 --x64",
+    "electron-build": "dotenvx run -- electron-forge make",
+    "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix",
     "package": "dotenvx run -- electron-forge package",
     "tsc": "vue-tsc --noEmit"
   },
@@ -29,7 +30,7 @@
     "@electron-forge/maker-deb": "^7.4.0",
     "@electron-forge/maker-rpm": "^7.4.0",
     "@electron-forge/maker-squirrel": "^7.4.0",
-    "@electron-forge/maker-zip": "^7.4.0",
+    "@electron-forge/maker-wix": "^7.4.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "@electron-forge/plugin-fuses": "^7.4.0",
     "@electron-forge/plugin-webpack": "^7.5.0",
@@ -64,8 +65,17 @@
         ]
       }
     ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "src/assets/windows/icon.ico"
+    },
     "linux": {
-      "target": ["deb"],
+      "target": [
+        "deb"
+      ],
       "desktop": {
         "MimeType": "x-scheme-handler/peekaview"
       },
@@ -73,12 +83,16 @@
         {
           "from": "src/assets/linux",
           "to": "usr/share/applications",
-          "filter": ["*.desktop"]
+          "filter": [
+            "*.desktop"
+          ]
         },
         {
           "from": "src/assets/linux",
           "to": "usr/share/mime/packages",
-          "filter": ["*.xml"]
+          "filter": [
+            "*.xml"
+          ]
         }
       ],
       "deb": {
