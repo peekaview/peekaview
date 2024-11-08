@@ -25,7 +25,7 @@ module.exports = (env, argv) => {
         },
         {
           test: /\.(png|jpe?g|gif|ico)$/i,
-          type: 'asset/resource'  
+          type: 'asset/resource'
         },
       ],
     },
@@ -38,9 +38,22 @@ module.exports = (env, argv) => {
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
 
-        APP_URL: JSON.stringify(process.env.APP_URL),
-        API_URL: JSON.stringify(process.env.API_URL),
-        CSP_POLICY: JSON.stringify(getCspPolicy(dev)),
+        ...(() => {
+          if (!process.env.APP_URL) {
+            throw new Error('Environment variable APP_URL must be set');
+          }
+          if (!process.env.API_URL) {
+            throw new Error('Environment variable API_URL must be set');
+          }
+          if (!process.env.CONNECT_SRC) {
+            throw new Error('Environment variable CONNECT_SRC must be set');
+          }
+          return {
+            APP_URL: JSON.stringify(process.env.APP_URL),
+            API_URL: JSON.stringify(process.env.API_URL),
+            CSP_POLICY: JSON.stringify(getCspPolicy(dev)),
+          }
+        })(),
       }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
