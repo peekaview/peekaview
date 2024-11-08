@@ -166,7 +166,7 @@ function handleError(error) {
 }
 
 function shareViaApp() {
-  const protocolUrl = `peekaview://share#${new URLSearchParams({ email: props.email, token: props.token }).toString()}`;
+  const protocolUrl = `peekaview://action=share&${new URLSearchParams({ email: props.email, token: props.token }).toString()}`;
   window.location.href = protocolUrl;
   
   // Show backup dialog after a short delay
@@ -175,7 +175,7 @@ function shareViaApp() {
       title: t('share.appDialog.title'),
       html: 
         t('share.appDialog.message') + '<br><br>' +
-        t('share.appDialog.download', { link: downloadLink }),
+        t('share.appDialog.download', { link: downloadLink.value }),
       icon: 'info',
       showCancelButton: true,
       confirmButtonText: t('share.appDialog.tryAgain'),
@@ -246,7 +246,7 @@ function shareViaApp() {
 
   <Modal :show="!!latestRequest">
     <template #default>
-      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest!.name }) }}</p>
+      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
     </template>
     <template #ok>
       <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="acceptRequest">
