@@ -13,7 +13,7 @@ interface Request {
   name: string
 }
 
-type WaitingStatus = 'checking' | 'noRequests' | 'requestReceived'
+type WaitingStatus = 'checking'
 
 const props = defineProps<{
   email: string
@@ -246,7 +246,7 @@ function shareViaApp() {
 
   <Modal :show="!!latestRequest">
     <template #default>
-      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
+      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest!.name }) }}</p>
     </template>
     <template #ok>
       <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="acceptRequest">

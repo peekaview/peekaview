@@ -6,6 +6,10 @@
   "description": "Simple screen sharing application",
   "license": "AGPL-3.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peekaview/peekaview.git"
+  },
   "main": "./.webpack/main",
   "scripts": {
     "web-dev": "dotenvx run -- webpack serve --mode=development",

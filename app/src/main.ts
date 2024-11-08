@@ -13,15 +13,15 @@ declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
 
 declare const CSP_POLICY: string
 
-updateElectronApp()
-
-// allow superhigh cpu usage for faster video-encoding
-app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
-
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
   app.quit()
 }
+
+updateElectronApp()
+
+// allow superhigh cpu usage for faster video-encoding
+app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
 let appWindow: BrowserWindow
 let sourcesWindow: BrowserWindow
