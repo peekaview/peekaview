@@ -12,10 +12,10 @@
     "web-build": "dotenvx run -- webpack --mode=production",
     "electron-dev": "dotenvx run -- electron-forge start",
     "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
-    "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix",
+    "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
     "package": "dotenvx run -- electron-forge package",
     "tsc": "vue-tsc --noEmit",
-    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target wix"
+    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
@@ -33,7 +33,6 @@
     "@electron-forge/maker-deb": "^7.4.0",
     "@electron-forge/maker-rpm": "^7.4.0",
     "@electron-forge/maker-squirrel": "^7.4.0",
-    "@electron-forge/maker-wix": "^7.4.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "@electron-forge/plugin-fuses": "^7.4.0",
     "@electron-forge/plugin-webpack": "^7.5.0",
@@ -70,8 +69,7 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "squirrel"
       ],
       "icon": "src/assets/windows/icon.ico"
     },

@@ -26,14 +26,6 @@ module.exports = {
       platforms: ['win32']
     },
     {
-      name: '@electron-forge/maker-wix',
-      config: {
-        name: 'Peekaview',
-        icon: './src/assets/img/peekaview.ico',
-      },
-      platforms: ['win32']
-    },
-    {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
@@ -111,7 +103,7 @@ module.exports = {
           const platform = option.platform
           const arch = option.arch
           const destDir = path.join('dist', `${platform}-${arch}`)
-          
+
           if (!fs.existsSync(destDir))
             fs.mkdirSync(destDir, { recursive: true })
 
