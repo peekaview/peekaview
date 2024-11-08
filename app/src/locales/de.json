@@ -1,17 +1,28 @@
 {
   "general": {
     "ok": "Okay",
+    "yes": "Ja",
     "cancel": "Abbrechen"
   },
+  "labels": {
+    "yourEmail": "Ihre E-Mail-Adresse",
+    "yourName": "Ihr Name",
+    "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten"
+  },
   "app": {
-    "logout": "Logout",
+    "logout": "Abmelden",
     "confirmLogout": "Möchten Sie sich wirklich ausloggen?",
     "about": "Impressum"
   },
+  "login": {
+    "register": "Registrieren",
+    "login": "Jetzt in App anmelden",
+    "loggingIn": "Logge in der App ein...",
+    "code": "Ihr Login-Code",
+    "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein."
+  },
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",
-    "emailLabel": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten",
-    "nameLabel": "Ihr Name",
     "requestAccess": "Zugriff anfordern",
     "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
     "waitingStatus": {

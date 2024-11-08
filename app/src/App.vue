@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
 import About from './components/About.vue'
+import Login from './components/Login.vue'
 import Modal from './components/Modal.vue'
 import Viewer from './components/Viewer.vue'
 import Share from './components/Share.vue'
@@ -25,6 +26,7 @@ const email = ref<string | undefined>()
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
+  action.value = params.get('action') ?? 'view'
   const v = params.get('v')
   if (v) {
     const vParams = new URLSearchParams(atob(v))
@@ -97,6 +99,9 @@ async function handleLogout() {
               :email="email"
               :token="token"
               @start-sharing="screenShareData = $event"
+            />
+            <Login
+              v-else-if="action === 'login'"
             />
           </div>
         </div>

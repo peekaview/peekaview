@@ -16,6 +16,8 @@ const app = createApp(App)
 app.use(modalControllerPlugin)
 
 const i18n = createI18n({
+  legacy: false,
+  globalInjection: true, 
   locale: 'en',
   fallbackLocale: 'en',
   messages: {

@@ -4,15 +4,25 @@
     "yes": "Yes",
     "cancel": "Cancel"
   },
+  "labels": {
+    "yourEmail": "Your email address",
+    "yourName": "Your Name",
+    "connectToEmail": "Email address of user to connect with"
+  },
   "app": {
     "logout": "Logout",
     "confirmLogout": "Are you sure you want to logout?",
     "about": "About"
   },
+  "login": {
+    "register": "Register",
+    "login": "Login to app",
+    "loggingIn": "Logging in to the app...",
+    "code": "Your login code",
+    "useCodeAlternatively": "Auto-Login not working on the desktop app? Then copy this code instead and enter it in the app."
+  },
   "viewer": {
     "requestScreenShare": "Request Screen Share Access",
-    "emailLabel": "Email address of user to connect with",
-    "nameLabel": "Your Name",
     "requestAccess": "Request Access",
     "requestDenied": "{email} has denied your request.",
     "waitingStatus": {

@@ -179,16 +179,16 @@ function formatLastSeen(timestamp) {
 <template>
   <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
-  <form id="viewerForm" class="section-form" @submit="handleSubmit">
+  <form class="section-form" @submit="handleSubmit">
     <div class="form-content">
       <div class="mb-4">
-        <label for="email" class="form-label">{{ $t('viewer.emailLabel') }}</label>
+        <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
           v-model="email"
           placeholder="example@email.com" required>
       </div>
       <div class="mb-4">
-        <label for="name" class="form-label">{{ $t('viewer.nameLabel') }}</label>
+        <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
         <input type="text" class="form-control form-control-lg" id="name" name="name"
           v-model="name"
           placeholder="Enter your name" required>
