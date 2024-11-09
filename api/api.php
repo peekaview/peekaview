@@ -308,7 +308,7 @@ function showMeYourScreen() {
             if ($status === 'request_accepted') {
                 echo json_encode([
                     'status' => 'request_accepted',
-                    'jwt' => generateJWT($email, $userData[3]),
+                    'jwt' => generateJWT($name, $userData[3]),
                     'roomId' => $userData[3],
                     'videoServer' => $userData[4],
                     'controlServer' => $userData[5],
@@ -446,10 +446,7 @@ function registerMyEmail() {
             require_once __DIR__.'/helper/EmailHelper.php';
             $emailHelper = new EmailHelper();
             $registrationLink = "https://".APP_DOMAIN."/?action=register&email=$email&token=$token&v=".base64_encode("action=register&email=$email&token=$token");
-            if ($emailHelper->sendRegistrationConfirmation($email, $registrationLink)) {
-                $requestData[3] = 'email_sent';
-                file_put_contents($requestFile, implode(',', $requestData));
-            }
+            $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
             echo json_encode([
                 'success' => true
