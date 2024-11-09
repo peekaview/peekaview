@@ -1,6 +1,7 @@
 import path from 'path'
 import url from 'url'
 import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
+import { updateElectronApp } from 'update-electron-app'
 
 import PeekaviewLogo from './assets/img/peekaview.png'
 
@@ -10,22 +11,28 @@ declare const APP_PRELOAD_WEBPACK_ENTRY: string
 declare const SOURCES_WEBPACK_ENTRY: string
 declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
 
+declare const APP_URL: string
 declare const CSP_POLICY: string
-
-// allow superhigh cpu usage for faster video-encoding
-app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
   app.quit()
 }
 
+updateElectronApp()
+
+// allow superhigh cpu usage for faster video-encoding
+app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
+
 let appWindow: BrowserWindow
 let sourcesWindow: BrowserWindow
 
 let isQuitting = false
 
-const createAppWindow = (show = false) => { // (roomName: string, jwtToken: string, serverUrl: string) => {
+let email: string | undefined
+let token: string | undefined
+
+const createAppWindow = (show = false) => {
   appWindow = new BrowserWindow({
     title: 'Peekaview',
     icon: path.join(__dirname, PeekaviewLogo),
@@ -53,7 +60,7 @@ const createAppWindow = (show = false) => { // (roomName: string, jwtToken: stri
     }
   })
 
-  appWindow.loadURL(APP_WEBPACK_ENTRY)// + '?' + (new URLSearchParams({ email: roomName, jwt: jwtToken, url: serverUrl }).toString()))
+  appWindow.loadURL(APP_WEBPACK_ENTRY)
 
   // Open the DevTools.
   !app.isPackaged && appWindow.webContents.openDevTools()
@@ -70,23 +77,30 @@ app.whenReady().then(() => {
   const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
   
   const tray = new Tray(trayIcon)
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Beenden', type: 'normal', click: () => {
-      isQuitting = true
-      app.quit()
-    }},
+  const contextMenu = Menu.buildFromTemplate([ // TODO: localize
+    { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
+    { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => viewScreen() },
+    { label: 'Beenden', type: 'normal', click: () => quit() },
   ])
   tray.setToolTip('Peekaview')
   tray.setContextMenu(contextMenu)
 
   tray.on('click', () => {
-    appWindow.show()
+    // appWindow.show()
+  })
+
+  tray.on('double-click', () => {
+    tryShareScreen()
   })
 
   protocol.handle('peekaview', (request) => {
-    const filePath = request.url.slice('peekaview://'.length)
+    const protocolPath = request.url.slice('peekaview://'.length)
     console.log(request.url)
-    return net.fetch(url.pathToFileURL(path.join(__dirname, filePath)).toString())
+    const params = new URLSearchParams(protocolPath)
+    email = params.get('email') ?? undefined
+    token = params.get('token') ?? undefined
+    tryShareScreen()
+    return net.fetch(url.pathToFileURL(path.join(__dirname, protocolPath)).toString())
   })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -100,7 +114,7 @@ app.whenReady().then(() => {
     })
   })
 
-  createAppWindow(!app.isPackaged)
+  createAppWindow()
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   app.on("activate", () => {
@@ -109,6 +123,25 @@ app.whenReady().then(() => {
     }
   })
 })
+
+function tryShareScreen() {
+  if (email && token) {
+    appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams({ action: 'share', email, token }).toString()))
+    appWindow.show()
+  } else {
+    shell.openExternal(`${APP_URL}?action=login`)
+  }
+}
+
+function viewScreen() {
+  appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams({ action: 'view' }).toString()))
+  appWindow.show()
+}
+
+function quit() {
+  isQuitting = true
+  app.quit()
+}
 
 // Handle graceful shutdown
 ipcMain.handle('handle-app-closing', async () => {

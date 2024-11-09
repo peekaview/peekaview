@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive, onBeforeUnmount } from "vue"
 import { Participant, RoomEvent, Track, type Room } from "livekit-client"
+import { useI18n } from 'vue-i18n'
 
 import TrackContainer from "./TrackContainer.vue"
 import { joinRoom, publishTrack } from "../screenShare"
@@ -21,6 +22,8 @@ const localScreen = ref<Screen>()
 const allScreens = computed(() => [...(localScreen.value ? [localScreen.value] : []), ...Object.values(remoteScreens)])
 const focusedScreenId = ref<string>()
 
+const { t } = useI18n()
+
 window.electronAPI?.onSendScreenSourceId((id) => {
   sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
 })
@@ -38,6 +41,10 @@ onMounted(async () => {
   try {
     const room = await joinRoom(props.serverUrl, props.jwtToken)
     sharingRoom.value = room
+
+    room.on(RoomEvent.Disconnected, () => {
+      console.log("room was disconnected")
+    })
 
     room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       console.debug("TrackSubscribed", track, participant)
@@ -99,32 +106,47 @@ async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = fals
     console.error('Error publishing screen track:', error)
   }
 }
+
+const getParticipantName = (participant: Participant, isLocal: boolean) => {
+  return participant.identity + (isLocal ? ` (${t('screenShare.localParticipant')})` : '')
+}
 </script>
 
 <template>
   <div id="room">
     <div id="room-header">
-      <h2 id="room-title">{{ roomName }}</h2>
+      <h2 id="room-title">{{ t('screenShare.title') }}</h2>
     </div>
     <div id="room-content">
       <div id="thumbnail-bar">
         <div v-if="sharingRoom && !localScreen">
-          <button class="btn btn-primary w-100" @click="shareLocalScreen(sharingRoom)">Share my screen</button>
+          <button class="btn btn-primary w-100" @click="shareLocalScreen(sharingRoom)">
+            {{ t('screenShare.shareButton') }}
+          </button>
         </div>
         <template v-for="screen in allScreens">
-          <div :id="`thumb-${screen.track.sid!}`" class="thumbnail" :class="{ focused: screen.track.sid === focusedScreenId }" @click="focusedScreenId = screen.track.sid">
+          <div 
+            :id="`thumb-${screen.track.sid!}`" 
+            class="thumbnail" 
+            :class="{ focused: screen.track.sid === focusedScreenId }" 
+            @click="focusedScreenId = screen.track.sid"
+          >
             <div class="participant-name">
               <TrackContainer :track="screen.track" muted plays-inline />
-              <p>{{ screen.participant.identity + (screen === localScreen ? " (You)" : "") }}</p>
+              <p>{{ getParticipantName(screen.participant, screen === localScreen) }}</p>
             </div>
           </div>
         </template>
       </div>
       <div id="layout-container">
         <template v-for="screen in allScreens">
-          <div v-show="screen.track.sid === focusedScreenId" :id="`camera-${screen.track.sid!}`" class="video-container">
+          <div 
+            v-show="screen.track.sid === focusedScreenId" 
+            :id="`camera-${screen.track.sid!}`" 
+            class="video-container"
+          >
             <div class="participant-data">
-              <p>{{ screen.participant.identity + (screen === localScreen ? " (You)" : "") }}</p>
+              <p>{{ getParticipantName(screen.participant, screen === localScreen) }}</p>
               <TrackContainer :track="screen.track" />
             </div>
           </div>

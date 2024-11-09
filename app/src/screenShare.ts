@@ -136,7 +136,7 @@ export async function joinRoom(url: string, jwtToken: string) {
   })
 
   try {
-    console.log("joinRoom connect")
+    console.log("joinRoom connect", url, jwtToken)
     if (!url.startsWith("http"))
       url = "https://" + url
     

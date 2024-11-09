@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
 import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShareData } from '../types'
-import { callApi } from '../api';
+import { callApi } from '../api'
 
-type RequestStatus = "request_accepted" | "request_notified" | "request_not_answered" | "request_open"
+type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
+type WaitingStatus = "establishing" | "notified" | "waiting"
 
 type UnacceptedRequestResponse = {
   message: string
@@ -45,6 +47,8 @@ const emit = defineEmits<{
   (e: 'startSharing', data: ScreenShareData): void
 }>()
 
+const { t } = useI18n()
+
 const email = defineModel<string>('email')
 const name = defineModel<string>('name')
 
@@ -52,28 +56,24 @@ const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
-const waitingMessage = ref<string | undefined>()
+const waitingStatus = ref<WaitingStatus | undefined>()
 
 function generateRequestId(length = 8) {
-  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
+  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
+    result += characters.charAt(Math.floor(Math.random() * characters.length))
   }
-  return result;
+  return result
 }
     
 async function handleSubmit(e: Event) {
-  e.preventDefault();
+  e.preventDefault()
 
   if (!email.value || !name.value)
     return
 
-  waitingMessage.value = 'Verbindung wird aufgebaut...'
-  setTimeout(() => {
-    // waitingMessage.value = `We've sent an email to ${email.value}. You can keep this window open.`
-  }, 20000)
-  
+  waitingStatus.value = 'establishing'
   requestStatus.value = undefined
 
   const params = {
@@ -92,7 +92,7 @@ async function requestScreen(params: RequestParams, initial = false) {
     })
     
     if (initial) {
-      waitingMessage.value = `Warten auf Antwort von ${email.value}...`
+      waitingStatus.value = 'waiting'
     } else {
       requestStatus.value = data.status
       requestUserStatus.value = data.user_status
@@ -106,25 +106,29 @@ async function requestScreen(params: RequestParams, initial = false) {
             controlServer: data.controlServer,
             roomId: data.roomId,
           })
-          return;
+          return
+        case 'request_denied':
+          waitingStatus.value = undefined
+          return
+        case 'request_notified':
+          waitingStatus.value = 'notified'
+          return
         case 'request_open':
           if (!requestStatus.value)
-            waitingMessage.value = `Warten auf Antwort von ${email.value}...`
-          break;
+            waitingStatus.value = 'waiting'
+          break
       }
-
-      window.setTimeout(() => {
-        requestScreen(params)
-      }, 1000);
     }
+
+    window.setTimeout(() => requestScreen(params), 1000)
   } catch (error) {
-    console.error('Error during polling:', error);
-    handleError(error);
+    console.error('Error during polling:', error)
+    handleError(error)
   }
 }
     
 function handleRequestAccepted(data: AcceptedRequestData) {
-  waitingMessage.value = undefined
+  waitingStatus.value = undefined
   requestStatus.value = undefined
   
   setTimeout(() => {
@@ -134,78 +138,86 @@ function handleRequestAccepted(data: AcceptedRequestData) {
       serverUrl: data.videoServer,
       isSharer: false,
     })
-  }, 300);
+  }, 300)
 }
 
 function handleError(error) {
-  waitingMessage.value = undefined
+  waitingStatus.value = undefined
   requestStatus.value = undefined
   
   Swal.fire({
     icon: 'error',
     title: 'Connection Error',
-    text: 'There was a problem connecting to the server. Please try again.',
+    text: t('viewer.connectionError'),
     customClass: {
         popup: 'animate__animated animate__fadeIn'
     }
-  });
+  })
 }
 
 function formatLastSeen(timestamp) {
-  const seconds = Math.floor((Date.now() / 1000) - timestamp);
+  const seconds = Math.floor((Date.now() / 1000) - timestamp)
   
   if (seconds < 60)
-    return 'gerade eben'
+    return t('viewer.lastSeen.justNow')
   
   if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    return `vor ${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`;
+    const minutes = Math.floor(seconds / 60)
+    return t('viewer.lastSeen.minutesAgo', { minutes })
   }
   
   if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    return `vor ${hours} ${hours === 1 ? 'Stunde' : 'Stunden'}`;
+    const hours = Math.floor(seconds / 3600)
+    return t('viewer.lastSeen.hoursAgo', { hours })
   }
   
-  const days = Math.floor(seconds / 86400);
-  return `vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}`;
+  const days = Math.floor(seconds / 86400)
+  return t('viewer.lastSeen.daysAgo', { days })
 }
 </script>
 
 <template>
-  <h3 class="text-center mb-4">Request Screen Share Access</h3>
+  <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
-  <form id="viewerForm" class="section-form" @submit="handleSubmit">
+  <form class="section-form" @submit="handleSubmit">
     <div class="form-content">
       <div class="mb-4">
-        <label for="email" class="form-label">Email address of user to connect with</label>
+        <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
           v-model="email"
           placeholder="example@email.com" required>
       </div>
       <div class="mb-4">
-        <label for="name" class="form-label">Your Name</label>
+        <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
         <input type="text" class="form-control form-control-lg" id="name" name="name"
           v-model="name"
           placeholder="Enter your name" required>
       </div>
-      <button type="submit" class="btn btn-primary btn-lg w-100">Request Access</button>
+      <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
     </div>
   </form>
 
-  <Modal :show="!!waitingMessage" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
+  <Modal :show="requestStatus === 'request_denied'">
+    <template #default>
+      <p id="requestMessage">{{ $t('viewer.requestDenied', { email }) }}</p>
+    </template>
+    <template #ok>
+      <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="requestStatus = undefined">{{ $t('general.ok') }}</button>
+    </template>
+  </Modal>
+
+  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
     <div class="text-center">
       <div class="waiting-spinner"></div>
-      <h4 class="mt-3" id="waitingMessage">{{ waitingMessage }}</h4>
+      <h4 class="mt-3" id="waitingMessage">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
       <p v-if="requestUserStatus" class="mb-3">
-        <span v-if="requestUserStatus === 'online'" class="badge bg-success">online <small>(zuletzt aktiv {{ formatLastSeen(requestLastSeen) }})</small></span>
-        <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">away <small>(zuletzt aktiv {{ formatLastSeen(requestLastSeen) }})</small></span>
-        <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">Benutzer offline</span>
-        <span v-else class="badge bg-warning">Benutzer inaktiv oder offline</span>
+        <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+        <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+        <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
+        <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
       </p>
       <p class="text-muted small mt-10">
-        Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, 
-        wird die Verbindung automatisch hergestellt.
+        {{ $t('viewer.keepWindowOpen') }}
       </p>
     </div>
   </Modal>

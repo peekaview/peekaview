@@ -1,8 +1,12 @@
-const { FusesPlugin } = require('@electron-forge/plugin-fuses');
-const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const fs = require('fs')
+const path = require('path')
+
+const { FusesPlugin } = require('@electron-forge/plugin-fuses')
+const { FuseV1Options, FuseVersion } = require('@electron/fuses')
 
 module.exports = {
   packagerConfig: {
+    out: 'dist',
     executableName: 'peekaview',
     icon: './src/assets/img/peekaview',
     asar: true,
@@ -12,27 +16,31 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
+        name: 'Peekaview',
+        setupExe: 'Peekaview-Setup-${version}.exe',
         options: {
           iconUrl: '/peekaview.ico',
           setupIcon: './src/assets/img/peekaview.ico',
         },
       },
-    },
-    {
-      name: '@electron-forge/maker-zip',
-      platforms: ['darwin', 'linux', 'win32'],
+      platforms: ['win32']
     },
     {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
+          name: 'Peekaview',
+          productName: 'Peekaview',
+          dest: 'dist/packages',
           icon: './src/assets/img/peekaview.png',
         },
       },
+      platforms: ['linux']
     },
     {
       name: '@electron-forge/maker-rpm',
       config: {},
+      platforms: ['linux']
     },
   ],
   plugins: [
@@ -73,8 +81,36 @@ module.exports = {
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false, // TODO: check how to create integrity validation for macOS and Windows
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  hooks: {
+    generateAssets: async (_config, platform) => {
+      const distPath = path.join('dist', platform)
+      if (fs.existsSync(distPath))
+        fs.rmSync(distPath, { recursive: true })
+
+      if (fs.existsSync('out'))
+        fs.rmSync('out', { recursive: true })
+    },
+    postMake: async (_forgeConfig, options) => {
+      if (!fs.existsSync('dist'))
+        fs.mkdirSync('dist', { recursive: true })
+
+      for (const option of options) {
+        for (const artifact of option.artifacts) {
+          const platform = option.platform
+          const arch = option.arch
+          const destDir = path.join('dist', `${platform}-${arch}`)
+
+          if (!fs.existsSync(destDir))
+            fs.mkdirSync(destDir, { recursive: true })
+
+          const filename = `${option.packageJSON.name}-${option.packageJSON.version}-setup${path.extname(artifact)}`
+          fs.copyFileSync(artifact, path.join(destDir, filename))
+        }
+      }
+    }
+  }
 };

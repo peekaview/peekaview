@@ -5,15 +5,21 @@
   "version": "0.0.1",
   "description": "Simple screen sharing application",
   "license": "AGPL-3.0",
-  "private": "true",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peekaview/peekaview.git"
+  },
   "main": "./.webpack/main",
   "scripts": {
     "web-dev": "dotenvx run -- webpack serve --mode=development",
     "web-build": "dotenvx run -- webpack --mode=production",
     "electron-dev": "dotenvx run -- electron-forge start",
-    "electron-build": "dotenvx run -- electron-forge make --platform=win32 --x64",
+    "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
+    "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
     "package": "dotenvx run -- electron-forge package",
-    "tsc": "vue-tsc --noEmit"
+    "tsc": "vue-tsc --noEmit",
+    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
@@ -21,7 +27,9 @@
     "electron-squirrel-startup": "^1.0.1",
     "livekit-client": "2.1.5",
     "sweetalert2": "^11.14.4",
-    "vue": "^3.5.12"
+    "update-electron-app": "^3.0.0",
+    "vue": "^3.5.12",
+    "vue-i18n": "^10.0.4"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.21.1",
@@ -29,7 +37,6 @@
     "@electron-forge/maker-deb": "^7.4.0",
     "@electron-forge/maker-rpm": "^7.4.0",
     "@electron-forge/maker-squirrel": "^7.4.0",
-    "@electron-forge/maker-zip": "^7.4.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "@electron-forge/plugin-fuses": "^7.4.0",
     "@electron-forge/plugin-webpack": "^7.5.0",
@@ -64,8 +71,16 @@
         ]
       }
     ],
+    "win": {
+      "target": [
+        "squirrel"
+      ],
+      "icon": "src/assets/windows/icon.ico"
+    },
     "linux": {
-      "target": ["deb"],
+      "target": [
+        "deb"
+      ],
       "desktop": {
         "MimeType": "x-scheme-handler/peekaview"
       },
@@ -73,12 +88,16 @@
         {
           "from": "src/assets/linux",
           "to": "usr/share/applications",
-          "filter": ["*.desktop"]
+          "filter": [
+            "*.desktop"
+          ]
         },
         {
           "from": "src/assets/linux",
           "to": "usr/share/mime/packages",
-          "filter": ["*.xml"]
+          "filter": [
+            "*.xml"
+          ]
         }
       ],
       "deb": {

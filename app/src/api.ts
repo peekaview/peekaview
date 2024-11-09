@@ -10,7 +10,7 @@ export type ApiRequestParams = {
   email: string
   token: string
 } | {
-  action: "youAreAllowedToSeeMyScreen"
+  action: "youAreAllowedToSeeMyScreen" | "youAreNotAllowedToSeeMyScreen"
   email: string
   token: string
   request_id: string
