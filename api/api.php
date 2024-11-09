@@ -13,6 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 header('Content-Type: application/json');
 
+// Add a custom error handler
+function handleError($errno, $errstr, $errfile, $errline) {
+    die(json_encode(['error' => $errstr]));
+}
+set_error_handler('handleError');
+
 // Validate required environment variables
 foreach (['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as $required) {
     if (!getenv($required)) {
@@ -496,9 +502,8 @@ try {
             registerMyEmail();
             break;
         default:
-            throw new Exception('Invalid action');
+            die(json_encode(['error' => 'Invalid action']));
     }
 } catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode(['error' => $e->getMessage()]);
+    die(json_encode(['error' => $e->getMessage()]));
 }
