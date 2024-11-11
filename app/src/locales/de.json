@@ -48,9 +48,9 @@
   "share": {
     "howToShare": "Wie möchten Sie Ihren Bildschirm teilen?",
     "appOption": {
-      "title": "Mit PeekAView App teilen",
+      "title": "Mit PeekaView App teilen",
       "description": "Empfohlen: Voller Fernzugriff und Zeichenfunktionen",
-      "button": "In PeekAView App öffnen"
+      "button": "In PeekaView App öffnen"
     },
     "or": "oder",
     "browserOption": {
@@ -59,8 +59,8 @@
       "button": "Im Browser fortfahren"
     },
     "download": {
-      "prompt": "Sie haben die PeekAView App noch nicht?",
-      "button": "PeekAView für Windows herunterladen"
+      "prompt": "Sie haben die PeekaView App noch nicht?",
+      "button": "PeekaView für Windows herunterladen"
     },
     "activeSession": {
       "title": "Aktive Freigabesitzung",
@@ -79,7 +79,7 @@
       "checking": "Prüfen auf Teilnehmeranfragen..."
     },
     "appDialog": {
-      "title": "PeekAView App",
+      "title": "PeekaView App",
       "message": "Wenn sich die App nicht automatisch öffnet, stellen Sie sicher, dass sie installiert ist.",
       "download": "Sie können sie <a href=\"{link}\" class=\"alert-link\">hier herunterladen</a>.",
       "tryAgain": "Erneut versuchen",

@@ -42,7 +42,7 @@ async function handleRegister(e: Event) {
 
   try {
     await callApi<Response>({
-      action: 'register',
+      action: 'registerMyEmail',
       email: email.value,
     })
   } catch (error) {

@@ -1,7 +1,7 @@
 {
   "name": "peekaview",
   "author": "Limtec GmbH",
-  "productName": "Peek-A-View",
+  "productName": "PeekaView",
   "version": "0.0.1",
   "description": "Simple screen sharing application",
   "license": "AGPL-3.0",
@@ -66,7 +66,7 @@
     "appId": "de.limtec.peekaview",
     "protocols": [
       {
-        "name": "Peekaview Protocol",
+        "name": "PeekaView Protocol",
         "schemes": [
           "peekaview"
         ]

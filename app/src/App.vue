@@ -10,7 +10,7 @@ import Viewer from './components/Viewer.vue'
 import Share from './components/Share.vue'
 import ScreenShare from './components/ScreenShare.vue'
 
-import PeekaviewLogo from './assets/img/peekaviewlogo.png'
+import PeekaViewLogo from './assets/img/peekaviewlogo.png'
 
 import type { ScreenShareData } from './types'
 
@@ -62,7 +62,7 @@ async function handleLogout() {
     <div class="header-content">
       <div class="logo-container">
         <a href="/">
-          <img :src="PeekaviewLogo" alt="Logo" class="logo">
+          <img :src="PeekaViewLogo" alt="Logo" class="logo">
         </a>
       </div>
       <h1 class="header-title">
@@ -115,7 +115,7 @@ async function handleLogout() {
 
   <footer class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 Peekaview | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a></p>
+      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a></p>
     </div>
   </footer>
 </template>

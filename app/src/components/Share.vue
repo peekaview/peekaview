@@ -28,7 +28,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const downloadLink = ref('downloads/PeekAView.exe')
+const downloadLink = ref('downloads/PeekaView.exe')
 
 const sessionActive = defineModel<boolean>('sessionActive')
 

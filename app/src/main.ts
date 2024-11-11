@@ -3,7 +3,7 @@ import url from 'url'
 import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
 import { updateElectronApp } from 'update-electron-app'
 
-import PeekaviewLogo from './assets/img/peekaview.png'
+import PeekaViewLogo from './assets/img/peekaview.png'
 
 declare const APP_WEBPACK_ENTRY: string
 declare const APP_PRELOAD_WEBPACK_ENTRY: string
@@ -34,8 +34,8 @@ let token: string | undefined
 
 const createAppWindow = (show = false) => {
   appWindow = new BrowserWindow({
-    title: 'Peekaview',
-    icon: path.join(__dirname, PeekaviewLogo),
+    title: 'PeekaView',
+    icon: path.join(__dirname, PeekaViewLogo),
     show,
     width: 1280,
     height: 720,
@@ -66,14 +66,18 @@ const createAppWindow = (show = false) => {
   !app.isPackaged && appWindow.webContents.openDevTools()
 }
 
-if (!app.isDefaultProtocolClient('peekaview'))
-  app.setAsDefaultProtocolClient('peekaview')
+if (!app.isDefaultProtocolClient('peekaview')) {
+  const success = app.setAsDefaultProtocolClient('peekaview')
+  if (!success) {
+    console.error('Failed to set peekaview protocol', success)
+  }
+}
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  const trayIconPath = path.join(__dirname, PeekaviewLogo)
+  const trayIconPath = path.join(__dirname, PeekaViewLogo)
   const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
   
   const tray = new Tray(trayIcon)
@@ -82,7 +86,7 @@ app.whenReady().then(() => {
     { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => viewScreen() },
     { label: 'Beenden', type: 'normal', click: () => quit() },
   ])
-  tray.setToolTip('Peekaview')
+  tray.setToolTip('PeekaView')
   tray.setContextMenu(contextMenu)
 
   tray.on('click', () => {

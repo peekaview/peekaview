@@ -15,7 +15,7 @@ export type ApiRequestParams = {
   token: string
   request_id: string
 } | {
-  action: "register"
+  action: "registerMyEmail"
   email: string
 }
 

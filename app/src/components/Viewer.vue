@@ -209,7 +209,7 @@ function formatLastSeen(timestamp) {
   <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
     <div class="text-center">
       <div class="waiting-spinner"></div>
-      <h4 class="mt-3" id="waitingMessage">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
+      <h4 v-if="waitingStatus" class="mt-3" id="waitingMessage">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
       <p v-if="requestUserStatus" class="mb-3">
         <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
         <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>

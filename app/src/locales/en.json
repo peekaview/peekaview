@@ -48,9 +48,9 @@
   "share": {
     "howToShare": "How would you like to share your screen?",
     "appOption": {
-      "title": "Share with PeekAView App",
+      "title": "Share with PeekaView App",
       "description": "Recommended: Full remote access and drawing capabilities",
-      "button": "Open in PeekAView App"
+      "button": "Open in PeekaView App"
     },
     "or": "or",
     "browserOption": {
@@ -59,8 +59,8 @@
       "button": "Continue in Browser"
     },
     "download": {
-      "prompt": "Don't have the PeekAView App yet?",
-      "button": "Download PeekAView for Windows"
+      "prompt": "Don't have the PeekaView App yet?",
+      "button": "Download PeekaView for Windows"
     },
     "activeSession": {
       "title": "Active Sharing Session",
@@ -79,7 +79,7 @@
       "checking": "Checking for participant requests..."
     },
     "appDialog": {
-      "title": "PeekAView App",
+      "title": "PeekaView App",
       "message": "If the app doesn't open automatically, please make sure you have it installed.",
       "download": "You can <a href=\"{link}\" class=\"alert-link\">download it here</a>.",
       "tryAgain": "Try Again",

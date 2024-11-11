@@ -42,8 +42,8 @@ onMounted(async () => {
     const room = await joinRoom(props.serverUrl, props.jwtToken)
     sharingRoom.value = room
 
-    room.on(RoomEvent.Disconnected, () => {
-      console.log("room was disconnected")
+    room.on(RoomEvent.Disconnected, (e) => {
+      console.log("room was disconnected", e)
     })
 
     room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {

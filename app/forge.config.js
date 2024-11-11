@@ -16,8 +16,8 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        name: 'Peekaview',
-        setupExe: 'Peekaview-Setup-${version}.exe',
+        name: 'PeekaView',
+        setupExe: 'PeekaView-Setup-${version}.exe',
         options: {
           iconUrl: '/peekaview.ico',
           setupIcon: './src/assets/img/peekaview.ico',
@@ -29,11 +29,12 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          name: 'Peekaview',
-          productName: 'Peekaview',
+          name: 'peekaview',
+          productName: 'PeekaView',
           dest: 'dist/packages',
           icon: './src/assets/img/peekaview.png',
         },
+        mimeType: ["x-scheme-handler/peekaview"],
       },
       platforms: ['linux']
     },
@@ -107,7 +108,7 @@ module.exports = {
           if (!fs.existsSync(destDir))
             fs.mkdirSync(destDir, { recursive: true })
 
-          const filename = `${option.packageJSON.name}-${option.packageJSON.version}-setup${path.extname(artifact)}`
+          const filename = `${option.packageJSON.productName}-${option.packageJSON.version}-setup${path.extname(artifact)}`
           fs.copyFileSync(artifact, path.join(destDir, filename))
         }
       }
