@@ -26,6 +26,7 @@
     "bootstrap-vue-next": "^0.25.10",
     "electron-squirrel-startup": "^1.0.1",
     "livekit-client": "2.1.5",
+    "rpmbuild": "^0.0.23",
     "sweetalert2": "^11.14.4",
     "update-electron-app": "^3.0.0",
     "vue": "^3.5.12",

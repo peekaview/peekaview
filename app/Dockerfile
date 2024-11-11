@@ -16,7 +16,7 @@ COPY webpack.config.js ./
 RUN npm install
 
 
-RUN npm run prod
+RUN npm run web-build
 
 # Production stage
 FROM nginx:alpine

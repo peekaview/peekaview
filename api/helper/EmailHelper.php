@@ -162,7 +162,7 @@ class EmailHelper {
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
         <h2 style="color: #333;">Bildschirmfreigabe-Anfrage</h2>
         <p>Hallo,</p>
-        <p><strong>{$requesterName}</strong> möchte Ihren Bildschirm sehen.</p>
+        <p><strong>{$requesterName}</strong> möchte Ihren Bildschirm über PeekaView sehen.</p>
         <p><a href="{$shareLink}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Bildschirm freigeben</a></p>
         <p>Oder nutzen Sie diesen Link: {$shareLink}</p>
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
@@ -178,7 +178,7 @@ Bildschirmfreigabe-Anfrage
 
 Hallo,
 
-{$requesterName} möchte Ihren Bildschirm sehen.
+{$requesterName} möchte Ihren Bildschirm über PeekaView sehen.
 
 Nutzen Sie diesen Link zur Freigabe: {$shareLink}
 
@@ -198,7 +198,7 @@ TEXT;
 <body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
         <h2 style="color: #333;">Registrierung bestätigen</h2>
-        <p>Hallo und willkommen bei Peekaview,</p>
+        <p>Hallo und willkommen bei PeekaView,</p>
         <p>vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
         <p><a href="{$confirmLink}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
         <p>Oder nutzen Sie diesen Link: {$confirmLink}</p>
@@ -213,7 +213,7 @@ HTML;
         $textContent = <<<TEXT
 Registrierung bestätigen
 
-Hallo und willkommen bei Peekaview,
+Hallo und willkommen bei PeekaView,
 
 vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse über diesen Link:
 

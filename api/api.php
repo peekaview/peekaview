@@ -284,7 +284,7 @@ function showMeYourScreen() {
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
                     require_once __DIR__.'/helper/EmailHelper.php';
                     $emailHelper = new EmailHelper();
-                    $shareLink = "https://".APP_DOMAIN."/?action=share&email=$email&token=$token&v=".base64_encode("action=share&email=$email&token=$token");
+                    $shareLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=share&email=$email&token=$token");
                     if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
                         $requestData[3] = 'email_sent';
                         file_put_contents($requestFile, implode(',', $requestData));
@@ -305,6 +305,16 @@ function showMeYourScreen() {
                         'status' => 'request_not_answered',
                         'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
                         'user_status' => 'away',
+                        'last_seen' => $lastSeen
+                    ]);
+                    return;
+                }
+
+                if ($status === 'request_denied') {
+                    echo json_encode([
+                        'status' => 'request_denied',
+                        'message' => "$email hat die Anfrage abgelehnt",
+                        'user_status' => $userStatus,
                         'last_seen' => $lastSeen
                     ]);
                     return;
@@ -451,7 +461,7 @@ function registerMyEmail() {
             
             require_once __DIR__.'/helper/EmailHelper.php';
             $emailHelper = new EmailHelper();
-            $registrationLink = "https://".APP_DOMAIN."/?action=register&email=$email&token=$token&v=".base64_encode("action=register&email=$email&token=$token");
+            $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token");
             $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
             echo json_encode([
