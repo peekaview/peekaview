@@ -28,6 +28,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const inElectron = ref(!!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
 const sessionActive = defineModel<boolean>('sessionActive')
@@ -46,6 +47,9 @@ document.addEventListener('visibilitychange', () => {
   else
     startPingInterval()
 })
+
+if (inElectron.value)
+  listenForRequests()
 
 function listenForRequests() {
   listeningForRequests.value = true
@@ -195,7 +199,7 @@ function shareViaApp() {
   <template v-if="token && !listeningForRequests">
     <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
     
-    <div class="share-options-stack">
+    <div v-if="!inElectron" class="share-options-stack">
       <div class="share-option primary">
         <div class="option-content">
           <h3>{{ $t('share.appOption.title') }}</h3>

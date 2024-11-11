@@ -1,6 +1,7 @@
 import path from 'path'
 import url from 'url'
-import { app, BrowserWindow, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
+import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, nativeImage, net, protocol, Tray, session, shell } from "electron"
+import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
 
 import PeekaViewLogo from './assets/img/peekaview.png'
@@ -19,10 +20,22 @@ if (require("electron-squirrel-startup")) {
   app.quit()
 }
 
-updateElectronApp()
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  console.log('An instance of the app is already running, quitting...')
+  app.quit()
+} else {
+  updateElectronApp()
 
-// allow superhigh cpu usage for faster video-encoding
-app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
+  if (!app.isDefaultProtocolClient('peekaview')) {
+    const success = app.setAsDefaultProtocolClient('peekaview')
+    if (!success) {
+      console.error('Failed to set peekaview protocol')
+    }
+  }
+  // allow superhigh cpu usage for faster video-encoding
+  app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
+}
 
 let appWindow: BrowserWindow
 let sourcesWindow: BrowserWindow
@@ -31,6 +44,74 @@ let isQuitting = false
 
 let email: string | undefined
 let token: string | undefined
+
+// This method will be called when Electron has finished
+// initialization and is ready to create browser windows.
+// Some APIs can only be used after this event occurs.
+app.whenReady().then(() => {
+  if (process.platform === 'linux')
+    exec(`xdg-mime default peekaview.desktop x-scheme-handler/peekaview`)
+  
+  const trayIconPath = path.join(__dirname, PeekaViewLogo)
+  const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
+  
+  const tray = new Tray(trayIcon)
+  const contextMenu = Menu.buildFromTemplate([ // TODO: localize
+    { label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
+        try {
+          const text = clipboard.readText()
+          new URL(text) // test if it's a valid URL
+          handleProtocol(text)
+        } catch (e) {
+          console.error('Clipboard content does not seem to be a valid PeekaView URL')
+        }
+      },
+    },
+    { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
+    { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => viewScreen() },
+    { label: 'Beenden', type: 'normal', click: () => quit() },
+  ])
+  tray.setToolTip('PeekaView')
+  tray.setContextMenu(contextMenu)
+
+  tray.on('click', () => {
+    // appWindow.show()
+  })
+
+  tray.on('double-click', () => {
+    tryShareScreen()
+  })
+
+  protocol.handle('peekaview', request => handleProtocol(request.url) ?? new Response())
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          CSP_POLICY
+        ]
+      }
+    })
+  })
+
+  createAppWindow()
+  // On OS X it's common to re-create a window in the app when the
+  // dock icon is clicked and there are no other windows open.
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createAppWindow(true)
+    }
+  })
+
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('second-instance', event, commandLine, workingDirectory)
+    if (appWindow) {
+      if (appWindow.isMinimized()) appWindow.restore()
+        appWindow.focus()
+    }
+  })
+})
 
 const createAppWindow = (show = false) => {
   appWindow = new BrowserWindow({
@@ -66,67 +147,14 @@ const createAppWindow = (show = false) => {
   !app.isPackaged && appWindow.webContents.openDevTools()
 }
 
-if (!app.isDefaultProtocolClient('peekaview')) {
-  const success = app.setAsDefaultProtocolClient('peekaview')
-  if (!success) {
-    console.error('Failed to set peekaview protocol', success)
-  }
+function handleProtocol(protocolUrl: string) {
+  const protocolPath = protocolUrl.slice('peekaview://'.length)
+  const params = new URLSearchParams(protocolPath)
+  email = params.get('email') ?? undefined
+  token = params.get('token') ?? undefined
+  tryShareScreen()
+  return undefined
 }
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  const trayIconPath = path.join(__dirname, PeekaViewLogo)
-  const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-  
-  const tray = new Tray(trayIcon)
-  const contextMenu = Menu.buildFromTemplate([ // TODO: localize
-    { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
-    { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => viewScreen() },
-    { label: 'Beenden', type: 'normal', click: () => quit() },
-  ])
-  tray.setToolTip('PeekaView')
-  tray.setContextMenu(contextMenu)
-
-  tray.on('click', () => {
-    // appWindow.show()
-  })
-
-  tray.on('double-click', () => {
-    tryShareScreen()
-  })
-
-  protocol.handle('peekaview', (request) => {
-    const protocolPath = request.url.slice('peekaview://'.length)
-    console.log(request.url)
-    const params = new URLSearchParams(protocolPath)
-    email = params.get('email') ?? undefined
-    token = params.get('token') ?? undefined
-    tryShareScreen()
-    return net.fetch(url.pathToFileURL(path.join(__dirname, protocolPath)).toString())
-  })
-
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          CSP_POLICY
-        ]
-      }
-    })
-  })
-
-  createAppWindow()
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createAppWindow(true)
-    }
-  })
-})
 
 function tryShareScreen() {
   if (email && token) {

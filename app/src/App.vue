@@ -26,17 +26,22 @@ const email = ref<string | undefined>()
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
-  action.value = params.get('action') ?? 'view'
+  handleParams(params)
+
   const v = params.get('v')
   if (v) {
     const vParams = new URLSearchParams(atob(v))
-    action.value = vParams.get('action') ?? 'view'
-    token.value = vParams.get('token') ?? localStorage.getItem('token') ?? undefined
-    email.value = vParams.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
-    token.value && localStorage.setItem('token', token.value)
-    email.value && localStorage.setItem('email', email.value)
+    handleParams(vParams)
   }
 })
+
+function handleParams(params: URLSearchParams) {
+  action.value = params.get('action') ?? 'view'
+  token.value = params.get('token') ?? localStorage.getItem('token') ?? undefined
+  email.value = params.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
+  token.value && localStorage.setItem('token', token.value)
+  email.value && localStorage.setItem('email', email.value)
+}
 
 async function handleLogout() {
   const result = await Swal.fire({
@@ -115,7 +120,7 @@ async function handleLogout() {
 
   <footer class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a></p>
+      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
     </div>
   </footer>
 </template>
