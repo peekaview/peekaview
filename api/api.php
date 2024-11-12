@@ -454,27 +454,20 @@ function registerMyEmail() {
         $email = validateEmail($_GET['email'] ?? '');
         
         $userFile = getEmailFilename($email);
-        if (!file_exists($userFile)) {
-            $token = generateRandomString(16);
-            $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
-            file_put_contents($userFile, $userData);
-            
-            require_once __DIR__.'/helper/EmailHelper.php';
-            $emailHelper = new EmailHelper();
-            $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token");
-            $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
-            echo json_encode([
-                'success' => true
-            ]);
-            return;
-        }
+        $token = generateRandomString(16);
+        $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
+        file_put_contents($userFile, $userData);
         
-        // User already exists
+        require_once __DIR__.'/helper/EmailHelper.php';
+        $emailHelper = new EmailHelper();
+        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token");
+        $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
+
         echo json_encode([
-            'success' => false,
-            'error' => 'Email already registered'
+            'success' => true
         ]);
+        return;
         
     } catch (Exception $e) {
         http_response_code(400);
