@@ -19,7 +19,14 @@
     "login": "Jetzt in App anmelden",
     "loggingIn": "Logge in der App ein...",
     "code": "Ihr Login-Code",
-    "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein."
+    "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein.",
+    "alreadyRegistered": "Diese E-Mail-Adresse ist bereits registriert.",
+    "justRegistered": "Sie haben sich erfolgreich registriert. Bitte prüfen Sie Ihre Mails für den Anmelde-Link.",
+    "successful": "Anmeldung erfolgreich",
+    "successMessage": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
+    "openApp": "App öffnen",
+    "orEnterCode": "Oder geben Sie diesen Code in der App ein, um fortzufahren:",
+    "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support."
   },
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",

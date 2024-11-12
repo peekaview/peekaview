@@ -9,6 +9,8 @@ declare global {
 }
 
 export interface IElectronAPI {
+  loginViaBrowser: () => Promise<void>,
+  loginWithCode: (code: string) => Promise<void>,
   getScreenSources: () => Promise<ScreenSource[]>,
   selectScreenSourceId: (id: string) => Promise<void>,
   onSendScreenSourceId: (callback: (id: string) => void) => Electron.IpcRenderer,

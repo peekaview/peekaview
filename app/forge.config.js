@@ -70,6 +70,13 @@ module.exports = {
             preload: {
               js: './src/sources/preload.ts'
             }
+          }, {
+            name: 'login',
+            html: './src/login/index.html',
+            js: './src/login/login.ts',
+            preload: {
+              js: './src/login/preload.ts'
+            }
           }]
         }
       },

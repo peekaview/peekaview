@@ -36,11 +36,13 @@ onMounted(() => {
 })
 
 function handleParams(params: URLSearchParams) {
-  action.value = params.get('action') ?? 'view'
+  action.value = params.get('action') ?? action.value
   token.value = params.get('token') ?? localStorage.getItem('token') ?? undefined
   email.value = params.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
+  
   token.value && localStorage.setItem('token', token.value)
   email.value && localStorage.setItem('email', email.value)
+  console.log("handleParams", action.value, token.value, email.value)
 }
 
 async function handleLogout() {
@@ -94,9 +96,8 @@ async function handleLogout() {
       <div class="content-card">
         <div class="centered-section">
           <div class="section-content">
-            <Viewer
-              v-if="action === 'view'"
-              @start-sharing="screenShareData = $event"
+            <Login
+              v-if="action === 'login'"
             />
             <Share
               v-else-if="action === 'share' && email && token"
@@ -105,8 +106,9 @@ async function handleLogout() {
               :token="token"
               @start-sharing="screenShareData = $event"
             />
-            <Login
-              v-else-if="action === 'login'"
+            <Viewer
+              v-else
+              @start-sharing="screenShareData = $event"
             />
           </div>
         </div>

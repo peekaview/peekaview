@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+  </head>
+  <body class="d-flex align-items-center justify-content-center">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-6 bg-white p-4 rounded shadow-sm fade-in">
+          
+          <div id="login-via-browser" class="text-center">
+            <h2 class="mb-4">Login</h2>
+            <button id="login" class="btn btn-primary btn-lg w-100">Click to login via browser</button>
+          </div>
+
+          <div id="wait-for-login" class="text-center" style="display: none;">
+            <h2 class="mb-3">Wait for login</h2>
+            <h3 class="text-secondary mb-3">or enter code from email</h3>
+            <input id="code-input" class="form-control mb-3" type="text" placeholder="Enter Code">
+            <button id="login-with-code" class="btn btn-primary btn-lg w-100">Login with code</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -12,6 +12,9 @@ declare const APP_PRELOAD_WEBPACK_ENTRY: string
 declare const SOURCES_WEBPACK_ENTRY: string
 declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
 
+declare const LOGIN_WEBPACK_ENTRY: string
+declare const LOGIN_PRELOAD_WEBPACK_ENTRY: string
+
 declare const APP_URL: string
 declare const CSP_POLICY: string
 
@@ -39,11 +42,11 @@ if (!gotTheLock) {
 
 let appWindow: BrowserWindow
 let sourcesWindow: BrowserWindow
+let loginWindow: BrowserWindow
 
 let isQuitting = false
 
-let email: string | undefined
-let token: string | undefined
+let v: string | undefined
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -56,21 +59,26 @@ app.whenReady().then(() => {
   const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
   
   const tray = new Tray(trayIcon)
-  const contextMenu = Menu.buildFromTemplate([ // TODO: localize
-    { label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
-        try {
-          const text = clipboard.readText()
-          new URL(text) // test if it's a valid URL
-          handleProtocol(text)
-        } catch (e) {
-          console.error('Clipboard content does not seem to be a valid PeekaView URL')
-        }
-      },
+  const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
+  if (app.isPackaged)
+    menuItems.push({ label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
+      try {
+        const text = clipboard.readText()
+        new URL(text) // test if it's a valid URL
+        handleProtocol(text)
+      } catch (e) {
+        console.error('Clipboard content does not seem to be a valid PeekaView URL')
+      }
     },
+  })
+
+  menuItems.push( // TODO: localize
     { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
-    { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => viewScreen() },
-    { label: 'Beenden', type: 'normal', click: () => quit() },
-  ])
+    { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => loadParams({ action: 'view' }) },
+    { label: 'Beenden', type: 'normal', click: () => quit() }
+  )
+
+  const contextMenu = Menu.buildFromTemplate(menuItems)
   tray.setToolTip('PeekaView')
   tray.setContextMenu(contextMenu)
 
@@ -82,7 +90,10 @@ app.whenReady().then(() => {
     tryShareScreen()
   })
 
-  protocol.handle('peekaview', request => handleProtocol(request.url) ?? new Response())
+  protocol.handle('peekaview', request => {
+    handleProtocol(request.url)
+    return new Response()
+  })
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -147,26 +158,42 @@ const createAppWindow = (show = false) => {
   !app.isPackaged && appWindow.webContents.openDevTools()
 }
 
+const createLoginWindow = () => {
+  if (loginWindow)
+    return
+
+  // Create the browser window.
+  loginWindow = new BrowserWindow({
+    width: 450,
+    height: 450,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: true,
+      preload: LOGIN_PRELOAD_WEBPACK_ENTRY,
+    }
+  })
+
+  loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
+}
+
 function handleProtocol(protocolUrl: string) {
   const protocolPath = protocolUrl.slice('peekaview://'.length)
   const params = new URLSearchParams(protocolPath)
-  email = params.get('email') ?? undefined
-  token = params.get('token') ?? undefined
+
+  v = params.get('v') ?? undefined // TODO: save locally in storage
+  loginWindow.close()
   tryShareScreen()
-  return undefined
 }
 
 function tryShareScreen() {
-  if (email && token) {
-    appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams({ action: 'share', email, token }).toString()))
-    appWindow.show()
-  } else {
-    shell.openExternal(`${APP_URL}?action=login`)
-  }
+  if (v)
+    loadParams({ action: 'share', v })
+  else
+    createLoginWindow()
 }
 
-function viewScreen() {
-  appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams({ action: 'view' }).toString()))
+function loadParams(params: Record<string, string>) {
+  appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
   appWindow.show()
 }
 
@@ -207,6 +234,16 @@ ipcMain.handle('open-screen-source-selection', async () => {
   })
 
   sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
+})
+
+ipcMain.handle('login-via-browser', async () => {
+  shell.openExternal(`${APP_URL}?action=login`)
+})
+
+ipcMain.handle('login-with-code', async (_event, code: string) => {
+  loginWindow.close()
+  v = code
+  tryShareScreen()
 })
 
 ipcMain.handle('get-screen-sources', async () => {

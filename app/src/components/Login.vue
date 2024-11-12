@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
 import { callApi } from '../api'
 
-type LoginState = 'loggedIn' | 'loggingIn' | 'protocolTimedOut' | 'registered' | 'unregistered'
-
 type Response = {
-  // TODO: define response
+  success: boolean
+  error?: string
 }
 
-const loginState = ref<LoginState>()
+const { t } = useI18n()
+
+const registered = ref(false)
 
 const email = ref<string>()
 const token = ref<string>()
@@ -23,15 +25,11 @@ onMounted(() => {
   email.value = localStorage.getItem('email') ?? undefined
   token.value = localStorage.getItem('token') ?? undefined
 
-  loginState.value = email.value && token.value ? 'registered' : 'unregistered'
+  registered.value = !!email.value && !!token.value
 })
 
-function handleLogin() {
+function handleOpenApp() {
   window.location.href = `peekaview://action=login&email=${email.value}&token=${token.value}` // TODO: fix protocol handling on Linux
-
-  setTimeout(() => {
-    loginState.value = 'protocolTimedOut'
-  }, 5000)
 }
     
 async function handleRegister(e: Event) {
@@ -41,14 +39,39 @@ async function handleRegister(e: Event) {
     return
 
   try {
-    await callApi<Response>({
+    const response = await callApi<Response>({
       action: 'registerMyEmail',
       email: email.value,
     })
+
+    if (response.error === "Email already registered")
+      handleAlreadyRegistered()
+    else if (response.success)
+    handleJustRegistered()
   } catch (error) {
     console.error('Error during registration:', error);
     handleError(error);
   }
+}
+
+function handleJustRegistered() {
+  Swal.fire({
+    icon: 'success',
+    text: t('login.justRegistered'),
+    customClass: {
+      popup: 'animate__animated animate__fadeIn'
+    }
+  });
+}
+
+function handleAlreadyRegistered() {
+  Swal.fire({
+    icon: 'error',
+    text: t('login.alreadyRegistered'),
+    customClass: {
+      popup: 'animate__animated animate__fadeIn'
+    }
+  });
 }
 
 function handleError(error) {
@@ -65,7 +88,7 @@ function handleError(error) {
 
 <template>
   <div class="text-center">
-    <form v-if="loginState === 'unregistered'" class="section-form" @submit="handleRegister">
+    <form v-if="!registered" class="section-form" @submit="handleRegister">
       <div class="form-content">
         <div class="mb-4">
           <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
@@ -76,21 +99,23 @@ function handleError(error) {
         <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
       </div>
     </form>
-    <div v-else-if="loginState === 'registered'">
-      <button class="btn btn-primary btn-lg w-100" @click="handleLogin">
-        {{ $t('login.login') }}
-      </button>
-    </div>
-    <template v-else-if="loginState === 'loggingIn'">
-      <div class="waiting-spinner"></div>
-      <h4 class="mt-3" id="waitingMessage">{{ $t('login.loggingIn') }}</h4>
-    </template>
-    <div v-else-if="loginState === 'protocolTimedOut'">
-      <p>{{ $t('login.useCodeAlternatively') }}</p>
-      <b>{{ code }}</b>
-    </div>
-    <div v-else-if="loginState === 'loggedIn'">
-      
+    <div v-else class="section-form">
+      <div class="form-content">
+        <h2 class="mb-3">{{ $t('login.successful') }}</h2>
+        <p class="text-secondary mb-4">{{ $t('login.successMessage') }}</p>
+        
+        <button class="btn btn-primary btn-lg w-100 mb-4" @click="handleOpenApp">
+          {{ $t('login.openApp') }}
+        </button>
+
+        <div class="text-secondary">
+          <small>{{ $t('login.orEnterCode') }}</small>
+          <div class="bg-light p-3 rounded mt-2 mb-3">
+            <code>{{ code }}</code>
+          </div>
+          <small>{{ $t('login.contactSupport') }}</small>
+        </div>
+      </div>
     </div>
   </div>
 </template>
