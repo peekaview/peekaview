@@ -129,6 +129,10 @@ async function handleLogout() {
 </template>
 
 <style>
+body {
+  background: url('@/assets/img/background.jpg') no-repeat center center fixed;
+  background-size: cover;
+}
 
 /* Header Styles */
 .main-header {

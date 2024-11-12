@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Swal from 'sweetalert2'
 import { useI18n } from 'vue-i18n'
 
@@ -36,6 +36,8 @@ const latestRequest = ref<Request>()
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 const listeningForRequests = ref(false)
+
+const viewCode = computed(() => btoa(`action=view&view=${ props.email }`))
         
 document.addEventListener('visibilitychange', () => {
   if (document.hidden)
@@ -235,7 +237,7 @@ function shareViaApp() {
     <div class="text-secondary">
       <small>{{ $t('share.startSharing.invite') }}</small>
       <div class="bg-light p-3 rounded mt-2 mb-3">
-        <code>{{ appUrl }}?action=view&view={{ email }}</code>
+        <code>{{ appUrl }}?{{ viewCode }}</code>
       </div>
     </div>
   </div>

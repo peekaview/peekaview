@@ -1,5 +1,5 @@
 import path from 'path'
-import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, nativeImage, protocol, Tray, session, shell } from "electron"
+import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
 import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
 
@@ -51,9 +51,9 @@ declare const CSP_POLICY: string
     app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
   }
 
-  let appWindow: BrowserWindow
-  let sourcesWindow: BrowserWindow
-  let loginWindow: BrowserWindow
+  let appWindow: BrowserWindow | undefined
+  let sourcesWindow: BrowserWindow | undefined
+  let loginWindow: BrowserWindow | undefined
 
   let isQuitting = false
 
@@ -69,16 +69,17 @@ declare const CSP_POLICY: string
     
     const tray = new Tray(trayIcon)
     const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
-    if (app.isPackaged)
+    if (!app.isPackaged)
       menuItems.push({ label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
-        try {
-          const text = clipboard.readText()
-          new URL(text) // test if it's a valid URL
-          handleProtocol(text)
-        } catch (e) {
-          console.error('Clipboard content does not seem to be a valid PeekaView URL')
-        }
-      },
+          try {
+            const text = clipboard.readText()
+            new URL(text) // test if it's a valid URL
+            handleProtocol(text)
+          } catch (e) {
+            console.error('Clipboard content does not seem to be a valid PeekaView URL')
+          }
+        },
+      }, { label: '[Dev] Logout', type: 'normal', click: () => store.delete('v'),
     })
 
     menuItems.push( // TODO: localize
@@ -92,7 +93,8 @@ declare const CSP_POLICY: string
     tray.setContextMenu(contextMenu)
 
     tray.on('click', () => {
-      // appWindow.show()
+      if (process.platform === 'linux')
+        tryShareScreen()
     })
 
     tray.on('double-click', () => {
@@ -125,12 +127,13 @@ declare const CSP_POLICY: string
     })
 
     app.on('second-instance', (event, commandLine, workingDirectory) => {
-      console.log('second-instance', event, commandLine, workingDirectory)
       if (appWindow) {
         if (appWindow.isMinimized()) appWindow.restore()
           appWindow.focus()
       }
     })
+
+    new Notification({ title: 'PeekaView', body: "PeekaView is running" }).show()
   })
 
   const createAppWindow = (show = false) => {
@@ -157,7 +160,7 @@ declare const CSP_POLICY: string
     appWindow.on('close', (e) => {
       if (!isQuitting) {
         e.preventDefault()
-        appWindow.hide()
+        appWindow!.hide()
       }
     })
 
@@ -168,13 +171,18 @@ declare const CSP_POLICY: string
   }
 
   const createLoginWindow = () => {
-    if (loginWindow)
+    if (loginWindow) {
+      if (loginWindow.isMinimized()) loginWindow.restore()
+        loginWindow.focus()
       return
+    }
 
     // Create the browser window.
     loginWindow = new BrowserWindow({
-      width: 450,
-      height: 450,
+      icon: path.join(__dirname, PeekaViewLogo),
+      width: 320,
+      height: 540,
+      autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
@@ -182,6 +190,7 @@ declare const CSP_POLICY: string
       }
     })
 
+    loginWindow.on('close', () => loginWindow = undefined)
     loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
   }
 
@@ -192,7 +201,7 @@ declare const CSP_POLICY: string
 
     const v = params.get('v') ?? undefined
     store.set('v', v)
-    loginWindow.close()
+    loginWindow?.close()
     tryShareScreen()
   }
 
@@ -205,8 +214,8 @@ declare const CSP_POLICY: string
   }
 
   function loadParams(params: Record<string, string>) {
-    appWindow.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
-    appWindow.show()
+    appWindow?.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
+    appWindow?.show()
   }
 
   function quit() {
@@ -231,13 +240,18 @@ declare const CSP_POLICY: string
   });
 
   ipcMain.handle('open-screen-source-selection', async () => {
-    if (sourcesWindow)
+    if (sourcesWindow) {
+      if (sourcesWindow.isMinimized()) sourcesWindow.restore()
+        sourcesWindow.focus()
       return
+    }
 
     // Create the browser window.
     sourcesWindow = new BrowserWindow({
+      icon: path.join(__dirname, PeekaViewLogo),
       width: 800,
       height: 450,
+      autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
@@ -245,6 +259,7 @@ declare const CSP_POLICY: string
       }
     })
 
+    sourcesWindow.on('close', () => sourcesWindow = undefined)
     sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
   })
 
@@ -253,7 +268,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('login-with-code', async (_event, code: string) => {
-    loginWindow.close()
+    loginWindow?.close()
     store.set('v', code)
     tryShareScreen()
   })
@@ -264,7 +279,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('select-screen-source-id', async (_event, id: string) => {
-    sourcesWindow.close()
-    appWindow.webContents.send('send-screen-source-id', id)
+    sourcesWindow?.close()
+    appWindow?.webContents.send('send-screen-source-id', id)
   })
 })()

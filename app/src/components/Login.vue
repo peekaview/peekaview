@@ -68,7 +68,7 @@ function handleError(error) {
     title: 'Connection Error',
     text: 'There was a problem connecting to the server. Please try again.',
     customClass: {
-        popup: 'animate__animated animate__fadeIn'
+      popup: 'animate__animated animate__fadeIn'
     }
   });
 }

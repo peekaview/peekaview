@@ -1,11 +1,13 @@
 /* Global Styles */
+
+html {
+  height: 100vh;
+}
 body {
   margin: 0;
   padding: 0;
   height: 100vh;
   overflow-x: hidden;
-  background: url('../img/background.jpg') no-repeat center center fixed;
-  background-size: cover;
 }
 
 /* Form Styles */
