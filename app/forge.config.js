@@ -10,6 +10,8 @@ module.exports = {
     executableName: 'peekaview',
     icon: './src/assets/img/peekaview',
     asar: true,
+    arch: ['x64', 'arm64'],
+    platform: ['darwin'],
   },
   rebuildConfig: {},
   makers: [
@@ -43,6 +45,13 @@ module.exports = {
       config: {},
       platforms: ['linux']
     },
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {
+        // If any existing DMG config...
+      },
+      platforms: ['darwin']
+    }
   ],
   plugins: [
     {
