@@ -20,7 +20,6 @@
     "loggingIn": "Logge in der App ein...",
     "code": "Ihr Login-Code",
     "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein.",
-    "alreadyRegistered": "Diese E-Mail-Adresse ist bereits registriert.",
     "justRegistered": "Sie haben sich erfolgreich registriert. Bitte prüfen Sie Ihre Mails für den Anmelde-Link.",
     "successful": "Anmeldung erfolgreich",
     "successMessage": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
@@ -75,7 +74,8 @@
     },
     "startSharing": {
       "title": "Bildschirmfreigabe starten",
-      "description": "Ihr Bildschirm wird automatisch geteilt, wenn jemand Zugriff anfordert."
+      "description": "Ihr Bildschirm wird automatisch geteilt, wenn jemand Zugriff anfordert.",
+      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
     },
     "requestAccess": {
       "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",

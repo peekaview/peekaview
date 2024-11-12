@@ -88,6 +88,7 @@ module.exports = (env, argv) => {
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
 
+        APP_URL: JSON.stringify(process.env.APP_URL),
         API_URL: JSON.stringify(process.env.API_URL),
 
         __VUE_OPTIONS_API__: false,

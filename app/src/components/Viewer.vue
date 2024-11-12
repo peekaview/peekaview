@@ -86,6 +86,9 @@ async function handleSubmit(e: Event) {
 
 async function requestScreen(params: RequestParams, initial = false) {
   try {
+    if (waitingStatus.value === undefined || waitingStatus.value === 'notified')
+      return
+
     const data = await callApi<Response>({
       action: 'showMeYourScreen',
       ...params,
@@ -199,26 +202,33 @@ function formatLastSeen(timestamp) {
 
   <Modal :show="requestStatus === 'request_denied'">
     <template #default>
-      <p id="requestMessage">{{ $t('viewer.requestDenied', { email }) }}</p>
+      <p>{{ $t('viewer.requestDenied', { email }) }}</p>
     </template>
     <template #ok>
-      <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="requestStatus = undefined">{{ $t('general.ok') }}</button>
+      <button type="button" class="btn btn-primary" @click="requestStatus = undefined">{{ $t('general.ok') }}</button>
     </template>
   </Modal>
 
-  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
-    <div class="text-center">
-      <div class="waiting-spinner"></div>
-      <h4 v-if="waitingStatus" class="mt-3" id="waitingMessage">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
-      <p v-if="requestUserStatus" class="mb-3">
-        <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-        <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-        <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
-        <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
-      </p>
-      <p class="text-muted small mt-10">
-        {{ $t('viewer.keepWindowOpen') }}
-      </p>
-    </div>
+  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header ok-only>
+    <template #default>
+      <div class="text-center">
+        <div class="waiting-spinner"></div>
+        <h4 v-if="waitingStatus" class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
+        <p v-if="requestUserStatus" class="mb-3">
+          <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+          <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+          <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
+          <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
+        </p>
+        <p class="text-muted small mt-10">
+          {{ $t('viewer.keepWindowOpen') }}
+        </p>
+      </div>
+    </template>
+    <template #ok>
+      <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+        {{ $t('general.cancel') }}
+      </button>
+    </template>
   </Modal>
 </template>

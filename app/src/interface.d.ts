@@ -8,6 +8,8 @@ declare global {
   }
 }
 
+declare const APP_URL: string
+
 export interface IElectronAPI {
   loginViaBrowser: () => Promise<void>,
   loginWithCode: (code: string) => Promise<void>,

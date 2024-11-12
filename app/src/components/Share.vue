@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Swal from 'sweetalert2'
 import { useI18n } from 'vue-i18n'
 
@@ -8,17 +8,16 @@ import Modal from './Modal.vue'
 import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi } from '../api';
 
+declare const APP_URL: string
+
 interface Request {
   request_id: string
   name: string
 }
 
-type WaitingStatus = 'checking'
-
 const props = defineProps<{
   email: string
   token: string
-  sessionActive: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,14 +27,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const inElectron = ref(!!window.electronAPI)
+const appUrl = ref(APP_URL)
+const offerDownload = ref(!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
-const sessionActive = defineModel<boolean>('sessionActive')
-
 const latestRequest = ref<Request>()
-
-const waitingStatus = ref<WaitingStatus>()
 
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
@@ -48,12 +44,13 @@ document.addEventListener('visibilitychange', () => {
     startPingInterval()
 })
 
-if (inElectron.value)
-  listenForRequests()
+watch(offerDownload, (flag) => {
+  if (!flag)
+    listenForRequests()
+}, { immediate: true })
 
 function listenForRequests() {
   listeningForRequests.value = true
-  waitingStatus.value = 'checking'
 
   window.setInterval(async () => {
     try {
@@ -67,7 +64,6 @@ function listenForRequests() {
       })
       
       if (requests.length > 0) {
-        waitingStatus.value = undefined
         latestRequest.value = requests[0];
       }
     } catch (error) {
@@ -109,8 +105,7 @@ async function acceptRequest() {
     })
 
     latestRequest.value = undefined
-    if (!sessionActive.value)
-      await createRoom()
+    await createRoom()
   } catch (error) {
     console.error('Error accepting request:', error)
     handleError(error)
@@ -143,8 +138,6 @@ async function createRoom() {
       email: props.email,
       token: props.token,
     })
-    
-    sessionActive.value = true;
 
     emit('startSharing', {
       roomName: data.roomId,
@@ -199,7 +192,7 @@ function shareViaApp() {
   <template v-if="token && !listeningForRequests">
     <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
     
-    <div v-if="!inElectron" class="share-options-stack">
+    <div v-if="offerDownload" class="share-options-stack">
       <div class="share-option primary">
         <div class="option-content">
           <h3>{{ $t('share.appOption.title') }}</h3>
@@ -234,26 +227,25 @@ function shareViaApp() {
     </div>
     
   </template>
-  <div v-else-if="sessionActive" id="activeSessionInfo">
-    <h3 class="mb-4">{{ $t('share.activeSession.title') }}</h3>
-    <div class="session-status alert alert-success">
-      <i class="mdi mdi-cast me-2"></i>
-      {{ $t('share.activeSession.status') }}
-    </div>
-  </div>
-  <div v-else id="noActiveSession" class="start-sharing-info">
-    <h3 class="mb-4">{{ $t('share.startSharing.title') }}</h3>
-    <p class="text-muted">
+  <div v-else class="start-sharing-info">
+    <h3 class="mb-3">{{ $t('share.startSharing.title') }}</h3>
+    <p class="text-secondary mb-4">
       {{ $t('share.startSharing.description') }}
     </p>
+    <div class="text-secondary">
+      <small>{{ $t('share.startSharing.invite') }}</small>
+      <div class="bg-light p-3 rounded mt-2 mb-3">
+        <code>{{ appUrl }}?action=view&view={{ email }}</code>
+      </div>
+    </div>
   </div>
 
-  <Modal :show="!!latestRequest">
+  <Modal :show="!!latestRequest" hide-header>
     <template #default>
-      <p id="requestMessage">{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
+      <p>{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
     </template>
     <template #ok>
-      <button type="button" class="btn btn-primary" id="acceptRequestBtn" @click="acceptRequest">
+      <button type="button" class="btn btn-primary" @click="acceptRequest">
         {{ $t('share.requestAccess.accept') }}
       </button>
     </template>
@@ -263,19 +255,9 @@ function shareViaApp() {
       </button>
     </template>
   </Modal>
-
-  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header hide-footer>
-    <template #default>
-      <div class="text-center">
-        <div class="waiting-spinner"></div>
-        <h4 class="mt-3" id="waitingMessage">{{ $t(`share.waitingStatus.${waitingStatus}`) }}</h4>
-      </div>
-    </template>
-  </Modal>
 </template>
 
 <style>
-/* Share Options Styles */
 .share-options-stack {
   display: flex;
   flex-direction: column;
@@ -377,18 +359,6 @@ function shareViaApp() {
   text-decoration: underline;
 }
 
-/* Session Status Styles */
-.session-status {
-  max-width: 400px;
-  margin: 0 auto;
-  display: inline-flex;
-  align-items: center;
-  padding: 1rem 2rem;
-  border-radius: 8px;
-  background-color: #d4edda;
-  border-color: #c3e6cb;
-}
-
 .start-sharing-info {
   background: rgba(255, 255, 255, 0.98);
   border-radius: 15px;
@@ -396,12 +366,6 @@ function shareViaApp() {
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255,255,255,0.8);
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-/* Active Session Info */
-#activeSessionInfo {
   max-width: 400px;
   margin: 0 auto;
 }

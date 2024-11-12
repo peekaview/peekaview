@@ -16,13 +16,13 @@ import type { ScreenShareData } from './types'
 
 const { t } = useI18n()
 
-const sessionActive = ref(false)
 const screenShareData = ref<ScreenShareData>()
 const showAbout = ref(false)
 
 const action = ref<string>('view')
 const token = ref<string | undefined>()
 const email = ref<string | undefined>()
+const viewEmail = ref<string | undefined>()
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
@@ -39,6 +39,7 @@ function handleParams(params: URLSearchParams) {
   action.value = params.get('action') ?? action.value
   token.value = params.get('token') ?? localStorage.getItem('token') ?? undefined
   email.value = params.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
+  viewEmail.value = params.get('view')?.toLowerCase() ?? undefined
   
   token.value && localStorage.setItem('token', token.value)
   email.value && localStorage.setItem('email', email.value)
@@ -78,7 +79,7 @@ async function handleLogout() {
         <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
       </h1>
       <div class="header-actions">
-        <button v-if="action === 'share' && token" id="logoutBtn" class="btn btn-outline-light" @click="handleLogout">
+        <button v-if="action === 'share' && token" class="btn btn-outline-light" @click="handleLogout">
           {{ $t('app.logout') }}
         </button>
       </div>
@@ -86,7 +87,7 @@ async function handleLogout() {
   </header>
 
   <!-- App Container -->
-  <div v-if="screenShareData" id="appContainer" class="app-container fade-in">
+  <div v-if="screenShareData" class="app-container fade-in">
     <ScreenShare v-bind="screenShareData" />
   </div>
 
@@ -101,13 +102,13 @@ async function handleLogout() {
             />
             <Share
               v-else-if="action === 'share' && email && token"
-              v-model:session-active="sessionActive"
               :email="email"
               :token="token"
               @start-sharing="screenShareData = $event"
             />
             <Viewer
               v-else
+              :email="viewEmail"
               @start-sharing="screenShareData = $event"
             />
           </div>
@@ -228,45 +229,6 @@ async function handleLogout() {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-}
-
-/* Form Styles */
-.section-form {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 15px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.8);
-}
-
-.form-content {
-  text-align: left;
-}
-
-.form-label {
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 0.5rem;
-}
-
-.form-control-lg {
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  border-radius: 8px;
-  border: 1px solid rgba(0,0,0,0.1);
-  background: rgba(255, 255, 255, 0.9);
-  transition: all 0.2s ease;
-}
-
-.form-control-lg:focus {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 4px rgba(26,115,232,0.1);
-  background: #ffffff;
-}
-
-.form-control-lg::placeholder {
-  color: #9ca3af;
 }
 
 /* Footer Styles */

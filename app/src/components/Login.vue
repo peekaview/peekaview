@@ -29,7 +29,7 @@ onMounted(() => {
 })
 
 function handleOpenApp() {
-  window.location.href = `peekaview://action=login&email=${email.value}&token=${token.value}` // TODO: fix protocol handling on Linux
+  window.location.href = `peekaview://v=${code.value}`
 }
     
 async function handleRegister(e: Event) {
@@ -44,10 +44,8 @@ async function handleRegister(e: Event) {
       email: email.value,
     })
 
-    if (response.error === "Email already registered")
-      handleAlreadyRegistered()
-    else if (response.success)
-    handleJustRegistered()
+    if (response.success)
+      handleJustRegistered()
   } catch (error) {
     console.error('Error during registration:', error);
     handleError(error);
@@ -58,16 +56,6 @@ function handleJustRegistered() {
   Swal.fire({
     icon: 'success',
     text: t('login.justRegistered'),
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
-  });
-}
-
-function handleAlreadyRegistered() {
-  Swal.fire({
-    icon: 'error',
-    text: t('login.alreadyRegistered'),
     customClass: {
       popup: 'animate__animated animate__fadeIn'
     }
