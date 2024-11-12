@@ -19,7 +19,14 @@
     "login": "Login to app",
     "loggingIn": "Logging in to the app...",
     "code": "Your login code",
-    "useCodeAlternatively": "Auto-Login not working on the desktop app? Then copy this code instead and enter it in the app."
+    "useCodeAlternatively": "Auto-Login not working on the desktop app? Then copy this code instead and enter it in the app.",
+    "alreadyRegistered": "This email address is already registered.",
+    "justRegistered": "You have successfully registered. Please check your mails for the login link.",
+    "successful": "Login Successful",
+    "successMessage": "Your login was successful. You can now proceed to the app.",
+    "openApp": "Open App",
+    "orEnterCode": "Or enter this code in the app to proceed:",
+    "contactSupport": "If you're having trouble, please contact support."
   },
   "viewer": {
     "requestScreenShare": "Request Screen Share Access",

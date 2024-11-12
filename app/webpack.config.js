@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
@@ -20,8 +19,10 @@ module.exports = (env, argv) => {
     app: './src/app.ts',
   }
 
-  if (!forWeb)
+  if (!forWeb) {
     entry.sources = './src/sources/sources.ts'
+    entry.login = './src/login/login.ts'
+  }
 
   return {
     watch: dev && forWeb,
@@ -37,10 +38,6 @@ module.exports = (env, argv) => {
       port: 8843,
       server: {
         type: 'https',
-        options: {
-          //key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-          //cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem')),
-        },
       },
       hot: true,
     },
