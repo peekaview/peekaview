@@ -11,7 +11,8 @@ declare global {
 declare const APP_URL: string
 
 export interface IElectronAPI {
-  loginViaBrowser: () => Promise<void>,
+  logout: (discardSession?: boolean) => Promise<void>,
+  loginViaBrowser: (discardSession?: boolean) => Promise<void>,
   loginWithCode: (code: string) => Promise<void>,
   getScreenSources: () => Promise<ScreenSource[]>,
   selectScreenSourceId: (id: string) => Promise<void>,

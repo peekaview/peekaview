@@ -119,11 +119,6 @@ const getParticipantName = (participant: Participant, isLocal: boolean) => {
     </div>
     <div id="room-content">
       <div id="thumbnail-bar">
-        <div v-if="sharingRoom && !localScreen">
-          <button class="btn btn-primary w-100" @click="shareLocalScreen(sharingRoom)">
-            {{ t('screenShare.shareButton') }}
-          </button>
-        </div>
         <template v-for="screen in allScreens">
           <div 
             :id="`thumb-${screen.track.sid!}`" 

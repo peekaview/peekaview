@@ -22,5 +22,17 @@ export type ApiRequestParams = {
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
   const response = await fetch(`${API_URL}?${new URLSearchParams(params).toString()}`)
+  if (response.status === 401)
+    throw new UnauthorizedError(`${response.status} ${response.statusText}`)
+
+  if (!response.ok)
+    throw new Error(`${response.status} ${response.statusText}`)
+
   return (await response.json()) as TResponse
+}
+
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
 }

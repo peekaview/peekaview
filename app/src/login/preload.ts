@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  loginViaBrowser: () => ipcRenderer.invoke('login-via-browser'),
+  loginViaBrowser: (discardSession = false) => ipcRenderer.invoke('login-via-browser', discardSession),
   loginWithCode: (code: string) => ipcRenderer.invoke('login-with-code', code),
 });
 

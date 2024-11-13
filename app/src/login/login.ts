@@ -5,8 +5,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (!window.electronAPI)
     return
 
+  const params = new URLSearchParams(window.location.search)
+  const discardSession = params.get('discardSession') === 'true'
+
+  if (discardSession && document.getElementById('session-error'))
+    (document.getElementById('session-error') as HTMLParagraphElement).style.display = 'block'
+
   document.getElementById('login')?.addEventListener('click', () => {
-    window.electronAPI!.loginViaBrowser()
+    window.electronAPI!.loginViaBrowser(discardSession)
     {(document.getElementById('login-via-browser') as HTMLDivElement).style.display = 'none'}
     {(document.getElementById('wait-for-login') as HTMLDivElement).style.display = 'block'}
   })

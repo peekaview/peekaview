@@ -23,6 +23,7 @@ declare const CSP_POLICY: string
   if (require("electron-squirrel-startup")) {
     log.info('Quitting due to Squirrel startup')
     app.quit()
+    return 
   }
 
   const gotTheLock = app.requestSingleInstanceLock()
@@ -34,21 +35,22 @@ declare const CSP_POLICY: string
     }
     log.info('Another instance is running, quitting...')
     app.quit()
-  } else {
-    updateElectronApp()
-    log.info('Starting app update check')
-
-    if (!app.isDefaultProtocolClient('peekaview')) {
-      const success = app.setAsDefaultProtocolClient('peekaview')
-      if (!success) {
-        log.error('Failed to set peekaview protocol')
-      } else {
-        log.info('Successfully set peekaview protocol')
-      }
-    }
-    // allow superhigh cpu usage for faster video-encoding
-    app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
+    return 
   }
+
+  updateElectronApp()
+  log.info('Starting app update check')
+
+  if (!app.isDefaultProtocolClient('peekaview')) {
+    const success = app.setAsDefaultProtocolClient('peekaview')
+    if (!success) {
+      log.error('Failed to set peekaview protocol')
+    } else {
+      log.info('Successfully set peekaview protocol')
+    }
+  }
+  // allow superhigh cpu usage for faster video-encoding
+  app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
   let appWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
@@ -61,15 +63,18 @@ declare const CSP_POLICY: string
   let isQuitting = false
 
   const Store = (await import('electron-store')).default
-  const store = new Store<{ v: string | undefined }>({
+  const store = new Store<{ code: string | undefined }>({
     schema: {
-      v: {
+      code: {
         type: 'string',
         default: undefined,
       }
     }
   })
   log.info('Store initialized')
+  
+  if (process.platform === 'win32')
+    app.setAppUserModelId(app.name)
 
   app.whenReady().then(() => {
     log.info('App is ready, initializing...')
@@ -96,7 +101,7 @@ declare const CSP_POLICY: string
         },
       })
 
-    logoutItem = new MenuItem({ label: 'Ausloggen', type: 'normal', click: () => store.delete('v'), enabled: !!store.get('v') })
+    logoutItem = new MenuItem({ label: 'Ausloggen', type: 'normal', click: () => store.delete('code'), enabled: !!store.get('code') })
 
     menuItems.push( // TODO: localize
       { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
@@ -120,7 +125,7 @@ declare const CSP_POLICY: string
 
     updateContextMenu()
 
-    store.onDidChange('v', () => {
+    store.onDidChange('code', () => {
       updateContextMenu()
     })
 
@@ -153,7 +158,7 @@ declare const CSP_POLICY: string
       }
     })
 
-    app.on('second-instance', (event, commandLine, workingDirectory) => {
+    app.on('second-instance', (_event, commandLine) => {
       log.info('Second instance detected, focusing existing window')
 
       // Find protocol URL in command line arguments
@@ -175,10 +180,9 @@ declare const CSP_POLICY: string
 
   
   const updateContextMenu = () => {
-    const v = store.get('v')
-    logoutItem.enabled = !!v
+    const code = store.get('code')
+    logoutItem.enabled = !!code
     
-    // Rebuild and set the context menu
     const contextMenu = Menu.buildFromTemplate(menuItems)
     tray.setContextMenu(contextMenu)
   }
@@ -217,11 +221,10 @@ declare const CSP_POLICY: string
     appWindow.loadURL(APP_WEBPACK_ENTRY)
     log.info('Main window loaded')
 
-    // Open the DevTools.
     !app.isPackaged && appWindow.webContents.openDevTools()
   }
 
-  const createLoginWindow = () => {
+  const createLoginWindow = (discardSession = false) => {
     if (loginWindow) {
       log.info('Reusing existing login window')
       if (loginWindow.isMinimized()) loginWindow.restore()
@@ -244,26 +247,25 @@ declare const CSP_POLICY: string
     })
 
     loginWindow.on('close', () => loginWindow = undefined)
-    loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
+    loginWindow.loadURL(LOGIN_WEBPACK_ENTRY + `?discardSession=${discardSession ? 'true' : 'false'}`)
   }
 
-  function handleProtocol(protocolUrl: string) {
-    log.info("Processing protocol URL", protocolUrl)
-    const protocolPath = protocolUrl.slice('peekaview://'.length)
-    const params = new URLSearchParams(protocolPath)
+  function handleProtocol(url: string) {
+    log.info("Processing protocol URL", url)
+    const params = new URL(url).searchParams
 
-    const v = params.get('v') ?? undefined
-    store.set('v', v)
+    const code = params.get('code') ?? undefined
+    store.set('code', code)
     log.info('Auth code stored from protocol')
     loginWindow?.close()
     tryShareScreen()
   }
 
   function tryShareScreen() {
-    const v = store.get('v')
-    log.info('Attempting to share screen', { hasAuthCode: !!v })
-    if (v)
-      loadParams({ action: 'share', v })
+    const code = store.get('code')
+    log.info('Attempting to share screen', { hasAuthCode: !!code })
+    if (code)
+      loadParams({ share: code })
     else
       createLoginWindow()
   }
@@ -314,8 +316,8 @@ declare const CSP_POLICY: string
 
     sourcesWindow = new BrowserWindow({
       icon: path.join(__dirname, PeekaViewLogo),
-      width: 800,
-      height: 450,
+      width: 960,
+      height: 540,
       autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
@@ -328,16 +330,24 @@ declare const CSP_POLICY: string
     sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
   })
 
-  ipcMain.handle('login-via-browser', async () => {
-    const url = `${APP_URL}?action=login&target=app`
+  ipcMain.handle('logout', async (_event, discardSession: boolean) => {
+    log.info('Logging out, discarding session:', discardSession)
+    appWindow?.hide()
+    store.delete('code')
+    createLoginWindow(discardSession)
+  })
+
+  ipcMain.handle('login-via-browser', async (_event, discardSession: boolean) => {
+    const url = `${APP_URL}?login=${btoa(`target=app&discardSession=${discardSession ? 'true' : 'false'}`)}`
     log.info('Opening browser login:', url)
+    log.info('Discarding session:', discardSession)
     shell.openExternal(url)
   })
 
   ipcMain.handle('login-with-code', async (_event, code: string) => {
-    log.info('Logging in with code')
+    log.info('Logging in with code:', code)
     loginWindow?.close()
-    store.set('v', code)
+    store.set('code', code)
     tryShareScreen()
   })
 

@@ -21,9 +21,9 @@ const registered = ref(false)
 const email = ref<string>()
 const token = ref<string>()
 
-const code = computed(() => {
-  return (email.value && token.value) ? btoa(`email=${email.value}&token=${token.value}`) : undefined
-})
+const code = computed(() => 
+  (email.value && token.value) ? btoa(`email=${email.value}&token=${token.value}`) : undefined
+)
 
 onMounted(() => {
   email.value = localStorage.getItem('email') ?? undefined
@@ -33,7 +33,7 @@ onMounted(() => {
 })
 
 function handleOpenApp() {
-  window.location.href = `peekaview://v=${code.value}`
+  window.location.href = `peekaview://login/?code=${code.value}`
 }
     
 async function handleRegister(e: Event) {
@@ -61,6 +61,8 @@ function handleJustRegistered() {
   Swal.fire({
     icon: 'success',
     text: t('login.justRegistered'),
+    showCancelButton: false,
+    showConfirmButton: false,
     customClass: {
       popup: 'animate__animated animate__fadeIn'
     }

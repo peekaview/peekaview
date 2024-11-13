@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
@@ -14,12 +14,18 @@ import PeekaViewLogo from './assets/img/peekaviewlogo.png'
 
 import type { ScreenShareData } from './types'
 
+enum Action {
+  Login = 'login',
+  Share = 'share',
+  View = 'view'
+}
+
 const { t } = useI18n()
 
 const screenShareData = ref<ScreenShareData>()
 const showAbout = ref(false)
 
-const action = ref<string>('view')
+const action = ref<Action>(Action.View)
 const token = ref<string | undefined>()
 const email = ref<string | undefined>()
 const target = ref<string | undefined>()
@@ -29,22 +35,35 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   handleParams(params)
 
-  const v = params.get('v')
-  if (v) {
-    const vParams = new URLSearchParams(atob(v))
-    handleParams(vParams)
+  for (const a of Object.values(Action)) {
+    const value = params.get(a)
+    if (!value)
+      continue
+
+    action.value = a
+    handleParams(new URLSearchParams(atob(value)))
   }
 })
 
+const liveKitDebugUrl = computed(() => 
+  `https://meet.livekit.io/custom?liveKitUrl=${screenShareData.value?.serverUrl}&token=${screenShareData.value?.jwtToken}`
+)
+
 function handleParams(params: URLSearchParams) {
-  action.value = params.get('action') ?? action.value
-  token.value = params.get('token') ?? localStorage.getItem('token') ?? undefined
-  email.value = params.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
-  target.value = params.get('target') ?? undefined
-  viewEmail.value = params.get('view')?.toLowerCase() ?? undefined
+  email.value = params.get('email')?.toLowerCase() ?? email.value ?? localStorage.getItem('email') ?? undefined
+  token.value = params.get('token') ?? token.value ?? localStorage.getItem('token') ?? undefined
+  target.value = params.get('target') ?? target.value ?? undefined
+  viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value ?? undefined
+
+  if (params.get('discardSession') === 'true') {
+    email.value = undefined
+    token.value = undefined
+    localStorage.removeItem('email')
+    localStorage.removeItem('token')
+  }
   
-  token.value && localStorage.setItem('token', token.value)
   email.value && localStorage.setItem('email', email.value)
+  token.value && localStorage.setItem('token', token.value)
 }
 
 async function handleLogout() {
@@ -125,7 +144,9 @@ async function handleLogout() {
 
   <footer class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
+      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub
+        <template v-if="screenShareData"> | <a :href="liveKitDebugUrl">Debug LiveKit Room</a></template>
+      </a></p>
     </div>
   </footer>
 </template>
@@ -276,27 +297,27 @@ body {
 /* Responsive Adjustments */
 @media (max-width: 640px) {
   .main-container {
-      height: calc(100vh - 125px);
+    height: calc(100vh - 125px);
   }
   
   .main-header {
-      height: 90px;
+    height: 90px;
   }
   
   .app-container {
-      top: 65px;
+    top: 65px;
   }
   
   .header-content {
-      padding: 0 1rem;
+    padding: 0 1rem;
   }
   
   .header-title {
-      font-size: 1.25rem;
+    font-size: 1.25rem;
   }
   
   .section-form {
-      padding: 1.5rem;
+    padding: 1.5rem;
   }
 }
 </style>

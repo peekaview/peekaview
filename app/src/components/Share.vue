@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShareData } from '../types'
-import { callApi } from '../api';
+import { callApi, UnauthorizedError } from '../api'
 
 declare const APP_URL: string
 
@@ -37,7 +37,7 @@ const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 const listeningForRequests = ref(false)
 
-const viewCode = computed(() => btoa(`action=view&view=${ props.email }`))
+const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
         
 document.addEventListener('visibilitychange', () => {
   if (document.hidden)
@@ -52,9 +52,12 @@ watch(offerDownload, (flag) => {
 }, { immediate: true })
 
 function listenForRequests() {
+  if (listeningForRequests.value)
+    return
+  
   listeningForRequests.value = true
 
-  window.setInterval(async () => {
+  let interval = window.setInterval(async () => {
     try {
       if (latestRequest.value)
         return
@@ -70,6 +73,10 @@ function listenForRequests() {
       }
     } catch (error) {
       console.error('Error checking requests:', error);
+      handleError(error)
+
+      clearInterval(interval)
+      listeningForRequests.value = false
     }
   }, 2000)
 }
@@ -91,6 +98,7 @@ async function updateOnlineStatus() {
     lastPingTime.value = Date.now();
   } catch (error) {
     console.error('Error updating online status:', error);
+    handleError(error)
   }
 }
 
@@ -154,6 +162,15 @@ async function createRoom() {
 }
     
 function handleError(error) {
+  console.log("handleError", error)
+  if (error instanceof UnauthorizedError) {
+    if (window.electronAPI)
+      window.electronAPI.logout(true)
+    else
+      window.location.href = `/?login=${btoa(`target=web&discardSession=true`)}`
+    return
+  }
+
   Swal.fire({
     icon: 'error',
     title: 'Error',
@@ -237,7 +254,7 @@ function shareViaApp() {
     <div class="text-secondary">
       <small>{{ $t('share.startSharing.invite') }}</small>
       <div class="bg-light p-3 rounded mt-2 mb-3">
-        <code>{{ appUrl }}?v={{ viewCode }}</code>
+        <code>{{ appUrl }}?view={{ viewCode }}</code>
       </div>
     </div>
   </div>
