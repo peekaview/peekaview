@@ -26,6 +26,11 @@ declare const CSP_POLICY: string
 
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
+    // Pass the protocol URL to the main instance before quitting
+    const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
+    if (protocolUrl) {
+      app.emit('second-instance', null, [protocolUrl], null)
+    }
     console.log('An instance of the app is already running, quitting...')
     app.quit()
   } else {
@@ -65,14 +70,15 @@ declare const CSP_POLICY: string
   app.whenReady().then(() => {
     if (process.platform === 'linux')
       exec(`xdg-mime default peekaview.desktop x-scheme-handler/peekaview`)
-    
+
     const trayIconPath = path.join(__dirname, PeekaViewLogo)
     const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-    
+
     const tray = new Tray(trayIcon)
     const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
     if (!app.isPackaged)
-      menuItems.push({ label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
+      menuItems.push({
+        label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
           try {
             const text = clipboard.readText()
             new URL(text) // test if it's a valid URL
@@ -81,8 +87,9 @@ declare const CSP_POLICY: string
             console.error('Clipboard content does not seem to be a valid PeekaView URL')
           }
         },
-      }, { label: '[Dev] Logout', type: 'normal', click: () => store.delete('v'),
-    })
+      }, {
+        label: '[Dev] Logout', type: 'normal', click: () => store.delete('v'),
+      })
 
     menuItems.push( // TODO: localize
       { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
@@ -129,9 +136,15 @@ declare const CSP_POLICY: string
     })
 
     app.on('second-instance', (event, commandLine, workingDirectory) => {
+      // Find protocol URL in command line arguments
+      const protocolUrl = commandLine.find(arg => arg.startsWith('peekaview://'))
+      if (protocolUrl) {
+        handleProtocol(protocolUrl)
+      }
+
       if (appWindow) {
         if (appWindow.isMinimized()) appWindow.restore()
-          appWindow.focus()
+        appWindow.focus()
       }
     })
 
@@ -176,7 +189,7 @@ declare const CSP_POLICY: string
   const createLoginWindow = () => {
     if (loginWindow) {
       if (loginWindow.isMinimized()) loginWindow.restore()
-        loginWindow.focus()
+      loginWindow.focus()
       return
     }
 
@@ -245,7 +258,7 @@ declare const CSP_POLICY: string
   ipcMain.handle('open-screen-source-selection', async () => {
     if (sourcesWindow) {
       if (sourcesWindow.isMinimized()) sourcesWindow.restore()
-        sourcesWindow.focus()
+      sourcesWindow.focus()
       return
     }
 
