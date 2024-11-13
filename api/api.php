@@ -150,7 +150,9 @@ function createScreenShareRoom() {
         $storedToken = $userData[1] ?? '';
         
         if ($token !== $storedToken) {
-            throw new Exception('Unauthorized');
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
         }
         
         $videoServer = VIDEO_SERVERS[array_rand(VIDEO_SERVERS)];
@@ -191,7 +193,9 @@ function doesAnyoneWantToSeeMyScreen() {
         $storedToken = $userData[1] ?? '';
         
         if ($token !== $storedToken) {
-            throw new Exception('Unauthorized');
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
         }
         
         // Set user online
@@ -396,7 +400,9 @@ function youAreAllowedToSeeMyScreen() {
         $storedToken = $userData[1] ?? '';
         
         if ($token !== $storedToken) {
-            throw new Exception('Unauthorized');
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
         }
         
         $requestFile = getRequestFilename($email, $requestId);
@@ -430,7 +436,9 @@ function youAreNotAllowedToSeeMyScreen() {
         $storedToken = $userData[1] ?? '';
         
         if ($token !== $storedToken) {
-            throw new Exception('Unauthorized');
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
         }
         
         $requestFile = getRequestFilename($email, $requestId);
