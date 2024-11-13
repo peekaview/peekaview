@@ -1,5 +1,5 @@
 import path from 'path'
-import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
+import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell, MenuItem } from "electron"
 import log from 'electron-log/main'
 import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
@@ -21,25 +21,29 @@ declare const CSP_POLICY: string
 (async () => {
   // Handle creating/removing shortcuts on Windows when installing/uninstalling.
   if (require("electron-squirrel-startup")) {
+    log.info('Quitting due to Squirrel startup')
     app.quit()
   }
 
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
-    // Pass the protocol URL to the main instance before quitting
     const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
     if (protocolUrl) {
+      log.info('Protocol URL found in command line arguments, emitting second-instance event')
       app.emit('second-instance', null, [protocolUrl], null)
     }
-    console.log('An instance of the app is already running, quitting...')
+    log.info('Another instance is running, quitting...')
     app.quit()
   } else {
     updateElectronApp()
+    log.info('Starting app update check')
 
     if (!app.isDefaultProtocolClient('peekaview')) {
       const success = app.setAsDefaultProtocolClient('peekaview')
       if (!success) {
-        console.error('Failed to set peekaview protocol')
+        log.error('Failed to set peekaview protocol')
+      } else {
+        log.info('Successfully set peekaview protocol')
       }
     }
     // allow superhigh cpu usage for faster video-encoding
@@ -49,6 +53,10 @@ declare const CSP_POLICY: string
   let appWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
+
+  let tray: Tray
+  let menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
+  let logoutItem: MenuItem
 
   let isQuitting = false
 
@@ -61,21 +69,20 @@ declare const CSP_POLICY: string
       }
     }
   })
+  log.info('Store initialized')
 
-  log.initialize()
-
-  // This method will be called when Electron has finished
-  // initialization and is ready to create browser windows.
-  // Some APIs can only be used after this event occurs.
   app.whenReady().then(() => {
-    if (process.platform === 'linux')
+    log.info('App is ready, initializing...')
+    
+    if (process.platform === 'linux') {
       exec(`xdg-mime default peekaview.desktop x-scheme-handler/peekaview`)
+      log.info('Set xdg-mime defaults for Linux')
+    }
 
     const trayIconPath = path.join(__dirname, PeekaViewLogo)
     const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
 
-    const tray = new Tray(trayIcon)
-    const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
+    tray = new Tray(trayIcon)
     if (!app.isPackaged)
       menuItems.push({
         label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
@@ -87,13 +94,14 @@ declare const CSP_POLICY: string
             console.error('Clipboard content does not seem to be a valid PeekaView URL')
           }
         },
-      }, {
-        label: '[Dev] Logout', type: 'normal', click: () => store.delete('v'),
       })
+
+    logoutItem = new MenuItem({ label: 'Ausloggen', type: 'normal', click: () => store.delete('v'), enabled: !!store.get('v') })
 
     menuItems.push( // TODO: localize
       { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
       { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => loadParams({ action: 'view' }) },
+      logoutItem,
       { label: 'Beenden', type: 'normal', click: () => quit() }
     )
 
@@ -110,7 +118,14 @@ declare const CSP_POLICY: string
       tryShareScreen()
     })
 
+    updateContextMenu()
+
+    store.onDidChange('v', () => {
+      updateContextMenu()
+    })
+
     protocol.handle('peekaview', request => {
+      log.info('Protocol handler called with URL:', request.url)
       handleProtocol(request.url)
       return new Response()
     })
@@ -127,18 +142,24 @@ declare const CSP_POLICY: string
     })
 
     createAppWindow()
+    log.info('Main window created')
+
     // On OS X it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
+        log.info('No windows found, creating new window on activate')
         createAppWindow(true)
       }
     })
 
     app.on('second-instance', (event, commandLine, workingDirectory) => {
+      log.info('Second instance detected, focusing existing window')
+
       // Find protocol URL in command line arguments
       const protocolUrl = commandLine.find(arg => arg.startsWith('peekaview://'))
       if (protocolUrl) {
+        log.info('Protocol URL found in command line arguments, handling')
         handleProtocol(protocolUrl)
       }
 
@@ -148,17 +169,29 @@ declare const CSP_POLICY: string
       }
     })
 
-    log.info("App was started")
+    log.info("App initialization complete")
     new Notification({ title: 'PeekaView', body: "PeekaView is running" }).show()
   })
 
+  
+  const updateContextMenu = () => {
+    const v = store.get('v')
+    logoutItem.enabled = !!v
+    
+    // Rebuild and set the context menu
+    const contextMenu = Menu.buildFromTemplate(menuItems)
+    tray.setContextMenu(contextMenu)
+  }
+
   const createAppWindow = (show = false) => {
+    log.info('Creating main window', { show })
     appWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
       show,
       width: 1280,
       height: 720,
+      autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
@@ -169,6 +202,7 @@ declare const CSP_POLICY: string
     })
 
     appWindow.webContents.setWindowOpenHandler(({ url }) => {
+      log.info('External URL requested:', url)
       shell.openExternal(url)
       return { action: 'deny' }
     })
@@ -181,6 +215,7 @@ declare const CSP_POLICY: string
     })
 
     appWindow.loadURL(APP_WEBPACK_ENTRY)
+    log.info('Main window loaded')
 
     // Open the DevTools.
     !app.isPackaged && appWindow.webContents.openDevTools()
@@ -188,16 +223,18 @@ declare const CSP_POLICY: string
 
   const createLoginWindow = () => {
     if (loginWindow) {
+      log.info('Reusing existing login window')
       if (loginWindow.isMinimized()) loginWindow.restore()
       loginWindow.focus()
       return
     }
 
-    // Create the browser window.
+    log.info('Creating new login window')
     loginWindow = new BrowserWindow({
       icon: path.join(__dirname, PeekaViewLogo),
       width: 360,
       height: 540,
+      resizable: false,
       autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
@@ -211,18 +248,20 @@ declare const CSP_POLICY: string
   }
 
   function handleProtocol(protocolUrl: string) {
-    log.info("handleProtocol", protocolUrl)
+    log.info("Processing protocol URL", protocolUrl)
     const protocolPath = protocolUrl.slice('peekaview://'.length)
     const params = new URLSearchParams(protocolPath)
 
     const v = params.get('v') ?? undefined
     store.set('v', v)
+    log.info('Auth code stored from protocol')
     loginWindow?.close()
     tryShareScreen()
   }
 
   function tryShareScreen() {
     const v = store.get('v')
+    log.info('Attempting to share screen', { hasAuthCode: !!v })
     if (v)
       loadParams({ action: 'share', v })
     else
@@ -230,39 +269,49 @@ declare const CSP_POLICY: string
   }
 
   function loadParams(params: Record<string, string>) {
+    log.info('Loading app with params:', params)
     appWindow?.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
     appWindow?.show()
   }
 
   function quit() {
+    log.info('Initiating app quit')
     isQuitting = true
     app.quit()
   }
 
   // Handle graceful shutdown
   ipcMain.handle('handle-app-closing', async () => {
-    console.log('Handling app closing');
-    // Perform any necessary cleanup here
+    log.info('Handling app closing request')
     isQuitting = true
     app.quit()
 
-    // Force quit after a timeout if app.quit() doesn't work
     setTimeout(() => {
-      console.log('Force quitting...');
-      app.exit(0);
-    }, 1000);
+      log.warn('Force quitting after timeout')
+      app.exit(0)
+    }, 1000)
 
-    return true;
-  });
+    return true
+  })
+
+  // Error handling
+  process.on('uncaughtException', (error) => {
+    log.error('Uncaught Exception:', error)
+  })
+
+  process.on('unhandledRejection', (reason) => {
+    log.error('Unhandled Rejection:', reason)
+  })
 
   ipcMain.handle('open-screen-source-selection', async () => {
+    log.info('Opening screen source selection')
     if (sourcesWindow) {
+      log.info('Reusing existing sources window')
       if (sourcesWindow.isMinimized()) sourcesWindow.restore()
       sourcesWindow.focus()
       return
     }
 
-    // Create the browser window.
     sourcesWindow = new BrowserWindow({
       icon: path.join(__dirname, PeekaViewLogo),
       width: 800,
@@ -280,21 +329,26 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('login-via-browser', async () => {
-    shell.openExternal(`${APP_URL}?action=login&target=app`)
+    const url = `${APP_URL}?action=login&target=app`
+    log.info('Opening browser login:', url)
+    shell.openExternal(url)
   })
 
   ipcMain.handle('login-with-code', async (_event, code: string) => {
+    log.info('Logging in with code')
     loginWindow?.close()
     store.set('v', code)
     tryShareScreen()
   })
 
   ipcMain.handle('get-screen-sources', async () => {
+    log.info('Fetching screen sources')
     const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] })
     return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
   })
 
   ipcMain.handle('select-screen-source-id', async (_event, id: string) => {
+    log.info('Screen source selected:', id)
     sourcesWindow?.close()
     appWindow?.webContents.send('send-screen-source-id', id)
   })
