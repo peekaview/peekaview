@@ -17,6 +17,7 @@ export type ApiRequestParams = {
 } | {
   action: "registerMyEmail"
   email: string
+  target: 'web' | 'app'
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {

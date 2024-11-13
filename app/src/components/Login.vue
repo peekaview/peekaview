@@ -10,6 +10,10 @@ type Response = {
   error?: string
 }
 
+const props = defineProps<{
+  target?: string
+}>()
+
 const { t } = useI18n()
 
 const registered = ref(false)
@@ -42,6 +46,7 @@ async function handleRegister(e: Event) {
     const response = await callApi<Response>({
       action: 'registerMyEmail',
       email: email.value,
+      target: props.target === 'app' ? 'app' : 'web',
     })
 
     if (response.success)

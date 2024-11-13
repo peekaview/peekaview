@@ -22,6 +22,7 @@ const showAbout = ref(false)
 const action = ref<string>('view')
 const token = ref<string | undefined>()
 const email = ref<string | undefined>()
+const target = ref<string | undefined>()
 const viewEmail = ref<string | undefined>()
 
 onMounted(() => {
@@ -39,11 +40,11 @@ function handleParams(params: URLSearchParams) {
   action.value = params.get('action') ?? action.value
   token.value = params.get('token') ?? localStorage.getItem('token') ?? undefined
   email.value = params.get('email')?.toLowerCase() ?? localStorage.getItem('email') ?? undefined
+  target.value = params.get('target') ?? undefined
   viewEmail.value = params.get('view')?.toLowerCase() ?? undefined
   
   token.value && localStorage.setItem('token', token.value)
   email.value && localStorage.setItem('email', email.value)
-  console.log("handleParams", action.value, token.value, email.value)
 }
 
 async function handleLogout() {
@@ -99,6 +100,7 @@ async function handleLogout() {
           <div class="section-content">
             <Login
               v-if="action === 'login'"
+              :target="target"
             />
             <Share
               v-else-if="action === 'share' && email && token"
