@@ -38,9 +38,9 @@ jobs:
       - name: Setup Environment
         working-directory: ./app
         run: |
-          echo "CONNECT_SRC=*.peekaview.de" >> .env
-          echo "API_DOMAIN=api.peekaview.de" >> .env
-          echo "API_URL=https://api.peekaview.de" >> .env
+          echo "APP_URL=https://peekaview.de/" >> .env
+          echo "API_URL=https://api.peekaview.de/" >> .env
+          echo "CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
           
       - name: Install dependencies
         working-directory: ./app
