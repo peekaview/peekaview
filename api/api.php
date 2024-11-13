@@ -455,14 +455,14 @@ function registerMyEmail() {
         $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
         
         $userFile = getEmailFilename($email);
-        
+
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
         file_put_contents($userFile, $userData);
         
         require_once __DIR__.'/helper/EmailHelper.php';
         $emailHelper = new EmailHelper();
-        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token&target=$target");
+        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=login&email=$email&token=$token&target=$target");
         $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
         echo json_encode([
