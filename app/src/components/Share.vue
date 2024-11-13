@@ -237,7 +237,7 @@ function shareViaApp() {
     <div class="text-secondary">
       <small>{{ $t('share.startSharing.invite') }}</small>
       <div class="bg-light p-3 rounded mt-2 mb-3">
-        <code>{{ appUrl }}?{{ viewCode }}</code>
+        <code>{{ appUrl }}?v={{ viewCode }}</code>
       </div>
     </div>
   </div>
