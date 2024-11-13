@@ -47,7 +47,8 @@ jobs:
         - name: Create Env
           run: |
             echo "API_URL=https://api.peekaview.de/" >> app/.env
-            echo "CONNECT_SRC=https://*.peekaview.de https://*.meetzi.de wss://*.meetzi.de" >> app/.env
+            echo "API_DOMAIN=api.peekaview.de" >> .env
+            echo "CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> app/.env
         - name: Install Dependencies
           working-directory: ./app
           run: npm install
