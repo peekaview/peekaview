@@ -1,5 +1,6 @@
 import path from 'path'
 import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
+import log from 'electron-log/main'
 import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
 
@@ -18,17 +19,6 @@ declare const APP_URL: string
 declare const CSP_POLICY: string
 
 (async () => {
-  // Initialize store
-  const Store = (await import('electron-store')).default
-  const store = new Store<{ v: string | undefined }>({
-    schema: {
-      v: {
-        type: 'string',
-        default: undefined,
-      }
-    }
-  })
-
   // Handle creating/removing shortcuts on Windows when installing/uninstalling.
   if (require("electron-squirrel-startup")) {
     app.quit()
@@ -56,6 +46,18 @@ declare const CSP_POLICY: string
   let loginWindow: BrowserWindow | undefined
 
   let isQuitting = false
+
+  const Store = (await import('electron-store')).default
+  const store = new Store<{ v: string | undefined }>({
+    schema: {
+      v: {
+        type: 'string',
+        default: undefined,
+      }
+    }
+  })
+
+  log.initialize()
 
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
@@ -133,6 +135,7 @@ declare const CSP_POLICY: string
       }
     })
 
+    log.info("App was started")
     new Notification({ title: 'PeekaView', body: "PeekaView is running" }).show()
   })
 
@@ -180,7 +183,7 @@ declare const CSP_POLICY: string
     // Create the browser window.
     loginWindow = new BrowserWindow({
       icon: path.join(__dirname, PeekaViewLogo),
-      width: 320,
+      width: 360,
       height: 540,
       autoHideMenuBar: true,
       webPreferences: {
@@ -195,7 +198,7 @@ declare const CSP_POLICY: string
   }
 
   function handleProtocol(protocolUrl: string) {
-    console.log("handleProtocol", protocolUrl)
+    log.info("handleProtocol", protocolUrl)
     const protocolPath = protocolUrl.slice('peekaview://'.length)
     const params = new URLSearchParams(protocolPath)
 
@@ -264,7 +267,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('login-via-browser', async () => {
-    shell.openExternal(`${APP_URL}?action=login`)
+    shell.openExternal(`${APP_URL}?action=login&target=app`)
   })
 
   ipcMain.handle('login-with-code', async (_event, code: string) => {
