@@ -452,6 +452,7 @@ function youAreNotAllowedToSeeMyScreen() {
 function registerMyEmail() {
     try {
         $email = validateEmail($_GET['email'] ?? '');
+        $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
         
         $userFile = getEmailFilename($email);
 
@@ -461,7 +462,7 @@ function registerMyEmail() {
         
         require_once __DIR__.'/helper/EmailHelper.php';
         $emailHelper = new EmailHelper();
-        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token");
+        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=register&email=$email&token=$token&target=$target");
         $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
         echo json_encode([

@@ -11,7 +11,8 @@ ENV API_URL=https://${API_DOMAIN}
 # Copy source files
 COPY src/ ./src/
 COPY *.json ./
-COPY webpack.config.js ./
+COPY .env ./
+COPY webpack.* ./
 
 RUN npm install
 
