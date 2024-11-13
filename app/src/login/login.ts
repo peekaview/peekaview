@@ -1,5 +1,5 @@
 import 'bootstrap/dist/css/bootstrap.css'
-import '@/assets/css/sources.css'
+import '@/assets/css/styles.css'
 
 window.addEventListener('DOMContentLoaded', async () => {
   if (!window.electronAPI)

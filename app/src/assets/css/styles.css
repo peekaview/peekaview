@@ -1,11 +1,52 @@
 /* Global Styles */
+
+html {
+  height: 100vh;
+}
 body {
   margin: 0;
   padding: 0;
   height: 100vh;
   overflow-x: hidden;
-  background: url('../img/background.jpg') no-repeat center center fixed;
-  background-size: cover;
+}
+
+/* Form Styles */
+.section-form {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.8);
+}
+
+.form-content {
+  text-align: left;
+}
+
+.form-label {
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.form-control-lg {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+}
+
+.form-control-lg:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 4px rgba(26,115,232,0.1);
+  background: #ffffff;
+}
+
+.form-control-lg::placeholder {
+  color: #9ca3af;
 }
 
 /* Button Styles */

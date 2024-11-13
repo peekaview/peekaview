@@ -19,12 +19,16 @@
     "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
     "package": "dotenvx run -- electron-forge package",
     "tsc": "vue-tsc --noEmit",
-    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel"
+    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
+    "make:mac": "dotenvx run -- electron-forge make --platform darwin --arch arm64,x64",
+    "make:mac-arm": "dotenvx run -- electron-forge make --platform darwin --arch arm64",
+    "make:mac-intel": "dotenvx run -- electron-forge make --platform darwin --arch x64"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
     "bootstrap-vue-next": "^0.25.10",
     "electron-squirrel-startup": "^1.0.1",
+    "electron-store": "^10.0.0",
     "livekit-client": "2.1.5",
     "rpmbuild": "^0.0.23",
     "sweetalert2": "^11.14.4",
@@ -60,7 +64,9 @@
     "vue-tsc": "^2.1.8",
     "webpack": "^5.95.0",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "webpack-dev-server": "^5.1.0",
+    "@electron-forge/maker-dmg": "^7.4.0",
+    "dotenv": "^16.0.3"
   },
   "build": {
     "appId": "de.limtec.peekaview",

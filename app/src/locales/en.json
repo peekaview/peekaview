@@ -75,7 +75,8 @@
     },
     "startSharing": {
       "title": "Start Screen Sharing",
-      "description": "Your screen will automatically be shared when someone requests access."
+      "description": "Your screen will automatically be shared when someone requests access.",
+      "invite": "You can invite someone to join your view your screen with this link:"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",
