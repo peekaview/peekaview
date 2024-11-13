@@ -455,7 +455,7 @@ function registerMyEmail() {
         $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
         
         $userFile = getEmailFilename($email);
-
+        
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
         file_put_contents($userFile, $userData);
