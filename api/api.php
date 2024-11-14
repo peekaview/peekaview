@@ -288,7 +288,7 @@ function showMeYourScreen() {
                 if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
                     require_once __DIR__.'/helper/EmailHelper.php';
                     $emailHelper = new EmailHelper();
-                    $shareLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=share&email=$email&token=$token");
+                    $shareLink = "https://".APP_DOMAIN."/?share=".base64_encode("email=$email&token=$token");
                     if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
                         $requestData[3] = 'email_sent';
                         file_put_contents($requestFile, implode(',', $requestData));
@@ -470,7 +470,7 @@ function registerMyEmail() {
         
         require_once __DIR__.'/helper/EmailHelper.php';
         $emailHelper = new EmailHelper();
-        $registrationLink = "https://".APP_DOMAIN."/?v=".base64_encode("action=login&email=$email&token=$token&target=$target");
+        $registrationLink = "https://".APP_DOMAIN."/?login=".base64_encode("email=$email&token=$token&target=$target");
         $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
         echo json_encode([
