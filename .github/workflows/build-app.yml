@@ -66,6 +66,7 @@ jobs:
           with:
             node-version: 20
         - name: Create Env
+          working-directory: ./app
           run: |
             echo "APP_URL=https://develop.peekaview.de/" >> .env
             echo "API_URL=https://api.peekaview.de/" >> .env
