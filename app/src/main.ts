@@ -330,6 +330,10 @@ declare const CSP_POLICY: string
     sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
   })
 
+  ipcMain.handle('log', async (_event, messages: any[]) => {
+    log.info(...messages)
+  })
+
   ipcMain.handle('logout', async (_event, discardSession: boolean) => {
     log.info('Logging out, discarding session:', discardSession)
     appWindow?.hide()

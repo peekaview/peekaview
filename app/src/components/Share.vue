@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import Swal from 'sweetalert2'
 import { useI18n } from 'vue-i18n'
+import { Participant, type Room } from "livekit-client"
+import Swal from 'sweetalert2'
 
+import { useScreenShare } from "../composables/useScreenShare"
+import { publishTrack } from "../screenShare"
 import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShareData } from '../types'
@@ -20,17 +23,16 @@ const props = defineProps<{
   token: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'startSharing', data: ScreenShareData): void
-  (e: 'handleError', error: Error): void
-}>()
-
 const { t } = useI18n()
+
+const sharingRoom = ref<Room>()
+const participants = ref(new Map<string, Participant>())
 
 const appUrl = ref(APP_URL)
 const offerDownload = ref(!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
+const screenShareData = ref<ScreenShareData>()
 const latestRequest = ref<Request>()
 
 const pingInterval = ref<number>()
@@ -46,46 +48,54 @@ document.addEventListener('visibilitychange', () => {
     startPingInterval()
 })
 
-watch(offerDownload, (flag) => {
-  if (!flag)
-    listenForRequests()
+window.electronAPI?.onSendScreenSourceId((id) => {
+  sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
+})
+
+watch(offerDownload, async (flag) => {
+  if (flag)
+    return
+
+  await createRoom()
+  listeningForRequests.value = true
 }, { immediate: true })
 
-function listenForRequests() {
-  if (listeningForRequests.value)
+let requestInterval: number | undefined
+watch(listeningForRequests, (flag) => {
+  if (!flag) {
+    clearInterval(requestInterval)
+    requestInterval = undefined
     return
-  
-  listeningForRequests.value = true
+  }
 
-  let interval = window.setInterval(async () => {
-    try {
-      if (latestRequest.value)
-        return
+  requestInterval = window.setInterval(async () => {
+  try {
+    if (latestRequest.value)
+      return
 
-      const requests = await callApi<Request[]>({
-        action: 'doesAnyoneWantToSeeMyScreen',
-        email: props.email,
-        token: props.token,
-      })
-      
-      if (requests.length > 0) {
-        latestRequest.value = requests[0];
-      }
-    } catch (error) {
-      console.error('Error checking requests:', error);
-      handleError(error)
-
-      clearInterval(interval)
-      listeningForRequests.value = false
+    const requests = await callApi<Request[]>({
+      action: 'doesAnyoneWantToSeeMyScreen',
+      email: props.email,
+      token: props.token,
+    })
+    
+    if (requests.length > 0) {
+      latestRequest.value = requests[0];
     }
+  } catch (error) {
+    console.error('Error checking requests:', error);
+    handleError(error)
+
+    listeningForRequests.value = false
+  }
   }, 2000)
-}
+})
 
 function startPingInterval() {
   pingInterval.value = window.setInterval(() => {
     updateOnlineStatus();
-  }, 10000); // Ping every 10 seconds
-  updateOnlineStatus(); // Initial ping
+  }, 10000) // Ping every 10 seconds
+  updateOnlineStatus() // Initial ping
 }
     
 async function updateOnlineStatus() {
@@ -115,7 +125,6 @@ async function acceptRequest() {
     })
 
     latestRequest.value = undefined
-    await createRoom()
   } catch (error) {
     console.error('Error accepting request:', error)
     handleError(error)
@@ -142,6 +151,9 @@ async function denyRequest() {
 }
     
 async function createRoom() {
+  if (sharingRoom.value)
+    return
+
   try {
     const data = await callApi<AcceptedRequestData>({
       action: 'createScreenShareRoom',
@@ -149,15 +161,31 @@ async function createRoom() {
       token: props.token,
     })
 
-    emit('startSharing', {
+    screenShareData.value = {
       roomName: data.roomId,
       jwtToken: data.jwt,
       serverUrl: data.videoServer,
-      isSharer: true,
-    })
+    }
+
+    const { room, participants: p } = await useScreenShare(screenShareData.value)
+    sharingRoom.value = room
+    participants.value = p
+    shareLocalScreen(sharingRoom.value)
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error);
+  }
+}
+
+async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = false) {
+  console.log("shareLocalScreen")
+  try {
+    const screenTrack = await publishTrack(room, sourceId, shareAudio)
+    console.debug('Screen track published:', screenTrack)
+
+    // The local track will be added to the thumbnail bar via the TrackPublished event
+  } catch (error) {
+    console.error('Error publishing screen track:', error)
   }
 }
     
@@ -182,8 +210,8 @@ function handleError(error) {
 }
 
 function shareViaApp() {
-  const protocolUrl = `peekaview://action=share&${new URLSearchParams({ email: props.email, token: props.token }).toString()}`;
-  window.location.href = protocolUrl;
+  const protocolUrl = `peekaview://action=share&${new URLSearchParams({ email: props.email, token: props.token }).toString()}`
+  window.location.href = protocolUrl
   
   // Show backup dialog after a short delay
   setTimeout(async () => {
@@ -208,10 +236,10 @@ function shareViaApp() {
 </script>
 
 <template>
-  <template v-if="token && !listeningForRequests">
+  <template v-if="token && offerDownload">
     <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
     
-    <div v-if="offerDownload" class="share-options-stack">
+    <div class="panel share-options-stack">
       <div class="share-option primary">
         <div class="option-content">
           <h3>{{ $t('share.appOption.title') }}</h3>
@@ -230,7 +258,7 @@ function shareViaApp() {
         <div class="option-content">
           <h3>{{ $t('share.browserOption.title') }}</h3>
           <p>{{ $t('share.browserOption.description') }}</p>
-          <button class="btn btn-outline-primary btn-lg w-100" @click="listenForRequests()">
+          <button class="btn btn-outline-primary btn-lg w-100" @click="listeningForRequests = true">
             {{ $t('share.browserOption.button') }}
           </button>
         </div>
@@ -244,20 +272,22 @@ function shareViaApp() {
         </a>
       </div>
     </div>
-    
   </template>
-  <div v-else class="start-sharing-info">
-    <h3 class="mb-3">{{ $t('share.startSharing.title') }}</h3>
-    <p class="text-secondary mb-4">
-      {{ $t('share.startSharing.description') }}
-    </p>
-    <div class="text-secondary">
-      <small>{{ $t('share.startSharing.invite') }}</small>
-      <div class="bg-light p-3 rounded mt-2 mb-3">
-        <code>{{ appUrl }}?view={{ viewCode }}</code>
+
+  <template v-else>
+    <div class="panel sharing-info">
+      <h3 class="mb-3">{{ $t('share.activeSession.title') }}</h3>
+      <p class="text-secondary mb-4">
+        {{ $t('share.activeSession.description') }}
+      </p>
+      <div class="text-secondary">
+        <small>{{ $t('share.activeSession.invite') }}</small>
+        <div class="bg-light p-3 rounded mt-2 mb-3">
+          <code>{{ appUrl }}?view={{ viewCode }}</code>
+        </div>
       </div>
     </div>
-  </div>
+  </template>
 
   <Modal :show="!!latestRequest" hide-header>
     <template #default>
@@ -281,12 +311,6 @@ function shareViaApp() {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 15px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.8);
 }
 
 .share-option {
@@ -378,22 +402,8 @@ function shareViaApp() {
   text-decoration: underline;
 }
 
-.start-sharing-info {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 15px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.8);
+.sharing-info {
   max-width: 400px;
   margin: 0 auto;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 640px) {
-  .share-options-stack,
-  .start-sharing-info {
-      padding: 1.5rem;
-  }
 }
 </style>

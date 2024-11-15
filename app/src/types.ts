@@ -9,5 +9,6 @@ export type ScreenShareData = {
   roomName: string
   jwtToken: string
   serverUrl: string
-  isSharer: boolean
 }
+
+export type PromiseValue<T extends Promise<any>> = T extends Promise<infer U> ? U : never

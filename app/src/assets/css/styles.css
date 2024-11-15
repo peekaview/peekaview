@@ -10,6 +10,15 @@ body {
   overflow-x: hidden;
 }
 
+.panel {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.8);
+}
+
 /* Form Styles */
 .section-form {
   background: rgba(255, 255, 255, 0.98);
@@ -110,4 +119,11 @@ body {
 @keyframes slideUp {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .panel {
+    padding: 1.5rem;
+  }
 }

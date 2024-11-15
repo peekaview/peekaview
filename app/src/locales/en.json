@@ -44,6 +44,7 @@
       "inactive": "User inactive or offline"
     },
     "lastSeen": {
+      "unknown": "unknown",
       "justNow": "just now",
       "minutesAgo": "{minutes} {minutes === 1 ? 'minute' : 'minutes'} ago",
       "hoursAgo": "{hours} {hours === 1 ? 'hour' : 'hours'} ago",
@@ -70,12 +71,8 @@
       "button": "Download PeekaView for Windows"
     },
     "activeSession": {
-      "title": "Active Sharing Session",
-      "status": "Your screen is ready to be shared"
-    },
-    "startSharing": {
-      "title": "Start Screen Sharing",
-      "description": "Your screen will automatically be shared when someone requests access.",
+      "title": "Sharing Session Active",
+      "description": "Your screen is being shared",
       "invite": "You can invite someone to join your view your screen with this link:"
     },
     "requestAccess": {

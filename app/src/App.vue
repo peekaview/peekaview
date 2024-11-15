@@ -8,11 +8,8 @@ import Login from './components/Login.vue'
 import Modal from './components/Modal.vue'
 import Viewer from './components/Viewer.vue'
 import Share from './components/Share.vue'
-import ScreenShare from './components/ScreenShare.vue'
 
 import PeekaViewLogo from './assets/img/peekaviewlogo.png'
-
-import type { ScreenShareData } from './types'
 
 enum Action {
   Login = 'login',
@@ -22,7 +19,6 @@ enum Action {
 
 const { t } = useI18n()
 
-const screenShareData = ref<ScreenShareData>()
 const showAbout = ref(false)
 
 const action = ref<Action>(Action.View)
@@ -44,10 +40,6 @@ onMounted(() => {
     handleParams(new URLSearchParams(atob(value)))
   }
 })
-
-const liveKitDebugUrl = computed(() => 
-  `https://meet.livekit.io/custom?liveKitUrl=${screenShareData.value?.serverUrl}&token=${screenShareData.value?.jwtToken}`
-)
 
 function handleParams(params: URLSearchParams) {
   email.value = params.get('email')?.toLowerCase() ?? email.value ?? localStorage.getItem('email') ?? undefined
@@ -106,13 +98,8 @@ async function handleLogout() {
     </div>
   </header>
 
-  <!-- App Container -->
-  <div v-if="screenShareData" class="app-container fade-in">
-    <ScreenShare v-bind="screenShareData" />
-  </div>
-
     <!-- Main Content -->
-  <div v-else class="main-container">
+  <div class="main-container">
     <div class="content-wrapper">
       <div class="content-card">
         <div class="centered-section">
@@ -125,12 +112,10 @@ async function handleLogout() {
               v-else-if="action === 'share' && email && token"
               :email="email"
               :token="token"
-              @start-sharing="screenShareData = $event"
             />
             <Viewer
               v-else
               :email="viewEmail"
-              @start-sharing="screenShareData = $event"
             />
           </div>
         </div>
@@ -144,9 +129,7 @@ async function handleLogout() {
 
   <footer class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub
-        <template v-if="screenShareData"> | <a :href="liveKitDebugUrl">Debug LiveKit Room</a></template>
-      </a></p>
+      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
     </div>
   </footer>
 </template>
@@ -157,17 +140,21 @@ body {
   background-size: cover;
 }
 
-/* Header Styles */
-.main-header {
+.main-header,
+.main-footer {
   background: rgba(255, 255, 255, 0.5);
   color: #2c3e50;
   padding: 0.75rem 0;
+  backdrop-filter: blur(5px);
+}
+
+/* Header Styles */
+.main-header {
   height: 90px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   position: sticky;
   top: 0;
   z-index: 1000;
-  backdrop-filter: blur(5px);
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
@@ -200,11 +187,6 @@ body {
 
 .header-actions {
   min-width: 120px;
-}
-
-/* App Container */
-.app-container {
-  background: rgba(0,0,0,0.8);
 }
 
 /* Content Card */
@@ -260,14 +242,10 @@ body {
 
 /* Footer Styles */
 .main-footer {
-  background: rgba(255, 255, 255, 0.5);
-  color: #2c3e50;
-  padding: 0.75rem 0;
   box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
   position: fixed;
   bottom: 0;
   width: 100%;
-  backdrop-filter: blur(5px);
   border-top: 1px solid rgba(0,0,0,0.05);
 }
 

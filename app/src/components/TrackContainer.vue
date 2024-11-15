@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, useTemplateRef, watchEffect } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watchEffect } from 'vue'
 import { Track } from 'livekit-client'
 
 const props = withDefaults(defineProps<{
@@ -11,17 +11,23 @@ const props = withDefaults(defineProps<{
   playsInline: false,
 })
 
+console.log(props.track)
+
 const containerRef = useTemplateRef('container')
 const trackElement = ref<HTMLVideoElement>()
 
-watchEffect(() => {
-  detach()
-  attach()
+onMounted(() => {
+  console.log('onMounted', props.track, trackElement.value, containerRef.value)
+  watchEffect(() => {
+    detach()
+    attach()
+  })
 })
 
 onBeforeUnmount(() => detach())
 
 function attach() {
+  console.log('attach', props.track, trackElement.value, containerRef.value)
   if (trackElement.value)
     return
 
@@ -33,7 +39,9 @@ function attach() {
 }
 
 function detach() {
+  console.log('detach', trackElement.value)
   trackElement.value?.remove()
+  trackElement.value = undefined
 }
 </script>
 

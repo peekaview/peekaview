@@ -143,6 +143,10 @@ export async function joinRoom(url: string, jwtToken: string) {
     // Connect to the room with the LiveKit URL and the token
     await room.connect(url, jwtToken)
 
+    room.on(RoomEvent.Disconnected, (e) => {
+      console.log("Room was disconnected", e)
+    })
+
     console.log("joinRoom return")
     return room
   } catch (error) {

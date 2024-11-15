@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
 import Modal from './Modal.vue'
+import TrackContainer from "./TrackContainer.vue"
 
-import type { AcceptedRequestData, ScreenShareData } from '../types'
+import type { AcceptedRequestData, PromiseValue, ScreenShareData } from '../types'
 import { callApi } from '../api'
+import { ScreenView, useScreenView } from '../composables/useScreenShare'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -43,10 +45,6 @@ defineProps<{
   name?: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'startSharing', data: ScreenShareData): void
-}>()
-
 const { t } = useI18n()
 
 const email = defineModel<string>('email')
@@ -56,7 +54,21 @@ const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
+const screenShareData = ref<ScreenShareData>()
+const screenView = ref<PromiseValue<ScreenView>>()
 const waitingStatus = ref<WaitingStatus | undefined>()
+
+watch(screenShareData, async (data) => {
+  if (data)
+    screenView.value = await useScreenView(data, () => {
+      // TODO
+      screenView.value = undefined
+    })
+})
+
+const liveKitDebugUrl = computed(() => 
+  screenShareData.value ? `https://meet.livekit.io/custom?liveKitUrl=${screenShareData.value.serverUrl}&token=${screenShareData.value.jwtToken}` : undefined
+)
 
 function generateRequestId(length = 8) {
   const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -134,13 +146,12 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   waitingStatus.value = undefined
   requestStatus.value = undefined
   
-  setTimeout(() => {
-    emit('startSharing', {
+  setTimeout(async () => {
+    screenShareData.value = {
       roomName: data.roomId,
       jwtToken: data.jwt,
-      serverUrl: data.videoServer,
-      isSharer: false,
-    })
+      serverUrl: data.videoServer
+    }
   }, 300)
 }
 
@@ -153,12 +164,15 @@ function handleError(error) {
     title: 'Connection Error',
     text: t('viewer.connectionError'),
     customClass: {
-        popup: 'animate__animated animate__fadeIn'
+      popup: 'animate__animated animate__fadeIn'
     }
   })
 }
 
-function formatLastSeen(timestamp) {
+function formatLastSeen(timestamp: number | undefined) {
+  if (!timestamp)
+  return t('viewer.lastSeen.unknown')
+
   const seconds = Math.floor((Date.now() / 1000) - timestamp)
   
   if (seconds < 60)
@@ -180,25 +194,46 @@ function formatLastSeen(timestamp) {
 </script>
 
 <template>
-  <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
-
-  <form class="section-form" @submit="handleSubmit">
-    <div class="form-content">
-      <div class="mb-4">
-        <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-        <input type="email" class="form-control form-control-lg" id="email" name="email"
-          v-model="email"
-          placeholder="example@email.com" required>
-      </div>
-      <div class="mb-4">
-        <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-        <input type="text" class="form-control form-control-lg" id="name" name="name"
-          v-model="name"
-          placeholder="Enter your name" required>
-      </div>
-      <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
+  <div v-if="screenView" id="room">
+    <div id="room-header">
+      <h2 class="mb-3">{{ $t('screenShare.title') }}</h2>
     </div>
-  </form>
+    <div id="room-content">
+      <div
+        v-if="screenView.screen"
+        class="video-container"
+      >
+        <div class="participant-data">
+          <TrackContainer :track="screenView.screen.track" />
+        </div>
+      </div>
+      <slot />
+    </div>
+    <div id="room-footer">
+      <a :href="liveKitDebugUrl">Debug LiveKit Room</a>
+    </div>
+  </div>
+  <template v-else>
+    <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
+
+    <form class="section-form" @submit="handleSubmit">
+      <div class="form-content">
+        <div class="mb-4">
+          <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
+          <input type="email" class="form-control form-control-lg" id="email" name="email"
+            v-model="email"
+            placeholder="example@email.com" required>
+        </div>
+        <div class="mb-4">
+          <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
+          <input type="text" class="form-control form-control-lg" id="name" name="name"
+            v-model="name"
+            placeholder="Enter your name" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
+      </div>
+    </form>
+  </template>
 
   <Modal :show="requestStatus === 'request_denied'">
     <template #default>
@@ -232,3 +267,61 @@ function formatLastSeen(timestamp) {
     </template>
   </Modal>
 </template>
+
+<style>
+#room {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1000px;
+  padding: 0 20px;
+  margin-bottom: 20px;
+}
+
+.video-container {
+  position: relative;
+  background: #3b3b3b;
+  aspect-ratio: 16/9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+}
+
+.video-container .participant-data {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.participant-data p {
+  background: #f8f8f8;
+  margin: 0;
+  padding: 0 5px;
+  color: #777777;
+  font-weight: bold;
+  border-bottom-right-radius: 4px;
+}
+
+#room-content {
+  display: flex;
+  width: 100%;
+}
+
+@media screen and (max-width: 768px) {
+  #layout-container {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+</style>
