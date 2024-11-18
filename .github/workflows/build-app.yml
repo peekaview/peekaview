@@ -99,5 +99,5 @@ jobs:
             prerelease: true
             draft: true
             files: |
-                app/dist/*/peekaview*.exe
+                app/dist/win32-x64/*.exe
             target_commitish: ${{ github.sha }}
