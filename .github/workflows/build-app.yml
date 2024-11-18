@@ -41,19 +41,23 @@ jobs:
           uses: actions/checkout@v4
           with:
             ref: ${{ github.ref }}
+
         - name: Install Node.js
           uses: actions/setup-node@v4
           with:
             node-version: 20
+
         - name: Create Env
           working-directory: ./app
           run: |
             echo "APP_URL=https://develop.peekaview.de/" >> .env
             echo "API_URL=https://api.peekaview.de/" >> .env
             echo "CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
+
         - name: Install Dependencies
           working-directory: ./app
           run: npm install
+
         - name: Set build version
           id: set_version
           working-directory: ./app
@@ -61,13 +65,25 @@ jobs:
             $VERSION = (node -p "require('./package.json').version")
             $COMMIT_SHA = (git rev-parse --short HEAD)
             echo "version=$VERSION-$COMMIT_SHA" >> $env:GITHUB_OUTPUT
+
         - name: Build Electron App
           working-directory: ./app
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             BUILD_VERSION: ${{ steps.set_version.outputs.version }}
           run: npm run electron-build-win
-      # Create GitHub Pre-release
+
+        - name: List dist directory
+          working-directory: ./app
+          run: |
+            Write-Host "Contents of dist directory:"
+            Get-ChildItem -Path dist -Recurse
+        - name: List out directory
+          working-directory: ./app
+          run: |
+            Write-Host "Contents of out directory:"
+            Get-ChildItem -Path out -Recurse
+
         - name: Create Pre-release
           uses: softprops/action-gh-release@v1
           env:
