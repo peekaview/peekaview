@@ -58,9 +58,9 @@ jobs:
           id: set_version
           working-directory: ./app
           run: |
-            VERSION=$(node -p "require('./package.json').version")
-            COMMIT_SHA=$(git rev-parse --short HEAD)
-            echo "version=$VERSION-$COMMIT_SHA" >> $GITHUB_OUTPUT
+            $VERSION = (node -p "require('./package.json').version")
+            $COMMIT_SHA = (git rev-parse --short HEAD)
+            echo "version=$VERSION-$COMMIT_SHA" >> $env:GITHUB_OUTPUT
         - name: Build Electron App
           working-directory: ./app
           env:
@@ -79,7 +79,7 @@ jobs:
                 Pre-release build from develop branch
                 Version: ${{ steps.set_version.outputs.version }}
                 Built from commit: ${{ github.sha }}
-                Build date: $(date +'%Y-%m-%d %H:%M:%S')
+                Build date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
             prerelease: true
             draft: true
             files: |
