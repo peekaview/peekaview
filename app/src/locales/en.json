@@ -47,9 +47,9 @@
     "lastSeen": {
       "unknown": "unknown",
       "justNow": "just now",
-      "minutesAgo": "{minutes} {minutes === 1 ? 'minute' : 'minutes'} ago",
-      "hoursAgo": "{hours} {hours === 1 ? 'hour' : 'hours'} ago",
-      "daysAgo": "{days} {days === 1 ? 'day' : 'days'} ago"
+      "minutesAgo": "one minute ago | {n} minutes ago",
+      "hoursAgo": "one hour ago | {n} hours ago",
+      "daysAgo": "one day ago | {n} days ago"
     },
     "keepWindowOpen": "You can keep this window open. Once your request is accepted, the connection will be established automatically.",
     "connectionError": "There was a problem connecting to the server. Please try again."
@@ -98,6 +98,21 @@
     "shareButton": "Share my screen",
     "localParticipant": "Me",
     "connectionError": "There was an error connecting to the room: {error}"
+  },
+  "loginWindow": {
+    "login": "Login",
+    "clickToLogin": "Click to login via browser",
+    "sessionError": "There has been an error with your session. Please try to login again.",
+    "waitForLogin": "Wait for login",
+    "orEnterCode": "or enter code from browser",
+    "loginWithCode": "loginWithCode"
+  },
+  "sourcesWindow": {
+    "type": {
+      "windows": "Windows",
+      "screens": "Screens"
+    },
+    "share": "Share"
   },
   "trayMenu": {
     "shareMyScreen": "Share my screen",

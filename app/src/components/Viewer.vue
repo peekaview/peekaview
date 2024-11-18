@@ -182,18 +182,16 @@ function formatLastSeen(timestamp: number | undefined) {
   
   if (seconds < 3600) {
     const minutes = Math.floor(seconds / 60)
-    if (minutes === undefined)
-      console.log("minutes undefined!", minutes, seconds, timestamp) // TODO: debug
-    return t('viewer.lastSeen.minutesAgo', { minutes })
+    return t('viewer.lastSeen.minutesAgo', minutes)
   }
   
   if (seconds < 86400) {
     const hours = Math.floor(seconds / 3600)
-    return t('viewer.lastSeen.hoursAgo', { hours })
+    return t('viewer.lastSeen.hoursAgo', hours)
   }
   
   const days = Math.floor(seconds / 86400)
-  return t('viewer.lastSeen.daysAgo', { days })
+  return t('viewer.lastSeen.daysAgo', days)
 }
 </script>
 

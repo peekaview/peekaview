@@ -202,7 +202,7 @@ declare const CSP_POLICY: string
         { label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
         { label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }) },
         { type: 'separator' },
-        { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => store.delete('code'), enabled: !!store.get('code') },
+        { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
           { label: i18n.t('trayMenu.selectLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
@@ -309,6 +309,13 @@ declare const CSP_POLICY: string
       createLoginWindow()
   }
 
+  function logout(discardSession = false) {
+    log.info('Logging out, discarding session:', discardSession)
+    appWindow?.hide()
+    store.delete('code')
+    createLoginWindow(discardSession)
+  }
+
   function loadParams(params: Record<string, string>) {
     log.info('Loading app with params:', params)
     appWindow?.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
@@ -377,10 +384,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('logout', async (_event, discardSession: boolean) => {
-    log.info('Logging out, discarding session:', discardSession)
-    appWindow?.hide()
-    store.delete('code')
-    createLoginWindow(discardSession)
+    logout(discardSession)
   })
 
   ipcMain.handle('login-via-browser', async (_event, discardSession: boolean) => {

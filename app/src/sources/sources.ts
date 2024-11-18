@@ -1,35 +1,17 @@
 import 'bootstrap/dist/css/bootstrap.css'
-import '@/assets/css/sources.css'
 
-window.addEventListener('DOMContentLoaded', async () => {
-  if (!window.electronAPI)
-    return
+import { createApp } from 'vue'
 
-  try {
-    let sourceId: string
-    const sources = await window.electronAPI.getScreenSources()
-    const sourceList = document.getElementById('sourceList') as HTMLDivElement
-    const submit = document.getElementById('select') as HTMLButtonElement
+import i18n from '../i18n'
 
-    sources.forEach(source => {
-      const item = document.createElement('div')
-      item.className = 'source-item'
-      item.innerHTML = `<img src="${source.thumbnail}" alt="${source.name}" width="150"><p>${source.name}</p>`
+import 'bootstrap/dist/css/bootstrap.css'
+import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
+// IMPORTANT: load bootstrap styles before Vue components for correct styling order
+import Sources from './Sources.vue'
 
-      sourceList.appendChild(item)
-      item.addEventListener('click', async (event) => {
-        const sourceItems = document.querySelectorAll('.source-item')
-        for (const item of sourceItems)
-          item.classList.remove('selected')
+import '@/assets/css/styles.css'
 
-        sourceId = source.id
-        {(event.currentTarget as HTMLElement).classList.add('selected')}
-        submit.disabled = false
-      })
-    })
+const app = createApp(Sources)
 
-    submit.onclick = () => sourceId && window.electronAPI!.selectScreenSourceId(sourceId)
-  } catch (error) {
-    console.error('Error getting screen sources:', error)
-  }
-})
+app.use(i18n)
+app.mount('#sources')

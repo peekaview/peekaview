@@ -46,9 +46,9 @@
     "lastSeen": {
       "unknown": "unbekannt",
       "justNow": "gerade eben",
-      "minutesAgo": "vor {minutes} {minutes === 1 ? 'Minute' : 'Minuten'}",
-      "hoursAgo": "vor {hours} {hours === 1 ? 'Stunde' : 'Stunden'}",
-      "daysAgo": "vor {days} {days === 1 ? 'Tag' : 'Tagen'}"
+      "minutesAgo": "vor einer Minute | vor {n} Minuten",
+      "hoursAgo": "vor einer Stunde | vor {n} Stunden",
+      "daysAgo": "vor einem Tag | vor {n} Tagen"
     },
     "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
     "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
@@ -97,6 +97,21 @@
     "shareButton": "Meinen Bildschirm teilen",
     "localParticipant": "Ich",
     "connectionError": "Beim Verbinden mit dem Raum ist ein Fehler aufgetreten: {error}"
+  },
+  "loginWindow": {
+    "login": "Anmelden",
+    "clickToLogin": "Hier klicken um via Browser anzumelden",
+    "sessionError": "Es ist ein Fehler bei Ihrer Sitzung aufgetreten. Bitte versuchen Sie erneut, sich anzumelden.",
+    "waitForLogin": "Warte auf Anmeldung",
+    "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
+    "loginWithCode": "Mit Code anmelden"
+  },
+  "sourcesWindow": {
+    "type": {
+      "windows": "Fenster",
+      "screens": "Bilschirme"
+    },
+    "share": "Teilen"
   },
   "trayMenu": {
     "shareMyScreen": "Meinen Bildschirm teilen",

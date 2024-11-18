@@ -1,24 +1,17 @@
 import 'bootstrap/dist/css/bootstrap.css'
+
+import { createApp } from 'vue'
+
+import i18n from '../i18n'
+
+import 'bootstrap/dist/css/bootstrap.css'
+import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
+// IMPORTANT: load bootstrap styles before Vue components for correct styling order
+import Login from './Login.vue'
+
 import '@/assets/css/styles.css'
 
-window.addEventListener('DOMContentLoaded', async () => {
-  if (!window.electronAPI)
-    return
+const app = createApp(Login)
 
-  const params = new URLSearchParams(window.location.search)
-  const discardSession = params.get('discardSession') === 'true'
-
-  if (discardSession && document.getElementById('session-error'))
-    (document.getElementById('session-error') as HTMLParagraphElement).style.display = 'block'
-
-  document.getElementById('login')?.addEventListener('click', () => {
-    window.electronAPI!.loginViaBrowser(discardSession)
-    {(document.getElementById('login-via-browser') as HTMLDivElement).style.display = 'none'}
-    {(document.getElementById('wait-for-login') as HTMLDivElement).style.display = 'block'}
-  })
-
-  document.getElementById('login-with-code')?.addEventListener('click', () => {
-    const code = (document.getElementById('code-input') as HTMLInputElement).value
-    window.electronAPI!.loginWithCode(code)
-  })
-})
+app.use(i18n)
+app.mount('#login')

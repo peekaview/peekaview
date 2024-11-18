@@ -57,7 +57,6 @@ watch(offerDownload, async (flag) => {
     return
 
   await createRoom()
-  listeningForRequests.value = true
 }, { immediate: true })
 
 let requestInterval: number | undefined
@@ -151,6 +150,7 @@ async function denyRequest() {
 }
     
 async function createRoom() {
+  console.log("createRoom")
   if (sharingRoom.value)
     return
 
@@ -171,6 +171,7 @@ async function createRoom() {
     sharingRoom.value = room
     participants.value = p
     shareLocalScreen(sharingRoom.value)
+    listeningForRequests.value = true
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error);
@@ -192,6 +193,7 @@ async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = fals
 function handleError(error) {
   console.log("handleError", error)
   if (error instanceof UnauthorizedError) {
+    return
     if (window.electronAPI)
       window.electronAPI.logout(true)
     else
@@ -260,7 +262,7 @@ function shareViaApp() {
             <div class="option-content">
               <h3>{{ $t('share.browserOption.title') }}</h3>
               <p>{{ $t('share.browserOption.description') }}</p>
-              <button class="btn btn-outline-primary btn-lg w-100" @click="listeningForRequests = true">
+              <button class="btn btn-outline-primary btn-lg w-100" @click="offerDownload = false">
                 {{ $t('share.browserOption.button') }}
               </button>
             </div>
