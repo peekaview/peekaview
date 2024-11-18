@@ -1,3 +1,5 @@
+import { useI18n } from "vue-i18n"
+    
 declare const API_URL: string
 
 export type ApiRequestParams = {
@@ -21,7 +23,11 @@ export type ApiRequestParams = {
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
-  const response = await fetch(`${API_URL}?${new URLSearchParams(params).toString()}`)
+  const i18nLocale = useI18n()
+  const response = await fetch(`${API_URL}?${new URLSearchParams({
+    lang: i18nLocale.locale.value,
+    ...params,
+  }).toString()}`)
   if (response.status === 401)
     throw new UnauthorizedError(`${response.status} ${response.statusText}`)
 

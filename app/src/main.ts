@@ -1,8 +1,11 @@
 import path from 'path'
-import { app, BrowserWindow, clipboard, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell, MenuItem } from "electron"
+import fs from 'fs'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
 import log from 'electron-log/main'
 import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
+import i18n from "i18next"
+import backend from "i18next-fs-backend"
 
 import PeekaViewLogo from './assets/img/peekaview.png'
 
@@ -15,6 +18,7 @@ declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
 declare const LOGIN_WEBPACK_ENTRY: string
 declare const LOGIN_PRELOAD_WEBPACK_ENTRY: string
 
+declare const APP_VERSION: string
 declare const APP_URL: string
 declare const CSP_POLICY: string
 
@@ -52,13 +56,33 @@ declare const CSP_POLICY: string
   // allow superhigh cpu usage for faster video-encoding
   app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
+  const languages = {
+    en: 'English',
+    de: 'Deutsch',
+  }
+
+  const i18nReady = i18n
+    .use(backend)
+    .init({
+      backend: {
+        loadPath: app.isPackaged
+          ? path.join(__dirname, 'src/locales/{{lng}}.json')
+          : path.join(__dirname, '../../src/locales/{{lng}}.json'),
+        addPath: app.isPackaged
+          ? path.join(__dirname, 'src/locales/{{lng}}.missing.json')
+          : path.join(__dirname, '../../src/locales/{{lng}}.missing.json'),
+      },
+      lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
+      fallbackLng: Object.keys(languages)[0],
+      preload: Object.keys(languages),
+      ns: ['translation'],
+    })
+
   let appWindow: BrowserWindow | undefined
-  let sourcesWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
+  let sourcesWindow: BrowserWindow | undefined
 
   let tray: Tray
-  let menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
-  let logoutItem: MenuItem
 
   let isQuitting = false
 
@@ -88,31 +112,8 @@ declare const CSP_POLICY: string
     const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
 
     tray = new Tray(trayIcon)
-    if (!app.isPackaged)
-      menuItems.push({
-        label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
-          try {
-            const text = clipboard.readText()
-            new URL(text) // test if it's a valid URL
-            handleProtocol(text)
-          } catch (e) {
-            console.error('Clipboard content does not seem to be a valid PeekaView URL')
-          }
-        },
-      })
 
-    logoutItem = new MenuItem({ label: 'Ausloggen', type: 'normal', click: () => store.delete('code'), enabled: !!store.get('code') })
-
-    menuItems.push( // TODO: localize
-      { label: 'Meinen Bildschirm teilen', type: 'normal', click: () => tryShareScreen() },
-      { label: 'Bildschirm-Anfrage stellen', type: 'normal', click: () => loadParams({ action: 'view' }) },
-      logoutItem,
-      { label: 'Beenden', type: 'normal', click: () => quit() }
-    )
-
-    const contextMenu = Menu.buildFromTemplate(menuItems)
     tray.setToolTip('PeekaView')
-    tray.setContextMenu(contextMenu)
 
     tray.on('click', () => {
       if (process.platform === 'linux')
@@ -175,16 +176,53 @@ declare const CSP_POLICY: string
     })
 
     log.info("App initialization complete")
-    new Notification({ title: 'PeekaView', body: "PeekaView is running" }).show()
+    const notificationIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 64, height: 64 })
+    new Notification({ title: 'PeekaView', body: "PeekaView is running", icon: notificationIcon }).show()
   })
-
   
   const updateContextMenu = () => {
-    const code = store.get('code')
-    logoutItem.enabled = !!code
-    
-    const contextMenu = Menu.buildFromTemplate(menuItems)
-    tray.setContextMenu(contextMenu)
+    i18nReady.then(() => {
+      const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
+      if (!app.isPackaged)
+        menuItems.push({
+          label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
+            try {
+              const text = clipboard.readText()
+              new URL(text) // test if it's a valid URL
+              handleProtocol(text)
+            } catch (e) {
+              console.error('Clipboard content does not seem to be a valid PeekaView URL')
+            }
+          },
+        },
+        { type: 'separator' },
+      )
+
+      menuItems.push(
+        { label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
+        { label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }) },
+        { type: 'separator' },
+        { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => store.delete('code'), enabled: !!store.get('code') },
+        { label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
+          { label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
+          { label: i18n.t('trayMenu.selectLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
+            { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => updateContextMenu())  }
+          ))},
+          { label: i18n.t('trayMenu.checkForUpdates'), type: 'normal', click: () => updateElectronApp() },
+        ] },
+        { label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
+      )
+      
+      const contextMenu = Menu.buildFromTemplate(menuItems)
+      tray.setContextMenu(contextMenu)
+    })
+  }
+
+  const showAbout = () => {
+    dialog.showMessageBox({
+      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024`,
+      title: i18n.t('trayMenu.about'),
+    })
   }
 
   const createAppWindow = (show = false) => {
@@ -195,6 +233,7 @@ declare const CSP_POLICY: string
       show,
       width: 1280,
       height: 720,
+      resizable: false,
       autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
@@ -284,6 +323,9 @@ declare const CSP_POLICY: string
 
   // Handle graceful shutdown
   ipcMain.handle('handle-app-closing', async () => {
+    if (process.platform === "darwin")
+      return false
+
     log.info('Handling app closing request')
     isQuitting = true
     app.quit()

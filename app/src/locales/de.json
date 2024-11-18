@@ -29,6 +29,7 @@
   },
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "requestFrom": "Von {email}",
     "requestAccess": "Zugriff anfordern",
     "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
     "waitingStatus": {
@@ -96,5 +97,15 @@
     "shareButton": "Meinen Bildschirm teilen",
     "localParticipant": "Ich",
     "connectionError": "Beim Verbinden mit dem Raum ist ein Fehler aufgetreten: {error}"
+  },
+  "trayMenu": {
+    "shareMyScreen": "Meinen Bildschirm teilen",
+    "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "help": "Hilfe",
+    "about": "Über PeekaView...",
+    "selectLanguage": "Sprache auswählen",
+    "checkForUpdates": "Auf Updates überprüfen",
+    "logout": "Ausloggen",
+    "quit": "Beenden"
   }
 } 

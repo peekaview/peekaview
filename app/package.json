@@ -30,6 +30,8 @@
     "electron-log": "^5.2.2",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",
+    "i18next": "^23.16.5",
+    "i18next-fs-backend": "^2.3.2",
     "livekit-client": "2.1.5",
     "rpmbuild": "^0.0.23",
     "sweetalert2": "^11.14.4",

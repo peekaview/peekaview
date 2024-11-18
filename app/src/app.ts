@@ -18,7 +18,7 @@ app.use(modalControllerPlugin)
 const i18n = createI18n({
   legacy: false,
   globalInjection: true, 
-  locale: 'en',
+  locale: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
   fallbackLocale: 'en',
   messages: {
     en,

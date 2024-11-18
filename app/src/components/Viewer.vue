@@ -40,15 +40,15 @@ type RequestParams = {
   request_id: string
 }
 
-defineProps<{
+const props = defineProps<{
   email?: string
   name?: string
 }>()
 
 const { t } = useI18n()
 
-const email = defineModel<string>('email')
-const name = defineModel<string>('name')
+const inputEmail = ref<string>()
+const inputName = ref<string>(props.name ?? '')
 
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
@@ -82,15 +82,17 @@ function generateRequestId(length = 8) {
 async function handleSubmit(e: Event) {
   e.preventDefault()
 
-  if (!email.value || !name.value)
+  if ((!props.email && !inputEmail.value) || !inputName.value)
     return
+
+  localStorage.setItem('name', inputName.value)
 
   waitingStatus.value = 'establishing'
   requestStatus.value = undefined
 
   const params = {
-    email: email.value,
-    name: name.value,
+    email: props.email ?? inputEmail.value!,
+    name: inputName.value,
     request_id: generateRequestId(),
   }
   requestScreen(params, true)
@@ -171,7 +173,7 @@ function handleError(error) {
 
 function formatLastSeen(timestamp: number | undefined) {
   if (!timestamp)
-  return t('viewer.lastSeen.unknown')
+    return t('viewer.lastSeen.unknown')
 
   const seconds = Math.floor((Date.now() / 1000) - timestamp)
   
@@ -180,6 +182,8 @@ function formatLastSeen(timestamp: number | undefined) {
   
   if (seconds < 3600) {
     const minutes = Math.floor(seconds / 60)
+    if (minutes === undefined)
+      console.log("minutes undefined!", minutes, seconds, timestamp) // TODO: debug
     return t('viewer.lastSeen.minutesAgo', { minutes })
   }
   
@@ -213,18 +217,20 @@ function formatLastSeen(timestamp: number | undefined) {
     <div class="section-content">
       <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
+      <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
+
       <form class="section-form" @submit="handleSubmit">
         <div class="form-content">
-          <div class="mb-4">
+          <div v-if="!email" class="mb-4">
             <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
             <input type="email" class="form-control form-control-lg" id="email" name="email"
-              v-model="email"
+              v-model="inputEmail"
               placeholder="example@email.com" required>
           </div>
           <div class="mb-4">
             <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
             <input type="text" class="form-control form-control-lg" id="name" name="name"
-              v-model="name"
+              v-model="inputName"
               placeholder="Enter your name" required>
           </div>
           <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>

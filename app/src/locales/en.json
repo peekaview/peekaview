@@ -12,7 +12,7 @@
   "app": {
     "logout": "Logout",
     "confirmLogout": "Are you sure you want to logout?",
-    "about": "About"
+    "about": "Impressum"
   },
   "login": {
     "register": "Register",
@@ -30,6 +30,7 @@
   },
   "viewer": {
     "requestScreenShare": "Request Screen Share Access",
+    "requestFrom": "From {email}",
     "requestAccess": "Request Access",
     "requestDenied": "{email} has denied your request.",
     "waitingStatus": {
@@ -97,5 +98,15 @@
     "shareButton": "Share my screen",
     "localParticipant": "Me",
     "connectionError": "There was an error connecting to the room: {error}"
+  },
+  "trayMenu": {
+    "shareMyScreen": "Share my screen",
+    "requestScreenShare": "Request screen share",
+    "help": "Help",
+    "about": "About PeekaView...",
+    "selectLanguage": "Select language",
+    "checkForUpdates": "Check for updates",
+    "logout": "Logout",
+    "quit": "Quit"
   }
 } 

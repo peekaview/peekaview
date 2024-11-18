@@ -22,8 +22,9 @@ const { t } = useI18n()
 const showAbout = ref(false)
 
 const action = ref<Action>(Action.View)
-const token = ref<string | undefined>()
-const email = ref<string | undefined>()
+const token = ref<string | undefined>(localStorage.getItem('token') ?? undefined)
+const email = ref<string | undefined>(localStorage.getItem('email') ?? undefined)
+const name = ref<string | undefined>(localStorage.getItem('name') ?? undefined)
 const target = ref<string | undefined>()
 const viewEmail = ref<string | undefined>()
 
@@ -42,10 +43,11 @@ onMounted(() => {
 })
 
 function handleParams(params: URLSearchParams) {
-  email.value = params.get('email')?.toLowerCase() ?? email.value ?? localStorage.getItem('email') ?? undefined
-  token.value = params.get('token') ?? token.value ?? localStorage.getItem('token') ?? undefined
-  target.value = params.get('target') ?? target.value ?? undefined
-  viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value ?? undefined
+  token.value = params.get('token') ?? token.value
+  email.value = params.get('email')?.toLowerCase() ?? email.value
+  name.value = params.get('name') ?? name.value
+  target.value = params.get('target') ?? target.value
+  viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value
 
   if (params.get('discardSession') === 'true') {
     email.value = undefined
@@ -56,6 +58,7 @@ function handleParams(params: URLSearchParams) {
   
   email.value && localStorage.setItem('email', email.value)
   token.value && localStorage.setItem('token', token.value)
+  name.value && localStorage.setItem('name', name.value)
 }
 
 async function handleLogout() {
@@ -112,6 +115,7 @@ async function handleLogout() {
     <Viewer
       v-else
       :email="viewEmail"
+      :name="name"
     />
   </div>
 
