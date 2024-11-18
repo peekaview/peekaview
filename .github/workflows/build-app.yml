@@ -36,6 +36,8 @@ jobs:
 
   build_on_win:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
         - name: Check out Git repository
           uses: actions/checkout@v4
