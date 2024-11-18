@@ -10,6 +10,42 @@ body {
   overflow-x: hidden;
 }
 
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main Container Layout */
+.main-container {
+  flex-grow: 1;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  margin-bottom: 60px;
+}
+
+.content-wrapper {
+  width: 100%;
+  max-width: 600px;
+  margin: 2rem auto;
+  flex-shrink: 0;
+}
+
+/* Section Styles */
+.section-content h3 {
+  color: #998472;
+  text-shadow: #fff 1px 0 10px;
+}
+
+.section-content {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
 .panel {
   background: rgba(255, 255, 255, 0.98);
   border-radius: 15px;

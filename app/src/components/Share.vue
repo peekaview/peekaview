@@ -236,58 +236,62 @@ function shareViaApp() {
 </script>
 
 <template>
-  <template v-if="token && offerDownload">
-    <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
-    
-    <div class="panel share-options-stack">
-      <div class="share-option primary">
-        <div class="option-content">
-          <h3>{{ $t('share.appOption.title') }}</h3>
-          <p>{{ $t('share.appOption.description') }}</p>
-          <button class="btn btn-primary btn-lg w-100" @click="shareViaApp">
-            {{ $t('share.appOption.button') }}
-          </button>
+  <div class="content-wrapper">
+    <div class="section-content">
+      <template v-if="token && offerDownload">
+        <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
+        
+        <div class="panel share-options-stack">
+          <div class="share-option primary">
+            <div class="option-content">
+              <h3>{{ $t('share.appOption.title') }}</h3>
+              <p>{{ $t('share.appOption.description') }}</p>
+              <button class="btn btn-primary btn-lg w-100" @click="shareViaApp">
+                {{ $t('share.appOption.button') }}
+              </button>
+            </div>
+          </div>
+          
+          <div class="divider">
+            <span>{{ $t('share.or') }}</span>
+          </div>
+          
+          <div class="share-option secondary">
+            <div class="option-content">
+              <h3>{{ $t('share.browserOption.title') }}</h3>
+              <p>{{ $t('share.browserOption.description') }}</p>
+              <button class="btn btn-outline-primary btn-lg w-100" @click="listeningForRequests = true">
+                {{ $t('share.browserOption.button') }}
+              </button>
+            </div>
+          </div>
+          
+          <div class="download-option">
+            <p class="text-muted mb-2">{{ t('share.download.prompt') }}</p>
+            <a :href="downloadLink" class="btn btn-link download-link" download>
+              <i class="mdi mdi-download me-2"></i>
+              {{ $t('share.download.button') }}
+            </a>
+          </div>
         </div>
-      </div>
-      
-      <div class="divider">
-        <span>{{ $t('share.or') }}</span>
-      </div>
-      
-      <div class="share-option secondary">
-        <div class="option-content">
-          <h3>{{ $t('share.browserOption.title') }}</h3>
-          <p>{{ $t('share.browserOption.description') }}</p>
-          <button class="btn btn-outline-primary btn-lg w-100" @click="listeningForRequests = true">
-            {{ $t('share.browserOption.button') }}
-          </button>
-        </div>
-      </div>
-      
-      <div class="download-option">
-        <p class="text-muted mb-2">{{ t('share.download.prompt') }}</p>
-        <a :href="downloadLink" class="btn btn-link download-link" download>
-          <i class="mdi mdi-download me-2"></i>
-          {{ $t('share.download.button') }}
-        </a>
-      </div>
-    </div>
-  </template>
+      </template>
 
-  <template v-else>
-    <div class="panel sharing-info">
-      <h3 class="mb-3">{{ $t('share.activeSession.title') }}</h3>
-      <p class="text-secondary mb-4">
-        {{ $t('share.activeSession.description') }}
-      </p>
-      <div class="text-secondary">
-        <small>{{ $t('share.activeSession.invite') }}</small>
-        <div class="bg-light p-3 rounded mt-2 mb-3">
-          <code>{{ appUrl }}?view={{ viewCode }}</code>
+      <template v-else>
+        <div class="panel sharing-info">
+          <h3 class="mb-3">{{ $t('share.activeSession.title') }}</h3>
+          <p class="text-secondary mb-4">
+            {{ $t('share.activeSession.description') }}
+          </p>
+          <div class="text-secondary">
+            <small>{{ $t('share.activeSession.invite') }}</small>
+            <div class="bg-light p-3 rounded mt-2 mb-3">
+              <code>{{ appUrl }}?view={{ viewCode }}</code>
+            </div>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
-  </template>
+  </div>
 
   <Modal :show="!!latestRequest" hide-header>
     <template #default>

@@ -67,7 +67,7 @@ watch(screenShareData, async (data) => {
 })
 
 const liveKitDebugUrl = computed(() => 
-  screenShareData.value ? `https://meet.livekit.io/custom?liveKitUrl=${screenShareData.value.serverUrl}&token=${screenShareData.value.jwtToken}` : undefined
+  screenShareData.value ? `https://meet.livekit.io/custom?liveKitUrl=wss://${screenShareData.value.serverUrl}&token=${screenShareData.value.jwtToken}` : undefined
 )
 
 function generateRequestId(length = 8) {
@@ -195,17 +195,13 @@ function formatLastSeen(timestamp: number | undefined) {
 
 <template>
   <div v-if="screenView" id="room">
-    <div id="room-header">
-      <h2 class="mb-3">{{ $t('screenShare.title') }}</h2>
-    </div>
+    <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3>
     <div id="room-content">
       <div
         v-if="screenView.screen"
         class="video-container"
       >
-        <div class="participant-data">
-          <TrackContainer :track="screenView.screen.track" />
-        </div>
+        <TrackContainer :track="screenView.screen.track" />
       </div>
       <slot />
     </div>
@@ -213,27 +209,29 @@ function formatLastSeen(timestamp: number | undefined) {
       <a :href="liveKitDebugUrl">Debug LiveKit Room</a>
     </div>
   </div>
-  <template v-else>
-    <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
+  <div v-else class="content-wrapper">
+    <div class="section-content">
+      <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
-    <form class="section-form" @submit="handleSubmit">
-      <div class="form-content">
-        <div class="mb-4">
-          <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-          <input type="email" class="form-control form-control-lg" id="email" name="email"
-            v-model="email"
-            placeholder="example@email.com" required>
+      <form class="section-form" @submit="handleSubmit">
+        <div class="form-content">
+          <div class="mb-4">
+            <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
+            <input type="email" class="form-control form-control-lg" id="email" name="email"
+              v-model="email"
+              placeholder="example@email.com" required>
+          </div>
+          <div class="mb-4">
+            <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
+            <input type="text" class="form-control form-control-lg" id="name" name="name"
+              v-model="name"
+              placeholder="Enter your name" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
         </div>
-        <div class="mb-4">
-          <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-          <input type="text" class="form-control form-control-lg" id="name" name="name"
-            v-model="name"
-            placeholder="Enter your name" required>
-        </div>
-        <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
-      </div>
-    </form>
-  </template>
+      </form>
+    </div>
+  </div>
 
   <Modal :show="requestStatus === 'request_denied'">
     <template #default>
@@ -297,21 +295,6 @@ function formatLastSeen(timestamp: number | undefined) {
 .video-container video {
   width: 100%;
   height: 100%;
-}
-
-.video-container .participant-data {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-.participant-data p {
-  background: #f8f8f8;
-  margin: 0;
-  padding: 0 5px;
-  color: #777777;
-  font-weight: bold;
-  border-bottom-right-radius: 4px;
 }
 
 #room-content {

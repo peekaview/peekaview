@@ -100,27 +100,19 @@ async function handleLogout() {
 
     <!-- Main Content -->
   <div class="main-container">
-    <div class="content-wrapper">
-      <div class="content-card">
-        <div class="centered-section">
-          <div class="section-content">
-            <Login
-              v-if="action === 'login'"
-              :target="target"
-            />
-            <Share
-              v-else-if="action === 'share' && email && token"
-              :email="email"
-              :token="token"
-            />
-            <Viewer
-              v-else
-              :email="viewEmail"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <Login
+      v-if="action === 'login'"
+      :target="target"
+    />
+    <Share
+      v-else-if="action === 'share' && email && token"
+      :email="email"
+      :token="token"
+    />
+    <Viewer
+      v-else
+      :email="viewEmail"
+    />
   </div>
 
   <Modal :show="!!showAbout" @click="showAbout = false" hide-header hide-footer>
@@ -187,57 +179,6 @@ body {
 
 .header-actions {
   min-width: 120px;
-}
-
-/* Content Card */
-.content-card {
-  background: transparent;
-  box-shadow: none;
-  border: none;
-  backdrop-filter: none;
-  padding: 0;
-  margin: 0;
-}
-
-/* Common Title Styles */
-.centered-section h3 {
-  color: #998472;
-}
-
-/* Main Container Layout */
-.main-container {
-  height: calc(100vh - 150px);
-  padding: 0 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-  margin-bottom: 60px;
-}
-
-.content-wrapper {
-  width: 100%;
-  max-width: 600px;
-  margin: 2rem auto;
-  flex-shrink: 0;
-}
-
-/* Centered Section Styles */
-.centered-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.centered-section h3 {
-  text-shadow: #fff 1px 0 10px;
-}
-
-.section-content {
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
 }
 
 /* Footer Styles */
