@@ -6,7 +6,7 @@ on:
     branches:
       - develop
     paths:
-      - "app/**"
+      - "app_disabled/**"
 
 
 jobs:
@@ -55,6 +55,14 @@ jobs:
             echo "APP_URL=https://develop.peekaview.de/" >> .env
             echo "API_URL=https://api.peekaview.de/" >> .env
             echo "CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
+
+        - name: Cache node_modules in app folder
+          uses: actions/cache@v3
+          with:
+            path: ./app/node_modules
+            key: ${{ runner.os }}-app-node-modules-${{ hashFiles('app/package-lock.json') }}
+            restore-keys: |
+               ${{ runner.os }}-app-node-modules-
 
         - name: Install Dependencies
           working-directory: ./app
