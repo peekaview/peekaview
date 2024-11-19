@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
-import About from './components/About.vue'
-import Login from './components/Login.vue'
-import Modal from './components/Modal.vue'
-import Viewer from './components/Viewer.vue'
-import Share from './components/Share.vue'
+import About from '../components/About.vue'
+import Login from '../components/Login.vue'
+import Modal from '../components/Modal.vue'
+import Viewer from '../components/Viewer.vue'
+import Share from '../components/Share.vue'
 
-import PeekaViewLogo from './assets/img/peekaviewlogo.png'
+import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
 enum Action {
   Login = 'login',
@@ -132,7 +132,7 @@ async function handleLogout() {
 
 <style>
 body {
-  background: url('@/assets/img/background.jpg') no-repeat center center fixed;
+  background: url('../../assets/img/background.jpg') no-repeat center center fixed;
   background-size: cover;
 }
 

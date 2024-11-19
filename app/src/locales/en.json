@@ -2,7 +2,9 @@
   "general": {
     "ok": "Okay",
     "yes": "Yes",
-    "cancel": "Cancel"
+    "no": "No",
+    "cancel": "Cancel",
+    "areYouSure": "Are you sure?"
   },
   "labels": {
     "yourEmail": "Your email address",
@@ -112,15 +114,15 @@
       "windows": "Windows",
       "screens": "Screens"
     },
-    "share": "Share"
+    "share": "Share",
+    "confirmCancel": "Are you sure you want to cancel the screen selection? A selection is required to share your screen."
   },
   "trayMenu": {
     "shareMyScreen": "Share my screen",
     "requestScreenShare": "Request screen share",
     "help": "Help",
     "about": "About PeekaView...",
-    "selectLanguage": "Select language",
-    "checkForUpdates": "Check for updates",
+    "changeLanguage": "Change language",
     "logout": "Logout",
     "quit": "Quit"
   }

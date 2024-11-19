@@ -16,12 +16,12 @@ module.exports = (env, argv) => {
   const cspPolicy = getCspPolicy(dev)
 
   const entry = {
-    app: './src/app.ts',
+    app: './src/renderer/app/entry.ts',
   }
 
   if (!forWeb) {
-    entry.sources = './src/sources/sources.ts'
-    entry.login = './src/login/login.ts'
+    entry.sources = './src/renderer/sources/entry.ts'
+    entry.login = './src/renderer/login/entry.ts'
   }
 
   return {
@@ -102,7 +102,7 @@ module.exports = (env, argv) => {
         Buffer: ['buffer', 'Buffer'],
       }),
       new HtmlWebpackPlugin({
-        template: path.resolve(__dirname, 'src/index.html'),
+        template: path.resolve(__dirname, 'src/renderer/app/index.html'),
         chunks : ['app'],
         meta: {
           'Content-Security-Policy': {

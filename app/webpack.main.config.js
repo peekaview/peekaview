@@ -6,11 +6,21 @@ const packageJson = require('./package.json')
 const { getCspPolicy } = require('./webpack.util.js')
 
 module.exports = (env, argv) => {
-  const dev = argv.mode === 'development';
+  const dev = argv.mode === 'development'
+
+  if (!process.env.APP_URL) {
+    throw new Error('Environment variable APP_URL must be set')
+  }
+  if (!process.env.API_URL) {
+    throw new Error('Environment variable API_URL must be set')
+  }
+  if (!process.env.CONNECT_SRC) {
+    throw new Error('Environment variable CONNECT_SRC must be set')
+  }
 
   return {
     mode: argv.mode,
-    entry: './src/main.ts',
+    entry: './src/main/main.ts',
     output: {
       path: path.join(__dirname, '.webpack/main'),
       filename: 'index.js'
@@ -38,22 +48,9 @@ module.exports = (env, argv) => {
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
 
-        ...(() => {
-          if (!process.env.APP_URL) {
-            throw new Error('Environment variable APP_URL must be set');
-          }
-          if (!process.env.API_URL) {
-            throw new Error('Environment variable API_URL must be set');
-          }
-          if (!process.env.CONNECT_SRC) {
-            throw new Error('Environment variable CONNECT_SRC must be set');
-          }
-          return {
-            APP_URL: JSON.stringify(process.env.APP_URL),
-            API_URL: JSON.stringify(process.env.API_URL),
-            CSP_POLICY: JSON.stringify(getCspPolicy(dev)),
-          }
-        })(),
+        APP_URL: JSON.stringify(process.env.APP_URL),
+        API_URL: JSON.stringify(process.env.API_URL),
+        CSP_POLICY: JSON.stringify(getCspPolicy(dev)),
       }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],

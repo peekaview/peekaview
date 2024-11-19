@@ -7,11 +7,11 @@ import i18n from '../i18n'
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 // IMPORTANT: load bootstrap styles before Vue components for correct styling order
-import Login from './Login.vue'
+import Sources from './Sources.vue'
 
-import '@/assets/css/styles.css'
+import '../../assets/css/styles.css'
 
-const app = createApp(Login)
+const app = createApp(Sources)
 
 app.use(i18n)
-app.mount('#login')
+app.mount('#sources')

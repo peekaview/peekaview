@@ -2,7 +2,9 @@
   "general": {
     "ok": "Okay",
     "yes": "Ja",
-    "cancel": "Abbrechen"
+    "no": "Nein",
+    "cancel": "Abbrechen",
+    "areYouSure": "Sind Sie sicher?"
   },
   "labels": {
     "yourEmail": "Ihre E-Mail-Adresse",
@@ -111,15 +113,15 @@
       "windows": "Fenster",
       "screens": "Bilschirme"
     },
-    "share": "Teilen"
+    "share": "Teilen",
+    "confirmCancel": "Sind Sie sicher, dass Sie die Bildschirm-Auswahl abbrechen wollen? Es wird eine Auswahl benötigt, um ihren Bildschirm teilen zu können."
   },
   "trayMenu": {
     "shareMyScreen": "Meinen Bildschirm teilen",
     "requestScreenShare": "Bildschirmfreigabe anfordern",
     "help": "Hilfe",
     "about": "Über PeekaView...",
-    "selectLanguage": "Sprache auswählen",
-    "checkForUpdates": "Auf Updates überprüfen",
+    "changeLanguage": "Sprache ändern",
     "logout": "Ausloggen",
     "quit": "Beenden"
   }

@@ -49,6 +49,10 @@ document.addEventListener('visibilitychange', () => {
 })
 
 window.electronAPI?.onSendScreenSourceId((id) => {
+  if (!id) {
+    
+    return
+  }
   sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
 })
 
@@ -193,7 +197,6 @@ async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = fals
 function handleError(error) {
   console.log("handleError", error)
   if (error instanceof UnauthorizedError) {
-    return
     if (window.electronAPI)
       window.electronAPI.logout(true)
     else

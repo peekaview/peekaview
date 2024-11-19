@@ -22,7 +22,7 @@ function share() {
 }
 
 function cancel() {
-  // TODO
+  window.electronAPI!.selectScreenSourceId(undefined)
 }
 </script>
 

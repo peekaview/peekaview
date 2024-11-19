@@ -1,5 +1,4 @@
 import path from 'path'
-import fs from 'fs'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
 import log from 'electron-log/main'
 import { exec } from 'child_process'
@@ -7,7 +6,7 @@ import { updateElectronApp } from 'update-electron-app'
 import i18n from "i18next"
 import backend from "i18next-fs-backend"
 
-import PeekaViewLogo from './assets/img/peekaview.png'
+import PeekaViewLogo from '../assets/img/peekaview.png'
 
 declare const APP_WEBPACK_ENTRY: string
 declare const APP_PRELOAD_WEBPACK_ENTRY: string
@@ -66,10 +65,10 @@ declare const CSP_POLICY: string
     .init({
       backend: {
         loadPath: app.isPackaged
-          ? path.join(__dirname, 'src/locales/{{lng}}.json')
+          ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
           : path.join(__dirname, '../../src/locales/{{lng}}.json'),
         addPath: app.isPackaged
-          ? path.join(__dirname, 'src/locales/{{lng}}.missing.json')
+          ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
           : path.join(__dirname, '../../src/locales/{{lng}}.missing.json'),
       },
       lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
@@ -84,6 +83,7 @@ declare const CSP_POLICY: string
 
   let tray: Tray
 
+  let selectedScreenSourceId: string | undefined
   let isQuitting = false
 
   const Store = (await import('electron-store')).default
@@ -155,6 +155,7 @@ declare const CSP_POLICY: string
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         log.info('No windows found, creating new window on activate')
+        appWindow?.webContents.send('change-language', i18n.resolvedLanguage)
         createAppWindow(true)
       }
     })
@@ -205,10 +206,14 @@ declare const CSP_POLICY: string
         { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
-          { label: i18n.t('trayMenu.selectLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
-            { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => updateContextMenu())  }
+          { label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
+            { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
+              appWindow?.webContents.send('change-language', locale)
+              sourcesWindow?.webContents.send('change-language', locale)
+              loginWindow?.webContents.send('change-language', locale)
+              updateContextMenu()
+            })}
           ))},
-          { label: i18n.t('trayMenu.checkForUpdates'), type: 'normal', click: () => updateElectronApp() },
         ] },
         { label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
       )
@@ -220,7 +225,7 @@ declare const CSP_POLICY: string
 
   const showAbout = () => {
     dialog.showMessageBox({
-      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024`,
+      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024 - info@limtec.de`,
       title: i18n.t('trayMenu.about'),
     })
   }
@@ -258,12 +263,14 @@ declare const CSP_POLICY: string
     })
 
     appWindow.loadURL(APP_WEBPACK_ENTRY)
+    appWindow?.webContents.send('change-language', i18n.resolvedLanguage)
     log.info('Main window loaded')
 
     !app.isPackaged && appWindow.webContents.openDevTools()
   }
 
   const createLoginWindow = (discardSession = false) => {
+    log.info('Opening login window')
     if (loginWindow) {
       log.info('Reusing existing login window')
       if (loginWindow.isMinimized()) loginWindow.restore()
@@ -286,7 +293,57 @@ declare const CSP_POLICY: string
     })
 
     loginWindow.on('close', () => loginWindow = undefined)
-    loginWindow.loadURL(LOGIN_WEBPACK_ENTRY + `?discardSession=${discardSession ? 'true' : 'false'}`)
+    loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
+    loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+  }
+
+  const createSourcesWindow = () => {
+    log.info('Opening sources window')
+    if (sourcesWindow) {
+      log.info('Reusing existing sources window')
+      if (sourcesWindow.isMinimized()) sourcesWindow.restore()
+      sourcesWindow.focus()
+      return
+    }
+
+    log.info('Creating new sources window')
+    sourcesWindow = new BrowserWindow({
+      icon: path.join(__dirname, PeekaViewLogo),
+      width: 960,
+      height: 540,
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: true,
+        preload: SOURCES_PRELOAD_WEBPACK_ENTRY,
+      }
+    })
+
+    sourcesWindow.on('close', async (e) => {
+      if (selectedScreenSourceId) {
+        appWindow?.webContents.send('send-screen-source-id', selectedScreenSourceId)
+      } else if (!isQuitting) {
+        const response = dialog.showMessageBoxSync({
+          message: i18n.t('sourcesWindow.confirmCancel'),
+          title: i18n.t('general.areYouSure'),
+          buttons: [
+            i18n.t('general.yes'),
+            i18n.t('general.no'),
+          ]
+        })
+
+        if (response === 1) {
+          e.preventDefault()
+          return
+        }
+
+        appWindow?.hide()
+      }
+
+      sourcesWindow = undefined
+    })
+    sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
+    sourcesWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
 
   function handleProtocol(url: string) {
@@ -328,6 +385,10 @@ declare const CSP_POLICY: string
     app.quit()
   }
 
+  ipcMain.handle('close-app-window', async () => {
+    
+  })
+
   // Handle graceful shutdown
   ipcMain.handle('handle-app-closing', async () => {
     if (process.platform === "darwin")
@@ -355,28 +416,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('open-screen-source-selection', async () => {
-    log.info('Opening screen source selection')
-    if (sourcesWindow) {
-      log.info('Reusing existing sources window')
-      if (sourcesWindow.isMinimized()) sourcesWindow.restore()
-      sourcesWindow.focus()
-      return
-    }
-
-    sourcesWindow = new BrowserWindow({
-      icon: path.join(__dirname, PeekaViewLogo),
-      width: 960,
-      height: 540,
-      autoHideMenuBar: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: true,
-        preload: SOURCES_PRELOAD_WEBPACK_ENTRY,
-      }
-    })
-
-    sourcesWindow.on('close', () => sourcesWindow = undefined)
-    sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
+    createSourcesWindow()
   })
 
   ipcMain.handle('log', async (_event, messages: any[]) => {
@@ -407,9 +447,9 @@ declare const CSP_POLICY: string
     return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
   })
 
-  ipcMain.handle('select-screen-source-id', async (_event, id: string) => {
+  ipcMain.handle('select-screen-source-id', async (_event, id: string | undefined) => {
     log.info('Screen source selected:', id)
+    selectedScreenSourceId = id
     sourcesWindow?.close()
-    appWindow?.webContents.send('send-screen-source-id', id)
   })
 })()

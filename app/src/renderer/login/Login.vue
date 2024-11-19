@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
+import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
 const params = new URLSearchParams(window.location.search)
 const discardSession = params.get('discardSession') === 'true'

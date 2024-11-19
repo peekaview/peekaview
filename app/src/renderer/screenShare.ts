@@ -115,18 +115,8 @@ export async function publishTrack(room: Room, sourceId?: string, shareAudio = f
 }
 
 export async function joinRoom(url: string, jwtToken: string) {
-  // Initialize a new Room object
-  // this is for webcam video
-  /*const newRoom = new Room({
-    adaptiveStream: true,
-    dynacast: true,
-    publishDefaults: {
-      videoSimulcastLayers: [VideoPresets.h90, VideoPresets.h216],
-    },
-  })*/
-
   console.log("joinRoom")
-  // this is for screen-sharing
+  
   const room = new Room({
     adaptiveStream: true,
     dynacast: true,

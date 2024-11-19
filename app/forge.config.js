@@ -12,6 +12,7 @@ module.exports = {
     asar: true,
     arch: ['x64', 'arm64'],
     platform: ['darwin'],
+    extraResource: ['./src/locales'],
   },
   rebuildConfig: {},
   makers: [
@@ -67,24 +68,24 @@ module.exports = {
           nodeIntegration: true,
           entryPoints: [{
             name: 'app',
-            html: './src/index.html',
-            js: './src/app.ts',
+            html: './src/renderer/app/index.html',
+            js: './src/renderer/app/entry.ts',
             preload: {
-              js: './src/preload.ts'
+              js: './src/main/preload/app.ts'
             }
           }, {
             name: 'sources',
-            html: './src/sources/index.html',
-            js: './src/sources/sources.ts',
+            html: './src/renderer/sources/index.html',
+            js: './src/renderer/sources/entry.ts',
             preload: {
-              js: './src/sources/preload.ts'
+              js: './src/main/preload/sources.ts'
             }
           }, {
             name: 'login',
-            html: './src/login/index.html',
-            js: './src/login/login.ts',
+            html: './src/renderer/login/index.html',
+            js: './src/renderer/login/entry.ts',
             preload: {
-              js: './src/login/preload.ts'
+              js: './src/main/preload/login.ts'
             }
           }]
         }
