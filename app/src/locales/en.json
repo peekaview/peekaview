@@ -53,6 +53,7 @@
       "hoursAgo": "one hour ago | {n} hours ago",
       "daysAgo": "one day ago | {n} days ago"
     },
+    "sharingEnded": "Screen sharing connection has been closed.",
     "keepWindowOpen": "You can keep this window open. Once your request is accepted, the connection will be established automatically.",
     "connectionError": "There was a problem connecting to the server. Please try again."
   },
@@ -73,9 +74,13 @@
       "prompt": "Don't have the PeekaView App yet?",
       "button": "Download PeekaView for Windows"
     },
+    "openSession": {
+      "title": "Share Your Screen",
+      "description": "Select a screen / window you want to share. A selection of screens / windows you can share will open in a separate window."
+    },
     "activeSession": {
       "title": "Sharing Session Active",
-      "description": "Your screen is being shared",
+      "description": "Your screen is currently being shared.",
       "invite": "You can invite someone to join your view your screen with this link:"
     },
     "requestAccess": {

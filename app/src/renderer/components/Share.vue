@@ -37,6 +37,8 @@ const latestRequest = ref<Request>()
 
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
+
+const screenTrack = ref<Track | undefined>()
 const listeningForRequests = ref(false)
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
@@ -49,11 +51,7 @@ document.addEventListener('visibilitychange', () => {
 })
 
 window.electronAPI?.onSendScreenSourceId((id) => {
-  if (!id) {
-    
-    return
-  }
-  sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
+  id && sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
 })
 
 watch(offerDownload, async (flag) => {
@@ -175,7 +173,6 @@ async function createRoom() {
     sharingRoom.value = room
     participants.value = p
     shareLocalScreen(sharingRoom.value)
-    listeningForRequests.value = true
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error);
@@ -185,10 +182,12 @@ async function createRoom() {
 async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = false) {
   console.log("shareLocalScreen")
   try {
-    const screenTrack = await publishTrack(room, sourceId, shareAudio)
-    console.debug('Screen track published:', screenTrack)
+    screenTrack.value = await publishTrack(room, sourceId, shareAudio)
+    if (!screenTrack.value)
+      return
 
-    // The local track will be added to the thumbnail bar via the TrackPublished event
+    console.debug('Screen track published:', screenTrack.value)
+    listeningForRequests.value = true
   } catch (error) {
     console.error('Error publishing screen track:', error)
   }
@@ -281,9 +280,18 @@ function shareViaApp() {
         </div>
       </template>
 
+      <template v-else-if="!screenTrack">
+        <div class="panel">
+          <h3 class="mb-3">{{ $t('share.openSession.title') }}</h3>
+          <p class="text-secondary mb-4">
+            {{ $t('share.openSession.description') }}
+          </p>
+        </div>
+      </template>
+
       <template v-else>
-        <div class="panel sharing-info">
-          <h3 class="mb-3">{{ $t('share.activeSession.title') }}</h3>
+        <div class="panel">
+          <h3 class="mb-3 share-title">{{ $t('share.activeSession.title') }}</h3>
           <p class="text-secondary mb-4">
             {{ $t('share.activeSession.description') }}
           </p>
@@ -411,8 +419,23 @@ function shareViaApp() {
   text-decoration: underline;
 }
 
-.sharing-info {
-  max-width: 400px;
-  margin: 0 auto;
+.share-title::after {
+  margin-left: 1rem;
+}
+
+.share-title::before {
+  margin-right: 1rem;
+}
+
+.share-title::before, 
+.share-title::after {
+  content: '';
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 1rem;
+  border: 1px solid red;
+  background: red;
+  box-shadow: 2px 2px 5px;
 }
 </style>

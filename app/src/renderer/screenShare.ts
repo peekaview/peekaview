@@ -10,7 +10,7 @@ export async function publishTrack(room: Room, sourceId?: string, shareAudio = f
     if (!sourceId) {
       console.log('No sourceId provided, opening screen source selection')
       await window.electronAPI.openScreenSourceSelection()
-      return
+      return undefined
     }
 
     console.debug('Selected sourceId:', sourceId)
@@ -64,7 +64,7 @@ export async function publishTrack(room: Room, sourceId?: string, shareAudio = f
     source: Track.Source.ScreenShare,
     videoEncoding: {
       maxBitrate: 1500000,
-      maxFramerate: 30
+      maxFramerate: 15,
     }
   }
 
@@ -121,7 +121,7 @@ export async function joinRoom(url: string, jwtToken: string) {
     adaptiveStream: true,
     dynacast: true,
     publishDefaults: {
-      videoSimulcastLayers: [VideoPresets.h90, VideoPresets.h216],
+      videoSimulcastLayers: [VideoPresets.h90, VideoPresets.h216, VideoPresets.h1080],
     },
   })
 

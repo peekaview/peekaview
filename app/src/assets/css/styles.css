@@ -19,7 +19,6 @@ body {
 /* Main Container Layout */
 .main-container {
   flex-grow: 1;
-  padding: 0 1rem;
   display: flex;
   align-items: center;
   justify-content: center;

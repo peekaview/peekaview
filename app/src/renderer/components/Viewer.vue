@@ -58,10 +58,19 @@ const screenShareData = ref<ScreenShareData>()
 const screenView = ref<PromiseValue<ScreenView>>()
 const waitingStatus = ref<WaitingStatus | undefined>()
 
+const videoHeight = ref<number>()
+const videoWidth = ref<number>()
+
 watch(screenShareData, async (data) => {
   if (data)
     screenView.value = await useScreenView(data, () => {
-      // TODO
+      Swal.fire({
+        icon: 'notice',
+        text: t('viewer.sharingEnded'),
+        customClass: {
+          popup: 'animate__animated animate__fadeIn'
+        }
+      })
       screenView.value = undefined
     })
 })
@@ -196,20 +205,16 @@ function formatLastSeen(timestamp: number | undefined) {
 </script>
 
 <template>
-  <div v-if="screenView" id="room">
+  <div v-if="screenView" class="viewer">
     <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3>
-    <div id="room-content">
-      <div
-        v-if="screenView.screen"
-        class="video-container"
-      >
-        <TrackContainer :track="screenView.screen.track" />
-      </div>
-      <slot />
-    </div>
-    <div id="room-footer">
-      <a :href="liveKitDebugUrl">Debug LiveKit Room</a>
-    </div>
+    <TrackContainer 
+      v-if="screenView.screen"
+      class="video-container"
+      :track="screenView.screen.track"
+      :style="{ width: videoWidth, height: videoHeight }"
+    />
+    <slot />
+    <a :href="liveKitDebugUrl">Debug LiveKit Room</a>
   </div>
   <div v-else class="content-wrapper">
     <div class="section-content">
@@ -221,13 +226,13 @@ function formatLastSeen(timestamp: number | undefined) {
         <div class="form-content">
           <div v-if="!email" class="mb-4">
             <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-            <input type="email" class="form-control form-control-lg" id="email" name="email"
+            <input type="email" class="form-control form-control-lg" name="email"
               v-model="inputEmail"
               placeholder="example@email.com" required>
           </div>
           <div class="mb-4">
             <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-            <input type="text" class="form-control form-control-lg" id="name" name="name"
+            <input type="text" class="form-control form-control-lg" name="name"
               v-model="inputName"
               placeholder="Enter your name" required>
           </div>
@@ -271,44 +276,26 @@ function formatLastSeen(timestamp: number | undefined) {
 </template>
 
 <style>
-#room {
+.viewer {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-}
-
-#room-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 1000px;
-  padding: 0 20px;
-  margin-bottom: 20px;
+  min-height: 0;
 }
 
 .video-container {
+  flex-grow: 1;
   position: relative;
   background: #3b3b3b;
   aspect-ratio: 16/9;
   border-radius: 6px;
   overflow: hidden;
+  min-height: 0;
 }
 
 .video-container video {
   width: 100%;
   height: 100%;
-}
-
-#room-content {
-  display: flex;
-  width: 100%;
-}
-
-@media screen and (max-width: 768px) {
-  #layout-container {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  }
 }
 </style>

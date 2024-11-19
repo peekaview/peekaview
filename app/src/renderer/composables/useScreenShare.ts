@@ -1,5 +1,5 @@
 import { onBeforeUnmount, reactive, ref, markRaw } from "vue"
-import { Room, RoomEvent, Participant, Track } from "livekit-client"
+import { RoomEvent, Participant, Track } from "livekit-client"
 
 import { joinRoom } from "../screenShare"
 import { ScreenShareData } from "../types"
@@ -73,6 +73,8 @@ export async function useScreenView(data: ScreenShareData, onLeave?: () => void)
     console.log("Sharing participant's track has ended, leaving room")
     onLeave?.()
   })
+
+  console.log("screenview", { room, participants, screen, sharingParticipant })
 
   return reactive({ room: markRaw(room), participants, screen, sharingParticipant })
 }

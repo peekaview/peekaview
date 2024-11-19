@@ -259,6 +259,7 @@ declare const CSP_POLICY: string
       if (!isQuitting) {
         e.preventDefault()
         appWindow!.hide()
+        sourcesWindow?.close()
       }
     })
 
@@ -292,7 +293,9 @@ declare const CSP_POLICY: string
       }
     })
 
-    loginWindow.on('close', () => loginWindow = undefined)
+    loginWindow.on('close', () => {
+      loginWindow = undefined
+    })
     loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
     loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
@@ -319,7 +322,7 @@ declare const CSP_POLICY: string
       }
     })
 
-    sourcesWindow.on('close', async (e) => {
+    sourcesWindow.on('close', (e) => {
       if (selectedScreenSourceId) {
         appWindow?.webContents.send('send-screen-source-id', selectedScreenSourceId)
       } else if (!isQuitting) {

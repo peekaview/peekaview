@@ -52,6 +52,7 @@
       "hoursAgo": "vor einer Stunde | vor {n} Stunden",
       "daysAgo": "vor einem Tag | vor {n} Tagen"
     },
+    "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
     "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
     "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
   },
@@ -72,9 +73,13 @@
       "prompt": "Sie haben die PeekaView App noch nicht?",
       "button": "PeekaView für Windows herunterladen"
     },
+    "openSession": {
+      "title": "Bildschirm freigeben",
+      "description": "Wählen Sie einen Bildschirm / ein Fenster zur Freigabe aus. Es wird ein separates Fenster geöffnet, in welchem eine Auswahl getroffen werden kann."
+    },
     "activeSession": {
       "title": "Bildschirmfreigabe aktiv",
-      "description": "Ihr Bildschirm wird aktuell geteilt",
+      "description": "Ihr Bildschirm wird aktuell geteilt.",
       "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
     },
     "requestAccess": {

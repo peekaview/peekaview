@@ -11,13 +11,10 @@ const props = withDefaults(defineProps<{
   playsInline: false,
 })
 
-console.log(props.track)
-
 const containerRef = useTemplateRef('container')
 const trackElement = ref<HTMLVideoElement>()
 
 onMounted(() => {
-  console.log('onMounted', props.track, trackElement.value, containerRef.value)
   watchEffect(() => {
     detach()
     attach()
@@ -27,7 +24,6 @@ onMounted(() => {
 onBeforeUnmount(() => detach())
 
 function attach() {
-  console.log('attach', props.track, trackElement.value, containerRef.value)
   if (trackElement.value)
     return
 
@@ -39,7 +35,6 @@ function attach() {
 }
 
 function detach() {
-  console.log('detach', trackElement.value)
   trackElement.value?.remove()
   trackElement.value = undefined
 }
