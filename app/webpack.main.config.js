@@ -2,10 +2,10 @@ const path = require('path');
 const webpack = require('webpack');
 
 const packageJson = require('./package.json')
-
 const { getCspPolicy } = require('./webpack.util.js')
 
 module.exports = (env, argv) => {
+<<<<<<< HEAD
   const dev = argv.mode === 'development'
 
   if (!process.env.APP_URL) {
@@ -17,6 +17,10 @@ module.exports = (env, argv) => {
   if (!process.env.CONNECT_SRC) {
     throw new Error('Environment variable CONNECT_SRC must be set')
   }
+=======
+  const dev = argv.mode === 'development';
+  const staticPath = path.join(__dirname, 'static');
+>>>>>>> feature/remotedesktop
 
   return {
     mode: argv.mode,
@@ -26,6 +30,10 @@ module.exports = (env, argv) => {
       filename: 'index.js'
     },
     target: 'electron-main',
+    externals: {
+      'koffi': 'commonjs koffi',
+      '@nut-tree-fork/nut-js': 'commonjs @nut-tree-fork/nut-js',
+    },
     module: {
       rules: [
         {
@@ -44,6 +52,7 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new webpack.DefinePlugin({
+        __static: JSON.stringify(staticPath),
         APP_VERSION: JSON.stringify(packageJson.version),
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
@@ -54,7 +63,7 @@ module.exports = (env, argv) => {
       }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
-      }),
+      })
     ],
   }
 }

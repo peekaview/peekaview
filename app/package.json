@@ -12,9 +12,10 @@
   },
   "main": "./.webpack/main",
   "scripts": {
+    "preinstall": "node preinstall.js",
     "web-dev": "dotenvx run -- webpack serve --mode=development",
     "web-build": "dotenvx run -- webpack --mode=production",
-    "electron-dev": "dotenvx run -- electron-forge start",
+    "electron-dev": "dotenvx run -- electron-forge start -- --no-sandbox ",
     "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
     "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
     "package": "dotenvx run -- electron-forge package",
@@ -24,16 +25,37 @@
     "make:mac-arm": "dotenvx run -- electron-forge make --platform darwin --arch arm64",
     "make:mac-intel": "dotenvx run -- electron-forge make --platform darwin --arch x64"
   },
+  "overrides": {
+    "os": {
+      "linux": {
+        "dependencies": {}
+      },
+      "win32": {
+        "dependencies": {}
+      },
+      "darwin": {
+        "dependencies": {}
+      }
+    }
+  },
   "dependencies": {
+    "@nut-tree-fork/nut-js": "4.2.2",
     "bootstrap": "^5.3.3",
     "bootstrap-vue-next": "^0.25.10",
     "electron-log": "^5.2.2",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",
+<<<<<<< HEAD
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
+=======
+    "fix-esm": "^1.0.1",
+    "fs": "^0.0.1-security",
+    "koffi": "^2.9.2",
+>>>>>>> feature/remotedesktop
     "livekit-client": "2.1.5",
     "rpmbuild": "^0.0.23",
+    "socket.io-client": "^4.8.1",
     "sweetalert2": "^11.14.4",
     "update-electron-app": "^3.0.0",
     "vue": "^3.5.12",

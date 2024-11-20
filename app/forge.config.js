@@ -11,8 +11,12 @@ module.exports = {
     icon: './src/assets/img/peekaview',
     asar: true,
     arch: ['x64', 'arm64'],
+<<<<<<< HEAD
     platform: ['darwin'],
     extraResource: ['./src/locales'],
+=======
+    platform: ['linux'],
+>>>>>>> feature/remotedesktop
   },
   rebuildConfig: {},
   makers: [
@@ -65,6 +69,10 @@ module.exports = {
         mainConfig: "./webpack.main.config.js",
         renderer: {
           config: "./webpack.config.js",
+          externals: {
+            'koffi': 'commonjs koffi',
+            '@nut-tree-fork/nut-js': 'commonjs @nut-tree-fork/nut-js',
+          },
           nodeIntegration: true,
           entryPoints: [{
             name: 'app',
@@ -111,6 +119,27 @@ module.exports = {
 
       if (fs.existsSync('out'))
         fs.rmSync('out', { recursive: true })
+
+      // Create build directory
+      const buildPath = path.join(__dirname, 'build')
+      if (!fs.existsSync(buildPath)) {
+        fs.mkdirSync(buildPath, { recursive: true })
+      }
+
+      // Copy native dependencies to build directory
+      /*const dependencies = [
+        { src: `node_modules/@nut-tree-fork/libnut-${process.platform}/build/Release/libnut.node`, dest: 'libnut.node' },
+        { src: `node_modules/ref-napi/prebuilds/${process.platform}-${process.arch}/ref-napi.node`, dest: 'ref-napi.node' },
+        { src: `node_modules/ffi-napi/prebuilds/${process.platform}-${process.arch}/ffi-napi.uv1.node`, dest: 'ffi-napi.node' },
+        { src: `node_modules/koffi/build/koffi/${process.platform}_${process.arch}/koffi.node`, dest: 'koffi.node' }
+      ];
+
+      dependencies.forEach(({ src, dest }) => {
+        const srcPath = path.join(__dirname, src);
+        fs.existsSync(srcPath) 
+          ? fs.copyFileSync(srcPath, path.join(buildPath, dest))
+          : console.warn(`${dest} not found at: ${srcPath}`);
+      });*/
     },
     postMake: async (_forgeConfig, options) => {
       if (!fs.existsSync('dist'))

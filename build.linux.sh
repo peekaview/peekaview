@@ -20,6 +20,9 @@ dpkg -l wine32:i386 2>/dev/null | grep -q "^ii" || MISSING+=("wine32:i386")
 dpkg -l | grep -q "^ii  mono-devel " || MISSING+=("mono-devel")
 dpkg -l | grep -q "^ii  rpm " || MISSING+=("rpm")
 command -v certutil >/dev/null || MISSING+=("libnss3-tools")
+command -v gcc >/dev/null || MISSING+=("build-essential")
+command -v python3 >/dev/null || MISSING+=("python3")
+
 
 # Check wine symlink
 if [ ! -L "/usr/bin/wine64" ] && [ -f "/usr/bin/wine" ]; then
@@ -41,6 +44,7 @@ if [ ${#ADDITIONAL_STEPS[@]} -ne 0 ]; then
     echo -e "\nAdditional steps needed:"
     printf '%s\n' "${ADDITIONAL_STEPS[@]}"
 fi
+
 
 [ ${#MISSING[@]} -eq 0 ] && [ ${#ADDITIONAL_STEPS[@]} -eq 0 ] && echo "✅ All requirements met!"
 

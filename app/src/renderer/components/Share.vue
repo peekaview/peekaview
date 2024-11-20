@@ -50,8 +50,13 @@ document.addEventListener('visibilitychange', () => {
     startPingInterval()
 })
 
+<<<<<<< HEAD:app/src/renderer/components/Share.vue
 window.electronAPI?.onSendScreenSourceId((id) => {
   id && sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
+=======
+window.electronAPI?.onSendScreenSourceId((id, name) => {
+  sharingRoom.value && shareLocalScreen(sharingRoom.value, id, name, false)
+>>>>>>> feature/remotedesktop:app/src/components/Share.vue
 })
 
 watch(offerDownload, async (flag) => {
@@ -172,6 +177,9 @@ async function createRoom() {
     const { room, participants: p } = await useScreenShare(screenShareData.value)
     sharingRoom.value = room
     participants.value = p
+
+    // TODO, ist das nicht komisch so? Warum wird hier ein Sharing eröffnet, ohne eine Quelle zu wählen?
+    // Müsste es nicht eine Funktion selectSharingSource oder so geben?
     shareLocalScreen(sharingRoom.value)
   } catch (error) {
     console.error('Error creating room:', error);
@@ -179,15 +187,22 @@ async function createRoom() {
   }
 }
 
-async function shareLocalScreen(room: Room, sourceId?: string, shareAudio = false) {
+async function shareLocalScreen(room: Room, sourceId?: string, name?: string, shareAudio = false) {
   console.log("shareLocalScreen")
   try {
     screenTrack.value = await publishTrack(room, sourceId, shareAudio)
     if (!screenTrack.value)
       return
 
+<<<<<<< HEAD:app/src/renderer/components/Share.vue
     console.debug('Screen track published:', screenTrack.value)
     listeningForRequests.value = true
+=======
+    console.log("sourceId", sourceId)
+    
+    window.electronAPI?.startRemoteControl(sourceId as any, name || "PeekaView")
+    // The local track will be added to the thumbnail bar via the TrackPublished event
+>>>>>>> feature/remotedesktop:app/src/components/Share.vue
   } catch (error) {
     console.error('Error publishing screen track:', error)
   }

@@ -6,7 +6,12 @@ import { updateElectronApp } from 'update-electron-app'
 import i18n from "i18next"
 import backend from "i18next-fs-backend"
 
+<<<<<<< HEAD:app/src/main/main.ts
 import PeekaViewLogo from '../assets/img/peekaview.png'
+=======
+import PeekaViewLogo from './assets/img/peekaview.png'
+import { Streamer } from './modules/Streamer'
+>>>>>>> feature/remotedesktop:app/src/main.ts
 
 declare const APP_WEBPACK_ENTRY: string
 declare const APP_PRELOAD_WEBPACK_ENTRY: string
@@ -369,11 +374,25 @@ declare const CSP_POLICY: string
       createLoginWindow()
   }
 
+<<<<<<< HEAD:app/src/main/main.ts
   function logout(discardSession = false) {
     log.info('Logging out, discarding session:', discardSession)
     appWindow?.hide()
     store.delete('code')
     createLoginWindow(discardSession)
+=======
+  function startRemoteControl(hwnd: string, name: string) {
+    if (!hwnd || !name) {
+      log.error('Invalid hwnd or name for remote control')
+      return
+    }
+
+    log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
+    const streamer = new Streamer('c1.peekaview.de')
+    streamer.setRoomSession('roomsessiontest')
+    streamer.setArgs(hwnd, name, 'c1.peekaview.de', 'test', 'test', 'Hans', '123' )
+    streamer.startSharing()
+>>>>>>> feature/remotedesktop:app/src/main.ts
   }
 
   function loadParams(params: Record<string, string>) {
@@ -450,9 +469,20 @@ declare const CSP_POLICY: string
     return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
   })
 
+<<<<<<< HEAD:app/src/main/main.ts
   ipcMain.handle('select-screen-source-id', async (_event, id: string | undefined) => {
     log.info('Screen source selected:', id)
     selectedScreenSourceId = id
     sourcesWindow?.close()
+=======
+  ipcMain.handle('select-screen-source-id', async (_event, id: string, name: string) => {
+    log.info('Screen source selected:', id, name)
+    sourcesWindow?.close()
+    appWindow?.webContents.send('send-screen-source-id', id, name)
+  })
+
+  ipcMain.handle('start-remote-control', async (_event, hwnd: string, name: string) => {
+    startRemoteControl(hwnd, name) // TODO: handle errors
+>>>>>>> feature/remotedesktop:app/src/main.ts
   })
 })()
