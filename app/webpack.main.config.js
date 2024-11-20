@@ -2,11 +2,11 @@ const path = require('path');
 const webpack = require('webpack');
 
 const packageJson = require('./package.json')
-
 const { getCspPolicy } = require('./webpack.util.js')
 
 module.exports = (env, argv) => {
   const dev = argv.mode === 'development';
+  const staticPath = path.join(__dirname, 'static');
 
   return {
     mode: argv.mode,
@@ -16,6 +16,10 @@ module.exports = (env, argv) => {
       filename: 'index.js'
     },
     target: 'electron-main',
+    externals: {
+      'koffi': 'commonjs koffi',
+      '@nut-tree-fork/nut-js': 'commonjs @nut-tree-fork/nut-js',
+    },
     module: {
       rules: [
         {
@@ -34,6 +38,7 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new webpack.DefinePlugin({
+        __static: JSON.stringify(staticPath),
         APP_VERSION: JSON.stringify(packageJson.version),
         WEBPACK_DEVMODE: dev,
         WEBPACK_BUILDTIME: webpack.DefinePlugin.runtimeValue(Date.now, true),
@@ -57,7 +62,7 @@ module.exports = (env, argv) => {
       }),
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
-      }),
+      })
     ],
   }
 }

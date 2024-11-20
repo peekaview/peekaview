@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <style>
+    @font-face {
+      font-family: 'Abel';
+      font-style: normal;
+      font-weight: 400;
+      src: local('Abel Regular'), local('Abel-Regular'), url('/assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
+    }
+
+    @font-face {
+      font-family: 'Quicksand';
+      font-style: normal;
+      font-weight: 400;
+      src: local('Quicksand Regular'), local('Quicksand-Regular'), url('/assets/fonts/Quicksand-Regular.ttf') format('truetype');
+    }
+
+
+
+
+    
+  </style>
+
+  <link rel="stylesheet" href="assets/css/spectre.min.css" />
+  <link rel="stylesheet" href="assets/css/spectre_navbar.css" />
+  <link rel="stylesheet" href="assets/css/boxicons.min.css" />
+  <!-- <link rel="stylesheet" href="/assets/css/spectre_customtheme.css" /> -->
+
+  <link rel="stylesheet" type="text/css" href="assets/css/trix.css">
+  <script type="text/javascript" src="assets/js/trix.js"></script>
+
+  <link rel="stylesheet" id="link_customtheme" href="" />
+  <link rel="stylesheet" id="link_customstyle" href="" />
+
+  <link rel="stylesheet" href="assets/css/styles.css" />
+    <link rel="stylesheet" href="assets/css/phoneanimation.css" />
+    <link rel="stylesheet" href="assets/css/loading.css" />
+    <link rel="stylesheet" href="assets/css/alerts.css" />
+
+    <style>
+      .modal-container {
+        -webkit-user-select: none;
+      }
+
+      #modalbuttons {
+      clear: both
+      }
+
+
+    .modalin {
+      animation-name: scale-in;
+      animation-duration: 0.3s;
+    }
+
+    .modalout {
+      animation-name: scale-out;
+      animation-duration: 0.2s;
+      transform: scale(0.1);
+    }
+
+    @keyframes scale-in {
+      0% {
+        transform: scale(0.1);
+        
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes scale-out {
+      0% {
+         transform: scale(1);
+      }
+      100% {
+        transform: scale(0.1);
+      }
+    }
+    </style>
+
+  <title>meetzi</title>
+</head>
+
+<body style="background: transparent;">
+  <div id="modal-id" class="modal active modalin">
+    <div class="modal-container settings_container">
+      <div class="modal-header">
+        <a href="#close" class="btn btn-clear float-right" aria-label="Close" id="close"></a>
+        <div class="modal-title h5" id="title"></div>
+      </div>
+      <div class="modal-body">
+        <div class="content">
+          <div class="wrapper" id="dialogpicture" style="display: none; margin-left: auto">
+            <div class="ring">
+              <div class="coccoc-alo-phone coccoc-alo-green coccoc-alo-show">
+                <div class="coccoc-alo-ph-circle"></div>
+                <div class="coccoc-alo-ph-circle-fill"></div>
+                <div class="coccoc-alo-ph-img-circle"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lds-ring" style="display: none;">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+          </div>
+
+          <div class="f-modal-alert" style="margin-top: -40px;">
+            <div class="f-modal-icon f-modal-error animate"  style="display: none;">
+              <span class="f-modal-x-mark">
+                <span class="f-modal-line f-modal-left animateXLeft"></span>
+                <span class="f-modal-line f-modal-right animateXRight"></span>
+              </span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+            <div class="f-modal-icon f-modal-warning scaleWarning"  style="display: none;">
+              <span class="f-modal-body pulseWarningIns"></span>
+              <span class="f-modal-dot pulseWarningIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-info scaleWarning" style="display: none;">
+              <span class="f-modal-body pulseInfoIns"></span>
+              <span class="f-modal-dot pulseInfoIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-success animate"  style="display: none;">
+              <span class="f-modal-line f-modal-tip animateSuccessTip"></span>
+              <span class="f-modal-line f-modal-long animateSuccessLong"></span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+          </div>
+          
+          <p id="detail"></p>
+
+          <div id="modalbuttons">
+
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+<script>
+  var params = [];
+  let i = 0;
+  if (window.process) {
+    window.process.argv.forEach(function (param) {
+      if (i > 0 && param.substring(0, 1) != '-' && param.substring(0, 1) != '/') {
+        params.push(param);
+      }
+      i++;
+    });
+    //params.shift();
+    console.log(params);
+    console.log(window.process.argv);
+    //alert(params[0]);
+
+    document.getElementById('link_customtheme').href = "https://" + params[0] + "/assets/css/spectre_customtheme.css";
+    document.getElementById('link_customstyle').href = "https://" + params[0] + "/api/clientapi.php?action=customstyle";
+  } else {
+    document.getElementById('link_customtheme').href = "assets/css/spectre_customtheme.css";
+    document.getElementById('link_customstyle').href = "api/clientapi.php?action=customstyle";
+  }
+
+
+  
+</script>
+
+</html>

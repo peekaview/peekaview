@@ -16,11 +16,12 @@ export interface IElectronAPI {
   loginViaBrowser: (discardSession?: boolean) => Promise<void>,
   loginWithCode: (code: string) => Promise<void>,
   getScreenSources: () => Promise<ScreenSource[]>,
-  selectScreenSourceId: (id: string) => Promise<void>,
-  onSendScreenSourceId: (callback: (id: string) => void) => Electron.IpcRenderer,
+  selectScreenSourceId: (id: string, name: string) => Promise<void>,
+  onSendScreenSourceId: (callback: (id: string, name: string) => void) => Electron.IpcRenderer,
   createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
   handleAppClosing: () => Promise<boolean>,
+  startRemoteControl: (hwnd: string, name: string) => Promise<void>,
 }
 
 export interface ScreenSource {

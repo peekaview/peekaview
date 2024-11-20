@@ -5,6 +5,7 @@ import { exec } from 'child_process'
 import { updateElectronApp } from 'update-electron-app'
 
 import PeekaViewLogo from './assets/img/peekaview.png'
+import { Streamer } from './modules/Streamer'
 
 declare const APP_WEBPACK_ENTRY: string
 declare const APP_PRELOAD_WEBPACK_ENTRY: string
@@ -270,6 +271,19 @@ declare const CSP_POLICY: string
       createLoginWindow()
   }
 
+  function startRemoteControl(hwnd: string, name: string) {
+    if (!hwnd || !name) {
+      log.error('Invalid hwnd or name for remote control')
+      return
+    }
+
+    log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
+    const streamer = new Streamer('c1.peekaview.de')
+    streamer.setRoomSession('roomsessiontest')
+    streamer.setArgs(hwnd, name, 'c1.peekaview.de', 'test', 'test', 'Hans', '123' )
+    streamer.startSharing()
+  }
+
   function loadParams(params: Record<string, string>) {
     log.info('Loading app with params:', params)
     appWindow?.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
@@ -361,9 +375,13 @@ declare const CSP_POLICY: string
     return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
   })
 
-  ipcMain.handle('select-screen-source-id', async (_event, id: string) => {
-    log.info('Screen source selected:', id)
+  ipcMain.handle('select-screen-source-id', async (_event, id: string, name: string) => {
+    log.info('Screen source selected:', id, name)
     sourcesWindow?.close()
-    appWindow?.webContents.send('send-screen-source-id', id)
+    appWindow?.webContents.send('send-screen-source-id', id, name)
+  })
+
+  ipcMain.handle('start-remote-control', async (_event, hwnd: string, name: string) => {
+    startRemoteControl(hwnd, name) // TODO: handle errors
   })
 })()

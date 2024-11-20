@@ -7,6 +7,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   try {
     let sourceId: string
+    let sourceName: string
     const sources = await window.electronAPI.getScreenSources()
     const sourceList = document.getElementById('sourceList') as HTMLDivElement
     const submit = document.getElementById('select') as HTMLButtonElement
@@ -23,12 +24,13 @@ window.addEventListener('DOMContentLoaded', async () => {
           item.classList.remove('selected')
 
         sourceId = source.id
+        sourceName = source.name
         {(event.currentTarget as HTMLElement).classList.add('selected')}
         submit.disabled = false
       })
     })
 
-    submit.onclick = () => sourceId && window.electronAPI!.selectScreenSourceId(sourceId)
+    submit.onclick = () => sourceId && window.electronAPI!.selectScreenSourceId(sourceId, sourceName)
   } catch (error) {
     console.error('Error getting screen sources:', error)
   }

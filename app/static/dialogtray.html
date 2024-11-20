@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <style>
+    /* Remove @font-face declarations and replace with system fonts */
+    :root {
+      --modal-bg: rgba(0, 0, 0, 0.8);
+      --text-color: white;
+      --animation-duration: 0.3s;
+    }
+
+    body {
+      /* Replace Quicksand with system fonts */
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+      font-size: 14px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .modal-container {
+      -webkit-user-select: none;
+      background: var(--modal-bg);
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--text-color);
+    }
+
+    .modal-body {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      position: relative;
+    }
+
+    /* Close button */
+    .btn-clear {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      width: 24px;
+      height: 24px;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+    }
+
+    .btn-clear:hover {
+      opacity: 1;
+    }
+
+    /* Content area */
+    .content {
+      flex: 1;
+      padding: 8px;
+    }
+
+    #detail {
+      margin: 8px 0;
+      line-height: 1.4;
+    }
+
+    #modalbuttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    /* Animation classes */
+    .modalin {
+      animation: slide-in var(--animation-duration) ease forwards;
+    }
+
+    .modalout {
+      animation: slide-out var(--animation-duration) ease forwards;
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    @keyframes slide-out {
+      from { transform: translateX(0); }
+      to { transform: translateX(100%); }
+    }
+
+    /* Modal icons - simplified container styles */
+    .f-modal-alert {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: scale(0.4);
+      margin: -50px -10px -40px -10px;
+    }
+
+    /* Keep existing modal icon styles as they are complex animations */
+    .f-modal-icon {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+    }
+  </style>
+
+  <title>meetzi</title>
+</head>
+
+<body style="background: transparent;">
+  <div id="modal-id" class="modal active modalin">
+    <div class="modal-container settings_container">
+      <div class="modal-body">
+        <a href="#close" class="btn btn-clear float-right" aria-label="Close" id="close"></a>
+        <div class="content">
+          <div class="f-modal-alert" style="margin-top: -50px; margin-bottom: -40px; transform: scale(0.4); margin-right: 10px; margin-left: -10px">
+            <div class="f-modal-icon f-modal-error animate" style="display: none;">
+              <span class="f-modal-x-mark">
+                <span class="f-modal-line f-modal-left animateXLeft"></span>
+                <span class="f-modal-line f-modal-right animateXRight"></span>
+              </span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+            <div class="f-modal-icon f-modal-warning scaleWarning" style="display: none;">
+              <span class="f-modal-body pulseWarningIns"></span>
+              <span class="f-modal-dot pulseWarningIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-info scaleWarning" style="display: none;">
+              <span class="f-modal-body pulseInfoIns"></span>
+              <span class="f-modal-dot pulseInfoIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-success animate" style="display: none;">
+              <span class="f-modal-line f-modal-tip animateSuccessTip"></span>
+              <span class="f-modal-line f-modal-long animateSuccessLong"></span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+          </div>
+
+          <p id="detail"></p>
+          <div id="modalbuttons">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+<script>
+  var params = [];
+  let i = 0;
+  if (window.process) {
+    window.process.argv.forEach(function (param) {
+      if (i > 0 && param.substring(0, 1) != '-' && param.substring(0, 1) != '/') {
+        params.push(param);
+      }
+      i++;
+    });
+    //params.shift();
+    console.log(params);
+    console.log(window.process.argv);
+    //alert(params[0]);
+
+    document.getElementById('link_customtheme').href = "https://" + params[0] + "/assets/css/spectre_customtheme.css";
+    document.getElementById('link_customstyle').href = "https://" + params[0] + "/api/clientapi.php?action=customstyle";
+  } else {
+    document.getElementById('link_customtheme').href = "assets/css/spectre_customtheme.css";
+    document.getElementById('link_customstyle').href = "api/clientapi.php?action=customstyle";
+  }
+
+
+
+</script>
+
+</html>
