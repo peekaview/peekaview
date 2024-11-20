@@ -31,6 +31,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@nut-tree-fork/nut-js": "4.2.2",
     "bootstrap": "^5.3.3",
     "bootstrap-vue-next": "^0.25.10",
     "electron-log": "^5.2.2",
@@ -38,7 +39,9 @@
     "electron-updater": "^6.1.7",
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
+    "koffi": "^2.9.2",
     "livekit-client": "2.1.5",
+    "socket.io-client": "^4.8.1",
     "sweetalert2": "^11.14.4",
     "vue": "^3.5.12",
     "vue-i18n": "^10.0.4"

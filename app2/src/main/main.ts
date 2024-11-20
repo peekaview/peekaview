@@ -20,7 +20,7 @@ import { exec } from 'child_process'
 import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
 
-// import { Streamer } from './modules/Streamer'
+import { Streamer } from '../modules/Streamer.js'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
 
@@ -383,10 +383,10 @@ interface StoreSchema {
       return
     }
     log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
-    /*const streamer = new Streamer('c1.peekaview.de')
+    const streamer = new Streamer('c1.peekaview.de')
     streamer.setRoomSession('roomsessiontest')
     streamer.setArgs(hwnd, name, 'c1.peekaview.de', 'test', 'test', 'Hans', '123' )
-    streamer.startSharing()*/
+    streamer.startSharing()
   }
 
   function loadParams(params: Record<string, string>) {
