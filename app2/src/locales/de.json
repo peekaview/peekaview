@@ -1,0 +1,133 @@
+{
+  "general": {
+    "ok": "Okay",
+    "yes": "Ja",
+    "no": "Nein",
+    "cancel": "Abbrechen",
+    "areYouSure": "Sind Sie sicher?"
+  },
+  "labels": {
+    "yourEmail": "Ihre E-Mail-Adresse",
+    "yourName": "Ihr Name",
+    "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten"
+  },
+  "app": {
+    "logout": "Abmelden",
+    "confirmLogout": "Möchten Sie sich wirklich ausloggen?",
+    "about": "Impressum"
+  },
+  "login": {
+    "register": "Registrieren",
+    "login": "Jetzt in App anmelden",
+    "loggingIn": "Logge in der App ein...",
+    "code": "Ihr Login-Code",
+    "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein.",
+    "justRegistered": "Sie haben sich erfolgreich registriert. Bitte prüfen Sie Ihre Mails für den Anmelde-Link.",
+    "successful": "Anmeldung erfolgreich",
+    "successMessage": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
+    "openApp": "App öffnen",
+    "orEnterCode": "Oder geben Sie diesen Code in der App ein, um fortzufahren:",
+    "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support."
+  },
+  "viewer": {
+    "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "requestFrom": "Von {email}",
+    "requestAccess": "Zugriff anfordern",
+    "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
+    "waitingStatus": {
+      "establishing": "Verbindung wird aufgebaut...",
+      "notified": "Wir haben eine E-Mail an {email} gesendet. Sie können das Fenster geöffnet lassen.",
+      "waiting": "Warten auf Antwort von {email}..."
+    },
+    "userStatus": {
+      "online": "Benutzer online (zuletzt aktiv {lastSeen})",
+      "away": "Benutzer abwesend (zuletzt aktiv {lastSeen})",
+      "offline": "Benutzer offline",
+      "inactive": "Benutzer inaktiv oder offline"
+    },
+    "lastSeen": {
+      "unknown": "unbekannt",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor einer Minute | vor {n} Minuten",
+      "hoursAgo": "vor einer Stunde | vor {n} Stunden",
+      "daysAgo": "vor einem Tag | vor {n} Tagen"
+    },
+    "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
+    "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
+    "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "share": {
+    "howToShare": "Wie möchten Sie Ihren Bildschirm teilen?",
+    "appOption": {
+      "title": "Mit PeekaView App teilen",
+      "description": "Empfohlen: Voller Fernzugriff und Zeichenfunktionen",
+      "button": "In PeekaView App öffnen"
+    },
+    "or": "oder",
+    "browserOption": {
+      "title": "Im Browser teilen",
+      "description": "Einfache Bildschirmfreigabe über Ihren Webbrowser",
+      "button": "Im Browser fortfahren"
+    },
+    "download": {
+      "prompt": "Sie haben die PeekaView App noch nicht?",
+      "button": "PeekaView für Windows herunterladen"
+    },
+    "openSession": {
+      "title": "Bildschirm freigeben",
+      "description": "Wählen Sie einen Bildschirm / ein Fenster zur Freigabe aus. Es wird ein separates Fenster geöffnet, in welchem eine Auswahl getroffen werden kann."
+    },
+    "activeSession": {
+      "title": "Bildschirmfreigabe aktiv",
+      "description": "Ihr Bildschirm wird aktuell geteilt.",
+      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
+    },
+    "requestAccess": {
+      "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
+      "accept": "Akzeptieren",
+      "deny": "Ablehnen"
+    },
+    "waitingStatus": {
+      "checking": "Prüfen auf Teilnehmeranfragen..."
+    },
+    "appDialog": {
+      "title": "PeekaView App",
+      "message": "Wenn sich die App nicht automatisch öffnet, stellen Sie sicher, dass sie installiert ist.",
+      "download": "Sie können sie <a href=\"{link}\" class=\"alert-link\">hier herunterladen</a>.",
+      "tryAgain": "Erneut versuchen",
+      "cancel": "Abbrechen"
+    },
+    "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "screenShare": {
+    "title": "Bildschirmfreigabe-Sitzung",
+    "shareButton": "Meinen Bildschirm teilen",
+    "localParticipant": "Ich",
+    "connectionError": "Beim Verbinden mit dem Raum ist ein Fehler aufgetreten: {error}"
+  },
+  "loginWindow": {
+    "login": "Anmelden",
+    "clickToLogin": "Hier klicken um via Browser anzumelden",
+    "sessionError": "Es ist ein Fehler bei Ihrer Sitzung aufgetreten. Bitte versuchen Sie erneut, sich anzumelden.",
+    "waitForLogin": "Warte auf Anmeldung",
+    "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
+    "loginWithCode": "Mit Code anmelden"
+  },
+  "sourcesWindow": {
+    "type": {
+      "windows": "Fenster",
+      "screens": "Bilschirme"
+    },
+    "share": "Teilen",
+    "confirmCancel": "Sind Sie sicher, dass Sie die Bildschirm-Auswahl abbrechen wollen? Es wird eine Auswahl benötigt, um ihren Bildschirm teilen zu können."
+  },
+  "trayMenu": {
+    "shareMyScreen": "Meinen Bildschirm teilen",
+    "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "help": "Hilfe",
+    "about": "Über PeekaView...",
+    "changeLanguage": "Sprache ändern",
+    "logout": "Ausloggen",
+    "quit": "Beenden"
+  }
+} 

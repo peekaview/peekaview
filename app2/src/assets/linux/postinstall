@@ -1,0 +1,12 @@
+#!/bin/bash
+
+touch /tmp/postinstall-works
+
+# Update desktop database and register protocol handler
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+    touch /home/postinstall-condition-works
+    update-desktop-database
+    xdg-mime default peekaview.desktop x-scheme-handler/peekaview
+fi
+
+exit 0
