@@ -116,9 +116,9 @@ export class CustomDialog {
       frame: false,
       x: windowParams.x,
       y: windowParams.y,
-      icon: path.join(__static, '/assets/img/peekaviewlogo.png'),
+      icon: 'public/static/peekaviewlogo.png',
       webPreferences: {
-        preload: path.join(__static, '/dialog.js'),
+        preload: 'public/static/dialog.js',
         additionalArguments: [hostname],
         nodeIntegration: true,
         contextIsolation: false,
@@ -127,7 +127,7 @@ export class CustomDialog {
       },
     })
 
-    dialogWindow.loadFile(path.join(__static, windowParams.template))
+    dialogWindow.loadFile(`public/static/${windowParams.template}`)
     if (type === 'dialog')
       dialogWindow.center()
     dialogWindow.show()

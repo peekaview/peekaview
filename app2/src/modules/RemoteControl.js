@@ -121,7 +121,7 @@ export class RemoteControl {
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
-        preload: path.join(__static, '/cursoroverlaysignal.js'), // needs full path
+        preload: 'public/static/cursoroverlaysignal.js',
         additionalArguments: [id, name, color],
       },
     })
@@ -129,9 +129,7 @@ export class RemoteControl {
     this.overlaycursorsignal[id].removeMenu()
     this.overlaycursorsignal[id].setIgnoreMouseEvents(true)
     // this.overlaycursorsignal[id].setAlwaysOnTop(true, 'screen-saver');
-    this.overlaycursorsignal[id].loadFile(
-      path.join(__static, '/cursoroverlaysignal.html'),
-    )
+    this.overlaycursorsignal[id].loadFile('public/static/cursoroverlaysignal.html')
     console.log(`show signal${cpoint}`)
 
     let currentoverlaysignal = this.overlaycursorsignal[id]
@@ -171,7 +169,7 @@ export class RemoteControl {
           webSecurity: false,
           nodeIntegration: true,
           contextIsolation: false,
-          preload: path.join(__static, '/drawer.js'), // needs full path
+          preload: 'public/static/drawer.js',
         },
       })
 
@@ -179,7 +177,7 @@ export class RemoteControl {
       this.overlaydrawer.removeMenu()
       this.overlaydrawer.setIgnoreMouseEvents(true)
       // this.overlaydrawer.setAlwaysOnTop(true, 'screen-saver');
-      this.overlaydrawer.loadFile(path.join(__static, '/drawer.html'))
+      this.overlaydrawer.loadFile('public/static/drawer.html')
     }
     this.overlaydrawer.webContents.send(action, data)
   }
@@ -207,14 +205,14 @@ export class RemoteControl {
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
-          preload: path.join(__static, '/cursoroverlay.js'), // needs full path
+          preload: 'public/static/cursoroverlay.js',
           additionalArguments: [id, name, color],
         },
       })
 
       this.overlaycursor[id].removeMenu()
       this.overlaycursor[id].setAlwaysOnTop(true, 'screen-saver')
-      this.overlaycursor[id].loadFile(path.join(__static, '/cursoroverlay.html'))
+      this.overlaycursor[id].loadFile('public/static/cursoroverlay.html')
       this.overlaycursor[id].setIgnoreMouseEvents(true)
 
       // const self = this
@@ -447,13 +445,13 @@ export class RemoteControl {
         webSecurity: false,
         nodeIntegration: true,
         contextIsolation: false,
-        preload: path.join(__static, '/clipboard.js'), // needs full path
+        preload: 'public/static/clipboard.js',
       },
     })
 
     this.clipboardwindow.removeMenu()
     this.clipboardwindow.setAlwaysOnTop(true, 'screen-saver')
-    this.clipboardwindow.loadFile(path.join(__static, '/clipboard.html'))
+    this.clipboardwindow.loadFile('public/static/clipboard.html')
     // this.clipboardwindow.webContents.openDevTools();
     this.clipboardwindow.webContents.send('pasteFromFile', data)
     this.clipboardwindow.show()

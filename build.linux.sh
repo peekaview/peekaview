@@ -22,7 +22,7 @@ dpkg -l | grep -q "^ii  rpm " || MISSING+=("rpm")
 command -v certutil >/dev/null || MISSING+=("libnss3-tools")
 command -v gcc >/dev/null || MISSING+=("build-essential")
 command -v python3 >/dev/null || MISSING+=("python3")
-
+npm install -g pnpm
 
 # Check wine symlink
 if [ ! -L "/usr/bin/wine64" ] && [ -f "/usr/bin/wine" ]; then

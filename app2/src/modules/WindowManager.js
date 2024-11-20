@@ -29,8 +29,7 @@ if (isWin32) {
       GetWindowRect: lib.func('__stdcall', 'GetWindowRect', 'bool', ['int64', 'void *']),
       GetClientRect: lib.func('__stdcall', 'GetClientRect', 'bool', ['int64', 'void *']),
       ClientToScreen: lib.func('__stdcall', 'ClientToScreen', 'bool', ['int64', 'void *']),
-      SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', 
-        ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
+      SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
       SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64'])
     };
     isUser32Available = true;
@@ -126,7 +125,7 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`osascript ${path.join(__static, 'mac_windowlist.osa')}`).toString().replace(regex, '')
+      res = this.executeCmd(`osascript 'public/static/mac_windowlist.osa'`).toString().replace(regex, '')
 
       console.log('start mac-windowlist')
       console.log(res)
@@ -879,7 +878,7 @@ export class WindowManager {
       console.log(windowdimensions)
 
       this.overlayrecord.removeMenu()
-      this.overlayrecord.loadFile(path.join(__static, '/windowoverlay.html'))
+      this.overlayrecord.loadFile('public/static/windowoverlay.html')
       this.overlayrecord.setIgnoreMouseEvents(true)
     }
   }
