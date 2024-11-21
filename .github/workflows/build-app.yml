@@ -52,9 +52,9 @@ jobs:
         - name: Create Env
           working-directory: ./app
           run: |
-            echo "APP_URL=https://develop.peekaview.de/" >> .env
-            echo "API_URL=https://api.peekaview.de/" >> .env
-            echo "CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
+            echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
+            echo "VITE_API_URL=https://api.peekaview.de/" >> .env
+            echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
 
         - name: Cache node_modules in app folder
           uses: actions/cache@v3
