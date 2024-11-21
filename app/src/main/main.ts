@@ -487,7 +487,7 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
   
-  ipcMain.handle('start-remote-control', async (_event, hwnd: string, name: string) => {
-    startRemoteControl(hwnd, name) // TODO: handle errors
+  ipcMain.handle('start-remote-control', async (_event, source: ScreenSource) => {
+    startRemoteControl(source.id, source.name) // TODO: handle errors
   })
 })()
