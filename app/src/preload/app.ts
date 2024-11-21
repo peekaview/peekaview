@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openScreenSourceSelection: () => ipcRenderer.invoke('open-screen-source-selection'),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
   handleAppClosing: () => ipcRenderer.invoke('handle-app-closing'),
-  startRemoteControl: (hwnd: string, name: string) => ipcRenderer.invoke('start-remote-control', hwnd, name),
+  startRemoteControl: (source: ScreenSource) => ipcRenderer.invoke('start-remote-control', source),
 });
 
 console.log('Preload script has been loaded');
