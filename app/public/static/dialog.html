@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="">
 
 <head>
@@ -7,42 +6,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <style>
     @font-face {
-      font-family: 'Abel';
-      font-style: normal;
-      font-weight: 400;
-      src: local('Abel Regular'), local('Abel-Regular'), url('/assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
-    }
-
-    @font-face {
-      font-family: 'Quicksand';
-      font-style: normal;
-      font-weight: 400;
-      src: local('Quicksand Regular'), local('Quicksand-Regular'), url('/assets/fonts/Quicksand-Regular.ttf') format('truetype');
-    }
-
-
-
-
-    
+        font-family: 'Abel';
+        font-style: normal;
+        font-weight: 400;
+        src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
+      }
   </style>
 
-  <link rel="stylesheet" href="assets/css/spectre.min.css" />
-  <link rel="stylesheet" href="assets/css/spectre_navbar.css" />
-  <link rel="stylesheet" href="assets/css/boxicons.min.css" />
-  <!-- <link rel="stylesheet" href="/assets/css/spectre_customtheme.css" /> -->
+  <link rel="stylesheet" href="css/spectre.min.css" />
 
-  <link rel="stylesheet" type="text/css" href="assets/css/trix.css">
-  <script type="text/javascript" src="assets/js/trix.js"></script>
-
-  <link rel="stylesheet" id="link_customtheme" href="" />
-  <link rel="stylesheet" id="link_customstyle" href="" />
-
-  <link rel="stylesheet" href="assets/css/styles.css" />
-    <link rel="stylesheet" href="assets/css/phoneanimation.css" />
-    <link rel="stylesheet" href="assets/css/loading.css" />
-    <link rel="stylesheet" href="assets/css/alerts.css" />
 
     <style>
+
       .modal-container {
         -webkit-user-select: none;
       }
@@ -162,13 +137,6 @@
     //params.shift();
     console.log(params);
     console.log(window.process.argv);
-    //alert(params[0]);
-
-    document.getElementById('link_customtheme').href = "https://" + params[0] + "/assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "https://" + params[0] + "/api/clientapi.php?action=customstyle";
-  } else {
-    document.getElementById('link_customtheme').href = "assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "api/clientapi.php?action=customstyle";
   }
 
 

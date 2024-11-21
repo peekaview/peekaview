@@ -25,7 +25,6 @@ export class Streamer {
     this.hwnd = null
 
     this.streamerOverlay = null
-    this.hostname = hostname
 
     this.args = {
       hwnd: null,
@@ -65,11 +64,13 @@ export class Streamer {
     this.imagedimensions = null
   }
 
-  setRoomSession(roomsession) {
-    this.roomsession = roomsession
+  joinRoom() {
     if (!this.joined) {
-      socket = io(`https://${this.hostname}/`)
+      socket = io(`${this.hostname}`)
       socket.emit('join-message', this.roomsession)
+
+
+      console.log('joined room:', this.roomsession)
       this.joined = true
     }
   }
@@ -78,18 +79,35 @@ export class Streamer {
     this.hostname = hostname
   }
 
-  setArgs(hwnd, windowtitle, hostname, roomname, school, username, userid) {
+  setArgs(hwnd, hostname, roomname, roomid, username, userid) {
     // Extract just the number if hwnd is in 'window:number:0' format
     this.hwnd = String(hwnd).includes(':') 
       ? String(hwnd).split(':')[1]
       : hwnd
       
-    this.args = { hwnd: this.hwnd, hostname: hostname, roomname: roomname, school: school, username: username, userid: userid }
+    this.roomsession = roomid
+    this.hostname = hostname
+
+    // Generate a color from username if not provided
+    let color = this.generateColorFromUsername(username)
+    
+    this.args = { hwnd: this.hwnd, hostname: hostname, roomname: roomname, roomid: roomid, username: username, userid: userid, color: color }
+  }
+
+  // Helper method to generate consistent colors from username
+  generateColorFromUsername(username) {
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+      hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    // Convert to hex color, ensuring good contrast and saturation
+    const color = Math.abs(hash).toString(16).substring(0, 6).padEnd(6, 'f');
+    return color;
   }
 
   async startSharing() {
     const hwnd = `${this.args.hwnd}`
-    const windowtitle = this.args.windowtitle
+    //const windowtitle = this.args.windowtitle
 
     console.log(`hwndstreamer:${hwnd}`)
 
@@ -173,7 +191,6 @@ export class Streamer {
       this.checkwindowinterval = null
     }
 
-    // this.closeStreamerOverlay()
     console.log('stop sharing!!')
     this.customDialog.closeShareDialogs()
     this.windowManager.hideRecordOverlay()
@@ -182,15 +199,6 @@ export class Streamer {
     if (this.streamingactive != null)
       this.streamingactive = null
   }
-
-  /*
-  toggleRemoteControl() {
-    this.remoteControl.toggleRemoteControl()
-  }
-
-  toggleMouse() {
-    this.remoteControl.toggleMouse()
-  } */
 
   pauseStreaming() {
     if (!this.streamingpaused) {
@@ -222,6 +230,8 @@ export class Streamer {
       obj.remotecontrol = self.remoteControl.remotecontrolinputenabled
       obj.mouseenabled = self.remoteControl.mouseenabled
       obj.dimensions = self.windowManager.getWindowOuterDimensions()
+      
+      console.log("startStreaming")
       console.log(JSON.stringify(obj))
       socket.emit('reset', JSON.stringify(obj))
 
@@ -245,6 +255,7 @@ export class Streamer {
 
       this.windowManager.selectWindow(this.hwnd)
       this.windowManager.showRecordOverlay()
+      this.windowManager.showDebugOverlay(this.args)
       this.remoteControl.activate(this.hwnd)
     }
   }
@@ -257,71 +268,11 @@ export class Streamer {
     socket.volatile.emit('host-info', JSON.stringify(obj))
   }
 
-  /* closeStreamerOverlay() {
-    //customDialog.closeShareDialogs()
-
-    if (this.streamerOverlay != null) {
-      this.streamerOverlay.close()
-      this.streamerOverlay = null
-    }
-  } */
-
   showStreamerOverlay(hwnd) {
     this.customDialog.playSoundOnOpen('ping.wav')
     this.customDialog.openTrayDialog(this.hostname, {
       detail: (hwnd !== 0 ? 'Sie haben ein Fenster mit meetzi geteilt. Andere Teilnehmer können das Fenster sehen/bearbeiten.' : 'Sie haben Ihren Bildschirm mit meetzi geteilt. Andere Teilnehmer können den Bildschirminhalt sehen/bearbeiten.'),
     })
     this.customDialog.openShareDialog(this.hostname, {})
-
-    /*
-    if (this.streamerOverlay == null) {
-
-      let y = 0
-      if (process.platform === 'linux')
-        y = screen.getPrimaryDisplay().workArea.y
-      if (process.platform === 'win32')
-        y = screen.getPrimaryDisplay().workAreaSize.height - (sourceid.split(':')[0] == 'window' ? 32 : 232)
-      if (process.platform === 'darwin')
-        y = 0
-
-      this.streamerOverlay = new BrowserWindow({
-        x: screen.getPrimaryDisplay().workAreaSize.width - 302,
-        y,
-        width: 302,
-        height: sourceid.split(':')[0] == 'window' ? 32 : 232,
-        transparent: true,
-        skipTaskbar: true,
-        focusable: false,
-        resizable: false,
-        roundedCorners: false,
-        // type: "toolbar",
-        title: '__meetzi - WindowCaptureClose',
-        frame: false,
-        alwaysOnTop: true,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false,
-          additionalArguments: [
-            sourceid.replaceAll(':', '_'),
-            this.args.hostname,
-            this.roomsession,
-          ],
-          preload: path.join(__static, '/windowoverlaybutton.js'),
-        },
-      })
-
-      // this.streamerOverlay.webContents.openDevTools();
-
-      // this.streamerOverlay.removeMenu();
-      // this.overlayrecord.setAlwaysOnTop(true, 'screen-saver');
-      this.streamerOverlay.loadFile(
-        path.join(__static, '/windowoverlaybutton.html'),
-      )
-
-      this.streamerOverlay.on('closed', () => {
-        this.streamerOverlay = null
-        this.closeStreamerOverlay()
-      })
-    } */
   }
 }

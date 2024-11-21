@@ -21,6 +21,7 @@ import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
 
 import { Streamer } from '../modules/Streamer.js'
+//import { Conference } from '../modules/Conference.js'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
 import { ScreenSource } from '../interface.js'
@@ -86,6 +87,8 @@ interface StoreSchema {
 
   let selectedScreenSource: ScreenSource | undefined
   let isQuitting = false
+
+  let streamer: Streamer | null = null;
 
   const Store = (await import('electron-store')).default
   const store = new Store<StoreSchema>({
@@ -384,9 +387,11 @@ interface StoreSchema {
       return
     }
     log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
-    const streamer = new Streamer('c1.peekaview.de')
-    streamer.setRoomSession('roomsessiontest')
-    streamer.setArgs(hwnd, name, 'c1.peekaview.de', 'test', 'test', 'Hans', '123' )
+
+    // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
+    streamer = new Streamer()
+    streamer.setArgs(hwnd, import.meta.env.VITE_CONTROLSERVER, 'roomname', 'roomid', 'username', 'userid' )
+    streamer.joinRoom()
     streamer.startSharing()
   }
 
@@ -486,8 +491,28 @@ interface StoreSchema {
     selectedScreenSource = source
     sourcesWindow?.close()
   })
+
+  
   
   ipcMain.handle('start-remote-control', async (_event, source: ScreenSource) => {
     startRemoteControl(source.id, source.name) // TODO: handle errors
   })
+
+
+  ipcMain.handle('toggleRemoteControl', async (_event) => {
+    console.log('toggleRemoteControl')
+    streamer.remoteControl.toggleRemoteControl()
+    streamer.remoteControl.toggleMouse()
+  })
+  
+  ipcMain.handle('toggleMouse', async (_event) => {
+    console.log('toggleMouse')
+    streamer.remoteControl.toggleMouse()
+  })
+
+  ipcMain.handle('stopSharing', async (_event) => {
+    console.log('stopSharing')
+    quit()
+  })
+
 })()

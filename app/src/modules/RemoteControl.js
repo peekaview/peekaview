@@ -8,6 +8,7 @@ import {
   Button,
 } from '@nut-tree-fork/nut-js';
 import { BrowserWindow, screen } from 'electron';
+import { app } from 'electron';
 // import SocketIO from 'socket.io-client';
 // import { fileTypeFromBlob } from 'file-type';
 // import { Streamer } from "./Streamer.js";
@@ -17,7 +18,7 @@ const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
-const defaulturl = 'http://meetdev.meetzi.de:5901'
+const defaulturl = 'wss://c1.peekaview.de'
 let lastmousepos = new Point({ x: 0, y: 0 })
 let windowcheckinterval = null
 let cursorcheckinterval = null
@@ -52,8 +53,6 @@ export class RemoteControl {
     this.remotecontrolinputenabled = false
     if (url == undefined || url == '')
       url = defaulturl
-
-    // this.socket = SocketIO('https://ps-meetdev.meetzi.de');
 
     const self = this
   }
@@ -121,7 +120,7 @@ export class RemoteControl {
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
-        preload: 'public/static/cursoroverlaysignal.js',
+        preload: path.join(app.getAppPath(), 'public/static/cursoroverlaysignal.js'),
         additionalArguments: [id, name, color],
       },
     })
@@ -169,7 +168,7 @@ export class RemoteControl {
           webSecurity: false,
           nodeIntegration: true,
           contextIsolation: false,
-          preload: 'public/static/drawer.js',
+          preload: path.join(app.getAppPath(), 'public/static/drawer.js'),
         },
       })
 
@@ -205,7 +204,7 @@ export class RemoteControl {
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
-          preload: 'public/static/cursoroverlay.js',
+          preload: path.join(app.getAppPath(), 'public/static/cursoroverlay.js'),
           additionalArguments: [id, name, color],
         },
       })
@@ -445,7 +444,7 @@ export class RemoteControl {
         webSecurity: false,
         nodeIntegration: true,
         contextIsolation: false,
-        preload: 'public/static/clipboard.js',
+        preload: path.join(app.getAppPath(), 'public/static/clipboard.js'),
       },
     })
 

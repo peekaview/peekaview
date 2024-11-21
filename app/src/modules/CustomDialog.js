@@ -131,7 +131,7 @@ export class CustomDialog {
     if (type === 'dialog')
       dialogWindow.center()
     dialogWindow.show()
-    //dialogWindow.webContents.openDevTools()
+    dialogWindow.webContents.openDevTools()
     dialogWindow.webContents.once('dom-ready', () => {
       dialogWindow.webContents.send('params', {
         ...defaultParams,

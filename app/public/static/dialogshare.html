@@ -5,83 +5,83 @@
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+
   <style>
-    html, body {
-      margin: 0px;
+    @font-face {
+        font-family: 'Abel';
+        font-style: normal;
+        font-weight: 400;
+        src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
+      }
+  </style>
+
+  <link rel="stylesheet" href="css/spectre.min.css" />
+  <link rel="stylesheet" href="css/loading.css" />
+  <link rel="stylesheet" href="css/overlay.css" />
+
+    <style>
+
+    body {
+      font-family: Abel;
+    }
+
+    .modal-container {
+      -webkit-user-select: none;
+    }
+
+    .modal-container .modal-body {
       padding: 0px;
+      padding-top: 4px;
     }
 
-    .checkboxcontainer {
-        display: flex;
-        align-items: center;
-        position: relative;
-        padding-left: 25px;
-        cursor: pointer;
-        user-select: none;
-        line-height: 20px;
-        margin: 0;
-        font-size: 12px;
-        color: white;
+    .modalin {
+      animation-name: scale-in;
+      animation-duration: 0.3s;
     }
 
-    .checkboxcontainer input {
-        position: absolute;
-        opacity: 0;
-        cursor: pointer;
-        height: 0;
-        width: 0;
+    .modalout {
+      animation-name: scale-out;
+      animation-duration: 0.2s;
+      transform: translateY(-100%);
     }
 
-    .checkmark {
-        position: absolute;
-        top: 50%;
-        left: 0;
-        height: 15px;
-        width: 15px;
-        background-color: #eee;
-        transform: translateY(-50%);
+    .checkboxcontainer .checkmark:after {
+      left: 5px;
+      right: 3px;
+      top: 2px;
     }
 
-    .checkmark:after {
-        content: "";
-        position: absolute;
-        display: none;
-        left: 5px;
-        top: 2px;
-        width: 5px;
-        height: 10px;
-        border: solid white;
-        border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
+     /* Colors and Fonts */
+    .btn.btn-secondary {
+        background: #2a2a2a;
+        border-color: #404040;
+        color: #aaa;
+    }
+    .btn.btn-secondary:hover {
+        background: #404040;
+        border-color: #505050;
+        color: #ddd;
     }
 
-    .checkboxcontainer input:checked ~ .checkmark:after {
-        display: block;
+    @keyframes scale-in {
+      0% {
+        transform: translateY(-100%);
+
+      }
+
+      100% {
+        transform: translateY(0%);
+      }
     }
 
-    .checkboxcontainer input:checked ~ .checkmark {
-        background-color: #2196F3;
-    }
+    @keyframes scale-out {
+      0% {
+        transform: translateY(0%);
+      }
 
-    .modal-body {
-      padding: 8px;
-      gap: 8px;
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr auto;
-    }
-
-    .btn {
-      width: calc(100% - 12px);
-      padding: 8px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      color: white;
-      font-family: system-ui;
-      font-size: 12px;
-    }
-
-    .btn:hover {
-        background: rgba(255, 255, 255, 0.15);
+      100% {
+        transform: translateY(-100%);
+      }
     }
   </style>
 
@@ -90,24 +90,26 @@
 
 <body style="background: transparent;">
   <div id="modal-id" class="modal active modalin">
-    <div class="modal-container settings_container" style="background: #333333;">
+    <div class="modal-container settings_container"  style="background: #1a1a1a;">
       <div class="modal-body">
-        <div class="btn btn-sm btn-secondary">
-          <label class="checkboxcontainer">Fernzugriff
-            <input type="checkbox" onChange="toggleRemoteControl()" id="remotecontrolenabled">
-            <span class="checkmark"></span>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 16px); margin:0px; padding: 4px;">
+          <label class="checkboxcontainer">&nbsp;&nbsp;Fernzugriff
+            <input type="checkbox" onChange="toggleRemoteControl()" id="remotecontrolenabled"><span
+              class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm btn-secondary">
-          <label class="checkboxcontainer">Mauszeiger
-            <input type="checkbox" onChange="toggleMouse()" id="mouseenabled" checked="checked">
-            <span class="checkmark"></span>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 16px); margin:0px; padding: 4px;">
+          <label class="checkboxcontainer">&nbsp;&nbsp;Mauszeiger
+            <input type="checkbox" onChange="toggleMouse()" id="mouseenabled" checked="checked"><span
+              class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm btn-secondary" onClick="stopJitsiSharing()">Beenden</div>
-        <div style="-webkit-app-region: drag;">
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 17px); margin:0px; padding: 4px;"
+          onClick="stopSharing()">Beenden</div>
+        <div style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width:32px; -webkit-user-select: none; -webkit-app-region: drag;">
           <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path fill="none" stroke="#ccc" stroke-width="2" d="M15,5 L17,5 L17,3 L15,3 L15,5 Z M7,5 L9,5 L9,3 L7,3 L7,5 Z M15,13 L17,13 L17,11 L15,11 L15,13 Z M7,13 L9,13 L9,11 L7,11 L7,13 Z M15,21 L17,21 L17,19 L15,19 L15,21 Z M7,21 L9,21 L9,19 L7,19 L7,21 Z" />
+            <path fill="none" stroke="#ccc" stroke-width="2"
+              d="M15,5 L17,5 L17,3 L15,3 L15,5 Z M7,5 L9,5 L9,3 L7,3 L7,5 Z M15,13 L17,13 L17,11 L15,11 L15,13 Z M7,13 L9,13 L9,11 L7,11 L7,13 Z M15,21 L17,21 L17,19 L15,19 L15,21 Z M7,21 L9,21 L9,19 L7,19 L7,21 Z" />
           </svg>
         </div>
       </div>
@@ -130,17 +132,11 @@
     console.log(params);
     console.log(window.process.argv);
     //alert(params[0]);
-
-    document.getElementById('link_customtheme').href = "https://" + params[0] + "/assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "https://" + params[0] + "/api/clientapi.php?action=customstyle";
-  } else {
-    document.getElementById('link_customtheme').href = "assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "api/clientapi.php?action=customstyle";
   }
 
-  function stopJitsiSharing() {
+  function stopSharing() {
     //removePeer(socket.id);
-    electron.ipcRenderer.invoke("stopJitsiSharing");
+    electron.ipcRenderer.invoke("stopSharing");
   }
 
   function toggleRemoteControl() {

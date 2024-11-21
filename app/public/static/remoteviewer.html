@@ -1,0 +1,31 @@
+<html></html>
+<head>
+    <title>Screen Viewer</title>
+
+    <style>
+      @font-face {
+        font-family: 'Abel';
+        font-style: normal;
+        font-weight: 400;
+        src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
+      }
+    </style>
+
+    <link rel="stylesheet" href="css/remoteviewer.css" />
+    <link rel="stylesheet" href="css/remoteviewer-overlay.css" />
+
+
+    
+</head>
+<body>
+    <div id="overlay"></div>
+    <div id="container" class="container">
+      <div class="cursorsignal" style="animation-delay: -1s"></div>
+      <div class="cursorsignal" style="animation-delay: -0.5s"></div>
+      <div class="cursorsignal" style="animation-delay: 0s"></div>
+    </div>
+    <script src="js/socket.io.min.js" type="application/javascript"></script>
+    <script src="js/panzoom.js"></script>
+    <script src="js/remoteviewer.js" type="application/javascript"></script>
+</body>
+</html>

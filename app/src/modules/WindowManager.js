@@ -69,6 +69,7 @@ export class WindowManager {
   constructor() {
     this.overlayrecord = null
     this.overlayrecordbutton = null
+    this.overlaydebug = null
     this.cache = {}
 
     this.lastmousePosX = 0
@@ -125,7 +126,7 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`osascript 'public/static/mac_windowlist.osa'`).toString().replace(regex, '')
+      res = this.executeCmd(`osascript 'public/static/scripts/mac_windowlist.osa'`).toString().replace(regex, '')
 
       console.log('start mac-windowlist')
       console.log(res)
@@ -564,7 +565,7 @@ export class WindowManager {
 
     if (isLinux) {
       try {
-        const result = this.executeCmdCached(`bash ${__static}/windowvisible.sh ${this.windowhwnd}`).toString().trim()
+        const result = this.executeCmdCached(`bash ${__static}/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
         return result === '1'
       } catch (error) {
         return true // Default to visible if script fails
@@ -757,7 +758,7 @@ export class WindowManager {
       this.cache[cacheKey] = { time: 0, result: null }
 
     if (this.cache[cacheKey].time < (Date.now() - maxcacheage) || this.cache[cacheKey].result == null) {
-      console.log(cmd)
+      //console.log(cmd)
       this.cache[cacheKey] = { time: Date.now(), result: require('child_process').execSync(cmd) }
     }
 
@@ -844,6 +845,42 @@ export class WindowManager {
     }
   }
 
+
+  showDebugOverlay(args) {
+    if (this.overlaydebug == null) {
+      this.overlaydebug = new BrowserWindow({
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 1000,
+        transparent: false,
+        skipTaskbar: true,
+        title: 'Debug',
+        webPreferences: {
+          nodeIntegration: true,
+        },
+      })
+
+      // Set CSP headers before loading the URL
+      this.overlaydebug.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': ["frame-ancestors 'self' file:;"]
+          }
+        });
+      });
+
+      const queryString = new URLSearchParams(args).toString();
+      const filePath = path.join(__dirname, '../../public/static/sharewindow.html');
+      this.overlaydebug.loadURL(`file://${filePath}?${queryString}`);
+
+      // Open DevTools automatically
+      //this.overlaydebug.webContents.openDevTools();
+    }
+  }
+
+
   showRecordOverlay() {
     if (!this.isScreen()) {
       const windowdimensions = this.getWindowOuterDimensions()
@@ -880,6 +917,9 @@ export class WindowManager {
       this.overlayrecord.removeMenu()
       this.overlayrecord.loadFile('public/static/windowoverlay.html')
       this.overlayrecord.setIgnoreMouseEvents(true)
+
+
+      //this.overlayrecord.webContents.openDevTools();
     }
   }
 
