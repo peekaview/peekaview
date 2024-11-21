@@ -6,9 +6,9 @@ import Swal from 'sweetalert2'
 import Modal from './Modal.vue'
 import TrackContainer from "./TrackContainer.vue"
 
-import type { AcceptedRequestData, ScreenShareData } from '../types'
+import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
 import { callApi } from '../api'
-import { ScreenView, useScreenView } from '../composables/useScreenShare'
+import { useScreenView } from '../composables/useLiveKitScreenShare'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -208,9 +208,9 @@ function formatLastSeen(timestamp: number | undefined) {
   <div v-if="screenView" class="viewer">
     <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3>
     <TrackContainer 
-      v-if="screenView.screen"
+      v-if="screenView.getTrackElement"
       class="video-container"
-      :track="screenView.screen.track"
+      :get-track-element="screenView.getTrackElement"
       :style="{ width: videoWidth, height: videoHeight }"
     />
     <slot />

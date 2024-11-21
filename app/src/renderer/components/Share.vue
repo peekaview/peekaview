@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RemoteParticipant, type Room } from "livekit-client"
 import Swal from 'sweetalert2'
 
-import { useScreenShare } from "../composables/useScreenShare"
-import { publishTrack } from "../screenShare"
+import { useScreenShare } from "../composables/useLiveKitScreenShare"
 import Modal from './Modal.vue'
 
-import type { AcceptedRequestData, ScreenShareData } from '../types'
+import type { AcceptedRequestData, ScreenShare, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { ScreenSource } from '../../interface'
 
@@ -24,21 +22,18 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const sharingRoom = ref<Room>()
-const participants = ref<Record<string, RemoteParticipant>>({})
-
 const appUrl = ref(import.meta.env.VITE_APP_URL)
 const offerDownload = ref(!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
+const screenShare = ref<ScreenShare>()
 const latestRequest = ref<Request>()
 
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 
-const screenTrack = ref<MediaStreamTrack | undefined>()
-const listeningForRequests = ref(false)
+const sessionActive = ref(false)
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
         
@@ -50,18 +45,18 @@ document.addEventListener('visibilitychange', () => {
 })
 
 window.electronAPI?.onSendScreenSource((source) => {
-  source && sharingRoom.value && shareLocalScreen(sharingRoom.value, source)
+  source && shareLocalScreen(source)
 })
 
 watch(offerDownload, async (flag) => {
   if (flag)
     return
 
-  await createRoom()
+  await startSession()
 }, { immediate: true })
 
 let requestInterval: number | undefined
-watch(listeningForRequests, (flag) => {
+watch(sessionActive, (flag) => {
   if (!flag) {
     clearInterval(requestInterval)
     requestInterval = undefined
@@ -86,7 +81,7 @@ watch(listeningForRequests, (flag) => {
     console.error('Error checking requests:', error);
     handleError(error as Error)
 
-    listeningForRequests.value = false
+    sessionActive.value = false
   }
   }, 2000)
 })
@@ -150,9 +145,8 @@ async function denyRequest() {
   }
 }
     
-async function createRoom() {
-  console.log("createRoom")
-  if (sharingRoom.value)
+async function startSession() {
+  if (screenShare.value)
     return
 
   try {
@@ -168,29 +162,66 @@ async function createRoom() {
       serverUrl: data.videoServer,
     }
 
-    const { room, participants: p } = await useScreenShare(screenShareData.value)
-    sharingRoom.value = room
-    participants.value = p
-    shareLocalScreen(sharingRoom.value)
+    screenShare.value = await useScreenShare(screenShareData.value)
+    shareLocalScreen()
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(room: Room, source?: ScreenSource, shareAudio = false) {
-  console.log("shareLocalScreen")
+async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
+  if (!screenShare.value)
+    return
+
   try {
-    screenTrack.value = await publishTrack(room, source, shareAudio)
-    if (!screenTrack.value || !source)
+    let stream: MediaStream
+    if (window.electronAPI) {
+      console.debug('Electron environment detected')
+      if (!source) {
+        console.debug('No source provided, opening screen source selection')
+        await window.electronAPI.openScreenSourceSelection()
+        return
+      }
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        ...(shareAudio ? {
+          audio: {
+            mandatory: {
+              chromeMediaSource: 'desktop'
+            }
+          }
+        }
+        : {}),
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: source.id,
+            minWidth: 1280,
+            maxWidth: 1920,
+            minHeight: 720,
+            maxHeight: 1080
+          }
+        }
+      })
+    } else {
+      console.debug('Browser environment detected')
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: shareAudio
+      })
+    }
+
+    if (!stream)
       return
 
-    console.debug('Screen track published:', screenTrack.value)
-    listeningForRequests.value = true    
+    console.debug('Screen stream obtained:', stream)
+    await screenShare.value.addStream(stream, shareAudio)
+    sessionActive.value = true    
 
-    window.electronAPI?.startRemoteControl(source)
+    source && window.electronAPI?.startRemoteControl(source)
   } catch (error) {
-    console.error('Error publishing screen track:', error)
+    console.error('Error sharing local screen:', error)
   }
 }
     
@@ -281,7 +312,7 @@ function shareViaApp() {
         </div>
       </template>
 
-      <template v-else-if="!screenTrack">
+      <template v-else-if="!sessionActive">
         <div class="panel">
           <h3 class="mb-3">{{ $t('share.openSession.title') }}</h3>
           <p class="text-secondary mb-4">

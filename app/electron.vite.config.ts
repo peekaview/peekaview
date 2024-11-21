@@ -7,6 +7,15 @@ import packageJson from './package.json'
 
 const env = loadEnv(process.env.NODE_ENV || 'development', process.cwd(), '')
 
+{[
+  "VITE_API_URL",
+  "VITE_APP_URL",
+  "VITE_CONNECT_SRC",
+].map(key => {
+  if (!env[key])
+    throw new Error(`Required .env variable ${key} is not defined!`)
+})}
+
 const CSP_POLICY = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
