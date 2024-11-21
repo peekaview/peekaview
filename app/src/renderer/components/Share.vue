@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Participant, type Room } from "livekit-client"
+import { RemoteParticipant, type Room } from "livekit-client"
 import Swal from 'sweetalert2'
 
 import { useScreenShare } from "../composables/useScreenShare"
@@ -10,8 +10,7 @@ import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-
-declare const APP_URL: string
+import { ScreenSource } from '../../interface'
 
 interface Request {
   request_id: string
@@ -26,9 +25,9 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const sharingRoom = ref<Room>()
-const participants = ref(new Map<string, Participant>())
+const participants = ref<Record<string, RemoteParticipant>>({})
 
-const appUrl = ref(APP_URL)
+const appUrl = ref(import.meta.env.VITE_APP_URL)
 const offerDownload = ref(!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
@@ -38,7 +37,7 @@ const latestRequest = ref<Request>()
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 
-const screenTrack = ref<Track | undefined>()
+const screenTrack = ref<MediaStreamTrack | undefined>()
 const listeningForRequests = ref(false)
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
@@ -50,13 +49,8 @@ document.addEventListener('visibilitychange', () => {
     startPingInterval()
 })
 
-<<<<<<< HEAD:app/src/renderer/components/Share.vue
-window.electronAPI?.onSendScreenSourceId((id) => {
-  id && sharingRoom.value && shareLocalScreen(sharingRoom.value, id)
-=======
-window.electronAPI?.onSendScreenSourceId((id, name) => {
-  sharingRoom.value && shareLocalScreen(sharingRoom.value, id, name, false)
->>>>>>> feature/remotedesktop:app/src/components/Share.vue
+window.electronAPI?.onSendScreenSource((source) => {
+  source && sharingRoom.value && shareLocalScreen(sharingRoom.value, source)
 })
 
 watch(offerDownload, async (flag) => {
@@ -90,7 +84,7 @@ watch(listeningForRequests, (flag) => {
     }
   } catch (error) {
     console.error('Error checking requests:', error);
-    handleError(error)
+    handleError(error as Error)
 
     listeningForRequests.value = false
   }
@@ -114,7 +108,7 @@ async function updateOnlineStatus() {
     lastPingTime.value = Date.now();
   } catch (error) {
     console.error('Error updating online status:', error);
-    handleError(error)
+    handleError(error as Error)
   }
 }
 
@@ -133,7 +127,7 @@ async function acceptRequest() {
     latestRequest.value = undefined
   } catch (error) {
     console.error('Error accepting request:', error)
-    handleError(error)
+    handleError(error as Error)
   }
 }
 
@@ -152,7 +146,7 @@ async function denyRequest() {
     latestRequest.value = undefined
   } catch (error) {
     console.error('Error denying request:', error)
-    handleError(error)
+    handleError(error as Error)
   }
 }
     
@@ -177,38 +171,30 @@ async function createRoom() {
     const { room, participants: p } = await useScreenShare(screenShareData.value)
     sharingRoom.value = room
     participants.value = p
-
-    // TODO, ist das nicht komisch so? Warum wird hier ein Sharing eröffnet, ohne eine Quelle zu wählen?
-    // Müsste es nicht eine Funktion selectSharingSource oder so geben?
     shareLocalScreen(sharingRoom.value)
   } catch (error) {
     console.error('Error creating room:', error);
-    handleError(error);
+    handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(room: Room, sourceId?: string, name?: string, shareAudio = false) {
+async function shareLocalScreen(room: Room, source?: ScreenSource, shareAudio = false) {
   console.log("shareLocalScreen")
   try {
-    screenTrack.value = await publishTrack(room, sourceId, shareAudio)
-    if (!screenTrack.value)
+    screenTrack.value = await publishTrack(room, source, shareAudio)
+    if (!screenTrack.value || !source)
       return
 
-<<<<<<< HEAD:app/src/renderer/components/Share.vue
     console.debug('Screen track published:', screenTrack.value)
-    listeningForRequests.value = true
-=======
-    console.log("sourceId", sourceId)
-    
-    window.electronAPI?.startRemoteControl(sourceId as any, name || "PeekaView")
-    // The local track will be added to the thumbnail bar via the TrackPublished event
->>>>>>> feature/remotedesktop:app/src/components/Share.vue
+    listeningForRequests.value = true    
+
+    window.electronAPI?.startRemoteControl(source)
   } catch (error) {
     console.error('Error publishing screen track:', error)
   }
 }
     
-function handleError(error) {
+function handleError(error: Error) {
   console.log("handleError", error)
   if (error instanceof UnauthorizedError) {
     if (window.electronAPI)

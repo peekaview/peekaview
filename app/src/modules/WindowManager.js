@@ -1,9 +1,8 @@
-const path = require('path')
-const { screen, desktopCapturer, BrowserWindow } = require('electron')
-// const { getActiveWindow } = require("@nut-tree/nut-js");
-const Store = require('electron-store')
-// const focusWindow = require('mac-focus-window');
-// const { getWindows } = require('mac-windows').getWindows;
+import path from 'path';
+import { screen, desktopCapturer, BrowserWindow } from 'electron';
+// import { getActiveWindow } from "@nut-tree/nut-js";
+// import focusWindow from 'mac-focus-window';
+// import { getWindows } from 'mac-windows';
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -30,8 +29,7 @@ if (isWin32) {
       GetWindowRect: lib.func('__stdcall', 'GetWindowRect', 'bool', ['int64', 'void *']),
       GetClientRect: lib.func('__stdcall', 'GetClientRect', 'bool', ['int64', 'void *']),
       ClientToScreen: lib.func('__stdcall', 'ClientToScreen', 'bool', ['int64', 'void *']),
-      SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', 
-        ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
+      SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
       SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64'])
     };
     isUser32Available = true;
@@ -67,7 +65,7 @@ const pointerToPoint = function (pointPointer) {
   return point
 }
 
-class WindowManager {
+export class WindowManager {
   constructor() {
     this.overlayrecord = null
     this.overlayrecordbutton = null
@@ -121,12 +119,13 @@ class WindowManager {
   }
 
   async getMacWindowlist() {
+    const Store = (await import('electron-store')).default
     const store = new Store()
     let res = {}
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`osascript ${path.join(__static, 'mac_windowlist.osa')}`).toString().replace(regex, '')
+      res = this.executeCmd(`osascript 'public/static/mac_windowlist.osa'`).toString().replace(regex, '')
 
       console.log('start mac-windowlist')
       console.log(res)
@@ -879,7 +878,7 @@ class WindowManager {
       console.log(windowdimensions)
 
       this.overlayrecord.removeMenu()
-      this.overlayrecord.loadFile(path.join(__static, '/windowoverlay.html'))
+      this.overlayrecord.loadFile('public/static/windowoverlay.html')
       this.overlayrecord.setIgnoreMouseEvents(true)
     }
   }
@@ -996,8 +995,4 @@ class WindowManager {
 
     return this.overlapping
   } */
-}
-
-module.exports = {
-  WindowManager,
 }

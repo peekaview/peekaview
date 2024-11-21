@@ -2,14 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
 
+import { ScreenSource } from '../interface'
+
 contextBridge.exposeInMainWorld('electronAPI', {
-<<<<<<< HEAD:app/src/main/preload/app.ts
   ...base,
-  onSendScreenSourceId: (callback: (id: string) => void) => ipcRenderer.on('send-screen-source-id', (_event, id: string) => callback(id)),
-=======
-  log: (...messages: any[]) => ipcRenderer.invoke('log', messages),
-  onSendScreenSourceId: (callback: (id: string, name: string) => void) => ipcRenderer.on('send-screen-source-id', (_event, id: string, name: string) => callback(id, name)),
->>>>>>> feature/remotedesktop:app/src/preload.ts
+  onSendScreenSource: (callback: (source: ScreenSource) => void) => ipcRenderer.on('send-screen-source', (_event, source: ScreenSource) => callback(source)),
   openScreenSourceSelection: () => ipcRenderer.invoke('open-screen-source-selection'),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
   handleAppClosing: () => ipcRenderer.invoke('handle-app-closing'),

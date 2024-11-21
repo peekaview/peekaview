@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, toRaw } from 'vue'
 
-import { ScreenSource } from '../interface'
+import { ScreenSource } from '../../interface'
 
 const sources = ref<ScreenSource[]>()
-const selectedSourceId = ref<string | undefined>()
+const selectedSource = ref<ScreenSource | undefined>()
 
 const activeTab = ref<"windows" | "screens">("windows")
 
@@ -18,11 +18,11 @@ onMounted(async () => {
 })
 
 function share() {
-  selectedSourceId.value && window.electronAPI!.selectScreenSourceId(selectedSourceId.value)
+  selectedSource.value && window.electronAPI!.selectScreenSource(toRaw(selectedSource.value))
 }
 
 function cancel() {
-  window.electronAPI!.selectScreenSourceId(undefined)
+  window.electronAPI!.selectScreenSource(undefined)
 }
 </script>
 
@@ -34,14 +34,14 @@ function cancel() {
       </div>
     </div>
     <div class="source-group p-2">
-      <div v-for="source in sourceGroups[activeTab]" class="source-item" :class="{ selected: selectedSourceId === source.id }" @click="selectedSourceId = source.id">
+      <div v-for="source in sourceGroups[activeTab]" class="source-item" :class="{ selected: selectedSource?.id === source.id }" @click="selectedSource = source">
         <img :src="source.thumbnail" :alt="source.name">
         <p>{{ source.name }}</p>
       </div>
     </div>
     <div class="btn-row">
       <button class="btn btn-secondary float-right" @click="cancel">{{ $t('general.cancel') }}</button>
-      <button class="btn btn-primary float-right" :disabled="!selectedSourceId" @click="share">{{  $t('sourcesWindow.share') }}</button>
+      <button class="btn btn-primary float-right" :disabled="!selectedSource" @click="share">{{  $t('sourcesWindow.share') }}</button>
     </div>
   </div>
 </template>

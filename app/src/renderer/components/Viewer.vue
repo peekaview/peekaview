@@ -6,7 +6,7 @@ import Swal from 'sweetalert2'
 import Modal from './Modal.vue'
 import TrackContainer from "./TrackContainer.vue"
 
-import type { AcceptedRequestData, PromiseValue, ScreenShareData } from '../types'
+import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi } from '../api'
 import { ScreenView, useScreenView } from '../composables/useScreenShare'
 
@@ -55,7 +55,7 @@ const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
 const screenShareData = ref<ScreenShareData>()
-const screenView = ref<PromiseValue<ScreenView>>()
+const screenView = ref<ScreenView>()
 const waitingStatus = ref<WaitingStatus | undefined>()
 
 const videoHeight = ref<number>()
@@ -65,7 +65,7 @@ watch(screenShareData, async (data) => {
   if (data)
     screenView.value = await useScreenView(data, () => {
       Swal.fire({
-        icon: 'notice',
+        icon: 'info',
         text: t('viewer.sharingEnded'),
         customClass: {
           popup: 'animate__animated animate__fadeIn'
@@ -149,7 +149,7 @@ async function requestScreen(params: RequestParams, initial = false) {
     window.setTimeout(() => requestScreen(params), 1000)
   } catch (error) {
     console.error('Error during polling:', error)
-    handleError(error)
+    handleError()
   }
 }
     
@@ -166,7 +166,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   }, 300)
 }
 
-function handleError(error) {
+function handleError() {
   waitingStatus.value = undefined
   requestStatus.value = undefined
   

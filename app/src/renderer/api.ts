@@ -1,6 +1,4 @@
 import i18n from "./i18n"
-    
-declare const API_URL: string
 
 export type ApiRequestParams = {
   action: "showMeYourScreen"
@@ -23,7 +21,7 @@ export type ApiRequestParams = {
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
-  const response = await fetch(`${API_URL}?${new URLSearchParams({
+  const response = await fetch(`${import.meta.env.VITE_API_URL}?${new URLSearchParams({
     lang: i18n.global.locale.value,
     ...params,
   }).toString()}`)

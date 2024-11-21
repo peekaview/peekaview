@@ -1,39 +1,38 @@
 import path from 'path'
-import { app, BrowserWindow, clipboard, dialog, ipcMain, desktopCapturer, Menu, Notification, nativeImage, protocol, Tray, session, shell } from "electron"
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  desktopCapturer,
+  Menu,
+  Notification,
+  nativeImage,
+  protocol,
+  Tray,
+  session,
+  shell
+} from 'electron'
+import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
-import { updateElectronApp } from 'update-electron-app'
-import i18n from "i18next"
-import backend from "i18next-fs-backend"
+import i18n from 'i18next'
+import backend from 'i18next-fs-backend'
 
-<<<<<<< HEAD:app/src/main/main.ts
+import { Streamer } from '../modules/Streamer.js'
+
 import PeekaViewLogo from '../assets/img/peekaview.png'
-=======
-import PeekaViewLogo from './assets/img/peekaview.png'
-import { Streamer } from './modules/Streamer'
->>>>>>> feature/remotedesktop:app/src/main.ts
-
-declare const APP_WEBPACK_ENTRY: string
-declare const APP_PRELOAD_WEBPACK_ENTRY: string
-
-declare const SOURCES_WEBPACK_ENTRY: string
-declare const SOURCES_PRELOAD_WEBPACK_ENTRY: string
-
-declare const LOGIN_WEBPACK_ENTRY: string
-declare const LOGIN_PRELOAD_WEBPACK_ENTRY: string
+import { ScreenSource } from '../interface.js'
 
 declare const APP_VERSION: string
-declare const APP_URL: string
 declare const CSP_POLICY: string
 
-(async () => {
-  // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-  if (require("electron-squirrel-startup")) {
-    log.info('Quitting due to Squirrel startup')
-    app.quit()
-    return 
-  }
+interface StoreSchema {
+  code: string | undefined
+}
 
+(async () => {
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
     const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
@@ -43,10 +42,9 @@ declare const CSP_POLICY: string
     }
     log.info('Another instance is running, quitting...')
     app.quit()
-    return 
+    return
   }
 
-  updateElectronApp()
   log.info('Starting app update check')
 
   if (!app.isDefaultProtocolClient('peekaview')) {
@@ -65,22 +63,20 @@ declare const CSP_POLICY: string
     de: 'Deutsch',
   }
 
-  const i18nReady = i18n
-    .use(backend)
-    .init({
-      backend: {
-        loadPath: app.isPackaged
-          ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
-          : path.join(__dirname, '../../src/locales/{{lng}}.json'),
-        addPath: app.isPackaged
-          ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
-          : path.join(__dirname, '../../src/locales/{{lng}}.missing.json'),
-      },
-      lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
-      fallbackLng: Object.keys(languages)[0],
-      preload: Object.keys(languages),
-      ns: ['translation'],
-    })
+  const i18nReady = i18n.use(backend).init({
+    backend: {
+      loadPath: app.isPackaged
+        ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
+        : path.join(__dirname, '../../src/locales/{{lng}}.json'),
+      addPath: app.isPackaged
+        ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
+        : path.join(__dirname, '../../src/locales/{{lng}}.missing.json'),
+    },
+    lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
+    fallbackLng: Object.keys(languages)[0],
+    preload: Object.keys(languages),
+    ns: ['translation'],
+  })
 
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
@@ -88,20 +84,20 @@ declare const CSP_POLICY: string
 
   let tray: Tray
 
-  let selectedScreenSourceId: string | undefined
+  let selectedScreenSource: ScreenSource | undefined
   let isQuitting = false
 
   const Store = (await import('electron-store')).default
-  const store = new Store<{ code: string | undefined }>({
+  const store = new Store<StoreSchema>({
     schema: {
       code: {
         type: 'string',
         default: undefined,
       }
     }
-  })
+  }) as any
   log.info('Store initialized')
-  
+
   if (process.platform === 'win32')
     app.setAppUserModelId(app.name)
 
@@ -185,7 +181,7 @@ declare const CSP_POLICY: string
     const notificationIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 64, height: 64 })
     new Notification({ title: 'PeekaView', body: "PeekaView is running", icon: notificationIcon }).show()
   })
-  
+
   const updateContextMenu = () => {
     i18nReady.then(() => {
       const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
@@ -201,7 +197,7 @@ declare const CSP_POLICY: string
             }
           },
         },
-        { type: 'separator' },
+          { type: 'separator' }
       )
 
       menuItems.push(
@@ -250,7 +246,7 @@ declare const CSP_POLICY: string
         contextIsolation: true,
         //webSecurity: false, // Make sure this is off only for development, adjust for production.
         //allowRunningInsecureContent: true,
-        preload: APP_PRELOAD_WEBPACK_ENTRY,
+        preload: path.join(__dirname, '../preload/app.js'),
       }
     })
 
@@ -268,7 +264,8 @@ declare const CSP_POLICY: string
       }
     })
 
-    appWindow.loadURL(APP_WEBPACK_ENTRY)
+    windowLoad(appWindow)
+
     appWindow?.webContents.send('change-language', i18n.resolvedLanguage)
     log.info('Main window loaded')
 
@@ -294,14 +291,14 @@ declare const CSP_POLICY: string
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        preload: LOGIN_PRELOAD_WEBPACK_ENTRY,
+        preload: path.join(__dirname, '../preload/login.js'),
       }
     })
 
     loginWindow.on('close', () => {
       loginWindow = undefined
     })
-    loginWindow.loadURL(LOGIN_WEBPACK_ENTRY)
+    windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
     loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
 
@@ -323,13 +320,13 @@ declare const CSP_POLICY: string
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        preload: SOURCES_PRELOAD_WEBPACK_ENTRY,
+        preload: path.join(__dirname, '../preload/sources.js'),
       }
     })
 
     sourcesWindow.on('close', (e) => {
-      if (selectedScreenSourceId) {
-        appWindow?.webContents.send('send-screen-source-id', selectedScreenSourceId)
+      if (selectedScreenSource) {
+        appWindow?.webContents.send('send-screen-source', selectedScreenSource)
       } else if (!isQuitting) {
         const response = dialog.showMessageBoxSync({
           message: i18n.t('sourcesWindow.confirmCancel'),
@@ -350,7 +347,7 @@ declare const CSP_POLICY: string
 
       sourcesWindow = undefined
     })
-    sourcesWindow.loadURL(SOURCES_WEBPACK_ENTRY)
+    windowLoad(sourcesWindow, 'sources')
     sourcesWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
 
@@ -374,31 +371,46 @@ declare const CSP_POLICY: string
       createLoginWindow()
   }
 
-<<<<<<< HEAD:app/src/main/main.ts
   function logout(discardSession = false) {
     log.info('Logging out, discarding session:', discardSession)
     appWindow?.hide()
     store.delete('code')
     createLoginWindow(discardSession)
-=======
+  }
+
   function startRemoteControl(hwnd: string, name: string) {
     if (!hwnd || !name) {
       log.error('Invalid hwnd or name for remote control')
       return
     }
-
     log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
     const streamer = new Streamer('c1.peekaview.de')
     streamer.setRoomSession('roomsessiontest')
     streamer.setArgs(hwnd, name, 'c1.peekaview.de', 'test', 'test', 'Hans', '123' )
     streamer.startSharing()
->>>>>>> feature/remotedesktop:app/src/main.ts
   }
 
   function loadParams(params: Record<string, string>) {
+    if (!appWindow)
+      return
+
     log.info('Loading app with params:', params)
-    appWindow?.loadURL(APP_WEBPACK_ENTRY + '?' + (new URLSearchParams(params).toString()))
-    appWindow?.show()
+    windowLoad(appWindow, undefined, params)
+    appWindow.show()
+  }
+
+  function windowLoad(window: BrowserWindow, entryKey?: string | undefined, params?: Record<string, string>) {
+    if (is.dev && process.env.ELECTRON_RENDERER_URL)
+      window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/${entryKey ? entryKey + '/': ''}index.html${params ? '?' + (new URLSearchParams(params).toString()) : ''}`)
+    else
+      window.loadFile(path.join(__dirname, `../renderer/${entryKey ? entryKey + '/': ''}index.html`), { query: params })
+  }
+
+  function getAppUrl() {
+    if (is.dev && process.env.ELECTRON_RENDERER_URL)
+      return process.env.ELECTRON_RENDERER_URL
+
+    return import.meta.env.VITE_APP_URL
   }
 
   function quit() {
@@ -415,7 +427,7 @@ declare const CSP_POLICY: string
   ipcMain.handle('handle-app-closing', async () => {
     if (process.platform === "darwin")
       return false
-
+    
     log.info('Handling app closing request')
     isQuitting = true
     app.quit()
@@ -450,7 +462,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('login-via-browser', async (_event, discardSession: boolean) => {
-    const url = `${APP_URL}?login=${btoa(`target=app&discardSession=${discardSession ? 'true' : 'false'}`)}`
+    const url = `${getAppUrl()}?login=${btoa(`target=app&discardSession=${discardSession ? 'true' : 'false'}`)}`
     log.info('Opening browser login:', url)
     log.info('Discarding session:', discardSession)
     shell.openExternal(url)
@@ -469,20 +481,13 @@ declare const CSP_POLICY: string
     return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
   })
 
-<<<<<<< HEAD:app/src/main/main.ts
-  ipcMain.handle('select-screen-source-id', async (_event, id: string | undefined) => {
-    log.info('Screen source selected:', id)
-    selectedScreenSourceId = id
+  ipcMain.handle('select-screen-source', async (_event, source: ScreenSource | undefined) => {
+    log.info('Screen source selected:', source)
+    selectedScreenSource = source
     sourcesWindow?.close()
-=======
-  ipcMain.handle('select-screen-source-id', async (_event, id: string, name: string) => {
-    log.info('Screen source selected:', id, name)
-    sourcesWindow?.close()
-    appWindow?.webContents.send('send-screen-source-id', id, name)
   })
-
+  
   ipcMain.handle('start-remote-control', async (_event, hwnd: string, name: string) => {
     startRemoteControl(hwnd, name) // TODO: handle errors
->>>>>>> feature/remotedesktop:app/src/main.ts
   })
 })()

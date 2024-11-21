@@ -1,17 +1,17 @@
-const path = require('path')
-const {
+import path from 'path';
+import {
   mouse,
   Point,
   clipboard,
   keyboard,
   Key,
   Button,
-} = require('@nut-tree-fork/nut-js')
-const { BrowserWindow, screen } = require('electron')
-// const SocketIO = require('socket.io-client');
-// const { fileTypeFromBlob } = require('file-type');
-// const { Streamer } = require("./Streamer.js");
-const { WindowManager } = require('./WindowManager.js')
+} from '@nut-tree-fork/nut-js';
+import { BrowserWindow, screen } from 'electron';
+// import SocketIO from 'socket.io-client';
+// import { fileTypeFromBlob } from 'file-type';
+// import { Streamer } from "./Streamer.js";
+import { WindowManager } from './WindowManager.js';
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -24,7 +24,7 @@ let cursorcheckinterval = null
 const rectanglecheckinterval = null
 const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 
-class RemoteControl {
+export class RemoteControl {
   constructor(url) {
     this.overlaycursor = {}
     this.overlaydrawer = null
@@ -121,7 +121,7 @@ class RemoteControl {
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
-        preload: path.join(__static, '/cursoroverlaysignal.js'), // needs full path
+        preload: 'public/static/cursoroverlaysignal.js',
         additionalArguments: [id, name, color],
       },
     })
@@ -129,9 +129,7 @@ class RemoteControl {
     this.overlaycursorsignal[id].removeMenu()
     this.overlaycursorsignal[id].setIgnoreMouseEvents(true)
     // this.overlaycursorsignal[id].setAlwaysOnTop(true, 'screen-saver');
-    this.overlaycursorsignal[id].loadFile(
-      path.join(__static, '/cursoroverlaysignal.html'),
-    )
+    this.overlaycursorsignal[id].loadFile('public/static/cursoroverlaysignal.html')
     console.log(`show signal${cpoint}`)
 
     let currentoverlaysignal = this.overlaycursorsignal[id]
@@ -171,7 +169,7 @@ class RemoteControl {
           webSecurity: false,
           nodeIntegration: true,
           contextIsolation: false,
-          preload: path.join(__static, '/drawer.js'), // needs full path
+          preload: 'public/static/drawer.js',
         },
       })
 
@@ -179,7 +177,7 @@ class RemoteControl {
       this.overlaydrawer.removeMenu()
       this.overlaydrawer.setIgnoreMouseEvents(true)
       // this.overlaydrawer.setAlwaysOnTop(true, 'screen-saver');
-      this.overlaydrawer.loadFile(path.join(__static, '/drawer.html'))
+      this.overlaydrawer.loadFile('public/static/drawer.html')
     }
     this.overlaydrawer.webContents.send(action, data)
   }
@@ -207,14 +205,14 @@ class RemoteControl {
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
-          preload: path.join(__static, '/cursoroverlay.js'), // needs full path
+          preload: 'public/static/cursoroverlay.js',
           additionalArguments: [id, name, color],
         },
       })
 
       this.overlaycursor[id].removeMenu()
       this.overlaycursor[id].setAlwaysOnTop(true, 'screen-saver')
-      this.overlaycursor[id].loadFile(path.join(__static, '/cursoroverlay.html'))
+      this.overlaycursor[id].loadFile('public/static/cursoroverlay.html')
       this.overlaycursor[id].setIgnoreMouseEvents(true)
 
       // const self = this
@@ -447,13 +445,13 @@ class RemoteControl {
         webSecurity: false,
         nodeIntegration: true,
         contextIsolation: false,
-        preload: path.join(__static, '/clipboard.js'), // needs full path
+        preload: 'public/static/clipboard.js',
       },
     })
 
     this.clipboardwindow.removeMenu()
     this.clipboardwindow.setAlwaysOnTop(true, 'screen-saver')
-    this.clipboardwindow.loadFile(path.join(__static, '/clipboard.html'))
+    this.clipboardwindow.loadFile('public/static/clipboard.html')
     // this.clipboardwindow.webContents.openDevTools();
     this.clipboardwindow.webContents.send('pasteFromFile', data)
     this.clipboardwindow.show()
@@ -774,8 +772,4 @@ class RemoteControl {
       })
     }, 500)
   } */
-}
-
-module.exports = {
-  RemoteControl,
 }

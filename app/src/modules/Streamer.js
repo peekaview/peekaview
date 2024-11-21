@@ -1,10 +1,10 @@
-const path = require('path')
-const { dialog, screen, BrowserWindow } = require('electron')
+import path from 'path'
+import { dialog, screen, BrowserWindow } from 'electron'
 
-const { io } = require('socket.io-client')
-const { WindowManager } = require('./WindowManager.js')
-const { RemoteControl } = require('./RemoteControl.js')
-const { CustomDialog } = require('./CustomDialog.js')
+import { io } from 'socket.io-client'
+import { WindowManager } from './WindowManager.js'
+import { RemoteControl } from './RemoteControl.js'
+import { CustomDialog } from './CustomDialog.js'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -17,7 +17,7 @@ let socket = null
 const windowcheckinterval = (isMac || isLinux) ? 1000 : 100
 let resetinterval = null
 
-class Streamer {
+export class Streamer {
   constructor(hostname) {
     this.customDialog = new CustomDialog()
     this.windowManager = new WindowManager()
@@ -324,8 +324,4 @@ class Streamer {
       })
     } */
   }
-}
-
-module.exports = {
-  Streamer,
 }

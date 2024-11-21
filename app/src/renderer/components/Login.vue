@@ -53,7 +53,7 @@ async function handleRegister(e: Event) {
       handleJustRegistered()
   } catch (error) {
     console.error('Error during registration:', error);
-    handleError(error);
+    handleError()
   }
 }
 
@@ -69,7 +69,7 @@ function handleJustRegistered() {
   });
 }
 
-function handleError(error) {
+function handleError() {
   Swal.fire({
     icon: 'error',
     title: 'Connection Error',

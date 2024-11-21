@@ -1,19 +1,20 @@
 import { Room, Track, TrackPublishOptions, LocalTrackPublication, RoomEvent, VideoPresets } from 'livekit-client'
+import { ScreenSource } from 'src/interface'
 
-export async function publishTrack(room: Room, sourceId?: string, shareAudio = false) {
-  console.debug('Starting publishTrack with sourceId:', sourceId)
+export async function publishTrack(room: Room, source?: ScreenSource, shareAudio = false) {
+  console.debug('Starting publishTrack with source:', source)
   let screenStream: MediaStream
 
   if (window.electronAPI) {
     console.log('Electron environment detected')
     // Electron environment
-    if (!sourceId) {
+    if (!source) {
       console.log('No sourceId provided, opening screen source selection')
       await window.electronAPI.openScreenSourceSelection()
       return undefined
     }
 
-    console.debug('Selected sourceId:', sourceId)
+    console.debug('Selected source:', source)
     console.log('Attempting to get user media in Electron')
     screenStream = await navigator.mediaDevices.getUserMedia({
       ...(shareAudio ? {
@@ -27,7 +28,7 @@ export async function publishTrack(room: Room, sourceId?: string, shareAudio = f
       video: {
         mandatory: {
           chromeMediaSource: 'desktop',
-          chromeMediaSourceId: sourceId,
+          chromeMediaSourceId: source.id,
           minWidth: 1280,
           maxWidth: 1920,
           minHeight: 720,

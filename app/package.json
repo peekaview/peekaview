@@ -4,137 +4,77 @@
   "productName": "PeekaView",
   "version": "0.0.1",
   "description": "Simple screen sharing application",
+  "homepage": "https://peekaview.de",
   "license": "AGPL-3.0",
   "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/peekaview/peekaview.git"
   },
-  "main": "./.webpack/main",
+  "main": "./out/main/main.js",
   "scripts": {
     "preinstall": "node preinstall.js",
-    "web-dev": "dotenvx run -- webpack serve --mode=development",
-    "web-build": "dotenvx run -- webpack --mode=production",
-    "electron-dev": "dotenvx run -- electron-forge start -- --no-sandbox ",
-    "electron-build-linux": "dotenvx run -- electron-forge make --platform linux --arch x64",
-    "electron-build-win": "dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
-    "package": "dotenvx run -- electron-forge package",
-    "tsc": "vue-tsc --noEmit",
-    "electron-build": "dotenvx run -- electron-forge make --platform linux --arch x64 && dotenvx run -- electron-forge make --platform win32 --arch x64 --target squirrel",
-    "make:mac": "dotenvx run -- electron-forge make --platform darwin --arch arm64,x64",
-    "make:mac-arm": "dotenvx run -- electron-forge make --platform darwin --arch arm64",
-    "make:mac-intel": "dotenvx run -- electron-forge make --platform darwin --arch x64"
-  },
-  "overrides": {
-    "os": {
-      "linux": {
-        "dependencies": {}
-      },
-      "win32": {
-        "dependencies": {}
-      },
-      "darwin": {
-        "dependencies": {}
-      }
-    }
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "start": "electron-vite preview -- --no-sandbox",
+    "dev": "electron-vite dev -- --no-sandbox",
+    "build": "npm run typecheck && electron-vite build",
+    "postinstall": "electron-builder install-app-deps",
+    "build:unpack": "npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
     "@nut-tree-fork/nut-js": "4.2.2",
     "bootstrap": "^5.3.3",
     "bootstrap-vue-next": "^0.25.10",
     "electron-log": "^5.2.2",
-    "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",
-<<<<<<< HEAD
+    "electron-updater": "^6.1.7",
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
-=======
-    "fix-esm": "^1.0.1",
-    "fs": "^0.0.1-security",
     "koffi": "^2.9.2",
->>>>>>> feature/remotedesktop
     "livekit-client": "2.1.5",
-    "rpmbuild": "^0.0.23",
     "socket.io-client": "^4.8.1",
     "sweetalert2": "^11.14.4",
-    "update-electron-app": "^3.0.0",
     "vue": "^3.5.12",
     "vue-i18n": "^10.0.4"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.21.1",
-    "@electron-forge/cli": "^7.4.0",
-    "@electron-forge/maker-deb": "^7.4.0",
-    "@electron-forge/maker-dmg": "^7.4.0",
-    "@electron-forge/maker-rpm": "^7.4.0",
-    "@electron-forge/maker-squirrel": "^7.4.0",
-    "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
-    "@electron-forge/plugin-fuses": "^7.4.0",
-    "@electron-forge/plugin-webpack": "^7.5.0",
-    "@electron/asar": "^3.2.16",
-    "@electron/fuses": "^1.8.0",
+    "@electron-toolkit/eslint-config": "^1.0.2",
+    "@electron-toolkit/eslint-config-ts": "^2.0.0",
+    "@electron-toolkit/tsconfig": "^1.0.1",
     "@electron/typescript-definitions": "^9.0.0",
-    "@types/electron": "^1.6.10",
+    "@rushstack/eslint-patch": "^1.10.3",
+    "@types/electron-store": "^3.2.2",
     "@types/node": "^22.7.4",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "@vue/eslint-config-typescript": "^13.0.0",
     "css-loader": "^7.1.2",
     "dotenv": "^16.0.3",
-    "electron": "^32.0.0",
-    "fork-ts-checker-webpack-plugin": "^9.0.2",
-    "html-webpack-plugin": "^5.6.0",
-    "mini-css-extract-plugin": "^2.9.1",
-    "style-loader": "^4.0.0",
-    "ts-loader": "^9.5.1",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.2",
-    "vue-loader": "^17.4.2",
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-vue": "^9.26.0",
+    "pnpm": "^9.14.1",
+    "prettier": "^3.3.2",
+    "typescript": "^5.5.2",
+    "vite": "^5.3.1",
+    "vitest": "^2.1.5",
     "vue-template-compiler": "^2.7.16",
-    "vue-tsc": "^2.1.8",
-    "webpack": "^5.95.0",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.1.0"
+    "vue-tsc": "^2.0.22"
   },
-  "build": {
-    "appId": "de.limtec.peekaview",
-    "protocols": [
-      {
-        "name": "PeekaView Protocol",
-        "schemes": [
-          "peekaview"
-        ]
-      }
-    ],
-    "win": {
-      "target": [
-        "squirrel"
-      ],
-      "icon": "src/assets/windows/icon.ico"
-    },
-    "linux": {
-      "target": [
-        "deb"
-      ],
-      "desktop": {
-        "MimeType": "x-scheme-handler/peekaview"
-      },
-      "extraFiles": [
-        {
-          "from": "src/assets/linux",
-          "to": "usr/share/applications",
-          "filter": [
-            "*.desktop"
-          ]
-        },
-        {
-          "from": "src/assets/linux",
-          "to": "usr/share/mime/packages",
-          "filter": [
-            "*.xml"
-          ]
-        }
-      ],
-      "deb": {
-        "afterInstall": "src/assets/linux/postinstall"
-      }
-    }
-  }
+  "packageManager": "pnpm@9.14.1+sha512.7f1de9cffea40ff4594c48a94776112a0db325e81fb18a9400362ff7b7247f4fbd76c3011611c9f8ac58743c3dc526017894e07948de9b72052f874ee2edfdcd"
 }

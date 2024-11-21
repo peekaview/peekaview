@@ -1,11 +1,11 @@
-const path = require('path')
-const { dialog, ipcMain, screen, BrowserWindow } = require('electron')
+import path from 'path'
+import { dialog, ipcMain, screen, BrowserWindow } from 'electron'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
-class CustomDialog {
+export class CustomDialog {
   constructor() {
     this.dialoglist = []
     this.traylist = []
@@ -116,9 +116,9 @@ class CustomDialog {
       frame: false,
       x: windowParams.x,
       y: windowParams.y,
-      icon: path.join(__static, '/assets/img/peekaviewlogo.png'),
+      icon: 'public/static/peekaviewlogo.png',
       webPreferences: {
-        preload: path.join(__static, '/dialog.js'),
+        preload: 'public/static/dialog.js',
         additionalArguments: [hostname],
         nodeIntegration: true,
         contextIsolation: false,
@@ -127,7 +127,7 @@ class CustomDialog {
       },
     })
 
-    dialogWindow.loadFile(path.join(__static, windowParams.template))
+    dialogWindow.loadFile(`public/static/${windowParams.template}`)
     if (type === 'dialog')
       dialogWindow.center()
     dialogWindow.show()
@@ -146,8 +146,4 @@ class CustomDialog {
     if (type === 'share')
       this.sharelist.push(dialogWindow)
   }
-}
-
-module.exports = {
-  CustomDialog,
 }
