@@ -120,7 +120,7 @@ export class RemoteControl {
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
-        preload: path.join(app.getAppPath(), 'public/static/cursoroverlaysignal.js'),
+        preload: path.join(app.getAppPath(), 'public/static/js/cursoroverlaysignal.js'),
         additionalArguments: [id, name, color],
       },
     })
@@ -168,7 +168,7 @@ export class RemoteControl {
           webSecurity: false,
           nodeIntegration: true,
           contextIsolation: false,
-          preload: path.join(app.getAppPath(), 'public/static/drawer.js'),
+          preload: path.join(app.getAppPath(), 'public/static/js/drawer.js'),
         },
       })
 
@@ -204,7 +204,7 @@ export class RemoteControl {
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
-          preload: path.join(app.getAppPath(), 'public/static/cursoroverlay.js'),
+          preload: path.join(app.getAppPath(), 'public/static/js/cursoroverlay.js'),
           additionalArguments: [id, name, color],
         },
       })
@@ -444,7 +444,7 @@ export class RemoteControl {
         webSecurity: false,
         nodeIntegration: true,
         contextIsolation: false,
-        preload: path.join(app.getAppPath(), 'public/static/clipboard.js'),
+        preload: path.join(app.getAppPath(), 'public/static/js/clipboard.js'),
       },
     })
 
