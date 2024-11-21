@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useTemplateRef, watchEffect } from 'vue'
-import { Track } from 'livekit-client'
 
 const props = withDefaults(defineProps<{
-  track: Track
+  getTrackElement: () => HTMLMediaElement | undefined
   muted?: boolean
   playsInline?: boolean
 }>(), {
@@ -27,7 +26,7 @@ function attach() {
   if (trackElement.value)
     return
 
-  trackElement.value = props.track.attach() as HTMLVideoElement
+  trackElement.value = props.getTrackElement() as HTMLVideoElement
   trackElement.value.muted = props.muted
   trackElement.value.playsInline = props.playsInline
 

@@ -486,8 +486,6 @@ interface StoreSchema {
     selectedScreenSource = source
     sourcesWindow?.close()
   })
-
-  console.log("test")
   
   ipcMain.handle('start-remote-control', async (_event, source: ScreenSource) => {
     startRemoteControl(source.id, source.name) // TODO: handle errors

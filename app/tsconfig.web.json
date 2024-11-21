@@ -8,8 +8,9 @@
     "src/renderer/env.d.ts",
     "src/renderer/**/*",
     "src/renderer/**/*.vue",
-    "src/preload/*.d.ts"
-, "src/interface.d.ts"  ],
+    "src/preload/*.d.ts",
+    "src/interface.d.ts"
+  ],
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",
