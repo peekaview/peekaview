@@ -1,16 +1,17 @@
 var app = require('express')();
+
 var http = require('http').createServer(app);
 var io = require('socket.io')(http, {
-    //wsEngine: require("eiows").Server,
     maxHttpBufferSize: 1e8,
     perMessageDeflate: {
         threshold: 32768
     },
     cors: {
-        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"], // Add your frontend URL
-        methods: ["GET", "POST"],
+        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"],
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true
-      }
+    }
 });
 
 var peers = {}

@@ -137,6 +137,11 @@ window.onload = function () {
 
     socket = io.connect(hostname);
 
+    socket = io(hostname, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true
+    });
+    
     console.log("connect to controlserver:", hostname)
     socket.emit("join-message", room);
 
