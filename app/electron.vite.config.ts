@@ -87,6 +87,17 @@ export default defineConfig({
         '@renderer': resolve('src/renderer')
       }
     },
-    plugins: [vue()]
+    plugins: [vue()],
+    publicDir: resolve('public'),
+    server: {
+      fs: {
+        allow: [
+          resolve('static'),
+          resolve('src'),
+          resolve('.')
+        ]
+      }
+    },
+    base: './'
   }
 })

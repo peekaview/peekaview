@@ -18,14 +18,17 @@ function openRemoteViewer(roomid, username, userid, color, hostname) {
     }
 
     let ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "remoteviewer.html?hostname=" + hostname + "&roomid=" + roomid + "&color=" + color + "&username=" + username + "&userid=" + userid + "");
-    ifrm.style.cssText = "width: 100vw; height: 100vh; position: absolute; top: 0px; border: 0px; z-index:250";
+    ifrm.setAttribute("src", "./static/remoteviewer.html?hostname=" + hostname + "&roomid=" + roomid + "&color=" + color + "&username=" + username + "&userid=" + userid + "");
+    
+    //ifrm.setAttribute("src", "./static/remoteviewer.html");
+    
+    ifrm.style.cssText = "width: 100vw; height: 100vh; position: absolute; top: 0px; border: 0px; z-index:9999";
     ifrm.id = "remoteviewer";
     ifrm.allow = "clipboard-write";
 
     window.document.querySelector('#remoteviewerwrapper').appendChild(ifrm);
-    window.document.querySelector('#remoteviewer').focus();
-    window.document.querySelector('#remoteviewer').contentDocument.body.focus();
+    //window.document.querySelector('#remoteviewerwrapper').focus();
+    //window.document.querySelector('#remoteviewerwrapper').contentDocument.body.focus();
 
     repaintRemoteViewer();
 }
@@ -84,7 +87,7 @@ function checkIfUrlAllowed(url, optionalcompareurl = null) {
 
 
 function handleMessage(e) {
-    //console.log("handleMessage", e);
+    console.log("handleMessage", e);
     // check origin of message
     if (checkIfUrlAllowed(e.origin) && e.data != undefined) {
         try {
@@ -139,6 +142,8 @@ function registerHandlers() {
     } else if (window.attachEvent) { // ie8
         window.attachEvent('onmessage', handleMessage);
     }
+
+    console.log("registerHandlers");
 
     window.addEventListener('resize', function (event) {
         repaintRemoteViewer();

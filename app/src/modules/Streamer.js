@@ -255,7 +255,7 @@ export class Streamer {
 
       this.windowManager.selectWindow(this.hwnd)
       this.windowManager.showRecordOverlay()
-      this.windowManager.showDebugOverlay(this.args)
+      //this.windowManager.showDebugOverlay(this.args)
       this.remoteControl.activate(this.hwnd)
     }
   }

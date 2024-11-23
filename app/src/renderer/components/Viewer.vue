@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Swal from 'sweetalert2'
 
@@ -60,6 +60,9 @@ const waitingStatus = ref<WaitingStatus | undefined>()
 
 const videoHeight = ref<number>()
 const videoWidth = ref<number>()
+
+const remoteViewerWrapper = ref<HTMLDivElement>()
+const remoteViewerDebug = ref<HTMLDivElement>()
 
 watch(screenShareData, async (data) => {
   if (data)
@@ -154,16 +157,89 @@ async function requestScreen(params: RequestParams, initial = false) {
 }
     
 function handleRequestAccepted(data: AcceptedRequestData) {
+  console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined
   requestStatus.value = undefined
   
+  screenShareData.value = {
+    roomName: data.roomId,
+    jwtToken: data.jwt,
+    serverUrl: data.videoServer
+  }
+
   setTimeout(async () => {
-    screenShareData.value = {
-      roomName: data.roomId,
-      jwtToken: data.jwt,
-      serverUrl: data.videoServer
+    console.log('Inside setTimeout callback')
+    console.log('Refs status before init:', {
+      wrapper: !!remoteViewerWrapper.value,
+      debug: !!remoteViewerDebug.value
+    });
+    initializeRemoteViewer(data)
+  }, 500)
+}
+
+function initializeRemoteViewer(data: AcceptedRequestData) {
+  console.log('initializeRemoteViewer called')
+  let retries = 0;
+  const maxRetries = 3;
+
+  const tryInitialize = () => {
+    console.log('Try initialize attempt:', retries + 1);
+    console.log('Current refs status:', {
+      wrapper: !!remoteViewerWrapper.value,
+      debug: !!remoteViewerDebug.value,
+      wrapperElement: remoteViewerWrapper.value,
+      debugElement: remoteViewerDebug.value
+    });
+
+    if (!remoteViewerWrapper.value || !remoteViewerDebug.value) {
+      console.log('Missing refs:', { 
+        wrapper: !!remoteViewerWrapper.value, 
+        debug: !!remoteViewerDebug.value 
+      })
+      if (retries < maxRetries) {
+        retries++;
+        setTimeout(tryInitialize, 200);
+      }
+      return;
     }
-  }, 300)
+
+    const params = new URLSearchParams({
+      roomid: data.roomId,
+      username: inputName.value || '',
+      userid: generateRequestId(),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16),
+      hostname: 'wss://c1.peekaview.de'
+    })
+
+    console.log('Generated params:', params.toString())
+    alert(params.toString())
+
+    // Load the remoteviewerhelper.js script dynamically
+    const script = document.createElement('script')
+    script.src = '/static/js/remoteviewerhelper.js'
+    script.onload = () => {
+      // @ts-ignore - assuming openRemoteViewer is globally available after script loads
+      window.openRemoteViewer(
+        params.get('roomid'),
+        params.get('username'),
+        params.get('userid'),
+        params.get('color'),
+        params.get('hostname')
+      )
+    }
+    document.body.appendChild(script)
+
+    // Debug info
+    remoteViewerDebug.value.innerHTML = `
+      Room ID: ${params.get('roomid')}<br>
+      Username: ${params.get('username')}<br>
+      User ID: ${params.get('userid')}<br>
+      Color: ${params.get('color')}<br>
+      Hostname: ${params.get('hostname')}
+    `
+  }
+
+  tryInitialize();
 }
 
 function handleError() {
@@ -202,11 +278,21 @@ function formatLastSeen(timestamp: number | undefined) {
   const days = Math.floor(seconds / 86400)
   return t('viewer.lastSeen.daysAgo', days)
 }
+
+onMounted(() => {
+  console.log('Component mounted, checking refs:', {
+    wrapper: !!remoteViewerWrapper.value,
+    debug: !!remoteViewerDebug.value
+  });
+});
 </script>
 
 <template>
+  <div ref="remoteViewerDebug" id="remoteviewerdebug" class="debug-info"></div>
+  <div ref="remoteViewerWrapper" id="remoteviewerwrapper" class="remote-viewer-wrapper" style="width: 800px; height: 600px;">
+    
   <div v-if="screenView" class="viewer">
-    <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3>
+    <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3> 
     <TrackContainer 
       v-if="screenView.getTrackElement"
       class="video-container"
@@ -240,6 +326,7 @@ function formatLastSeen(timestamp: number | undefined) {
         </div>
       </form>
     </div>
+  </div>
   </div>
 
   <Modal :show="requestStatus === 'request_denied'">
@@ -297,5 +384,21 @@ function formatLastSeen(timestamp: number | undefined) {
 .video-container video {
   width: 100%;
   height: 100%;
+}
+
+.remote-viewer-wrapper {
+  margin-top: 20px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.debug-info {
+  margin: 10px 0;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: monospace;
 }
 </style>
