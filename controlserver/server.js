@@ -1,19 +1,16 @@
 var app = require('express')();
-// Add cors middleware
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
-});
-
 var http = require('http').createServer(app);
 var io = require('socket.io')(http, {
     //wsEngine: require("eiows").Server,
     maxHttpBufferSize: 1e8,
     perMessageDeflate: {
         threshold: 32768
-    }
+    },
+    cors: {
+        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"], // Add your frontend URL
+        methods: ["GET", "POST"],
+        credentials: true
+      }
 });
 
 var peers = {}
