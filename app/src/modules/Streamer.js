@@ -35,6 +35,9 @@ export class Streamer {
       userid: null,
     }
 
+
+    this.lastState = null
+
     // this.fullframeinterval = null;
     this.fullframeinterval = null
     this.checkwindowinterval = null
@@ -158,14 +161,16 @@ export class Streamer {
               // resume streaming, if window is back to normal state
             }
             else {
-              // console.log('window is back');
-              self.resumeStreamingIfPaused()
+              if (self.windowManager.isVisible()) {
+                self.resumeStreamingIfPaused()
+              }
             }
           }
 
           if (!self.windowManager.isVisible()) {
             console.log('window is not visible')
-            self.stopSharing()
+            //self.stopSharing()
+            self.pauseStreaming()
           }
         }, windowcheckinterval)
       }
@@ -204,16 +209,36 @@ export class Streamer {
     if (!this.streamingpaused) {
       this.streamingpaused = true
 
+      if (this.lastState == null) {
+        this.lastState = {
+          mouseenabled: this.remoteControl.mouseenabled,
+          remotecontrolinputenabled: this.remoteControl.remotecontrolinputenabled
+        }
+        this.remoteControl.mouseenabled = false
+        this.remoteControl.remotecontrolinputenabled = false
+        this.sendReset()
+      }
+
       console.log('pause')
       this.windowManager.hideRecordOverlay()
       this.remoteControl.hideRemoteControl()
       if (this.streamingactive != null)
         this.streamingactive = null
+
+
+      
     }
   }
 
   resumeStreamingIfPaused() {
     if (this.streamingpaused) {
+      if (this.lastState != null) {
+        this.remoteControl.mouseenabled = this.lastState.mouseenabled
+        this.remoteControl.remotecontrolinputenabled = this.lastState.remotecontrolinputenabled
+        this.lastState = null
+      }
+      
+
       this.streamingpaused = false
       console.log('resume')
       this.startStreaming()
@@ -222,7 +247,21 @@ export class Streamer {
 
   startStreaming() {
     if (this.streamingactive == null) {
-      const self = this
+      console.log("startStreaming")
+
+      this.sendReset(true)
+
+      this.streamingactive = 1
+
+      this.windowManager.selectWindow(this.hwnd)
+      this.windowManager.showRecordOverlay()
+      //this.windowManager.showDebugOverlay(this.args)
+      this.remoteControl.activate(this.hwnd)
+    }
+  }
+
+  sendReset() {
+    const self = this
       const obj = {}
       obj.room = self.roomsession
       obj.scalefactor = self.windowManager.getScaleFactor()
@@ -231,7 +270,7 @@ export class Streamer {
       obj.mouseenabled = self.remoteControl.mouseenabled
       obj.dimensions = self.windowManager.getWindowOuterDimensions()
       
-      console.log("startStreaming")
+     
       console.log(JSON.stringify(obj))
       socket.emit('reset', JSON.stringify(obj))
 
@@ -239,6 +278,7 @@ export class Streamer {
         clearInterval(resetinterval)
         resetinterval = null
       }
+
 
       resetinterval = setInterval(() => {
         const obj = {}
@@ -250,14 +290,7 @@ export class Streamer {
         obj.dimensions = self.windowManager.getWindowOuterDimensions()
         socket.emit('reset', JSON.stringify(obj))
       }, 2000)
-
-      this.streamingactive = 1
-
-      this.windowManager.selectWindow(this.hwnd)
-      this.windowManager.showRecordOverlay()
-      //this.windowManager.showDebugOverlay(this.args)
-      this.remoteControl.activate(this.hwnd)
-    }
+      
   }
 
   sendScaleFactor() {

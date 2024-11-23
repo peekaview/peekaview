@@ -62,7 +62,6 @@ const videoHeight = ref<number>()
 const videoWidth = ref<number>()
 
 const remoteViewerWrapper = ref<HTMLDivElement>()
-const remoteViewerDebug = ref<HTMLDivElement>()
 
 watch(screenShareData, async (data) => {
   if (data)
@@ -75,6 +74,8 @@ watch(screenShareData, async (data) => {
         }
       })
       screenView.value = undefined
+
+      window.closeRemoteViewer()
     })
 })
 
@@ -171,7 +172,6 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     console.log('Inside setTimeout callback')
     console.log('Refs status before init:', {
       wrapper: !!remoteViewerWrapper.value,
-      debug: !!remoteViewerDebug.value
     });
     initializeRemoteViewer(data)
   }, 500)
@@ -186,57 +186,50 @@ function initializeRemoteViewer(data: AcceptedRequestData) {
     console.log('Try initialize attempt:', retries + 1);
     console.log('Current refs status:', {
       wrapper: !!remoteViewerWrapper.value,
-      debug: !!remoteViewerDebug.value,
-      wrapperElement: remoteViewerWrapper.value,
-      debugElement: remoteViewerDebug.value
     });
 
-    if (!remoteViewerWrapper.value || !remoteViewerDebug.value) {
-      console.log('Missing refs:', { 
+    /*if (!remoteViewerWrapper.value) {
+      console.log('Missing wrapper ref:', { 
         wrapper: !!remoteViewerWrapper.value, 
-        debug: !!remoteViewerDebug.value 
       })
       if (retries < maxRetries) {
         retries++;
         setTimeout(tryInitialize, 200);
       }
       return;
-    }
+    }*/
 
     const params = new URLSearchParams({
-      roomid: data.roomId,
-      username: inputName.value || '',
-      userid: generateRequestId(),
-      color: '#' + Math.floor(Math.random()*16777215).toString(16),
+      roomid: 'roomid',
+      roomname: 'roomname',
+      username: 'username',
+      userid: 'userid',
+      color: '' + Math.floor(Math.random()*16777215).toString(16),
       hostname: 'wss://c1.peekaview.de'
     })
 
     console.log('Generated params:', params.toString())
-    alert(params.toString())
+    //alert(params.toString())
+    
+    document.querySelector('.main-header')?.classList.add('d-none')
 
     // Load the remoteviewerhelper.js script dynamically
     const script = document.createElement('script')
     script.src = '/static/js/remoteviewerhelper.js'
     script.onload = () => {
-      // @ts-ignore - assuming openRemoteViewer is globally available after script loads
+      // These functions are now properly typed
+      window.denyLoadingInTopWindow();
+      window.disableBrowserZoom();
+      window.registerHandlers();
       window.openRemoteViewer(
         params.get('roomid'),
         params.get('username'),
         params.get('userid'),
         params.get('color'),
         params.get('hostname')
-      )
+      );
     }
     document.body.appendChild(script)
-
-    // Debug info
-    remoteViewerDebug.value.innerHTML = `
-      Room ID: ${params.get('roomid')}<br>
-      Username: ${params.get('username')}<br>
-      User ID: ${params.get('userid')}<br>
-      Color: ${params.get('color')}<br>
-      Hostname: ${params.get('hostname')}
-    `
   }
 
   tryInitialize();
@@ -282,17 +275,13 @@ function formatLastSeen(timestamp: number | undefined) {
 onMounted(() => {
   console.log('Component mounted, checking refs:', {
     wrapper: !!remoteViewerWrapper.value,
-    debug: !!remoteViewerDebug.value
   });
 });
 </script>
 
 <template>
-  <div ref="remoteViewerDebug" id="remoteviewerdebug" class="debug-info"></div>
   <div ref="remoteViewerWrapper" id="remoteviewerwrapper" class="remote-viewer-wrapper" style="width: 800px; height: 600px;">
-    
   <div v-if="screenView" class="viewer">
-    <h3 class="text-center mb-4">{{ $t('screenShare.title') }}</h3> 
     <TrackContainer 
       v-if="screenView.getTrackElement"
       class="video-container"
@@ -300,7 +289,6 @@ onMounted(() => {
       :style="{ width: videoWidth, height: videoHeight }"
     />
     <slot />
-    <a :href="liveKitDebugUrl">Debug LiveKit Room</a>
   </div>
   <div v-else class="content-wrapper">
     <div class="section-content">
@@ -363,6 +351,19 @@ onMounted(() => {
 </template>
 
 <style>
+
+.viewer, .video-container, .video-container video {
+  width: 100%;
+  height: 100%;
+}
+#remoteviewerwrapper {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+}
+
+
+/*
 .viewer {
   display: flex;
   flex-direction: column;
@@ -391,14 +392,5 @@ onMounted(() => {
   border: 1px solid #ccc;
   border-radius: 6px;
   overflow: hidden;
-}
-
-.debug-info {
-  margin: 10px 0;
-  padding: 10px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  font-size: 0.9em;
-  font-family: monospace;
-}
+}*/
 </style>

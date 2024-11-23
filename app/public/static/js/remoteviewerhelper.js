@@ -81,13 +81,14 @@ function denyLoadingInTopWindow() {
 
 function checkIfUrlAllowed(url, optionalcompareurl = null) {
     return true;
+    // TODO: check if url is allowed
     //optionalcompareurl = optionalcompareurl ? optionalcompareurl : 'https://' + location.hostname
     //return url.replace(/https:\/\/(be-|fe-|ps-|)/gi, '') === optionalcompareurl.replace(/https:\/\/(be-|fe-|ps-|)/gi, '')
 }
 
 
 function handleMessage(e) {
-    console.log("handleMessage", e);
+    //console.log("handleMessage", e);
     // check origin of message
     if (checkIfUrlAllowed(e.origin) && e.data != undefined) {
         try {
@@ -100,7 +101,7 @@ function handleMessage(e) {
             const wrapper = document.querySelector('div#remoteviewerwrapper');
             const wrapperRect = wrapper.getBoundingClientRect();
             
-            if (data.scaleinfo.height < window.innerHeight || data.scaleinfo.width < window.innerWidth) {
+            //if (data.scaleinfo.height < window.innerHeight || data.scaleinfo.width < window.innerWidth) {
                 const currentHeight = Math.round(wrapperRect.height);
                 const currentWidth = Math.round(wrapperRect.width);
                 
@@ -108,23 +109,24 @@ function handleMessage(e) {
                     wrapper.style.height = data.scaleinfo.height + 'px';
                     wrapper.style.width = data.scaleinfo.width + 'px';
                 }
-            } else {
+            /*} else {
                 wrapper.style.height = '100%';
                 wrapper.style.width = '100%';
-            }
+            }*/
 
             wrapper.style.overflow = 'visible';
-            document.querySelector('div#remoteviewerwrapper video').style.transform = "scale(" + data.scaleinfo.scale + ") translate(" + data.scaleinfo.x + "px," + data.scaleinfo.y + "px)";
+            const video = document.querySelector('video');
+            video.style.transform = "scale(" + data.scaleinfo.scale + ") translate(" + data.scaleinfo.x + "px," + data.scaleinfo.y + "px)";
 
             var obj = {
                 "action": 'videosize',
                 "sizeinfo": {
-                    'x': Math.round(document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().left),
-                    'y': Math.round(document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().top),
-                    'fullwidth': Math.round(document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().right - document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().left),
-                    'fullheight': Math.round(document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().bottom - document.querySelector('div#remoteviewerwrapper video').getBoundingClientRect().top),
-                    'width': Math.round(document.querySelector('div#remoteviewerwrapper').getBoundingClientRect().right - document.querySelector('div#remoteviewerwrapper').getBoundingClientRect().left),
-                    'height': Math.round(document.querySelector('div#remoteviewerwrapper').getBoundingClientRect().bottom - document.querySelector('div#remoteviewerwrapper').getBoundingClientRect().top)
+                    'x': Math.round(video.getBoundingClientRect().left),
+                    'y': Math.round(video.getBoundingClientRect().top),
+                    'fullwidth': Math.round(video.getBoundingClientRect().right - video.getBoundingClientRect().left),
+                    'fullheight': Math.round(video.getBoundingClientRect().bottom - video.getBoundingClientRect().top),
+                    'width': Math.round(wrapper.getBoundingClientRect().right - wrapper.getBoundingClientRect().left),
+                    'height': Math.round(wrapper.getBoundingClientRect().bottom - wrapper.getBoundingClientRect().top)
                 }
             }
             if (e.source != null) {

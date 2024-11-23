@@ -29,7 +29,12 @@ function attach() {
   trackElement.value = props.getTrackElement() as HTMLVideoElement
   trackElement.value.muted = props.muted
   trackElement.value.playsInline = props.playsInline
-
+  trackElement.value.style.maxWidth = '100%'
+  trackElement.value.style.maxHeight = '100%'
+  trackElement.value.style.width = '100%'
+  trackElement.value.style.height = '100%'
+  trackElement.value.style.objectFit = 'cover'
+  
   containerRef.value?.append(trackElement.value)
 }
 

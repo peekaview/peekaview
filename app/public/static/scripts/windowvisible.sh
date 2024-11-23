@@ -8,11 +8,13 @@ if [ -z "$wid" ]; then
     exit 1
 fi
 
+
 # Convert the given window ID to hexadecimal (if it's not already)
 if [[ ! "$wid" =~ ^0x ]]; then
     wid=$(printf "0x%x" "$wid")
     #echo "Converted window ID to hexadecimal: $wid"
 fi
+
 
 # Check if the window is viewable
 if ! xwininfo -id "$wid" -stats | grep -q 'IsViewable'; then
@@ -21,7 +23,7 @@ if ! xwininfo -id "$wid" -stats | grep -q 'IsViewable'; then
 fi
 
 # Get stacking order
-stacking_order=($(xprop -root _NET_CLIENT_LIST_STACKING | grep -o "0x[0-9a-fA-F]\+"))
+stacking_order=($(xprop -root _NET_CLIENT_LIST_STACKING | grep -o "0x[0-9a-fA-F]\+" | grep -v "^0x0"))
 if [ "${#stacking_order[@]}" -eq 0 ]; then
     #echo "Error: Could not retrieve stacking order."
     exit 1
@@ -72,6 +74,7 @@ window_width=${target_geometry[2]}
 window_height=${target_geometry[3]}
 window_area=$((window_width * window_height))
 
+#exit 1
 #echo "Target window geometry: X=$window_x, Y=$window_y, Width=$window_width, Height=$window_height, Area=$window_area"
 
 # Gather geometry of windows above the target window

@@ -565,7 +565,8 @@ export class WindowManager {
 
     if (isLinux) {
       try {
-        const result = this.executeCmdCached(`bash ${__static}/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
+        const result = this.executeCmdCached(`bash public/static/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
+        //const result = '1'
         return result === '1'
       } catch (error) {
         return true // Default to visible if script fails

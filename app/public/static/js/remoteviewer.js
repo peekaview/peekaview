@@ -219,7 +219,7 @@ window.onload = function () {
 
     // Der Videoviewer sendet seine Informationen zur Videogröße, sizeinfo und Overlay werden entsprechend angepasst, so dass sie das Video genau überlagern
     window.addEventListener("message", (event) => {
-        //console.log(event);
+        console.log(event);
         var obj = JSON.parse(event.data);
         if (obj.action == 'videosize') {
             remotevideosize = obj.sizeinfo;
@@ -681,7 +681,13 @@ window.onload = function () {
             remotescale = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
         } else {*/
         //remotescale = message.scalefactor;
-        remotescale = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
+        remotescaleheight = (remotevideosize.height / ((message.dimensions.bottom - message.dimensions.top) - 0));
+        remotescalewidth = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
+        if (remotescaleheight < remotescalewidth) {
+            remotescale = remotescaleheight;
+        } else {
+            remotescale = remotescalewidth;
+        }
         //}
 
 
