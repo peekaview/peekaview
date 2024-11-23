@@ -99,11 +99,4 @@ apps:
               - handler: proxy
                 upstreams:
                   - dial: ["127.0.0.1:8081"]
-                headers:
-                  response:
-                    add:
-                      Access-Control-Allow-Origin: ["http://localhost:5173", "https://REPLACE_APP_DOMAIN"]
-                      Access-Control-Allow-Methods: ["GET, POST, PUT, DELETE"]
-                      Access-Control-Allow-Headers: ["Content-Type, Authorization"]
-                      Access-Control-Allow-Credentials: ["true"]
           ### END CONTROL ###

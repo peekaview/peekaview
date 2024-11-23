@@ -1,16 +1,28 @@
 var app = require('express')();
+
+// Add Express middleware for regular HTTP endpoints
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'https://peekaview.de');
+    res.header('Access-Control-Allow-Origin', 'https://*.peekaview.de'); 
+    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
+
 var http = require('http').createServer(app);
 var io = require('socket.io')(http, {
-    //wsEngine: require("eiows").Server,
     maxHttpBufferSize: 1e8,
     perMessageDeflate: {
         threshold: 32768
     },
     cors: {
-        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"], // Add your frontend URL
-        methods: ["GET", "POST"],
+        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"],
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true
-      }
+    }
 });
 
 var peers = {}
