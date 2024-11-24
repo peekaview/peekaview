@@ -219,7 +219,7 @@ window.onload = function () {
 
     // Der Videoviewer sendet seine Informationen zur Videogröße, sizeinfo und Overlay werden entsprechend angepasst, so dass sie das Video genau überlagern
     window.addEventListener("message", (event) => {
-        console.log(event);
+        //console.log(event);
         var obj = JSON.parse(event.data);
         if (obj.action == 'videosize') {
             remotevideosize = obj.sizeinfo;

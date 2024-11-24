@@ -6,22 +6,8 @@ declare global {
   interface MediaTrackConstraints {
     mandatory?: any
   }
-
-  interface Window {
-    initializeRemoteViewer?: () => void;
-    closeRemoteViewer: () => void;
-    denyLoadingInTopWindow: () => void;
-    disableBrowserZoom: () => void;
-    registerHandlers: () => void;
-    openRemoteViewer: (
-      roomId: string | null,
-      username: string | null,
-      userId: string | null,
-      color: string | null,
-      hostname: string | null
-    ) => void;
-  }
 }
+
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,

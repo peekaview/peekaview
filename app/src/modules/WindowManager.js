@@ -114,7 +114,7 @@ export class WindowManager {
   }
 
   isScreen() {
-    if (this.windowhwnd.split(',')[0] < 10 || (isLinux && this.windowhwnd < 1000))
+    if (this.windowhwnd.split(',')[0] < 10 || (isLinux && this.windowhwnd < 10000))
       return true
     else return false
   }

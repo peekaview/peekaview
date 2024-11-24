@@ -8,13 +8,11 @@ if [ -z "$wid" ]; then
     exit 1
 fi
 
-
 # Convert the given window ID to hexadecimal (if it's not already)
 if [[ ! "$wid" =~ ^0x ]]; then
     wid=$(printf "0x%x" "$wid")
     #echo "Converted window ID to hexadecimal: $wid"
 fi
-
 
 # Check if the window is viewable
 if ! xwininfo -id "$wid" -stats | grep -q 'IsViewable'; then

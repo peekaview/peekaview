@@ -5,10 +5,12 @@ import Swal from 'sweetalert2'
 
 import Modal from './Modal.vue'
 import TrackContainer from "./TrackContainer.vue"
+import RemoteControl from "./RemoteControl.vue"
 
 import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
 import { callApi } from '../api'
 import { useScreenView } from '../composables/useLiveKitScreenShare'
+import { useRemoteControl } from  '../composables/useRemoteControl'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -62,6 +64,9 @@ const videoHeight = ref<number>()
 const videoWidth = ref<number>()
 
 const remoteViewerWrapper = ref<HTMLDivElement>()
+const remoteControl = ref()
+
+const { openRemoteControl, closeRemoteControl } = useRemoteControl()
 
 watch(screenShareData, async (data) => {
   if (data)
@@ -75,7 +80,7 @@ watch(screenShareData, async (data) => {
       })
       screenView.value = undefined
 
-      window.closeRemoteViewer()
+      closeRemoteControl()
     })
 })
 
@@ -179,60 +184,26 @@ function handleRequestAccepted(data: AcceptedRequestData) {
 
 function initializeRemoteViewer(data: AcceptedRequestData) {
   console.log('initializeRemoteViewer called')
-  let retries = 0;
-  const maxRetries = 3;
 
-  const tryInitialize = () => {
-    console.log('Try initialize attempt:', retries + 1);
-    console.log('Current refs status:', {
-      wrapper: !!remoteViewerWrapper.value,
-    });
-
-    /*if (!remoteViewerWrapper.value) {
-      console.log('Missing wrapper ref:', { 
-        wrapper: !!remoteViewerWrapper.value, 
-      })
-      if (retries < maxRetries) {
-        retries++;
-        setTimeout(tryInitialize, 200);
-      }
-      return;
-    }*/
-
-    const params = new URLSearchParams({
-      roomid: 'roomid',
-      roomname: 'roomname',
-      username: 'username',
-      userid: 'userid',
-      color: '' + Math.floor(Math.random()*16777215).toString(16),
-      hostname: 'wss://c1.peekaview.de'
-    })
-
-    console.log('Generated params:', params.toString())
-    //alert(params.toString())
-    
-    document.querySelector('.main-header')?.classList.add('d-none')
-
-    // Load the remoteviewerhelper.js script dynamically
-    const script = document.createElement('script')
-    script.src = '/static/js/remoteviewerhelper.js'
-    script.onload = () => {
-      // These functions are now properly typed
-      window.denyLoadingInTopWindow();
-      window.disableBrowserZoom();
-      window.registerHandlers();
-      window.openRemoteViewer(
-        params.get('roomid'),
-        params.get('username'),
-        params.get('userid'),
-        params.get('color'),
-        params.get('hostname')
-      );
-    }
-    document.body.appendChild(script)
+  const params = {
+    roomid: 'roomid',
+    username: 'username',
+    userid: 'userid',
+    color: Math.floor(Math.random()*16777215).toString(16),
+    hostname: 'wss://c1.peekaview.de'
   }
 
-  tryInitialize();
+  console.log('Generated params:', params)
+  
+  document.querySelector('.main-header')?.classList.add('d-none')
+
+  remoteControl.value?.openRemoteControl(
+    params.roomid,
+    params.username,
+    params.userid,
+    params.color,
+    params.hostname
+  )
 }
 
 function handleError() {
@@ -280,42 +251,46 @@ onMounted(() => {
 </script>
 
 <template>
-  <div ref="remoteViewerWrapper" id="remoteviewerwrapper" class="remote-viewer-wrapper" style="width: 800px; height: 600px;">
-  <div v-if="screenView" class="viewer">
-    <TrackContainer 
-      v-if="screenView.getTrackElement"
-      class="video-container"
-      :get-track-element="screenView.getTrackElement"
-      :style="{ width: videoWidth, height: videoHeight }"
-    />
-    <slot />
-  </div>
-  <div v-else class="content-wrapper">
-    <div class="section-content">
-      <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
+  <RemoteControl 
+    ref="remoteControl" 
+    class="remote-viewer-wrapper" 
+    style="width: 800px; height: 600px;"
+  >
+      <div v-if="screenView" class="viewer">
+        <TrackContainer 
+          v-if="screenView.getTrackElement"
+          class="video-container"
+          :get-track-element="screenView.getTrackElement"
+          :style="{ width: videoWidth, height: videoHeight }"
+        />
+        <slot />
+      </div>
+      <div v-else class="content-wrapper">
+        <div class="section-content">
+          <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
-      <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
+          <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
 
-      <form class="section-form" @submit="handleSubmit">
-        <div class="form-content">
-          <div v-if="!email" class="mb-4">
-            <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-            <input type="email" class="form-control form-control-lg" name="email"
-              v-model="inputEmail"
-              placeholder="example@email.com" required>
-          </div>
-          <div class="mb-4">
-            <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-            <input type="text" class="form-control form-control-lg" name="name"
-              v-model="inputName"
-              placeholder="Enter your name" required>
-          </div>
-          <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
+          <form class="section-form" @submit="handleSubmit">
+            <div class="form-content">
+              <div v-if="!email" class="mb-4">
+                <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
+                <input type="email" class="form-control form-control-lg" name="email"
+                  v-model="inputEmail"
+                  placeholder="example@email.com" required>
+              </div>
+              <div class="mb-4">
+                <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
+                <input type="text" class="form-control form-control-lg" name="name"
+                  v-model="inputName"
+                  placeholder="Enter your name" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
+            </div>
+          </form>
         </div>
-      </form>
-    </div>
-  </div>
-  </div>
+      </div>
+  </RemoteControl>
 
   <Modal :show="requestStatus === 'request_denied'">
     <template #default>
@@ -356,11 +331,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
 }
-#remoteviewerwrapper {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-}
+
 
 
 /*
