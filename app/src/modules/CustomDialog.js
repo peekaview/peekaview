@@ -94,7 +94,7 @@ export class CustomDialog {
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : params.buttons.length - 1),
       message: '',
-      timeout: (type === 'tray' ? 800000 : 0),
+      timeout: (type === 'tray' ? 8000 : 0),
       detail: '',
       soundfile: (this.soundfile != null) ? this.soundfile : null,
     }
