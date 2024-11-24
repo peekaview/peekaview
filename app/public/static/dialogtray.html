@@ -20,6 +20,17 @@
 
     <style>
 
+    body {
+      font-family: Abel;
+    }
+
+    .content {
+      margin-top: 10px;
+      display: inline-block;
+      margin: 0px;
+      margin-right: 20px;
+    }
+
     .modal-container {
       -webkit-user-select: none;
     }
@@ -35,23 +46,39 @@
       transform: translateX(100%);
     }
 
+    .modal-container {
+      background: #1a1a1a;
+      color: #EEE
+    }
+
     @keyframes scale-in {
       0% {
-        transform: translateX(100%);
+        transform: translateY(0%);
         
       }
       100% {
-        transform: translateX(0%);
+        transform: translateY(100%);
       }
     }
 
     @keyframes scale-out {
       0% {
-        transform: translateX(0%);
+        transform: translateY(100%);
       }
       100% {
-        transform: translateX(100%);
+        transform: translateY(0%);
       }
+    }
+
+    .btn.btn-secondary {
+        background: #2a2a2a;
+        border-color: #404040;
+        color: #aaa;
+    }
+    .btn.btn-secondary:hover {
+        background: #404040;
+        border-color: #505050;
+        color: #ddd;
     }
     /*
       a.btn, button.btn {
@@ -66,7 +93,7 @@
   <div id="modal-id" class="modal active modalin">
     <div class="modal-container settings_container">
       <div class="modal-body">
-        <a href="#close" class="btn btn-clear float-right" aria-label="Close" id="close"></a>
+        <a href="#close" class="btn btn-secondary btn-clear float-right" aria-label="Close" id="close"></a>
         <div class="content">
           <div class="f-modal-alert" style="margin-top: -50px; margin-bottom: -40px; transform: scale(0.4); margin-right: 10px; margin-left: -10px">
             <div class="f-modal-icon f-modal-error animate" style="display: none;">
@@ -116,13 +143,7 @@
     console.log(params);
     console.log(window.process.argv);
     //alert(params[0]);
-
-    document.getElementById('link_customtheme').href = "https://" + params[0] + "/assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "https://" + params[0] + "/api/clientapi.php?action=customstyle";
-  } else {
-    document.getElementById('link_customtheme').href = "assets/css/spectre_customtheme.css";
-    document.getElementById('link_customstyle').href = "api/clientapi.php?action=customstyle";
-  }
+}
 
 
 

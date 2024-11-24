@@ -401,7 +401,7 @@ window.onload = function () {
                 extension = obj.filename.split('.').slice(-1);
             }
 
-            div.style.cssText = 'background-image: url(/assets/icons/' + extension + '.svg); background-repeat: no-repeat; background-position-x: right';
+            div.style.cssText = 'background-image: url(../icons/' + extension + '.svg); background-repeat: no-repeat; background-position-x: right';
             div.innerHTML = '<textarea id="filecontent" style="background: hsl(0deg 62% 55% / 85%)">' + decoded + '</textarea>';
 
             //console.log(decoded);
@@ -448,7 +448,7 @@ window.onload = function () {
             //console.log(extension);
 
             const div = document.createElement('div');
-            div.innerHTML = '<center><img id="extensionimage" src="/assets/icons/' + extension + '.svg" style="max-height:150px"></center>';
+            div.innerHTML = '<center><img id="extensionimage" src="../icons/' + extension + '.svg" style="max-height:150px"></center>';
             document.getElementById('clipboardarea').append(div);
 
             document.querySelector("#extensionimage").onclick = function () {

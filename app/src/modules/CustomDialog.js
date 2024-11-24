@@ -65,14 +65,16 @@ export class CustomDialog {
     if (type === 'share') {
       windowParams.width = 400
       windowParams.height = 50
-      windowParams.x = screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
+      windowParams.x = screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 200)
       windowParams.y = screen.getPrimaryDisplay().bounds.y -8
       windowParams.template = 'dialogshare.html'
     }
     else if (type === 'tray') {
       windowParams.width = 500
       windowParams.height = 200
-      windowParams.x = screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - 500)
+      //windowParams.x = screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
+
+      windowParams.x = screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 250 : screen.getPrimaryDisplay().workAreaSize.width - 500 / 2)
       windowParams.y = screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 0 : screen.getPrimaryDisplay().workAreaSize.height - 175)
       windowParams.template = 'dialogtray.html'
     }
@@ -92,7 +94,7 @@ export class CustomDialog {
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : params.buttons.length - 1),
       message: '',
-      timeout: (type === 'tray' ? 3000 : 0),
+      timeout: (type === 'tray' ? 800000 : 0),
       detail: '',
       soundfile: (this.soundfile != null) ? this.soundfile : null,
     }
@@ -118,7 +120,7 @@ export class CustomDialog {
       y: windowParams.y,
       icon: 'public/static/img/peekaviewlogo.png',
       webPreferences: {
-        preload: 'public/static/js/dialog.js',
+        preload: path.join(__dirname, '../../public/static/js/dialog.js'),
         additionalArguments: [hostname],
         nodeIntegration: true,
         contextIsolation: false,

@@ -21,6 +21,7 @@ import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
 
 import { Streamer } from '../modules/Streamer.js'
+import { CustomDialog } from '../modules/CustomDialog.js'
 //import { Conference } from '../modules/Conference.js'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
@@ -89,7 +90,7 @@ interface StoreSchema {
   let isQuitting = false
 
   let streamer: Streamer | null = null;
-
+  let customDialog: CustomDialog | null = null;
   const Store = (await import('electron-store')).default
   const store = new Store<StoreSchema>({
     schema: {
@@ -455,6 +456,8 @@ interface StoreSchema {
   })
 
   ipcMain.handle('open-screen-source-selection', async () => {
+    customDialog = new CustomDialog()
+    customDialog.openDialog('dialog', { title: 'Ein super Testdialog', detail: 'Möchtest du Pizza bestellen?', type: 'info', buttons: ['Yeah','Nope'] })
     createSourcesWindow()
   })
 
