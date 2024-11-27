@@ -56,15 +56,6 @@ body {
 }
 
 /* Form Styles */
-.section-form {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 15px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.8);
-}
-
 .form-content {
   text-align: left;
 }

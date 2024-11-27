@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Swal from 'sweetalert2'
 
 import { callApi } from '../api'
+import { notify } from '../util'
 
 type Response = {
   success: boolean
@@ -58,26 +58,19 @@ async function handleRegister(e: Event) {
 }
 
 function handleJustRegistered() {
-  Swal.fire({
-    icon: 'success',
+  notify({
+    type: 'success',
     text: t('login.justRegistered'),
-    showCancelButton: false,
-    showConfirmButton: false,
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
-  });
+    showButtons: false
+  })
 }
 
 function handleError() {
-  Swal.fire({
-    icon: 'error',
+  notify({
+    type: 'error',
     title: 'Connection Error',
-    text: 'There was a problem connecting to the server. Please try again.',
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
-  });
+    text: 'There was a problem connecting to the server. Please try again.'
+  })
 }
 </script>
 
@@ -85,7 +78,7 @@ function handleError() {
   <div class="content-wrapper">
     <div class="section-content">
       <div class="text-center">
-        <form v-if="!registered" class="section-form" @submit="handleRegister">
+        <form v-if="!registered" class="panel" @submit="handleRegister">
           <div class="form-content">
             <div class="mb-4">
               <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
@@ -96,7 +89,7 @@ function handleError() {
             <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
           </div>
         </form>
-        <div v-else class="section-form">
+        <div v-else class="panel">
           <div class="form-content">
             <h2 class="mb-3">{{ $t('login.successful') }}</h2>
             <p class="text-secondary mb-4">{{ $t('login.successMessage') }}</p>

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Swal from 'sweetalert2'
 
-import Modal from './Modal.vue'
 import TrackContainer from "./TrackContainer.vue"
 import RemoteControl from "./RemoteControl.vue"
 
 import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
 import { callApi } from '../api'
+import { notify } from '../util'
 import { useScreenView } from '../composables/useLiveKitScreenShare'
 import { useRemoteControl } from  '../composables/useRemoteControl'
 
@@ -71,17 +70,27 @@ const { openRemoteControl, closeRemoteControl } = useRemoteControl()
 watch(screenShareData, async (data) => {
   if (data)
     screenView.value = await useScreenView(data, () => {
-      Swal.fire({
-        icon: 'info',
+      notify({
+        type: 'info',
         text: t('viewer.sharingEnded'),
-        customClass: {
-          popup: 'animate__animated animate__fadeIn'
-        }
       })
       screenView.value = undefined
 
       closeRemoteControl()
     })
+})
+
+watch(requestStatus, (status) => {
+  if (status !== 'request_denied')
+    return
+
+  notify({
+    type: 'info',
+    text: t('viewer.requestDenied', { email: props.email }),
+    confirmButtonText: t('general.ok'),
+  })
+
+  requestStatus.value = undefined
 })
 
 const liveKitDebugUrl = computed(() => 
@@ -210,13 +219,10 @@ function handleError() {
   waitingStatus.value = undefined
   requestStatus.value = undefined
   
-  Swal.fire({
-    icon: 'error',
+  notify({
+    type: 'error',
     title: 'Connection Error',
     text: t('viewer.connectionError'),
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
   })
 }
 
@@ -266,12 +272,12 @@ onMounted(() => {
         <slot />
       </div>
       <div v-else class="content-wrapper">
-        <div class="section-content">
+        <div v-if="!waitingStatus" class="section-content">
           <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
           <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
 
-          <form class="section-form" @submit="handleSubmit">
+          <form class="panel" @submit="handleSubmit">
             <div class="form-content">
               <div v-if="!email" class="mb-4">
                 <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
@@ -289,50 +295,37 @@ onMounted(() => {
             </div>
           </form>
         </div>
+        <div v-else class="section-content">
+          <div class="panel">
+            <div class="form-content">
+              <div class="text-center">
+                <div class="waiting-spinner"></div>
+                <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
+                <p v-if="requestUserStatus" class="mb-3">
+                  <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+                  <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+                  <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
+                  <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
+                </p>
+                <p class="text-muted small mt-10">
+                  {{ $t('viewer.keepWindowOpen') }}
+                </p>
+              </div>
+              <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+                {{ $t('general.cancel') }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
   </RemoteControl>
-
-  <Modal :show="requestStatus === 'request_denied'">
-    <template #default>
-      <p>{{ $t('viewer.requestDenied', { email }) }}</p>
-    </template>
-    <template #ok>
-      <button type="button" class="btn btn-primary" @click="requestStatus = undefined">{{ $t('general.ok') }}</button>
-    </template>
-  </Modal>
-
-  <Modal :show="!!waitingStatus" no-close-on-backdrop no-close-on-esc hide-header ok-only>
-    <template #default>
-      <div class="text-center">
-        <div class="waiting-spinner"></div>
-        <h4 v-if="waitingStatus" class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
-        <p v-if="requestUserStatus" class="mb-3">
-          <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-          <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-          <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
-          <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
-        </p>
-        <p class="text-muted small mt-10">
-          {{ $t('viewer.keepWindowOpen') }}
-        </p>
-      </div>
-    </template>
-    <template #ok>
-      <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
-        {{ $t('general.cancel') }}
-      </button>
-    </template>
-  </Modal>
 </template>
 
 <style>
-
 .viewer, .video-container, .video-container video {
   width: 100%;
   height: 100%;
 }
-
-
 
 /*
 .viewer {

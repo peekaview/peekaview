@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Swal from 'sweetalert2'
 
 import { useScreenShare } from "../composables/useLiveKitScreenShare"
-import Modal from './Modal.vue'
 
 import type { AcceptedRequestData, ScreenShare, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
+import { notify, prompt } from '../util'
 import { ScreenSource } from '../../interface'
 
 interface Request {
@@ -28,6 +27,7 @@ const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
 const screenShare = ref<ScreenShare>()
+//const incomingRequests = reactive<{ [id: string]: string }>({})
 const latestRequest = ref<Request>()
 
 const pingInterval = ref<number>()
@@ -84,6 +84,24 @@ watch(sessionActive, (flag) => {
     sessionActive.value = false
   }
   }, 2000)
+})
+
+watch(latestRequest, async (request) => {
+  if (!request)
+    return
+
+  const result = await prompt({
+    text: t('share.requestAccess.message', { name: request.name }),
+    confirmButtonText: t('share.requestAccess.accept'),
+    cancelButtonText: t('share.requestAccess.deny'),
+  })
+
+  console.log("result", result)
+      
+  if (result === '0')
+    acceptRequest()
+  else
+    denyRequest()
 })
 
 function startPingInterval() {
@@ -235,14 +253,11 @@ function handleError(error: Error) {
     return
   }
 
-  Swal.fire({
-    icon: 'error',
+  notify({
+    type: 'error',
     title: 'Error',
     text: t('share.requestError'),
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
-  });
+  })
 }
 
 function shareViaApp() {
@@ -251,21 +266,17 @@ function shareViaApp() {
   
   // Show backup dialog after a short delay
   setTimeout(async () => {
-    const result = await Swal.fire({
+    const result = await prompt({
       title: t('share.appDialog.title'),
       html: 
         t('share.appDialog.message') + '<br><br>' +
         t('share.appDialog.download', { link: downloadLink.value }),
-      icon: 'info',
-      showCancelButton: true,
+      type: 'info',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
-      customClass: {
-        popup: 'animate__animated animate__fadeIn'
-      }
     })
     
-    if (result.isConfirmed)
+    if (result === '0')
       window.location.href = protocolUrl
   }, 1000);
 }
@@ -337,22 +348,6 @@ function shareViaApp() {
       </template>
     </div>
   </div>
-
-  <Modal :show="!!latestRequest" hide-header>
-    <template #default>
-      <p>{{ $t('share.requestAccess.message', { name: latestRequest?.name }) }}</p>
-    </template>
-    <template #ok>
-      <button type="button" class="btn btn-primary" @click="acceptRequest">
-        {{ $t('share.requestAccess.accept') }}
-      </button>
-    </template>
-    <template #cancel>
-      <button type="button" class="btn btn-secondary" @click="denyRequest">
-        {{ $t('share.requestAccess.deny') }}
-      </button>
-    </template>
-  </Modal>
 </template>
 
 <style>

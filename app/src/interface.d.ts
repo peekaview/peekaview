@@ -1,3 +1,5 @@
+import { type DialogParams } from './main/composables/useCustomDialog'
+
 declare global {
   interface Window {
     electronAPI?: IElectronAPI
@@ -8,9 +10,10 @@ declare global {
   }
 }
 
-
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
+  dialog: (params: DialogParams) => Promise<void>,
+  onReplyDialog: (callback: (dialogId: number, result: string) => void) => Electron.IpcRenderer,
   onChangeLanguage: (callback: (locale: string) => void) => Electron.IpcRenderer,
   logout: (discardSession?: boolean) => Promise<void>,
   loginViaBrowser: (discardSession?: boolean) => Promise<void>,

@@ -20,9 +20,6 @@ importers:
       bootstrap:
         specifier: ^5.3.3
         version: 5.3.3(@popperjs/core@2.11.8)
-      bootstrap-vue-next:
-        specifier: ^0.25.10
-        version: 0.25.15(vue@3.5.13(typescript@5.6.3))
       electron-log:
         specifier: ^5.2.2
         version: 5.2.2
@@ -1378,11 +1375,6 @@ packages:
   boolean@3.2.0:
     resolution: {integrity: sha512-d0II/GO9uf9lfUHH2BQsjxzRJZBdsjgsBiW4BvhWk/3qoKwQFjIDVN19PfX8F2D/r9PCMTtLWjYVCFrpeYUzsw==}
     deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-
-  bootstrap-vue-next@0.25.15:
-    resolution: {integrity: sha512-9ZI2+Qkeg2wM2BgtpEfay6Hl2Ak70GbOgFTNXCpccyqa1L0HMGyYHV6bHeOzKWKhBvn9Ku4Wp88zHkqWq2Gagg==}
-    peerDependencies:
-      vue: ^3.5.3
 
   bootstrap@5.3.3:
     resolution: {integrity: sha512-8HLCdWgyoMguSO9o+aH+iuZ+aht+mzW0u3HIMzVu7Srrpv7EBBxTnrFlSCskwdY1+EOFQSm7uMJhNQHkdPcmjg==}
@@ -4942,10 +4934,6 @@ snapshots:
 
   boolean@3.2.0:
     optional: true
-
-  bootstrap-vue-next@0.25.15(vue@3.5.13(typescript@5.6.3)):
-    dependencies:
-      vue: 3.5.13(typescript@5.6.3)
 
   bootstrap@5.3.3(@popperjs/core@2.11.8):
     dependencies:

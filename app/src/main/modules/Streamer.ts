@@ -1,40 +1,87 @@
 import path from 'path'
 import { dialog, screen, BrowserWindow } from 'electron'
 
-import { io } from 'socket.io-client'
+import { io, type Socket } from 'socket.io-client'
 import { WindowManager } from './WindowManager.js'
 import { RemoteControl } from './RemoteControl.js'
-import { CustomDialog } from './CustomDialog.js'
+import { useCustomDialog } from '../composables/useCustomDialog'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
 // var socket = require('socket.io-client')('http://meetdev.meetzi.de:5901');
-let socket = null
+let socket: Socket | null = null
 
 // Intervals
 const windowcheckinterval = (isMac || isLinux) ? 1000 : 100
-let resetinterval = null
+let resetinterval: NodeJS.Timeout | null = null
 
 export class Streamer {
-  constructor(hostname) {
-    this.customDialog = new CustomDialog()
+  customDialog: ReturnType<typeof useCustomDialog>
+  windowManager: typeof WindowManager
+  remoteControl: typeof RemoteControl
+  hwnd: string | null
+  streamerOverlay: null
+  lastState: {
+    mouseenabled: boolean
+    remotecontrolinputenabled: boolean
+  } | null
+  fullframeinterval: NodeJS.Timeout | null
+  checkwindowinterval: NodeJS.Timeout | null
+  roomsession: null
+  streamingpaused: boolean
+  streamingactive: boolean
+  imgBufferLast: null
+  diffBufferLast: null
+  resizeBufferLast: null
+  windowlist: string[] | null
+  joined: boolean
+  lastmousePosX: number
+  lastmousePosY: number
+  hostname: string | null
+  imagedimensions: null
+  args: {
+    hwnd: string | null
+    hostname: string | null
+    roomid: string | null
+    roomname: string | null
+    username: string | null
+    userid: string | null
+    color: string | null
+  }
+  lastcheck: {
+    lastframetime: string | null
+    calcdimensions: string | null
+    calcrect: string | null
+    returnrect: string | null
+    returnfullframe: string | null
+  }
+  lastrect: {
+    left: number
+    top: number
+    width: number
+    height: number
+  }
+
+  constructor() {
+    this.customDialog = useCustomDialog()
     this.windowManager = new WindowManager()
     this.remoteControl = new RemoteControl('')
     this.hwnd = null
+    this.hostname = null
 
     this.streamerOverlay = null
 
     this.args = {
       hwnd: null,
       hostname: null,
+      roomid: null,
       roomname: null,
-      school: null,
       username: null,
       userid: null,
+      color: null,
     }
-
 
     this.lastState = null
 
@@ -45,7 +92,7 @@ export class Streamer {
 
     this.streamingpaused = false
 
-    this.streamingactive = null
+    this.streamingactive = false
     this.imgBufferLast = null
     this.diffBufferLast = null
     this.resizeBufferLast = null
@@ -114,7 +161,6 @@ export class Streamer {
 
     console.log(`hwndstreamer:${hwnd}`)
 
-    
     /* const { desktopCapturer } = require('electron')
     desktopCapturer.getSources({ types: ['window', 'screen'] }).then(async (sources) => {
       for (const source of sources) {
@@ -133,7 +179,7 @@ export class Streamer {
     console.log(this.hwnd)
     console.log(this.windowlist)
 
-    if (this.windowlist.includes(hwnd) || hwnd == 0) {
+    if (this.windowlist.includes(hwnd) || hwnd == '0') {
       console.log(`${hwnd} in windowlsit`)
 
       this.showStreamerOverlay(hwnd)
@@ -182,8 +228,8 @@ export class Streamer {
 
   stopSharing() {
     if (this.joined) {
-      socket.disconnect()
-      socket.close()
+      socket!.disconnect()
+      socket!.close()
     }
 
     if (resetinterval != null) {
@@ -201,8 +247,7 @@ export class Streamer {
     this.windowManager.hideRecordOverlay()
     this.remoteControl.hideRemoteControl()
     this.remoteControl.deactivate()
-    if (this.streamingactive != null)
-      this.streamingactive = null
+    this.streamingactive = false
   }
 
   pauseStreaming() {
@@ -222,11 +267,7 @@ export class Streamer {
       console.log('pause')
       this.windowManager.hideRecordOverlay()
       this.remoteControl.hideRemoteControl()
-      if (this.streamingactive != null)
-        this.streamingactive = null
-
-
-      
+      this.streamingactive = false
     }
   }
 
@@ -238,7 +279,6 @@ export class Streamer {
         this.lastState = null
       }
       
-
       this.streamingpaused = false
       console.log('resume')
       this.startStreaming()
@@ -246,12 +286,12 @@ export class Streamer {
   }
 
   startStreaming() {
-    if (this.streamingactive == null) {
+    if (!this.streamingactive) {
       console.log("startStreaming")
 
-      this.sendReset(true)
+      this.sendReset()
 
-      this.streamingactive = 1
+      this.streamingactive = true
 
       this.windowManager.selectWindow(this.hwnd)
       this.windowManager.showRecordOverlay()
@@ -262,50 +302,51 @@ export class Streamer {
 
   sendReset() {
     const self = this
-      const obj = {}
-      obj.room = self.roomsession
-      obj.scalefactor = self.windowManager.getScaleFactor()
-      obj.iscreen = self.windowManager.isScreen()
-      obj.remotecontrol = self.remoteControl.remotecontrolinputenabled
-      obj.mouseenabled = self.remoteControl.mouseenabled
-      obj.dimensions = self.windowManager.getWindowOuterDimensions()
-      
-     
+      const obj = {
+        room: self.roomsession,
+        scalefactor: self.windowManager.getScaleFactor(),
+        iscreen: self.windowManager.isScreen(),
+        remotecontrol: self.remoteControl.remotecontrolinputenabled,
+        mouseenabled: self.remoteControl.mouseenabled,
+        dimensions: self.windowManager.getWindowOuterDimensions(),
+      }
+
       console.log(JSON.stringify(obj))
-      socket.emit('reset', JSON.stringify(obj))
+      socket!.emit('reset', JSON.stringify(obj))
 
       if (resetinterval != null) {
         clearInterval(resetinterval)
         resetinterval = null
       }
 
-
       resetinterval = setInterval(() => {
-        const obj = {}
-        obj.room = self.roomsession
-        obj.scalefactor = self.windowManager.getScaleFactor()
-        obj.iscreen = self.windowManager.isScreen()
-        obj.remotecontrol = self.remoteControl.remotecontrolinputenabled
-        obj.mouseenabled = self.remoteControl.mouseenabled
-        obj.dimensions = self.windowManager.getWindowOuterDimensions()
-        socket.emit('reset', JSON.stringify(obj))
+        const obj = {
+          room: self.roomsession,
+          scalefactor: self.windowManager.getScaleFactor(),
+          iscreen: self.windowManager.isScreen(),
+          remotecontrol: self.remoteControl.remotecontrolinputenabled,
+          mouseenabled: self.remoteControl.mouseenabled,
+          dimensions: self.windowManager.getWindowOuterDimensions(),
+        }
+        socket!.emit('reset', JSON.stringify(obj))
       }, 2000)
       
   }
 
   sendScaleFactor() {
-    const obj = {}
-    obj.room = this.roomsession
-    obj.scalefactor = this.windowManager.getScaleFactor()
+    const obj = {
+      room: this.roomsession,
+      scalefactor: this.windowManager.getScaleFactor(),
+    }
     // socket.sendBuffer = [];
-    socket.volatile.emit('host-info', JSON.stringify(obj))
+    socket!.volatile.emit('host-info', JSON.stringify(obj))
   }
 
   showStreamerOverlay(hwnd) {
     this.customDialog.playSoundOnOpen('ping.wav')
-    this.customDialog.openTrayDialog(this.hostname, {
+    this.customDialog.openTrayDialog(this.hostname!, {
       detail: (hwnd !== 0 ? 'Sie haben ein Fenster mit meetzi geteilt. Andere Teilnehmer können das Fenster sehen/bearbeiten.' : 'Sie haben Ihren Bildschirm mit meetzi geteilt. Andere Teilnehmer können den Bildschirminhalt sehen/bearbeiten.'),
     })
-    this.customDialog.openShareDialog(this.hostname, {})
+    this.customDialog.openShareDialog(this.hostname!, {})
   }
 }

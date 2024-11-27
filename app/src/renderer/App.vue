@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Swal from 'sweetalert2'
 
 import About from './components/About.vue'
 import Login from './components/Login.vue'
-import Modal from './components/Modal.vue'
 import Viewer from './components/Viewer.vue'
 import Share from './components/Share.vue'
+
+import { prompt } from './util'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 
@@ -62,19 +62,14 @@ function handleParams(params: URLSearchParams) {
 }
 
 async function handleLogout() {
-  const result = await Swal.fire({
+  const result = await prompt({
     title: t("app.logout"),
     text: t("app.confirmLogout"),
-    icon: 'question',
-    showCancelButton: true,
     confirmButtonText: t("general.yes"),
     cancelButtonText: t("general.cancel"),
-    customClass: {
-      popup: 'animate__animated animate__fadeIn'
-    }
   })
   
-  if (result.isConfirmed)
+  if (result === '0')
     window.location.href = 'index.php'
 }
 </script>
@@ -119,9 +114,7 @@ async function handleLogout() {
     />
   </div>
 
-  <Modal :show="!!showAbout" @click="showAbout = false" hide-header hide-footer>
-    <About />
-  </Modal>
+  <About v-if="showAbout" @click="showAbout = false"/>
 
   <footer class="main-footer">
     <div class="footer-content">
@@ -239,7 +232,7 @@ body {
     font-size: 1.25rem;
   }
   
-  .section-form {
+  .panel {
     padding: 1.5rem;
   }
 }

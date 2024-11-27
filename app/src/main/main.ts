@@ -20,9 +20,10 @@ import { exec } from 'child_process'
 import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
 
-import { Streamer } from '../modules/Streamer.js'
-import { CustomDialog } from '../modules/CustomDialog.js'
-//import { Conference } from '../modules/Conference.js'
+import { useCustomDialog, type DialogParams } from './composables/useCustomDialog'
+
+import { Streamer } from './modules/Streamer'
+//import { Conference } from './modules/Conference.js'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
 import { ScreenSource } from '../interface.js'
@@ -89,8 +90,9 @@ interface StoreSchema {
   let selectedScreenSource: ScreenSource | undefined
   let isQuitting = false
 
-  let streamer: Streamer | null = null;
-  let customDialog: CustomDialog | null = null;
+  let streamer: Streamer
+  const customDialog = useCustomDialog()
+
   const Store = (await import('electron-store')).default
   const store = new Store<StoreSchema>({
     schema: {
@@ -455,9 +457,15 @@ interface StoreSchema {
     log.error('Unhandled Rejection:', reason)
   })
 
+  ipcMain.handle('dialog', async (_event, params: DialogParams) => {
+    customDialog.openDialog('dialog', params)
+  })
+
+  ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
+    appWindow?.webContents.send('on-reply-dialog', id, result)
+  })
+
   ipcMain.handle('open-screen-source-selection', async () => {
-    customDialog = new CustomDialog()
-    customDialog.openDialog('dialog', { title: 'Ein super Testdialog', detail: 'Möchtest du Pizza bestellen?', type: 'info', buttons: ['Yeah','Nope'] })
     createSourcesWindow()
   })
 
@@ -495,12 +503,9 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  
-  
   ipcMain.handle('start-remote-control', async (_event, source: ScreenSource) => {
     startRemoteControl(source.id, source.name) // TODO: handle errors
   })
-
 
   ipcMain.handle('toggleRemoteControl', async (_event) => {
     console.log('toggleRemoteControl')
@@ -517,5 +522,4 @@ interface StoreSchema {
     console.log('stopSharing')
     quit()
   })
-
 })()

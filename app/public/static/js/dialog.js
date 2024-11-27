@@ -3,7 +3,6 @@ const {
   ipcRenderer,
 } = require('electron')
 
-
 document.addEventListener("DOMContentLoaded", () => {
   //window.onload = function () {
   ipcRenderer.on('params', function (evt, params) {
@@ -73,8 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById('modalbuttons').appendChild(placeholder.content.firstElementChild);
 
       document.getElementById('button' + tabindex).addEventListener("click", (event) => {
-        ipcRenderer.send('replyDialog', event.currentTarget.value);
-        close()
+        reply(params.id, event.currentTarget.value);
       }
       );
 
@@ -88,18 +86,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById('close').addEventListener("click", (event) => {
-      ipcRenderer.send('replyDialog', params.cancelId);
-      close()
+      reply(params.id, params.cancelId);
     }
     );
 
     window.addEventListener("beforeunload", function (e) {
-      ipcRenderer.send('replyDialog', params.cancelId);
-      close()
+      reply(params.id, params.cancelId);
     }, false);
 
 
   });
+
+  let replySent = false;
+  function reply(id, result) {
+    if (replySent)
+      return
+    
+    if (id !== undefined)
+      ipcRenderer.invoke('reply-dialog', id, result);
+    replySent = true;
+    close()
+  }
 
   function close() {
     document.getElementById('modal-id').classList.add("modalin");
