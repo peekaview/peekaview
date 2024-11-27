@@ -16,7 +16,7 @@ export interface DialogParams {
   timeout?: number
 }
 
-const isWin32 = process.platform === 'win32'
+//const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
@@ -69,11 +69,11 @@ export function useCustomDialog() {
     _openPopup(hostname, 'tray', params)
   }
 
-  function openDialog(hostname: string, params: DialogParams, onReply?: (result: number) => void) {
-    _openPopup(hostname, 'dialog', params, onReply)
+  function openDialog(hostname: string, params: DialogParams) {
+    _openPopup(hostname, 'dialog', params)
   }
 
-  function _openPopup(hostname: string, type: 'share' | 'tray' | 'dialog', params: DialogParams, onReply?: (result: number) => void) {
+  function _openPopup(hostname: string, type: 'share' | 'tray' | 'dialog', params: DialogParams) {
     let windowParams: {
       width: number
       height: number

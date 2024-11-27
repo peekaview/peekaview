@@ -1,12 +1,11 @@
-import path from 'path'
-import { dialog, screen, BrowserWindow } from 'electron'
+import { dialog } from 'electron'
 
 import { io, type Socket } from 'socket.io-client'
 import { WindowManager } from './WindowManager.js'
 import { RemoteControl } from './RemoteControl.js'
 import { useCustomDialog } from '../composables/useCustomDialog'
 
-const isWin32 = process.platform === 'win32'
+//const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
@@ -179,7 +178,7 @@ export class Streamer {
     console.log(this.hwnd)
     console.log(this.windowlist)
 
-    if (this.windowlist.includes(hwnd) || hwnd == '0') {
+    if (this.windowlist?.includes(hwnd) || hwnd == '0') {
       console.log(`${hwnd} in windowlsit`)
 
       this.showStreamerOverlay(hwnd)

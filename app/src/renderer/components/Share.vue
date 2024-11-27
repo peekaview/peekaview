@@ -95,8 +95,6 @@ watch(latestRequest, async (request) => {
     confirmButtonText: t('share.requestAccess.accept'),
     cancelButtonText: t('share.requestAccess.deny'),
   })
-
-  console.log("result", result)
       
   if (result === '0')
     acceptRequest()

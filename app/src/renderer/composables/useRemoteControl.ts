@@ -13,20 +13,10 @@ interface MessageData {
     scaleinfo?: ScaleInfo
 }
 
-interface SizeInfo {
-    x: number
-    y: number
-    fullwidth: number
-    fullheight: number
-    width: number
-    height: number
-}
-
-
 export function useRemoteControl() {
     const lastOpenRemoteControl = ref<string | null>(null)
 
-    const checkIfUrlAllowed = (url: string, optionalcompareurl: string | null = null): boolean => {
+    const checkIfUrlAllowed = (_url: string, _optionalcompareurl: string | null = null): boolean => {
         return true
         // TODO: check if url is allowed
     }

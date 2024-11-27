@@ -71,6 +71,10 @@ export async function useScreenView(data: ScreenShareData, onLeave?: () => void)
 
   peer.on('stream', s => stream = s)
 
+  peer.on('close', () => { // TODO: check if this is correct
+    onLeave?.()
+  })
+
   const getTrackElement = () => {
     if (!stream)
       return undefined

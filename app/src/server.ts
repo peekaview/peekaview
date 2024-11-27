@@ -10,7 +10,7 @@ const rooms: Record<string, Client[]> = {}
 
 wss.on('connection', (ws) => {
   ws.on('message', (message) => {
-    const data = JSON.parse(message)
+    const data = JSON.parse(message.toString())
     const room = data.room
 
     if (!rooms[room])

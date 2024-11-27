@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import TrackContainer from "./TrackContainer.vue"
@@ -59,25 +59,26 @@ const screenShareData = ref<ScreenShareData>()
 const screenView = ref<ScreenView>()
 const waitingStatus = ref<WaitingStatus | undefined>()
 
-const videoHeight = ref<number>()
-const videoWidth = ref<number>()
-
 const remoteViewerWrapper = ref<HTMLDivElement>()
-const remoteControl = ref()
+const remoteControlRef = useTemplateRef('remoteControl')
 
-const { openRemoteControl, closeRemoteControl } = useRemoteControl()
+const { closeRemoteControl } = useRemoteControl()
 
 watch(screenShareData, async (data) => {
-  if (data)
-    screenView.value = await useScreenView(data, () => {
-      notify({
-        type: 'info',
-        text: t('viewer.sharingEnded'),
-      })
-      screenView.value = undefined
+  if (!data)
+    return
 
-      closeRemoteControl()
+  console.log('liveKitDebugUrl', liveKitDebugUrl.value)
+
+  screenView.value = await useScreenView(data, () => {
+    notify({
+      type: 'info',
+      text: t('viewer.sharingEnded'),
     })
+    screenView.value = undefined
+
+    closeRemoteControl()
+  })
 })
 
 watch(requestStatus, (status) => {
@@ -187,11 +188,11 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     console.log('Refs status before init:', {
       wrapper: !!remoteViewerWrapper.value,
     });
-    initializeRemoteViewer(data)
+    initializeRemoteViewer()
   }, 500)
 }
 
-function initializeRemoteViewer(data: AcceptedRequestData) {
+function initializeRemoteViewer() {
   console.log('initializeRemoteViewer called')
 
   const params = {
@@ -206,7 +207,7 @@ function initializeRemoteViewer(data: AcceptedRequestData) {
   
   document.querySelector('.main-header')?.classList.add('d-none')
 
-  remoteControl.value?.openRemoteControl(
+  remoteControlRef.value?.openRemoteControl(
     params.roomid,
     params.username,
     params.userid,
@@ -257,68 +258,66 @@ onMounted(() => {
 </script>
 
 <template>
-  <RemoteControl 
-    ref="remoteControl" 
-    class="remote-viewer-wrapper" 
-    style="width: 800px; height: 600px;"
-  >
-      <div v-if="screenView" class="viewer">
-        <TrackContainer 
-          v-if="screenView.getTrackElement"
-          class="video-container"
-          :get-track-element="screenView.getTrackElement"
-          :style="{ width: videoWidth, height: videoHeight }"
-        />
-        <slot />
-      </div>
-      <div v-else class="content-wrapper">
-        <div v-if="!waitingStatus" class="section-content">
-          <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
+  <div v-show="screenView" class="viewer">
+    <RemoteControl 
+      ref="remoteControl" 
+      style="width: 800px; height: 600px;"
+    >
+      <TrackContainer 
+        v-if="screenView?.getTrackElement"
+        class="video-container"
+        :get-track-element="screenView?.getTrackElement"
+      />
+      <slot />
+    </RemoteControl>
+  </div>
+  <div v-if="!screenView"  class="content-wrapper">
+    <div v-if="!waitingStatus" class="section-content">
+      <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
-          <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
+      <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
 
-          <form class="panel" @submit="handleSubmit">
-            <div class="form-content">
-              <div v-if="!email" class="mb-4">
-                <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-                <input type="email" class="form-control form-control-lg" name="email"
-                  v-model="inputEmail"
-                  placeholder="example@email.com" required>
-              </div>
-              <div class="mb-4">
-                <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-                <input type="text" class="form-control form-control-lg" name="name"
-                  v-model="inputName"
-                  placeholder="Enter your name" required>
-              </div>
-              <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
-            </div>
-          </form>
-        </div>
-        <div v-else class="section-content">
-          <div class="panel">
-            <div class="form-content">
-              <div class="text-center">
-                <div class="waiting-spinner"></div>
-                <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
-                <p v-if="requestUserStatus" class="mb-3">
-                  <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-                  <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-                  <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
-                  <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
-                </p>
-                <p class="text-muted small mt-10">
-                  {{ $t('viewer.keepWindowOpen') }}
-                </p>
-              </div>
-              <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
-                {{ $t('general.cancel') }}
-              </button>
-            </div>
+      <form class="panel" @submit="handleSubmit">
+        <div class="form-content">
+          <div v-if="!email" class="mb-4">
+            <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
+            <input type="email" class="form-control form-control-lg" name="email"
+              v-model="inputEmail"
+              placeholder="example@email.com" required>
           </div>
+          <div class="mb-4">
+            <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
+            <input type="text" class="form-control form-control-lg" name="name"
+              v-model="inputName"
+              placeholder="Enter your name" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
+        </div>
+      </form>
+    </div>
+    <div v-else class="section-content">
+      <div class="panel">
+        <div class="form-content">
+          <div class="text-center">
+            <div class="waiting-spinner"></div>
+            <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
+            <p v-if="requestUserStatus" class="mb-3">
+              <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+              <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+              <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
+              <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
+            </p>
+            <p class="text-muted small mt-10">
+              {{ $t('viewer.keepWindowOpen') }}
+            </p>
+          </div>
+          <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+            {{ $t('general.cancel') }}
+          </button>
         </div>
       </div>
-  </RemoteControl>
+    </div>
+  </div>
 </template>
 
 <style>
@@ -327,13 +326,19 @@ onMounted(() => {
   height: 100%;
 }
 
-/*
 .viewer {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 0;
+}
+
+.remote-viewer-wrapper {
+  margin-top: 20px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .video-container {
@@ -345,16 +350,4 @@ onMounted(() => {
   overflow: hidden;
   min-height: 0;
 }
-
-.video-container video {
-  width: 100%;
-  height: 100%;
-}
-
-.remote-viewer-wrapper {
-  margin-top: 20px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}*/
 </style>
