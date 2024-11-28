@@ -51,8 +51,10 @@ io.on('connection', (socket)=> {
             if(id === socket.id) continue
             console.log('sending initReceive to ' + id)
             peers[id].emit('initReceive', socket.id)
+        }
 
-            peers[id].emit('presenterId', presenters[roomId]);
+        if (presenters[roomId]) {
+            io.to(roomId).emit('presenterId', presenters[roomId]);
         }
     })
 
