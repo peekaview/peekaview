@@ -434,6 +434,7 @@ function youAreNotAllowedToSeeMyScreen() {
         
         $userData = explode(';', file_get_contents($userFile));
         $storedToken = $userData[1] ?? '';
+        $roomId = $userData[3] ?? ''; // Get roomId from user data
         
         if ($token !== $storedToken) {
             http_response_code(401);
@@ -446,7 +447,10 @@ function youAreNotAllowedToSeeMyScreen() {
             $requestData = explode(',', file_get_contents($requestFile));
             $requestData[2] = 'request_denied';
             file_put_contents($requestFile, implode(',', $requestData));
-            echo json_encode(['success' => true]);
+            echo json_encode([
+                'success' => true,
+                'roomId' => $roomId
+            ]);
         } else {
             throw new Exception('Request not found');
         }

@@ -1,6 +1,6 @@
 {
   "name": "peekaview",
-  "author": "Limtec GmbH",
+  "author": "Limtec GmbH <info@limtec.de>",
   "productName": "PeekaView",
   "version": "0.0.1",
   "description": "Simple screen sharing application",
