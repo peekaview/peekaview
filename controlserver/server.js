@@ -36,27 +36,33 @@ app.get('/remoteviewer', (req, res) => {
 })
 
 io.on('connection', (socket)=> {
-    socket.on("join", (roomId, isPresenter) => {
+    socket.on('join', (data) => {
+        const roomId = data.roomId;
+        const isPresenter = data.isPresenter;
         socket.join(roomId);
-        console.log("User " + socket.id + " joined in a room : " + roomId);
-        roomdb[socket.id] = roomId
+        console.log('User ' + socket.id + ' joined in room: ' + roomId);
+        roomdb[socket.id] = roomId;
     
-        peers[socket.id] = socket
-
+        peers[socket.id] = socket;
+    
         if (isPresenter) {
-            presenters[roomId] = socket.id
+          presenters[roomId] = socket.id; // Speichert die presenter_id für den Raum
+          console.log('Presenter in room ' + roomId + ': ' + socket.id);
         }
-        
-        for(let id in peers) {
-            if(id === socket.id) continue
-            console.log('sending initReceive to ' + id)
-            peers[id].emit('initReceive', socket.id)
+    
+        // Broadcast der presenter_id an alle Teilnehmer im Raum
+        const presenter_id = presenters[roomId] || null;
+        io.to(roomId).emit('presenterId', presenter_id);
+    
+        // Senden von 'initReceive' an andere Teilnehmer
+        for (let id in peers) {
+          if (id === socket.id) continue;
+          if (roomdb[id] === roomId) {
+            console.log('sending initReceive to ' + id);
+            peers[id].emit('initReceive', socket.id);
+          }
         }
-
-        if (presenters[roomId]) {
-            io.to(roomId).emit('presenterId', presenters[roomId]);
-        }
-    })
+      });
 
         socket.on('signal', data => {
             console.log('sending signal from ' + socket.id + ' to ')
