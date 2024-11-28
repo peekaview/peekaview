@@ -116,7 +116,7 @@ export class Streamer {
   joinRoom() {
     if (!this.joined) {
       socket = io(`${this.hostname}`)
-      socket.emit('join', this.roomsession)
+      socket.emit('join', { roomId: this.roomsession, isPresenter: false })
 
 
       console.log('joined room:', this.roomsession)
