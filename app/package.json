@@ -36,6 +36,7 @@
     "electron-log": "^5.2.2",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.1.7",
+    "engine.io-client": "^6.5.3",
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
     "koffi": "^2.9.2",
@@ -45,7 +46,8 @@
     "sweetalert2": "^11.14.4",
     "vue": "^3.5.12",
     "vue-i18n": "^10.0.4",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "xmlhttprequest-ssl": "^2.0.0"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.21.1",

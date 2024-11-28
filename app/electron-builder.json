@@ -2,56 +2,86 @@
   "appId": "com.limtec.peekaview",
   "productName": "peekaview",
   "directories": {
-    "buildResources": "build"
+    "buildResources": "build-resources",
+    "output": "dist"
   },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "peekaview",
+      "repo": "peekaview"
+    }
+  ],
   "files": [
     "!**/.vscode/*",
     "!src/*",
     "!electron.vite.config.{js,ts,mjs,cjs}",
     "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}",
     "!{.env,.env.*,.npmrc,pnpm-lock.yaml}",
-    "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
+    "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}",
+    "out/**/*",
+    "build/**/*",
+    "node_modules/**/*",
+    "package.json"
   ],
-  "asarUnpack": [
-    "resources/**"
-  ],
+  "asar": {
+    "smartUnpack": true
+  },
   "win": {
-    "executableName": "peekaview"
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64", "ia32"]
+      }
+    ],
+    "icon": "build-resources/icon.ico",
+    "artifactName": "${productName}-${version}-win-${arch}.${ext}"
   },
   "nsis": {
-    "artifactName": "${name}-${version}-setup.${ext}",
-    "shortcutName": "${productName}",
-    "uninstallDisplayName": "${productName}",
-    "createDesktopShortcut": "always"
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "peekaview"
   },
   "mac": {
-    "entitlementsInherit": "build/entitlements.mac.plist",
-    "extendInfo": {
-      "NSCameraUsageDescription": "Application requests access to the device's camera.",
-      "NSMicrophoneUsageDescription": "Application requests access to the device's microphone.",
-      "NSDocumentsFolderUsageDescription": "Application requests access to the user's Documents folder.",
-      "NSDownloadsFolderUsageDescription": "Application requests access to the user's Downloads folder."
-    },
-    "notarize": false
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.utilities",
+    "icon": "build-resources/icon.icns",
+    "artifactName": "${productName}-${version}-mac.${ext}"
   },
   "dmg": {
-    "artifactName": "${name}-${version}.${ext}"
+    "background": "build-resources/dmg-background.png",
+    "iconSize": 128,
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
   },
   "linux": {
     "target": [
       "AppImage",
+      "deb",
       "snap",
-      "deb"
+      "rpm"
     ],
-    "maintainer": "peekaview.de",
+    "icon": "build-resources/icons",
+    "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
     "category": "Utility"
   },
-  "appImage": {
-    "artifactName": "${name}-${version}.${ext}"
-  },
-  "npmRebuild": false,
-  "publish": {
-    "provider": "generic",
-    "url": "https://example.com/auto-updates"
+  "snap": {
+    "grade": "stable",
+    "confinement": "strict",
+    "summary": "A Desktop sharing application",
+    "plugs": ["home", "network", "x11"]
   }
 }
