@@ -27,6 +27,7 @@ var io = require('socket.io')(http, {
 
 var peers = {}
 var roomdb = {}
+var presenters = {}
 //const { createServer } = require("http");
 //const { Server } = require("socket.io");
 
@@ -35,19 +36,23 @@ app.get('/remoteviewer', (req, res) => {
 })
 
 io.on('connection', (socket)=> {
-    socket.on("join-message", (roomId) => {
+    socket.on("join", (roomId, isPresenter) => {
         socket.join(roomId);
-        console.log("User "+socket.id+" joined in a room : " + roomId);
+        console.log("User " + socket.id + " joined in a room : " + roomId);
         roomdb[socket.id] = roomId
-
+    
         peers[socket.id] = socket
 
-        // Asking all other clients to setup the peer connection receiver
+        if (isPresenter) {
+            presenters[roomId] = socket.id
+        }
+        
         for(let id in peers) {
             if(id === socket.id) continue
-            //if(roomdb[id] && roomdb[socket.id] && roomdb[id] != roomdb[socket.id])return
-            console.log('sending init receive to ' + socket.id)
+            console.log('sending initReceive to ' + id)
             peers[id].emit('initReceive', socket.id)
+
+            peers[id].emit('presenterId', presenters[roomId]);
         }
     })
 
@@ -71,10 +76,21 @@ io.on('connection', (socket)=> {
         })
 
         socket.on('disconnect', () => {
-            console.log('socket disconnected ' + socket.id)
-            socket.broadcast.emit('removePeer', socket.id)
-            delete peers[socket.id]
-        })
+            const roomId = roomdb[socket.id];
+            if (presenters[roomId] === socket.id) {
+                // Presenter hat den Raum verlassen
+                delete presenters[roomId];
+                // Informiere alle Teilnehmer, dass der Presenter weg ist
+                io.to(roomId).emit('presenterLeft');
+            }
+            else {
+                io.to(roomId).emit('viewerLeft', socket.id);
+            }
+            
+            // Rest Ihres Disconnect-Handlings
+            delete peers[socket.id];
+            delete roomdb[socket.id];
+        });
 
     socket.on("screen-pause", function(data) {
         data = JSON.parse(data);

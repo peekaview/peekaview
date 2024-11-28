@@ -143,7 +143,7 @@ window.onload = function () {
     });
     
     console.log("connect to controlserver:", hostname)
-    socket.emit("join-message", room);
+    socket.emit("join", room);
 
 
     document.body.appendChild(msgmousesync);    // display syncmessage
