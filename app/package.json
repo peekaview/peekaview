@@ -67,7 +67,7 @@
     "css-loader": "^7.1.2",
     "dotenv": "^16.0.3",
     "electron": "^31.0.2",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.0.0-alpha.6",
     "electron-vite": "^2.3.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
