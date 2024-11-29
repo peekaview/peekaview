@@ -40,15 +40,6 @@ if (isWin32) {
   }
 }
 
-
-// Add cleanup when the app exits
-process.on('exit', () => {
-  if (isWin32) {
-    const { close } = require('ffi-rs');
-    close('user32');
-  }
-});
-
 const pointerToRect = function (rectPointer) {
   const rect = {}
   rect.left = rectPointer.readInt16LE(0)

@@ -95,8 +95,8 @@ export function useCustomDialog() {
         width: 500,
         height: 200,
         //x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
-        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 250 : screen.getPrimaryDisplay().workAreaSize.width - 500 / 2),
-        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 0 : screen.getPrimaryDisplay().workAreaSize.height - 175),
+        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 250 : screen.getPrimaryDisplay().workAreaSize.width - 500),
+        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 175),
         template: 'dialogtray.html',
       }
     else if (type === 'dialog')

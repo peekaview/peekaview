@@ -395,10 +395,10 @@ export class RemoteControl {
 
     const obj = JSON.parse(data);
     (async () => {
-      const tmpclipboard = await clipboard.paste()
+      const tmpclipboard = await clipboard.getContent()
       await keyboard.pressKey(controlkey, Key.C)
       await keyboard.releaseKey(controlkey, Key.C)
-      const remoteclipboard = await clipboard.paste()
+      const remoteclipboard = await clipboard.getContent()
 
       if (!cut) {
         console.log(`copy to clipboad: ${remoteclipboard}`)
@@ -438,8 +438,10 @@ export class RemoteControl {
       title: '__meetzi - Clipboard',
       titleBarStyle: 'hidden',
       skipTaskbar: true,
-      x: screen.getPrimaryDisplay().workAreaSize.width - 170,
-      y: screen.getPrimaryDisplay().workAreaSize.height - 250,
+      //x: screen.getPrimaryDisplay().workAreaSize.width - 170,
+      //y: screen.getPrimaryDisplay().workAreaSize.height - 250,
+      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 170 : screen.getPrimaryDisplay().workAreaSize.width - 500 / 2),
+      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 250),
       webPreferences: {
         webSecurity: false,
         nodeIntegration: true,
@@ -451,7 +453,7 @@ export class RemoteControl {
     this.clipboardwindow.removeMenu()
     this.clipboardwindow.setAlwaysOnTop(true, 'screen-saver')
     this.clipboardwindow.loadFile('public/static/clipboard.html')
-    // this.clipboardwindow.webContents.openDevTools();
+    //this.clipboardwindow.webContents.openDevTools();
     this.clipboardwindow.webContents.send('pasteFromFile', data)
     this.clipboardwindow.show()
 
@@ -473,11 +475,11 @@ export class RemoteControl {
       console.log(`localclipboard: ${this.localclipboardtime}, remoteclipboard: ${obj.time}`)
       if (obj.time > this.localclipboardtime) {
         (async () => {
-          const tmpclipboard = await clipboard.paste()
-          await clipboard.copy(obj.text)
+          const tmpclipboard = await clipboard.getContent()
+          await clipboard.setContent(obj.text)
           await keyboard.pressKey(controlkey, Key.V)
           await keyboard.releaseKey(controlkey, Key.V)
-          await clipboard.copy(tmpclipboard)
+          await clipboard.setContent(tmpclipboard)
         })()
       }
     }
@@ -520,11 +522,11 @@ export class RemoteControl {
     }
     else if (specialkeys.includes(key)) {
       (async () => {
-        const tmpclipboard = await clipboard.paste()
-        await clipboard.copy(key)
+        const tmpclipboard = await clipboard.getContent()
+        await clipboard.setContent(key)
         await keyboard.pressKey(controlkey, Key.V)
         await keyboard.releaseKey(controlkey, Key.V)
-        await clipboard.copy(tmpclipboard)
+        await clipboard.setContent(tmpclipboard)
       })()
     }
     else if (key == 'Quote') {

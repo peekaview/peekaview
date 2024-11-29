@@ -338,7 +338,7 @@ onMounted(() => {
 }
 
 .remote-viewer-wrapper {
-  margin-top: 20px;
+  margin-top: 0px;
   border: 1px solid #ccc;
   border-radius: 6px;
   overflow: hidden;

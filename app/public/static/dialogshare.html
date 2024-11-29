@@ -12,7 +12,7 @@
         font-style: normal;
         font-weight: 400;
         src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
-      }
+  }
   </style>
 
   <link rel="stylesheet" href="css/spectre.min.css" />
@@ -51,22 +51,6 @@
       top: 2px;
     }
 
-     /* Colors and Fonts */
-    .btn.btn-secondary {
-        background: #2a2a2a;
-        border-color: #404040;
-        color: #aaa;
-    }
-    .btn.btn-secondary:hover {
-        background: #404040;
-        border-color: #505050;
-        color: #ddd;
-    }
-
-    .modal-container {
-      background: #1a1a1a;
-    }
-
     @keyframes scale-in {
       0% {
         transform: translateY(-100%);
@@ -94,6 +78,7 @@
 
 <body style="background: transparent;">
   <div id="modal-id" class="modal active modalin">
+    <div style="height: 15px; width: 100%; position: absolute; top: 0; left: 0; -webkit-app-region: drag;"></div>
     <div class="modal-container settings_container" >
       <div class="modal-body">
         <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 16px); margin:0px; padding: 4px;">
@@ -110,6 +95,7 @@
         </div>
         <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 17px); margin:0px; padding: 4px;"
           onClick="stopSharing()">Beenden</div>
+        
         <div style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width:32px; -webkit-user-select: none; -webkit-app-region: drag;">
           <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path fill="none" stroke="#ccc" stroke-width="2"
@@ -144,9 +130,13 @@
   }
 
   function toggleRemoteControl() {
-    if (document.querySelector('#remotecontrolenabled').checked == true && document.querySelector('#mouseenabled').checked == false) {
-      document.querySelector('#mouseenabled').checked = true;
+    if (document.querySelector('#remotecontrolenabled').checked) {
+      document.querySelector('#mouseenabled').disabled = true;
+    } else {
+      document.querySelector('#mouseenabled').disabled = false;
     }
+    document.querySelector('#mouseenabled').checked = true;
+    toggleMouse();
     electron.ipcRenderer.invoke("toggleRemoteControl");
   }
 
