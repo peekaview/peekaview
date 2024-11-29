@@ -135,9 +135,9 @@ window.onload = function () {
         socket.close();
     }
 
-    socket = io.connect(hostname);
+    socket = io.connect('wss://' + hostname);
 
-    socket = io(hostname, {
+    socket = io('wss://' + hostname, {
         transports: ['websocket', 'polling'],
         withCredentials: true
     });
@@ -742,14 +742,17 @@ window.onload = function () {
     var lastposx = 0;
     var lastposy = 0;
 
-    document.querySelector("#overlay").addEventListener('mouseleave', function() {
-        if (lastmousedown > 0 && (lastmousedown > (Date.now() - 5000))) {
+    document.querySelector("#overlay").addEventListener('mouseleave', handleMouseUp);
+    window.addEventListener('blur', handleMouseUp);
+
+    function handleMouseUp() {
+        if (lastmousedown > 0) {
             socket.volatile.emit("mouse-up", JSON.stringify(obj));
             clearTimeout(eventToSend);
             eventToSend = null;
             lastmousedown = 0;
         }
-    });
+    }
 
     document.querySelector("#overlay").addEventListener('mouseenter', function() { 
         remoteclipboard = true; 

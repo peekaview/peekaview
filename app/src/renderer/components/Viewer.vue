@@ -181,8 +181,10 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   screenShareData.value = {
     userName: inputName.value,
     roomName: data.roomId,
+    roomId: data.roomId,
     jwtToken: data.jwt,
-    serverUrl: data.videoServer
+    serverUrl: data.videoServer,
+    controlServer: data.controlServer,
   }
 
   setTimeout(async () => {
@@ -190,19 +192,21 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     console.log('Refs status before init:', {
       wrapper: !!remoteViewerWrapper.value,
     });
-    initializeRemoteViewer()
+    if (screenShareData.value) {
+      initializeRemoteViewer(screenShareData.value)
+    }
   }, 500)
 }
 
-function initializeRemoteViewer() {
+function initializeRemoteViewer(data: ScreenShareData) {
   console.log('initializeRemoteViewer called')
 
   const params = {
-    roomid: 'roomid',
-    username: 'username',
-    userid: 'userid',
-    color: Math.floor(Math.random()*16777215).toString(16),
-    hostname: 'wss://c1.peekaview.de'
+    roomid: data.roomName,
+    username: data.userName,
+    userid: data.userName, //TODO: generate userid
+    color: stringToColor(data.userName ?? 'Anonymous'),
+    hostname: data.controlServer
   }
 
   console.log('Generated params:', params)
@@ -216,6 +220,19 @@ function initializeRemoteViewer() {
     params.color,
     params.hostname
   )
+}
+
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (((hash >> (i * 8)) & 0xFF) % 120) + 60;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color.substring(1); // Remove # prefix to match existing format
 }
 
 function handleError() {

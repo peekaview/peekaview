@@ -21,7 +21,7 @@ export interface IElectronAPI {
   getScreenSources: () => Promise<ScreenSource[]>,
   selectScreenSource: (source: ScreenSource | undefined) => Promise<void>,
   onSendScreenSource: (callback: (source: ScreenSource) => void) => Electron.IpcRenderer,
-  startRemoteControl: (source: ScreenSource) => Promise<void>,
+  startRemoteControl: (source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
   createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
   handleAppClosing: () => Promise<void>,

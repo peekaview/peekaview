@@ -27,12 +27,16 @@ async function useScreenPeer({ serverUrl, roomName }: ScreenShareData, isPresent
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          {
+          /*{
             urls: 'turn:turn.speed.cloudflare.com:50000',
             username: '03f2f3316d7c596c2674ab7af813864819b23b401772cb58f490a307141657f1fd9bbe2abd8553936072e921fcd30f7269f731501de30ceb85163f9757b9620a',
             credential: 'aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb'
-          }
+          }*/
         ]
+      },
+      offerOptions: {
+        offerToReceiveVideo: true,
+        offerToReceiveAudio: false
       }
     })
 
@@ -119,9 +123,18 @@ export async function useScreenPresent(screenShareData: ScreenShareData): Promis
   }
 
   const addStream = async (s: MediaStream, _shareAudio = false) => {
-    stream = s
+    s.getVideoTracks().forEach(track => {
+      const constraints = {
+        width: { max: 2560 },
+        height: { max: 1440 },
+        frameRate: { max: 15 },
+      };
+      track.applyConstraints(constraints);
+    });
+    
+    stream = s;
     for (const socketId in peers)
-      peers[socketId].addStream(stream)
+      peers[socketId].addStream(stream);
   }
 
   return reactive({ participants, addStream, leave })

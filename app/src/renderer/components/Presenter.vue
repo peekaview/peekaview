@@ -45,7 +45,9 @@ document.addEventListener('visibilitychange', () => {
 })
 
 window.electronAPI?.onSendScreenSource((source) => {
-  source && shareLocalScreen(source)
+  if (screenShareData.value && source) {
+    shareLocalScreen(screenShareData.value.roomName, screenShareData.value.roomId, props.email, props.email, source)
+  }
 })
 
 watch(offerDownload, async (flag) => {
@@ -174,19 +176,20 @@ async function startSession() {
 
     screenShareData.value = {
       roomName: data.roomId,
+      roomId: data.roomId,
       jwtToken: data.jwt,
       serverUrl: data.videoServer,
     }
 
     screenPresent.value = await useScreenPresent(screenShareData.value)
-    shareLocalScreen()
+    shareLocalScreen(data.roomId, data.roomId, props.email, props.email, undefined)
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
+async function shareLocalScreen(roomName: string, roomId: string, userName: string, userId: string, source?: ScreenSource,  shareAudio = false) {
   if (!screenPresent.value)
     return
 
@@ -235,7 +238,7 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
     await screenPresent.value.addStream(stream, shareAudio)
     sessionActive.value = true    
 
-    source && window.electronAPI?.startRemoteControl(source)
+    source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }

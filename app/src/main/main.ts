@@ -386,7 +386,7 @@ interface StoreSchema {
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(hwnd: string, name: string) {
+  async function startRemoteControl(hwnd: string, name: string, roomName: string, roomId: string, userName: string, userId: string) {
     if (!hwnd || !name) {
       log.error('Invalid hwnd or name for remote control')
       return
@@ -400,7 +400,7 @@ interface StoreSchema {
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
     streamer = new Streamer()
-    streamer.setArgs(hwnd, import.meta.env.VITE_CONTROLSERVER, 'roomname', 'roomid', 'username', 'userid' )
+    streamer.setArgs(hwnd, import.meta.env.VITE_CONTROLSERVER, roomName, roomId, userName, userId)
     streamer.joinRoom()
     streamer.startSharing()
   }
@@ -510,8 +510,8 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  ipcMain.handle('start-remote-control', async (_event, source: ScreenSource) => {
-    startRemoteControl(source.id, source.name) // TODO: handle errors
+  ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
+    startRemoteControl(source.id, source.name, roomName, roomId, userName, userId)
   })
 
   ipcMain.handle('toggleRemoteControl', async (_event) => {

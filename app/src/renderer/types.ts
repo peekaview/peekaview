@@ -10,8 +10,10 @@ export type AcceptedRequestData = {
 export type ScreenShareData = {
   userName?: string
   roomName: string
+  roomId: string
   jwtToken: string
   serverUrl: string
+  controlServer?: string
 }
 
 export type ScreenPresent = Reactive<{
