@@ -25,18 +25,22 @@ window.electronAPI?.onReplyDialog((dialogId, result) => {
   }
 })
 
-export async function notify({ type, title, text, html, showButtons, confirmButtonText, cancelButtonText }: NotifyOptions) {
+export async function notify({ type, title, text, html, confirmButtonText, cancelButtonText }: NotifyOptions) {
   if (window.electronAPI) {
     const id = increment++
+
+    const buttons: string[] = []
+    if (confirmButtonText)
+      buttons.push(confirmButtonText)
+    if (cancelButtonText)
+      buttons.push(cancelButtonText)
 
     window.electronAPI.dialog({
       id,
       type,
       title,
       message: text ?? html,
-      buttons: showButtons ? [
-        confirmButtonText ?? 'OK',
-      ] : [],
+      buttons,
     })
   } else {
     Swal.fire({
@@ -44,8 +48,8 @@ export async function notify({ type, title, text, html, showButtons, confirmButt
       title,
       text,
       html,
-      showCancelButton: showButtons ?? true,
-      showConfirmButton: showButtons ?? true,
+      showCancelButton: !!cancelButtonText,
+      showConfirmButton: !!confirmButtonText,
       confirmButtonText,
       cancelButtonText,
       customClass: {

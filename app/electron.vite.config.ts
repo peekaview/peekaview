@@ -84,7 +84,8 @@ export default defineConfig({
     define,
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer')
+        '@renderer': resolve('src/renderer'),
+        "simple-peer": "simple-peer/simplepeer.min.js",
       }
     },
     plugins: [vue()],

@@ -2,9 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { useScreenShare } from "../composables/useLiveKitScreenShare"
+import { useScreenPresent } from "../composables/useSimplePeerScreenShare"
 
-import type { AcceptedRequestData, ScreenShare, ScreenShareData } from '../types'
+import type { AcceptedRequestData, ScreenPresent, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { notify, prompt } from '../util'
 import { ScreenSource } from '../../interface'
@@ -26,7 +26,7 @@ const offerDownload = ref(!window.electronAPI)
 const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
-const screenShare = ref<ScreenShare>()
+const screenPresent = ref<ScreenPresent>()
 //const incomingRequests = reactive<{ [id: string]: string }>({})
 const latestRequest = ref<Request>()
 
@@ -162,7 +162,7 @@ async function denyRequest() {
 }
     
 async function startSession() {
-  if (screenShare.value)
+  if (screenPresent.value)
     return
 
   try {
@@ -178,7 +178,7 @@ async function startSession() {
       serverUrl: data.videoServer,
     }
 
-    screenShare.value = await useScreenShare(screenShareData.value)
+    screenPresent.value = await useScreenPresent(screenShareData.value)
     shareLocalScreen()
   } catch (error) {
     console.error('Error creating room:', error);
@@ -187,7 +187,7 @@ async function startSession() {
 }
 
 async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
-  if (!screenShare.value)
+  if (!screenPresent.value)
     return
 
   try {
@@ -232,7 +232,7 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
       return
 
     console.debug('Screen stream obtained:', stream)
-    await screenShare.value.addStream(stream, shareAudio)
+    await screenPresent.value.addStream(stream, shareAudio)
     sessionActive.value = true    
 
     source && window.electronAPI?.startRemoteControl(source)
@@ -255,6 +255,7 @@ function handleError(error: Error) {
     type: 'error',
     title: 'Error',
     text: t('share.requestError'),
+    confirmButtonText: t('general.ok'),
   })
 }
 

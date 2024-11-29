@@ -8,20 +8,20 @@ export type AcceptedRequestData = {
 }
 
 export type ScreenShareData = {
+  userName?: string
   roomName: string
   jwtToken: string
   serverUrl: string
 }
 
-export type ScreenShare = Reactive<{
+export type ScreenPresent = Reactive<{
   participants: Ref<Record<string, ViewingParticipant>>
   addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
 }>
 
 export type ScreenView = Reactive<{
-  participants: Ref<Record<string, ViewingParticipant>>
   sharingParticipant: Ref<SharingParticipant | undefined>
-  getTrackElement: () => HTMLMediaElement | undefined
+  trackElement: Ref<HTMLMediaElement | undefined>
 }>
 
 export type ViewingParticipant = {

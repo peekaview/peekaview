@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, useTemplateRef, watchEffect } from 'vue'
 
 const props = withDefaults(defineProps<{
-  getTrackElement: () => HTMLMediaElement | undefined
+  trackElement: HTMLMediaElement | undefined
   muted?: boolean
   playsInline?: boolean
 }>(), {
@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
 })
 
 const containerRef = useTemplateRef('container')
-const trackElement = ref<HTMLVideoElement>()
+const _trackElement = ref<HTMLVideoElement>()
 
 onMounted(() => {
   watchEffect(() => {
@@ -23,24 +23,24 @@ onMounted(() => {
 onBeforeUnmount(() => detach())
 
 function attach() {
-  if (trackElement.value)
+  if (_trackElement.value)
     return
 
-  trackElement.value = props.getTrackElement() as HTMLVideoElement
-  trackElement.value.muted = props.muted
-  trackElement.value.playsInline = props.playsInline
-  trackElement.value.style.maxWidth = '100%'
-  trackElement.value.style.maxHeight = '100%'
-  trackElement.value.style.width = '100%'
-  trackElement.value.style.height = '100%'
-  trackElement.value.style.objectFit = 'cover'
+  _trackElement.value = props.trackElement as HTMLVideoElement
+  _trackElement.value.muted = props.muted
+  _trackElement.value.playsInline = props.playsInline
+  _trackElement.value.style.maxWidth = '100%'
+  _trackElement.value.style.maxHeight = '100%'
+  _trackElement.value.style.width = '100%'
+  _trackElement.value.style.height = '100%'
+  _trackElement.value.style.objectFit = 'cover'
   
-  containerRef.value?.append(trackElement.value)
+  containerRef.value?.append(_trackElement.value)
 }
 
 function detach() {
-  trackElement.value?.remove()
-  trackElement.value = undefined
+  _trackElement.value?.remove()
+  _trackElement.value = undefined
 }
 </script>
 
