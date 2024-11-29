@@ -244,6 +244,8 @@ function showMeYourScreen() {
         $email = validateEmail($_GET['email'] ?? '');
         $name = validateName($_GET['name'] ?? '');
         $requestId = validateRequestId($_GET['request_id'] ?? '');
+        $lang = validateLang($_GET['lang'] ?? '');
+        $init = $_GET['init'] === '1' ? true : false;
         
         $userFile = getEmailFilename($email);
         if (!file_exists($userFile)) {
@@ -258,6 +260,11 @@ function showMeYourScreen() {
         $userStatus = $lastSeen < (time() - OFFLINE_TIMEOUT) ? 'offline' : 'online';
         $requestFile = getRequestFilename($email, $requestId);
         
+        // If init is true, delete the request file
+        if ($init) {
+            @unlink($requestFile);
+        }
+
         // If request doesn't exist, create it
         if (!file_exists($requestFile)) {
             // Cleanup old requests
