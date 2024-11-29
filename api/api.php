@@ -61,6 +61,14 @@ function validateRequestId($requestId) {
     return $requestId;
 }
 
+function validateLang($lang) {
+    $lang = strtolower($lang);
+    if ($lang !== 'de' && $lang !== 'en') {
+        throw new InvalidArgumentException('Invalid language');
+    }
+    return $lang;
+}
+
 function validateName($name) {
     // Trim whitespace
     $name = trim($name);
