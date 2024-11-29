@@ -61,7 +61,6 @@ function handleJustRegistered() {
   notify({
     type: 'success',
     text: t('login.justRegistered'),
-    showButtons: false
   })
 }
 
@@ -69,7 +68,8 @@ function handleError() {
   notify({
     type: 'error',
     title: 'Connection Error',
-    text: 'There was a problem connecting to the server. Please try again.'
+    text: 'There was a problem connecting to the server. Please try again.',
+    confirmButtonText: t('general.ok'),
   })
 }
 </script>

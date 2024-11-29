@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import About from './components/About.vue'
 import Login from './components/Login.vue'
 import Viewer from './components/Viewer.vue'
-import Share from './components/Share.vue'
+import Present from './components/Presenter.vue'
 
 import { prompt } from './util'
 
@@ -102,7 +102,7 @@ async function handleLogout() {
       v-if="action === 'login'"
       :target="target"
     />
-    <Share
+    <Present
       v-else-if="action === 'share' && email && token"
       :email="email"
       :token="token"

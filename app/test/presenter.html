@@ -6,6 +6,7 @@
 </head>
 <body>
   <h1>Presenter</h1>
+  <button id="share">Teilen</button>
   <video id="localVideo" autoplay muted style="display: none;"></video>
   <!-- Da der Presenter seinen eigenen Stream nicht sehen muss, ist das Video ausgeblendet -->
   
@@ -68,25 +69,27 @@
       });
     }
 
-    // Bildschirm teilen und Stream erfassen
-    navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
-      .then(stream => {
-        localStream = stream;
-        const localVideo = document.getElementById('localVideo');
-        localVideo.srcObject = stream;
+    document.getElementById('share').addEventListener('click', () => {
+      // Bildschirm teilen und Stream erfassen
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+        .then(stream => {
+          localStream = stream;
+          const localVideo = document.getElementById('localVideo');
+          localVideo.srcObject = stream;
 
-        // Optionale Handhabung von Beenden des Screen Sharings
-        stream.getVideoTracks()[0].addEventListener('ended', () => {
-          console.log('Bildschirmfreigabe beendet');
-          // Hier können Sie alle Verbindungen schließen oder den Teilnehmern mitteilen
-          for (let socket_id in peers) {
-            peers[socket_id].destroy();
-          }
+          // Optionale Handhabung von Beenden des Screen Sharings
+          stream.getVideoTracks()[0].addEventListener('ended', () => {
+            console.log('Bildschirmfreigabe beendet');
+            // Hier können Sie alle Verbindungen schließen oder den Teilnehmern mitteilen
+            for (let socket_id in peers) {
+              peers[socket_id].destroy();
+            }
+          });
+        })
+        .catch(error => {
+          console.error('Fehler beim Teilen des Bildschirms:', error);
         });
-      })
-      .catch(error => {
-        console.error('Fehler beim Teilen des Bildschirms:', error);
-      });
+    });
   </script>
 </body>
 </html>

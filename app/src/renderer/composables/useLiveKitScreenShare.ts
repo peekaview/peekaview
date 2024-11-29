@@ -3,6 +3,7 @@ import {
   reactive,
   ref,
   markRaw,
+  computed,
 } from "vue"
 
 import {
@@ -14,7 +15,7 @@ import {
   LocalTrackPublication,
 } from "livekit-client"
 
-import { ScreenShare, ScreenShareData, ScreenView, SharingParticipant, ViewingParticipant } from "../types"
+import { ScreenPresent, ScreenShareData, ScreenView, SharingParticipant, ViewingParticipant } from "../types"
 
 async function useRoomConnection({ serverUrl, jwtToken }: ScreenShareData) {
   try {
@@ -61,7 +62,7 @@ async function useRoomConnection({ serverUrl, jwtToken }: ScreenShareData) {
   }
 }
 
-export async function useScreenShare(data: ScreenShareData): Promise<ScreenShare> {
+export async function useScreenPresent(data: ScreenShareData): Promise<ScreenPresent> {
   const { room, participants } = await useRoomConnection(data)
 
   // Log connection state changes
@@ -74,8 +75,8 @@ export async function useScreenShare(data: ScreenShareData): Promise<ScreenShare
   return reactive({ participants, addStream })
 }
 
-export async function useScreenView(data: ScreenShareData, onLeave?: () => void): Promise<ScreenView> {
-  const { room, participants } = await useRoomConnection(data)
+export async function useScreenView(data: ScreenShareData, onEnding?: () => void): Promise<ScreenView> {
+  const { room } = await useRoomConnection(data)
   const sharingParticipant = ref<SharingParticipant>()
   const track = ref<Track>()
 
@@ -97,17 +98,17 @@ export async function useScreenView(data: ScreenShareData, onLeave?: () => void)
       return
 
     console.log("Sharing participant disconnected, leaving room")
-    onLeave?.()
+    onEnding?.()
   })
 
   room.on(RoomEvent.TrackUnsubscribed, () => {
     console.log("Sharing participant's track has ended, leaving room")
-    onLeave?.()
+    onEnding?.()
   })
 
-  const getTrackElement = () => track.value?.attach()
+  const trackElement = computed(() => track.value?.attach())
 
-  return reactive({ participants, sharingParticipant, getTrackElement })
+  return reactive({ sharingParticipant, trackElement })
 }
 
 export async function publishTrack(room: Room, stream: MediaStream, shareAudio = false) {

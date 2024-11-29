@@ -8,7 +8,7 @@ import RemoteControl from "./RemoteControl.vue"
 import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
 import { callApi } from '../api'
 import { notify } from '../util'
-import { useScreenView } from '../composables/useLiveKitScreenShare'
+import { useScreenView } from '../composables/useSimplePeerScreenShare'
 import { useRemoteControl } from  '../composables/useRemoteControl'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
@@ -74,6 +74,7 @@ watch(screenShareData, async (data) => {
     notify({
       type: 'info',
       text: t('viewer.sharingEnded'),
+      confirmButtonText: t('general.ok'),
     })
     screenView.value = undefined
 
@@ -178,6 +179,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   requestStatus.value = undefined
   
   screenShareData.value = {
+    userName: inputName.value,
     roomName: data.roomId,
     jwtToken: data.jwt,
     serverUrl: data.videoServer
@@ -224,6 +226,7 @@ function handleError() {
     type: 'error',
     title: 'Connection Error',
     text: t('viewer.connectionError'),
+    confirmButtonText: t('general.ok'),
   })
 }
 
@@ -264,9 +267,9 @@ onMounted(() => {
       style="width: 800px; height: 600px;"
     >
       <TrackContainer 
-        v-if="screenView?.getTrackElement"
+        v-if="screenView?.trackElement"
         class="video-container"
-        :get-track-element="screenView?.getTrackElement"
+        :track-element="screenView?.trackElement"
       />
       <slot />
     </RemoteControl>
