@@ -324,7 +324,10 @@ onMounted(() => {
 </template>
 
 <style>
-
+.viewer, .video-container, .video-container video {
+  max-width: 100%;
+  max-height: 100%;
+}
 
 .viewer {
   display: flex;
@@ -334,19 +337,15 @@ onMounted(() => {
   min-height: 0;
 }
 
-.remote-viewer-wrapper {
-  margin-top: 0px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
 .video-container {
   flex-grow: 1;
   position: relative;
   background: #3b3b3b;
-  border-radius: 6px;
   overflow: hidden;
   min-height: 0;
+}
+
+footer {
+  display: none;;
 }
 </style>
