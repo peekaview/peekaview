@@ -1,5 +1,5 @@
 <template>
-  <div class="remote-control remote-viewer-wrapper">
+  <div class="remote-control remote-viewer-wrapper" id="remoteviewerwrapper">
     <slot></slot>
     <!-- other RemoteControl component content -->
   </div>
