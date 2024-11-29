@@ -253,7 +253,7 @@ function showMeYourScreen() {
         $name = validateName($_GET['name'] ?? '');
         $requestId = validateRequestId($_GET['request_id'] ?? '');
         $lang = validateLang($_GET['lang'] ?? '');
-        $init = $_GET['init'] === '1' ? true : false;
+        $init = isset($_GET['init']) && $_GET['init'] === '1' ? true : false;
         
         $userFile = getEmailFilename($email);
         if (!file_exists($userFile)) {
