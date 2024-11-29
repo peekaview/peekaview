@@ -135,6 +135,8 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
     
     const trackElement = document.createElement('video')
     trackElement.srcObject = stream.value
+    trackElement.autoplay = true
+    trackElement.playsInline = true
     return trackElement
   })
 
@@ -156,9 +158,13 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
       sharingPeer.on('connect', () => 
         sharingPeer!.send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
       )
-      sharingPeer.on('stream', s => 
+      sharingPeer.on('stream', s => {
+        console.log('Received stream:', s.getTracks())
         stream.value = s
-      )
+        trackElement.value?.play().catch(err => {
+          console.error('Error playing video:', err)
+        })
+      })
       sharingPeer.on('data', (json) => {
         const data = JSON.parse(json)
         switch (data.type) {

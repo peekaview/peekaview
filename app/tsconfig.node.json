@@ -3,7 +3,7 @@
   "files": [
     "src/vite-env.d.ts"
   ],
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/server.ts", "./package.json"],
+  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "./package.json"],
   "compilerOptions": {
     "moduleResolution": "node",
     "composite": true,
