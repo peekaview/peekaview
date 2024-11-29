@@ -26,7 +26,12 @@ async function useScreenPeer({ serverUrl, roomName }: ScreenShareData, isPresent
       stream,
       config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
+          { urls: 'stun:stun.l.google.com:19302' },
+          {
+            urls: 'turn:turn.speed.cloudflare.com:50000',
+            username: '03f2f3316d7c596c2674ab7af813864819b23b401772cb58f490a307141657f1fd9bbe2abd8553936072e921fcd30f7269f731501de30ceb85163f9757b9620a',
+            credential: 'aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb'
+          }
         ]
       }
     })
@@ -137,6 +142,22 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
     trackElement.srcObject = stream.value
     trackElement.autoplay = true
     trackElement.playsInline = true
+    trackElement.muted = true
+
+    // Wait for metadata to load before attempting to play
+    trackElement.addEventListener('loadedmetadata', () => {
+      const attemptPlay = async () => {
+        try {
+          await trackElement.play()
+        } catch (err) {
+          console.warn('Autoplay failed:', err)
+          // Retry once after a short delay
+          setTimeout(attemptPlay, 100)
+        }
+      }
+      attemptPlay()
+    })
+    
     return trackElement
   })
 
@@ -161,9 +182,6 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
       sharingPeer.on('stream', s => {
         console.log('Received stream:', s.getTracks())
         stream.value = s
-        trackElement.value?.play().catch(err => {
-          console.error('Error playing video:', err)
-        })
       })
       sharingPeer.on('data', (json) => {
         const data = JSON.parse(json)
