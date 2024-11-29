@@ -23,6 +23,7 @@ import backend from 'i18next-fs-backend'
 import { useCustomDialog, type DialogParams } from './composables/useCustomDialog'
 
 import { Streamer } from './modules/Streamer'
+import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
@@ -84,6 +85,7 @@ interface StoreSchema {
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
+  let windowManager: WindowManager | undefined
 
   let tray: Tray
 
@@ -384,12 +386,17 @@ interface StoreSchema {
     createLoginWindow(discardSession)
   }
 
-  function startRemoteControl(hwnd: string, name: string) {
+  async function startRemoteControl(hwnd: string, name: string) {
     if (!hwnd || !name) {
       log.error('Invalid hwnd or name for remote control')
       return
     }
     log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
+
+    if (process.platform === 'darwin') {
+      windowManager = new WindowManager()
+      hwnd = await windowManager.getHwndForWindowByTitleAndId(name, hwnd)
+    }
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
     streamer = new Streamer()

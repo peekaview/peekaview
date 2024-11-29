@@ -146,11 +146,14 @@ export class WindowManager {
     let windowhwnd = 0
     let num = 0
 
+    console.log("TEST2", isMac)
     // Mac doesn't provide enough information about the windows via desktopCapturer API, so we need our own way to get windows via osascript
     if (isMac) {
       const processlist = await this.getMacWindowlist()
       console.log(processlist)
 
+
+      console.log("TEST")
       processlist.data.forEach((process) => {
         process.windows.forEach((window) => {
           console.log(`${window} - ${title}`)
