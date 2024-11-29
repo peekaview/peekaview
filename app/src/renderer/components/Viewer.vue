@@ -324,10 +324,7 @@ onMounted(() => {
 </template>
 
 <style>
-.viewer, .video-container, .video-container video {
-  width: 100%;
-  height: 100%;
-}
+
 
 .viewer {
   display: flex;
@@ -348,7 +345,6 @@ onMounted(() => {
   flex-grow: 1;
   position: relative;
   background: #3b3b3b;
-  aspect-ratio: 16/9;
   border-radius: 6px;
   overflow: hidden;
   min-height: 0;
