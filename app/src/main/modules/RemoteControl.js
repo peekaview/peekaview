@@ -440,8 +440,8 @@ export class RemoteControl {
       skipTaskbar: true,
       //x: screen.getPrimaryDisplay().workAreaSize.width - 170,
       //y: screen.getPrimaryDisplay().workAreaSize.height - 250,
-      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 170 : screen.getPrimaryDisplay().workAreaSize.width - 500 / 2),
-      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 250),
+      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 85 : screen.getPrimaryDisplay().workAreaSize.width - 180),
+      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 210),
       webPreferences: {
         webSecurity: false,
         nodeIntegration: true,
@@ -467,7 +467,7 @@ export class RemoteControl {
     if (obj.filecontent != null)
       return
 
-    if (!this.remotecontrolactive) {
+    if (!this.remotecontrolactive || !this.remotecontrolinputenabled) {
       const obj2 = { filecontent: `data:text/plain;base64,${btoa(obj.text)}` }
       this.pasteFromFile(socket, JSON.stringify(obj2))
     }
@@ -676,8 +676,8 @@ export class RemoteControl {
     })
 
     socket.on('paste', (data) => {
-      if (this.remotecontrolinputenabled)
-        this.pasteFromClipboard(socket, data)
+      //if (this.remotecontrolinputenabled)
+      this.pasteFromClipboard(socket, data)
     })
 
     socket.on('pastefile', (data) => {

@@ -139,7 +139,7 @@ window.addEventListener("DOMContentLoaded", () => {
             }
 
             div.style.cssText = 'background-image: url(icons/' + extension + '.svg); background-repeat: no-repeat; background-position-x: right;  max-height: 150px;  max-width: 150px;';
-            div.innerHTML = '<textarea id="filecontent" style="background: hsl(0deg 62% 55% / 85%)">' + decoded + '</textarea>';
+            div.innerHTML = '<textarea id="filecontent">' + decoded + '</textarea>';
 
             console.log(decoded);
 
