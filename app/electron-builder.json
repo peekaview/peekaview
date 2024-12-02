@@ -24,6 +24,13 @@
     "node_modules/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "locales",
+      "to": "./locales",
+      "filter": ["**/*"]
+    }
+  ],
   "asar": {
     "smartUnpack": true
   },

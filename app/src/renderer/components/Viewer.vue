@@ -2,7 +2,6 @@
 import { computed, ref, watch, onMounted, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import TrackContainer from "./TrackContainer.vue"
 import RemoteControl from "./RemoteControl.vue"
 
 import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
@@ -61,6 +60,7 @@ const waitingStatus = ref<WaitingStatus | undefined>()
 
 const remoteViewerWrapper = ref<HTMLDivElement>()
 const remoteControlRef = useTemplateRef('remoteControl')
+const trackRef = useTemplateRef('track')
 
 const { closeRemoteControl } = useRemoteControl()
 
@@ -70,7 +70,7 @@ watch(screenShareData, async (data) => {
 
   console.log('liveKitDebugUrl', liveKitDebugUrl.value)
 
-  screenView.value = await useScreenView(data, () => {
+  screenView.value = await useScreenView(data, trackRef.value ?? undefined, () => {
     notify({
       type: 'info',
       text: t('viewer.sharingEnded'),
@@ -99,12 +99,17 @@ const liveKitDebugUrl = computed(() =>
   screenShareData.value ? `https://meet.livekit.io/custom?liveKitUrl=wss://${screenShareData.value.serverUrl}&token=${screenShareData.value.jwtToken}` : undefined
 )
 
-function generateRequestId(length = 8) {
+function getRequestId(length = 8) {
+  const requestId = localStorage.getItem('requestId')
+  if (requestId)
+    return requestId
+
   const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let result = ''
   for (let i = 0; i < length; i++) {
     result += characters.charAt(Math.floor(Math.random() * characters.length))
   }
+  localStorage.setItem('requestId', result)
   return result
 }
     
@@ -122,7 +127,7 @@ async function handleSubmit(e: Event) {
   const params = {
     email: props.email ?? inputEmail.value!,
     name: inputName.value,
-    request_id: generateRequestId(),
+    request_id: getRequestId(),
   }
   requestScreen(params, true)
 }
@@ -134,6 +139,7 @@ async function requestScreen(params: RequestParams, initial = false) {
 
     const data = await callApi<Response>({
       action: 'showMeYourScreen',
+      init: initial ? '1' : '0',
       ...params,
     })
     
@@ -273,7 +279,7 @@ function formatLastSeen(timestamp: number | undefined) {
 onMounted(() => {
   console.log('Component mounted, checking refs:', {
     wrapper: !!remoteViewerWrapper.value,
-  });
+  })
 });
 </script>
 
@@ -283,11 +289,7 @@ onMounted(() => {
       ref="remoteControl" 
       style="width: 800px; height: 600px;"
     >
-      <TrackContainer 
-        v-if="screenView?.trackElement"
-        class="video-container"
-        :track-element="screenView?.trackElement"
-      />
+      <video ref="track" playsinline autoplay/>
       <slot />
     </RemoteControl>
   </div>
@@ -341,17 +343,29 @@ onMounted(() => {
 </template>
 
 <style>
-.viewer, .video-container, .video-container video {
-  max-width: 100%;
-  max-height: 100%;
-}
-
 .viewer {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 0;
+}
+
+.viewer video {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+}
+
+.remote-viewer-wrapper {
+  margin-top: 20px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .video-container {

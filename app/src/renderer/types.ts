@@ -23,7 +23,6 @@ export type ScreenPresent = Reactive<{
 
 export type ScreenView = Reactive<{
   sharingParticipant: Ref<SharingParticipant | undefined>
-  trackElement: Ref<HTMLMediaElement | undefined>
 }>
 
 export type ViewingParticipant = {

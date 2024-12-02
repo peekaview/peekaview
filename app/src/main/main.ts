@@ -67,14 +67,16 @@ interface StoreSchema {
     de: 'Deutsch',
   }
 
+  console.log(path.join(process.resourcesPath, 'locales/{{lng}}.json'))
+
   const i18nReady = i18n.use(backend).init({
     backend: {
       loadPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
-        : path.join(__dirname, '../../src/locales/{{lng}}.json'),
+        ? path.join(process.resourcesPath, 'public/static/locales/{{lng}}.json')
+        : path.join(__dirname, '../../public/static/locales/{{lng}}.json'),
       addPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
-        : path.join(__dirname, '../../src/locales/{{lng}}.missing.json'),
+        ? path.join(process.resourcesPath, 'public/static/locales/{{lng}}.missing.json')
+        : path.join(__dirname, '../../public/static/locales/{{lng}}.missing.json'),
     },
     lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
     fallbackLng: Object.keys(languages)[0],

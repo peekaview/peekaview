@@ -2,9 +2,10 @@ import i18n from "./i18n"
 
 export type ApiRequestParams = {
   action: "showMeYourScreen"
-  email: string;
-  name: string;
-  request_id: string;
+  email: string
+  name: string
+  request_id: string
+  init: '1' | '0'
 } | {
   action: "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
   email: string

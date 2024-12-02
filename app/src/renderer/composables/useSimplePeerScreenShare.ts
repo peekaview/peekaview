@@ -1,9 +1,9 @@
 import {
-  computed,
   onBeforeUnmount,
   reactive,
   ref,
   shallowRef,
+  watch,
 } from "vue"
 
 import SimplePeer from 'simple-peer'
@@ -16,7 +16,7 @@ interface ScreenPeer {
   initPeer: (socketId: string, initiator: boolean, stream?: MediaStream) => SimplePeer.Instance
 }
 
-async function useScreenPeer({ serverUrl, roomName }: ScreenShareData, isPresenter: boolean): Promise<ScreenPeer> {
+async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean): Promise<ScreenPeer> {
   const socket = io("wss://c1.peekaview.de")
   
   const initPeer = (socketId: string, initiator: boolean, stream?: MediaStream) => {
@@ -48,8 +48,8 @@ async function useScreenPeer({ serverUrl, roomName }: ScreenShareData, isPresent
     })
 
     peer.on("error", (err) => {
-      console.error(err);
-    });
+      console.error(err)
+    })
 
     socket.on('signal', (data) => {
       if ((data.socket_id && socketId !== data.socket_id) || peer.destroyed)
@@ -140,38 +140,23 @@ export async function useScreenPresent(screenShareData: ScreenShareData): Promis
   return reactive({ participants, addStream, leave })
 }
 
-export async function useScreenView(screenShareData: ScreenShareData, onEnding?: () => void): Promise<ScreenView> {
+export async function useScreenView(screenShareData: ScreenShareData, videoElement: HTMLVideoElement | undefined, onEnding?: () => void): Promise<ScreenView> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, false)
   const sharingParticipant = ref<SharingParticipant>()
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined
 
-  const trackElement = computed(() => {
-    console.log('trackElement', stream.value)
-    if (!stream.value)
-      return undefined
-    
-    const trackElement = document.createElement('video')
-    trackElement.srcObject = stream.value
-    trackElement.autoplay = true
-    trackElement.playsInline = true
-    trackElement.muted = true
+  watch(stream, (stream) => {
+    if (!stream || !videoElement)
+      return
 
-    // Wait for metadata to load before attempting to play
-    trackElement.addEventListener('loadedmetadata', () => {
-      const attemptPlay = async () => {
-        try {
-          await trackElement.play()
-        } catch (err) {
-          console.warn('Autoplay failed:', err)
-          // Retry once after a short delay
-          setTimeout(attemptPlay, 100)
-        }
-      }
-      attemptPlay()
-    })
-    
-    return trackElement
+    console.log('stream', stream.getTracks())
+    videoElement.srcObject = stream
+    setTimeout(() => {
+      videoElement.play().catch(err => {
+        console.error('Error playing video:', err)
+      })
+    }, 5000)
   })
 
   const close = () => {
@@ -187,18 +172,18 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
 
   return new Promise<ScreenView>((resolve) => {
     socket.on('presenterId', (socketId) => {
-      console.log('presenterId', socketId)
       sharingPeer = initPeer(socketId, false)
       sharingPeer.on('connect', () => 
         sharingPeer!.send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
       )
       sharingPeer.on('stream', s => {
-        console.log('Received stream:', s.getTracks())
         stream.value = s
       })
       sharingPeer.on('data', (json) => {
         const data = JSON.parse(json)
         switch (data.type) {
+          case 'remote':
+            break
           case 'identity':
             sharingParticipant.value = { name: data.name }
             break
@@ -213,7 +198,7 @@ export async function useScreenView(screenShareData: ScreenShareData, onEnding?:
         close()
       }
 
-      resolve(reactive({ sharingParticipant, trackElement, leave }))
+      resolve(reactive({ sharingParticipant, leave }))
     })
   })
 }

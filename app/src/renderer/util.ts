@@ -78,7 +78,7 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
     return promise
   }
   
-  return Swal.fire({
+  const result = await Swal.fire({
     icon: type ?? 'question',
     title,
     text,
@@ -90,4 +90,6 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
       popup: 'animate__animated animate__fadeIn'
     }
   })
+
+  return result.isConfirmed ? '0' : '1'
 }
