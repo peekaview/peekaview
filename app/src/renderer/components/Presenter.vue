@@ -258,7 +258,7 @@ function handleError(error: Error) {
   notify({
     type: 'error',
     title: 'Error',
-    text: t('share.requestError'),
+    text: t('share.requestError') + '\n\n' + error.message,
     confirmButtonText: t('general.ok'),
   })
 }
