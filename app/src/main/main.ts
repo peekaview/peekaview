@@ -67,16 +67,14 @@ interface StoreSchema {
     de: 'Deutsch',
   }
 
-  console.log(path.join(process.resourcesPath, 'locales/{{lng}}.json'))
-
   const i18nReady = i18n.use(backend).init({
     backend: {
       loadPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'public/static/locales/{{lng}}.json')
-        : path.join(__dirname, '../../public/static/locales/{{lng}}.json'),
+        ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
+        : path.join(__dirname, '../../locales/{{lng}}.json'),
       addPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'public/static/locales/{{lng}}.missing.json')
-        : path.join(__dirname, '../../public/static/locales/{{lng}}.missing.json'),
+        ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
+        : path.join(__dirname, '../../locales/{{lng}}.missing.json'),
     },
     lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
     fallbackLng: Object.keys(languages)[0],
@@ -212,7 +210,7 @@ interface StoreSchema {
 
       menuItems.push(
         { label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
-        { label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }) },
+        { label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
         { type: 'separator' },
         { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
@@ -374,11 +372,20 @@ interface StoreSchema {
 
   function tryShareScreen() {
     const code = store.get('code')
-    log.info('Attempting to share screen', { hasAuthCode: !!code })
-    if (code)
-      loadParams({ share: code })
-    else
+    if (!code) {
       createLoginWindow()
+      return
+    }
+
+    if (appWindow) {
+      const url = appWindow.webContents.getURL()
+      const params = new URL(url).searchParams
+      const share = params.get('share')
+      if (share === code)
+        return
+    }
+
+    loadParams({ share: code }, false)
   }
 
   function logout(discardSession = false) {
@@ -407,13 +414,14 @@ interface StoreSchema {
     streamer.startSharing()
   }
 
-  function loadParams(params: Record<string, string>) {
+  function loadParams(params: Record<string, string>, show?: boolean) {
     if (!appWindow)
       return
 
     log.info('Loading app with params:', params)
     windowLoad(appWindow, undefined, params)
-    appWindow.show()
+    if (show !== undefined)
+      show ? appWindow.show() : appWindow.hide()
   }
 
   function windowLoad(window: BrowserWindow, entryKey?: string | undefined, params?: Record<string, string>) {

@@ -1,7 +1,7 @@
 import { createI18n } from 'vue-i18n'
 
-import en from '../../public/static/locales/en.json'
-import de from '../../public/static/locales/de.json'
+import en from '../../locales/en.json'
+import de from '../../locales/de.json'
 
 export type Locale = "en" | "de"
 
