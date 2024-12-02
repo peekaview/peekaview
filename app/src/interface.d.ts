@@ -24,6 +24,7 @@ export interface IElectronAPI {
   startRemoteControl: (source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
   createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
+  sharingActive: (viewCode: string) => Promise<void>,
   handleAppClosing: () => Promise<void>,
 }
 

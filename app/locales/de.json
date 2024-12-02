@@ -1,10 +1,11 @@
 {
   "general": {
-    "ok": "Okay",
+    "ok": "OK",
     "yes": "Ja",
     "no": "Nein",
     "cancel": "Abbrechen",
-    "areYouSure": "Sind Sie sicher?"
+    "areYouSure": "Sind Sie sicher?",
+    "copyToClipboard": "In Zwischenablage kopieren"
   },
   "labels": {
     "yourEmail": "Ihre E-Mail-Adresse",
@@ -120,6 +121,10 @@
     },
     "share": "Teilen",
     "confirmCancel": "Sind Sie sicher, dass Sie die Bildschirm-Auswahl abbrechen wollen? Es wird eine Auswahl benötigt, um ihren Bildschirm teilen zu können."
+  },
+  "sharingActive": {
+    "title": "Bildschirmfreigabe aktiv",
+    "message": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen"
   },
   "trayMenu": {
     "shareMyScreen": "Meinen Bildschirm teilen",

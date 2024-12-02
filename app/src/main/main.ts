@@ -80,6 +80,10 @@ interface StoreSchema {
     fallbackLng: Object.keys(languages)[0],
     preload: Object.keys(languages),
     ns: ['translation'],
+    /*interpolation: {
+      prefix: '{', 
+      suffix: '}',
+    }*/
   })
 
   let appWindow: BrowserWindow | undefined
@@ -522,6 +526,21 @@ interface StoreSchema {
 
   ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
     startRemoteControl(source.id, source.name, roomName, roomId, userName, userId)
+  })
+
+  ipcMain.handle('sharing-active', async (_event, viewCode: string) => {
+    const url = `${import.meta.env.VITE_APP_URL}?view=${viewCode}`
+    const response = dialog.showMessageBoxSync({
+      title: i18n.t('sharingActive.title'),
+      message: `${i18n.t('sharingActive.message')}:\n\n${url}`,
+      buttons: [
+        i18n.t('general.ok'),
+        i18n.t('general.copyToClipboard'),
+      ]
+    })
+    
+    if (response === 1)
+      clipboard.writeText(url)
   })
 
   ipcMain.handle('toggleRemoteControl', async (_event) => {

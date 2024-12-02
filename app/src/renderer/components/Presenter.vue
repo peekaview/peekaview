@@ -236,9 +236,10 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
 
     console.debug('Screen stream obtained:', stream)
     await screenPresent.value.addStream(stream, shareAudio)
-    sessionActive.value = true    
+    sessionActive.value = true
 
     source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
+    window.electronAPI?.sharingActive(viewCode.value)
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }

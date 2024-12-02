@@ -4,7 +4,8 @@
     "yes": "Yes",
     "no": "No",
     "cancel": "Cancel",
-    "areYouSure": "Are you sure?"
+    "areYouSure": "Are you sure?",
+    "copyToClipboard": "Copy to clipboard"
   },
   "labels": {
     "yourEmail": "Your email address",
@@ -121,6 +122,10 @@
     },
     "share": "Share",
     "confirmCancel": "Are you sure you want to cancel the screen selection? A selection is required to share your screen."
+  },
+  "sharingActive": {
+    "title": "Sharing Session Active",
+    "message": "You can invite someone to view your screen with this link"
   },
   "trayMenu": {
     "shareMyScreen": "Share my screen",
