@@ -14,6 +14,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^3.0.0
         version: 3.0.0(electron@31.7.5)
+      '@miniben90/x-win':
+        specifier: ^2.0.3
+        version: 2.0.3
       '@nut-tree-fork/nut-js':
         specifier: 4.2.2
         version: 4.2.2(encoding@0.1.13)
@@ -752,6 +755,57 @@ packages:
   '@malept/flatpak-bundler@0.4.0':
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
+
+  '@miniben90/x-win-darwin-arm64@2.0.3':
+    resolution: {integrity: sha512-92VJZjgKp6d+/JKFdCFD0S+a/bB/9DwoXibTbnq5KY3U/dWHyz/JcRdbFYZYQNU1mQ5Y8ZsWhIKSb9WqQDOg6w==}
+    engines: {node: '>= 14'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@miniben90/x-win-darwin-universal@2.0.3':
+    resolution: {integrity: sha512-hxqn/i9ev3zSBzeHgmYNJzaPUsSWAcIVQ5mx+OPAEBWTCkskehTVNneKH9KYBM2qXpwMWQHhKM1Hi2RIy08l9w==}
+    engines: {node: '>= 14'}
+    os: [darwin]
+
+  '@miniben90/x-win-darwin-x64@2.0.3':
+    resolution: {integrity: sha512-MONTfJQKkI2uEXxMsL2eKnYfEsnZkCJaOyuG7fZAZKCMMlWYHUtMrCVxxFMi+dq7GlrtfAI0HBC207AskfUtBw==}
+    engines: {node: '>= 14'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@miniben90/x-win-linux-x64-gnu@2.0.3':
+    resolution: {integrity: sha512-1yJz8pzPEi6586JUIaqo6QLGIkGYa1A/f6rVGrIHFNDOdZCKGDIjvr6gYr8h2oVcG6ziRRm1p7/wvpOm4PYQog==}
+    engines: {node: '>= 14'}
+    cpu: [x64]
+    os: [linux]
+
+  '@miniben90/x-win-linux-x64-musl@2.0.3':
+    resolution: {integrity: sha512-gR3LKSVIKMDsgE8Sa3w7sVgTQJBrBxNA4QeYSxWXJFOEe18jP+02PETI8WvnujLKxprVNE7BH4R6PEcedIdCcQ==}
+    engines: {node: '>= 14'}
+    cpu: [x64]
+    os: [linux]
+
+  '@miniben90/x-win-win32-arm64-msvc@2.0.3':
+    resolution: {integrity: sha512-VVTg8v+E1AF5VKKzH3Hn9DPVlVGza3SlT1jyQssdv5uUgs1fb49vNyySEtWfmgcAOAuxeTKFEs1jVY/xmBoLTg==}
+    engines: {node: '>= 14'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@miniben90/x-win-win32-ia32-msvc@2.0.3':
+    resolution: {integrity: sha512-rhMaUR9//J/HjpqEb6VgZGGZE8RXVB+3ZZx/+7R8cNG/uVqK6FCkl6OVUEn0Q9SU8KyELT9fSAFLMqDfeIYhcg==}
+    engines: {node: '>= 14'}
+    cpu: [ia32]
+    os: [win32]
+
+  '@miniben90/x-win-win32-x64-msvc@2.0.3':
+    resolution: {integrity: sha512-x1E3Y+rGxOH8a38a+svh4SfLWAjiRBQwxUMLei9pB6W8npFxZ7/a1Ipa+JBJJWpKvVgPW8MOOC+U50aAWBR1IA==}
+    engines: {node: '>= 14'}
+    cpu: [x64]
+    os: [win32]
+
+  '@miniben90/x-win@2.0.3':
+    resolution: {integrity: sha512-4kcjdVVxi54+ymc0FrIntkYzChnOfBBPrATWod02WjTw44Ive9f6dyIZZPA6WxBqPWFDO15KKQ6/KDgCjJ/lJg==}
+    engines: {node: '>= 14'}
 
   '@noble/ciphers@1.0.0':
     resolution: {integrity: sha512-wH5EHOmLi0rEazphPbecAzmjd12I6/Yv/SiHdkA9LSycsQk7RuuTp7am5/o62qYr0RScE7Pc9icXGBbsr6cesA==}
@@ -4473,6 +4527,41 @@ snapshots:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@miniben90/x-win-darwin-arm64@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-darwin-universal@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-darwin-x64@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-linux-x64-gnu@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-linux-x64-musl@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-win32-arm64-msvc@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-win32-ia32-msvc@2.0.3':
+    optional: true
+
+  '@miniben90/x-win-win32-x64-msvc@2.0.3':
+    optional: true
+
+  '@miniben90/x-win@2.0.3':
+    optionalDependencies:
+      '@miniben90/x-win-darwin-arm64': 2.0.3
+      '@miniben90/x-win-darwin-universal': 2.0.3
+      '@miniben90/x-win-darwin-x64': 2.0.3
+      '@miniben90/x-win-linux-x64-gnu': 2.0.3
+      '@miniben90/x-win-linux-x64-musl': 2.0.3
+      '@miniben90/x-win-win32-arm64-msvc': 2.0.3
+      '@miniben90/x-win-win32-ia32-msvc': 2.0.3
+      '@miniben90/x-win-win32-x64-msvc': 2.0.3
 
   '@noble/ciphers@1.0.0': {}
 

@@ -776,7 +776,9 @@ window.onload = function () {
             "color": color
         }
 
-        if ((lastmove < Date.now() - 100) || (lastmove < Date.now() - 50) && (Math.abs(lastposx - x) < 3 || Math.abs(lastposy - y) < 3)) {
+        if ((lastmousedown > 0 && lastmove < Date.now() - 10) || 
+            (lastmove < Date.now() - 100) || 
+            (lastmove < Date.now() - 50 && (Math.abs(lastposx - x) < 3 || Math.abs(lastposy - y) < 3))) {
             lastmove = Date.now()
             socket.volatile.emit("mouse-move", JSON.stringify(obj));
         }
@@ -802,6 +804,7 @@ window.onload = function () {
     })
 
     var ignoremouse = 0;
+    var lastobjclick = null;
     document.querySelector("#overlay").addEventListener('mousedown', function(e) {
         if (!mouseenabled) return false;
         if (!controlpressed && (ignoremouse < Date.now() - 500)) {
@@ -840,10 +843,13 @@ window.onload = function () {
 
             lastmousedown = Date.now();
 
+            
+
             eventToSend = setTimeout(function () {
                 console.log("mouse-down");
                 //mousepressed[lastobj.id] = true;
-
+                
+                
                 socket.volatile.emit("mouse-down", JSON.stringify(lastobj));
             }, 150);
         }

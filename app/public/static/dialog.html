@@ -42,25 +42,27 @@
     .modalout {
       animation-name: scale-out;
       animation-duration: 0.2s;
-      transform: scale(0.1);
+      transform: translateY(-100%);
     }
 
     @keyframes scale-in {
       0% {
-        transform: scale(0.1);
-        
+        transform: translateY(-100%);
+
       }
+
       100% {
-        transform: scale(1);
+        transform: translateY(0%);
       }
     }
 
     @keyframes scale-out {
       0% {
-         transform: scale(1);
+        transform: translateY(0%);
       }
+
       100% {
-        transform: scale(0.1);
+        transform: translateY(-100%);
       }
     }
 

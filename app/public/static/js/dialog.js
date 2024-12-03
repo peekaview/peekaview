@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (params.type == 'call') {
-      var audio = new Audio('../sounds/ringtone.wav');
+      var audio = new Audio('sounds/ringtone.wav');
       audio.play();
 
       audio.addEventListener('ended', function () {
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById('dialogpicture').style.display = 'block'
     }
     if (params.soundfile !== null) {
-      var audio = new Audio('../sounds/' + params.soundfile);
+      var audio = new Audio('sounds/' + params.soundfile);
       audio.play();
     }
 
@@ -115,5 +115,11 @@ document.addEventListener("DOMContentLoaded", () => {
       window.close()
     }, 200)
   }
+
+  window.api.receive('dialog-data', (data) => {
+    if (data.shareUrl) {
+      setShareUrl(data.shareUrl)
+    }
+  })
 });
 //}

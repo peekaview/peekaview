@@ -81,19 +81,21 @@
     <div style="height: 15px; width: 100%; position: absolute; top: 0; left: 0; -webkit-app-region: drag;"></div>
     <div class="modal-container settings_container" >
       <div class="modal-body">
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 16px); margin:0px; padding: 4px;">
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;">
           <label class="checkboxcontainer">&nbsp;&nbsp;Fernzugriff
             <input type="checkbox" onChange="toggleRemoteControl()" id="remotecontrolenabled"><span
               class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 16px); margin:0px; padding: 4px;">
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;">
           <label class="checkboxcontainer">&nbsp;&nbsp;Mauszeiger
             <input type="checkbox" onChange="toggleMouse()" id="mouseenabled" checked="checked"><span
               class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(33% - 17px); margin:0px; padding: 4px;"
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;"
+          onClick="copyLink()">Link teilen</div>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 17px); margin:0px; padding: 4px;"
           onClick="stopSharing()">Beenden</div>
         
         <div style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width:32px; -webkit-user-select: none; -webkit-app-region: drag;">
@@ -126,22 +128,38 @@
 
   function stopSharing() {
     //removePeer(socket.id);
-    electron.ipcRenderer.invoke("stopSharing");
+    electron.ipcRenderer.invoke("stop-sharing");
   }
+
+  let previousMouseState = false;
 
   function toggleRemoteControl() {
     if (document.querySelector('#remotecontrolenabled').checked) {
+      previousMouseState = document.querySelector('#mouseenabled').checked;
       document.querySelector('#mouseenabled').disabled = true;
+      document.querySelector('#mouseenabled').checked = true;
+      electron.ipcRenderer.invoke("enable-remote-control");
+      electron.ipcRenderer.invoke("enable-mouse");
     } else {
       document.querySelector('#mouseenabled').disabled = false;
+      document.querySelector('#mouseenabled').checked = previousMouseState;
+      electron.ipcRenderer.invoke("disable-remote-control");
+      if (!previousMouseState) {
+        electron.ipcRenderer.invoke("disable-mouse");
+      }
     }
-    document.querySelector('#mouseenabled').checked = true;
-    toggleMouse();
-    electron.ipcRenderer.invoke("toggleRemoteControl");
   }
 
   function toggleMouse() {
-    electron.ipcRenderer.invoke("toggleMouse");
+    if (document.querySelector('#mouseenabled').checked) {
+      electron.ipcRenderer.invoke("enable-mouse");
+    } else {
+      electron.ipcRenderer.invoke("disable-mouse");
+    }
+  }
+
+  function copyLink() {
+    electron.ipcRenderer.invoke("show-sharing-active");
   }
 
 </script>

@@ -14,9 +14,10 @@ export interface DialogParams {
   defaultId?: number
   cancelId?: number
   timeout?: number
+  data?: any
 }
 
-//const isWin32 = process.platform === 'win32'
+const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
@@ -84,19 +85,19 @@ export function useCustomDialog() {
 
     if (type === 'share')
       windowParams = {
-        width: 400,
+        width: 500,
         height: 50,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 200),
+        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250),
         y: screen.getPrimaryDisplay().bounds.y -8,
         template: 'dialogshare.html',
       }
     else if (type === 'tray')
       windowParams = {
-        width: 500,
-        height: 200,
+        width: 600,
+        height: 300,
         //x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
-        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 250 : screen.getPrimaryDisplay().workAreaSize.width - 500),
-        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 175),
+        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux || isWin32 ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 300 : screen.getPrimaryDisplay().workAreaSize.width - 600),
+        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux || isWin32 ? 30 : screen.getPrimaryDisplay().workAreaSize.height - 300),
         template: 'dialogtray.html',
       }
     else if (type === 'dialog')

@@ -19,6 +19,7 @@ import log from 'electron-log/main'
 import { exec } from 'child_process'
 import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
+import fs from 'fs'
 
 import { useCustomDialog, type DialogParams } from './composables/useCustomDialog'
 
@@ -399,21 +400,21 @@ interface StoreSchema {
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(hwnd: string, name: string, roomName: string, roomId: string, userName: string, userId: string) {
-    if (!hwnd || !name) {
-      log.error('Invalid hwnd or name for remote control')
+  async function startRemoteControl(sourceId: string, name: string, roomName: string, roomId: string, userName: string, userId: string) {
+    if (!sourceId || !name) {
+      log.error('Invalid sourceId or name for remote control')
       return
     }
-    log.info('Starting remote control with hwnd:', hwnd, 'and window name:', name)
+    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', name)
 
     if (process.platform === 'darwin') {
       windowManager = new WindowManager()
-      hwnd = await windowManager.getHwndForWindowByTitleAndId(name, hwnd)
+      sourceId = await windowManager.getHwndForWindowByTitleAndId(name, sourceId)
     }
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
     streamer = new Streamer()
-    streamer.setArgs(hwnd, import.meta.env.VITE_CONTROLSERVER, roomName, roomId, userName, userId)
+    streamer.setArgs(sourceId, import.meta.env.VITE_CONTROLSERVER, roomName, roomId, userName, userId)
     streamer.joinRoom()
     streamer.startSharing()
   }
@@ -524,37 +525,69 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
+  /*ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
     startRemoteControl(source.id, source.name, roomName, roomId, userName, userId)
-  })
+  })*/
 
-  ipcMain.handle('sharing-active', async (_event, viewCode: string) => {
-    const url = `${import.meta.env.VITE_APP_URL}?view=${viewCode}`
-    const response = dialog.showMessageBoxSync({
-      title: i18n.t('sharingActive.title'),
-      message: `${i18n.t('sharingActive.message')}:\n\n${url}`,
-      buttons: [
-        i18n.t('general.ok'),
-        i18n.t('general.copyToClipboard'),
-      ]
-    })
+  let currentViewCode: string | undefined
+
+  const openShareMessage = async () => {
+    if (!currentViewCode) return
+
+    const url = `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`
     
-    if (response === 1)
-      clipboard.writeText(url)
+    // Load and process template
+    const templatePath = app.isPackaged
+      ? path.join(process.resourcesPath, '/public/static/templates/sharing-active.html')
+      : path.join(__dirname, '../../public/static/templates/sharing-active.html')
+
+    let htmlContent = (await fs.promises.readFile(templatePath, 'utf8'))
+      .replace('{{message}}', i18n.t('sharingActive.message'))
+      .replaceAll('{{url}}', url)
+
+    customDialog.playSoundOnOpen('ping.wav')
+    customDialog.openTrayDialog(import.meta.env.VITE_APP_URL, {
+      title: i18n.t('sharingActive.title'),
+      detail: htmlContent,
+      timeout: 30000
+    })
+  }
+
+  ipcMain.handle('sharing-active', async (_event, viewCode: string, sourceId: string, sourceName: string, roomName: string, roomId: string, userName: string, userId: string) => {
+    log.info('sharing-active handler called with source:', sourceId)
+    
+    currentViewCode = viewCode
+    startRemoteControl(sourceId, sourceName, roomName, roomId, userName, userId)
+    
+    customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
+    await openShareMessage()
   })
 
-  ipcMain.handle('toggleRemoteControl', async (_event) => {
-    console.log('toggleRemoteControl')
-    streamer.remoteControl.toggleRemoteControl()
-    streamer.remoteControl.toggleMouse()
-  })
-  
-  ipcMain.handle('toggleMouse', async (_event) => {
-    console.log('toggleMouse')
-    streamer.remoteControl.toggleMouse()
+  ipcMain.handle('show-sharing-active', async (_event) => {
+    await openShareMessage()
   })
 
-  ipcMain.handle('stopSharing', async (_event) => {
+  ipcMain.handle('enable-mouse', async (_event) => {
+    console.log('Enabling mouse control')
+    streamer.remoteControl.enableMouse()
+  })
+
+  ipcMain.handle('disable-mouse', async (_event) => {
+    console.log('Disabling mouse control')
+    streamer.remoteControl.disableMouse()
+  })
+
+  ipcMain.handle('enable-remote-control', async (_event) => {
+    console.log('Enabling remote control')
+    streamer.remoteControl.enableRemoteControl()
+  })
+
+  ipcMain.handle('disable-remote-control', async (_event) => {
+    console.log('Disabling remote control')
+    streamer.remoteControl.disableRemoteControl()
+  })
+
+  ipcMain.handle('stop-sharing', async (_event) => {
     console.log('stopSharing')
     quit()
   })

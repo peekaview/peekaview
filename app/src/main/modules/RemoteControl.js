@@ -99,6 +99,31 @@ export class RemoteControl {
       this.hideOverlays()
   }
 
+  enableMouse() {
+    console.log('Enabling mouse control')
+    this.mouseenabled = true
+    this.socket.emit('mouse-control', { enabled: true })
+  }
+
+  disableMouse() {
+    console.log('Disabling mouse control')
+    this.mouseenabled = false
+    this.hideOverlays()
+    this.socket.emit('mouse-control', { enabled: false })
+  }
+
+  enableRemoteControl() {
+    console.log('Enabling remote control')
+    this.remotecontrolinputenabled = true
+    this.socket.emit('remote-control', { enabled: true })
+  }
+
+  disableRemoteControl() {
+    console.log('Disabling remote control')
+    this.remotecontrolinputenabled = false
+    this.socket.emit('remote-control', { enabled: false })
+  }
+
   showOverlayCursorSignal(id, name, color) {
     if (this.lasttargetpoint[id] == undefined || this.lasttargetpoint[id] == null)
       return

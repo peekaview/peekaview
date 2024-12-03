@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openScreenSourceSelection: () => ipcRenderer.invoke('open-screen-source-selection'),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
   startRemoteControl: (source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => ipcRenderer.invoke('start-remote-control', source, roomName, roomId, userName, userId),
-  sharingActive: (viewCode: string) => ipcRenderer.invoke('sharing-active', viewCode),
+  sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => ipcRenderer.invoke('sharing-active', viewCode, source, roomName, roomId, userName, userId),
   handleAppClosing: () => ipcRenderer.invoke('handle-app-closing'),
 });
 

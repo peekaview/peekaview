@@ -342,10 +342,6 @@ export class Streamer {
   }
 
   showStreamerOverlay(hwnd) {
-    this.customDialog.playSoundOnOpen('ping.wav')
-    this.customDialog.openTrayDialog(this.hostname!, {
-      detail: (hwnd !== 0 ? 'Sie haben ein Fenster mit meetzi geteilt. Andere Teilnehmer können das Fenster sehen/bearbeiten.' : 'Sie haben Ihren Bildschirm mit meetzi geteilt. Andere Teilnehmer können den Bildschirminhalt sehen/bearbeiten.'),
-    })
-    this.customDialog.openShareDialog(this.hostname!, {})
+    //this.customDialog.openShareDialog(this.hostname!, {})
   }
 }
