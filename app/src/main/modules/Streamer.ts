@@ -181,7 +181,7 @@ export class Streamer {
     if (this.windowlist?.includes(hwnd) || hwnd == '0') {
       console.log(`${hwnd} in windowlsit`)
 
-      this.showStreamerOverlay(hwnd)
+      this.showStreamerOverlay()
 
       this.windowManager.selectAndActivateWindow(hwnd)
       // windowManager = this.windowManager
@@ -341,7 +341,7 @@ export class Streamer {
     socket!.volatile.emit('host-info', JSON.stringify(obj))
   }
 
-  showStreamerOverlay(hwnd) {
+  showStreamerOverlay() {
     //this.customDialog.openShareDialog(this.hostname!, {})
   }
 }

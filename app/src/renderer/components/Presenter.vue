@@ -181,7 +181,7 @@ async function startSession() {
       serverUrl: data.videoServer,
     }
 
-    screenPresent.value = await useScreenPresent(screenShareData.value)
+    screenPresent.value = await useScreenPresent(screenShareData.value, !!window.electronAPI)
     shareLocalScreen(data.roomId, data.roomId, props.email, props.email, undefined)
   } catch (error) {
     console.error('Error creating room:', error);
@@ -189,7 +189,7 @@ async function startSession() {
   }
 }
 
-async function shareLocalScreen(roomName: string, roomId: string, userName: string, userId: string, source?: ScreenSource,  shareAudio = false) {
+async function shareLocalScreen(roomName: string, roomId: string, userName: string, userId: string, source?: ScreenSource, shareAudio = false) {
   if (!screenPresent.value)
     return
 
@@ -238,8 +238,8 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
     await screenPresent.value.addStream(stream, shareAudio)
     sessionActive.value = true
 
-    //source && window.electronAPI?.startRemoteControl(source.id, source.name, roomName, roomId, userName, userId)
-    source && window.electronAPI?.sharingActive(viewCode.value, source.id, source.name, roomName, roomId, userName, userId)
+    //source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
+    source && window.electronAPI?.sharingActive(viewCode.value, source, roomName, roomId, userName, userId)
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }

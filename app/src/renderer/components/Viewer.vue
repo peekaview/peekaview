@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, useTemplateRef } from 'vue'
+import { computed, ref, watch, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import RemoteControl from "./RemoteControl.vue"
@@ -58,7 +58,6 @@ const screenShareData = ref<ScreenShareData>()
 const screenView = ref<ScreenView>()
 const waitingStatus = ref<WaitingStatus | undefined>()
 
-const remoteViewerWrapper = ref<HTMLDivElement>()
 const remoteControlRef = useTemplateRef('remoteControl')
 const trackRef = useTemplateRef('track')
 
@@ -70,15 +69,19 @@ watch(screenShareData, async (data) => {
 
   console.log('liveKitDebugUrl', liveKitDebugUrl.value)
 
-  screenView.value = await useScreenView(data, trackRef.value ?? undefined, () => {
-    notify({
-      type: 'info',
-      text: t('viewer.sharingEnded'),
-      confirmButtonText: t('general.ok'),
-    })
-    screenView.value = undefined
+  screenView.value = await useScreenView(data, {
+    videoElement: trackRef.value ?? undefined,
+    onRemote: () => initializeRemoteViewer(data),
+    onEnding: () => {
+      notify({
+        type: 'info',
+        text: t('viewer.sharingEnded'),
+        confirmButtonText: t('general.ok'),
+      })
+      screenView.value = undefined
 
-    closeRemoteControl()
+      closeRemoteControl()
+    }
   })
 })
 
@@ -192,16 +195,6 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     serverUrl: data.videoServer,
     controlServer: data.controlServer,
   }
-
-  setTimeout(async () => {
-    console.log('Inside setTimeout callback')
-    console.log('Refs status before init:', {
-      wrapper: !!remoteViewerWrapper.value,
-    });
-    if (screenShareData.value) {
-      initializeRemoteViewer(screenShareData.value)
-    }
-  }, 500)
 }
 
 function initializeRemoteViewer(data: ScreenShareData) {
@@ -221,10 +214,10 @@ function initializeRemoteViewer(data: ScreenShareData) {
 
   remoteControlRef.value?.openRemoteControl(
     params.roomid,
-    params.username,
-    params.userid,
+    params.username!,
+    params.userid!,
     params.color,
-    params.hostname
+    params.hostname!
   )
 }
 
@@ -275,12 +268,6 @@ function formatLastSeen(timestamp: number | undefined) {
   const days = Math.floor(seconds / 86400)
   return t('viewer.lastSeen.daysAgo', days)
 }
-
-onMounted(() => {
-  console.log('Component mounted, checking refs:', {
-    wrapper: !!remoteViewerWrapper.value,
-  })
-});
 </script>
 
 <template>
@@ -359,23 +346,5 @@ onMounted(() => {
   max-width: 100%;
   max-height: 100%;
   object-fit: cover;
-}
-
-.remote-viewer-wrapper {
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.video-container {
-  flex-grow: 1;
-  position: relative;
-  background: #3b3b3b;
-  overflow: hidden;
-  min-height: 0;
-}
-
-footer {
-  display: none;;
 }
 </style>

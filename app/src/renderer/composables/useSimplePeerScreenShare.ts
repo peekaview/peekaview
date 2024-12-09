@@ -1,5 +1,4 @@
 import {
-  onBeforeUnmount,
   reactive,
   ref,
   shallowRef,
@@ -14,6 +13,12 @@ import { ScreenPresent, ScreenShareData, ScreenView, SharingParticipant, Viewing
 interface ScreenPeer {
   socket: Socket
   initPeer: (socketId: string, initiator: boolean, stream?: MediaStream) => SimplePeer.Instance
+}
+
+interface ScreenViewOptions {
+  videoElement?: HTMLVideoElement
+  onRemote?: () => void
+  onEnding?: () => void
 }
 
 async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean): Promise<ScreenPeer> {
@@ -58,8 +63,6 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
       peer.signal(data.signal)
     })
 
-    onBeforeUnmount(() => peer?.destroy())
-
     return peer
   }
 
@@ -76,7 +79,7 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
   )
 }
 
-export async function useScreenPresent(screenShareData: ScreenShareData): Promise<ScreenPresent> {
+export async function useScreenPresent(screenShareData: ScreenShareData, remote: boolean): Promise<ScreenPresent> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, true)
   const participants = ref<Record<string, ViewingParticipant>>({})
   const peers: Record<string, SimplePeer.Instance> = {}
@@ -85,9 +88,9 @@ export async function useScreenPresent(screenShareData: ScreenShareData): Promis
   socket.on('initReceive', (socketId) => {
     peers[socketId] = initPeer(socketId, true, stream)
 
-    peers[socketId].on('connect', () => {
-      //peers[socketId].send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
-    })
+    peers[socketId].on('connect', () => 
+      peers[socketId].send(JSON.stringify({ type: 'identity', name: screenShareData.userName, remote }))
+    )
     
     peers[socketId].on('data', (json) => {
       const data = JSON.parse(json)
@@ -140,20 +143,19 @@ export async function useScreenPresent(screenShareData: ScreenShareData): Promis
   return reactive({ participants, addStream, leave })
 }
 
-export async function useScreenView(screenShareData: ScreenShareData, videoElement: HTMLVideoElement | undefined, onEnding?: () => void): Promise<ScreenView> {
+export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, false)
   const sharingParticipant = ref<SharingParticipant>()
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined
 
   watch(stream, (stream) => {
-    if (!stream || !videoElement)
+    if (!stream || !options?.videoElement)
       return
 
-    console.log('stream', stream.getTracks())
-    videoElement.srcObject = stream
+    options.videoElement.srcObject = stream
     setTimeout(() => {
-      videoElement.play().catch(err => {
+      options!.videoElement!.play().catch(err => {
         console.error('Error playing video:', err)
       })
     }, 5000)
@@ -165,7 +167,7 @@ export async function useScreenView(screenShareData: ScreenShareData, videoEleme
     sharingParticipant.value = undefined
     stream.value = undefined
 
-    onEnding?.()
+    options?.onEnding?.()
   }
 
   socket.on('presenterLeft', () => close())
@@ -176,6 +178,7 @@ export async function useScreenView(screenShareData: ScreenShareData, videoEleme
       sharingPeer.on('connect', () => 
         sharingPeer!.send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
       )
+
       sharingPeer.on('stream', s => {
         stream.value = s
       })
@@ -186,6 +189,8 @@ export async function useScreenView(screenShareData: ScreenShareData, videoEleme
             break
           case 'identity':
             sharingParticipant.value = { name: data.name }
+            if (data.remote)
+              options?.onRemote?.()
             break
           case 'close':
             close()

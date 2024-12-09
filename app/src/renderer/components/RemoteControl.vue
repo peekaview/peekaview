@@ -1,5 +1,5 @@
 <template>
-  <div class="remote-control remote-viewer-wrapper" id="remoteviewerwrapper">
+  <div class="remote-control" id="remoteviewerwrapper">
     <slot></slot>
     <!-- other RemoteControl component content -->
   </div>
@@ -14,10 +14,13 @@ defineExpose({
 </script>
 
 <style scoped>
-.remote-viewer-wrapper {
+.remote-control {
   position: absolute;
   top: 0px;
   left: 0px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 </style>

@@ -33,12 +33,15 @@ onMounted(() => {
   handleParams(params)
 
   for (const a of Object.values(Action)) {
-    const value = params.get(a)
-    if (!value)
+    if (!params.has(a))
       continue
 
     action.value = a
-    handleParams(new URLSearchParams(atob(value)))
+    const value = params.get(a)
+    if (value)
+      handleParams(new URLSearchParams(atob(value)))
+
+    break
   }
 })
 

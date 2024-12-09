@@ -21,9 +21,9 @@ import i18n from 'i18next'
 import backend from 'i18next-fs-backend'
 import fs from 'fs'
 
-import { useCustomDialog, type DialogParams } from './composables/useCustomDialog'
+import { useCustomDialog, type DialogOptions } from './composables/useCustomDialog'
+import { useStreamer, type Streamer } from './composables/useStreamer'
 
-import { Streamer } from './modules/Streamer'
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
 
@@ -390,7 +390,7 @@ interface StoreSchema {
         return
     }
 
-    loadParams({ share: code }, false)
+    loadParams({ share: code }, !app.isPackaged)
   }
 
   function logout(discardSession = false) {
@@ -400,20 +400,21 @@ interface StoreSchema {
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(sourceId: string, name: string, roomName: string, roomId: string, userName: string, userId: string) {
-    if (!sourceId || !name) {
+  async function startRemoteControl(source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) {
+    if (!source) {
       log.error('Invalid sourceId or name for remote control')
       return
     }
-    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', name)
+    let sourceId = source.id
+    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', source.name)
 
     if (process.platform === 'darwin') {
       windowManager = new WindowManager()
-      sourceId = await windowManager.getHwndForWindowByTitleAndId(name, sourceId)
+      sourceId = await windowManager.getHwndForWindowByTitleAndId(source.name, sourceId)
     }
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
-    streamer = new Streamer()
+    streamer = useStreamer()
     streamer.setArgs(sourceId, import.meta.env.VITE_CONTROLSERVER, roomName, roomId, userName, userId)
     streamer.joinRoom()
     streamer.startSharing()
@@ -479,8 +480,8 @@ interface StoreSchema {
     log.error('Unhandled Rejection:', reason)
   })
 
-  ipcMain.handle('dialog', async (_event, params: DialogParams) => {
-    customDialog.openDialog('dialog', params)
+  ipcMain.handle('dialog', async (_event, options: DialogOptions) => {
+    customDialog.openDialog('dialog', options)
   })
 
   ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
@@ -520,13 +521,13 @@ interface StoreSchema {
   })
 
   ipcMain.handle('select-screen-source', async (_event, source: ScreenSource | undefined) => {
-    log.info('Screen source selected:', source)
+    log.info('Screen source selected:', source?.id, source?.name)
     selectedScreenSource = source
     sourcesWindow?.close()
   })
 
   /*ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
-    startRemoteControl(source.id, source.name, roomName, roomId, userName, userId)
+    startRemoteControl(source, roomName, roomId, userName, userId)
   })*/
 
   let currentViewCode: string | undefined
@@ -553,11 +554,11 @@ interface StoreSchema {
     })
   }
 
-  ipcMain.handle('sharing-active', async (_event, viewCode: string, sourceId: string, sourceName: string, roomName: string, roomId: string, userName: string, userId: string) => {
-    log.info('sharing-active handler called with source:', sourceId)
+  ipcMain.handle('sharing-active', async (_event, viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
+    log.info('sharing-active handler called with source:', source.id)
     
     currentViewCode = viewCode
-    startRemoteControl(sourceId, sourceName, roomName, roomId, userName, userId)
+    startRemoteControl(source, roomName, roomId, userName, userId)
     
     customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
     await openShareMessage()

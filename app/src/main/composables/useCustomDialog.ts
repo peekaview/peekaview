@@ -1,7 +1,7 @@
 import path from 'path'
 import { ipcMain, screen, BrowserWindow } from 'electron'
 
-export interface DialogParams {
+export interface DialogOptions {
   id?: number
   title?: string
   message?: string
@@ -61,20 +61,16 @@ export function useCustomDialog() {
     soundfile = file
   }
 
-  function openShareDialog(hostname: string, params: DialogParams) {
-    _openPopup(hostname, 'share', params)
+  function openShareDialog(hostname: string, options: DialogOptions) {
+    openDialog(hostname, options, 'share')
   }
 
-  function openTrayDialog(hostname: string, params: DialogParams) {
+  function openTrayDialog(hostname: string, options: DialogOptions) {
     closeTrayDialogs()
-    _openPopup(hostname, 'tray', params)
+    openDialog(hostname, options, 'tray')
   }
 
-  function openDialog(hostname: string, params: DialogParams) {
-    _openPopup(hostname, 'dialog', params)
-  }
-
-  function _openPopup(hostname: string, type: 'share' | 'tray' | 'dialog', params: DialogParams) {
+  function openDialog(hostname: string, options: DialogOptions, type: 'share' | 'tray' | 'dialog' = 'dialog') {
     let windowParams: {
       width: number
       height: number
@@ -111,13 +107,13 @@ export function useCustomDialog() {
     else
       return
 
-    const defaultParams = {
+    const defaultOptions: DialogOptions = {
       title: 'Info',
       type: 'info',
       buttons: [],
       noLink: true,
       defaultId: 0,
-      cancelId: (type !== 'dialog' ? 0 : (params.buttons ?? []).length - 1),
+      cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
       message: '',
       timeout: (type === 'tray' ? 8000 : 0),
       detail: '',
@@ -139,7 +135,7 @@ export function useCustomDialog() {
       //skipTaskbar: true,
       skipTaskbar: (type !== 'dialog'),
       show: false,
-      title: `peekaview - ${params.title}`,
+      title: `peekaview - ${options.title}`,
       frame: false,
       x: windowParams.x,
       y: windowParams.y,
@@ -161,8 +157,8 @@ export function useCustomDialog() {
     //dialogWindow.webContents.openDevTools()
     dialogWindow.webContents.once('dom-ready', () => {
       dialogWindow.webContents.send('params', {
-        ...defaultParams,
-        ...params,
+        ...defaultOptions,
+        ...options,
       })
     })
 
