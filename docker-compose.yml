@@ -12,17 +12,19 @@ services:
     volumes:
       - ingress_data:/data
   
-  livekit:
-    image: peekaview/livekit:${DOCKER_TAG}
-    restart: unless-stopped
-    environment:
-      - LIVEKIT_URL=${LIVEKIT_URL}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - LIVEKIT_TURN_DOMAIN=${TURN_DOMAIN}
-    network_mode: "host"
-    volumes:
-      - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
+  # livekit:
+  #   image: peekaview/livekit:${DOCKER_TAG}
+  #   restart: unless-stopped
+  #   environment:
+  #     - LIVEKIT_URL=${LIVEKIT_URL}
+  #     - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+  #     - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+  #     - LIVEKIT_TURN_DOMAIN=${TURN_DOMAIN}
+  #   network_mode: "host"
+  #   volumes:
+  #     - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
+
+  
 
   api:
     image: peekaview/api:${DOCKER_TAG}
@@ -65,6 +67,23 @@ services:
       - "8082:80"
     networks:
       - internal
+
+  turnserver:
+    image: coturn/coturn
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+    command: [
+      "--min-port=49160",
+      "--max-port=49200"
+    ]
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "49160-49200:49160-49200/udp"
 
 volumes:
   ingress_data:
