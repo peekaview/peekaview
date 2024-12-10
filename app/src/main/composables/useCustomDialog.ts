@@ -1,5 +1,5 @@
-import path from 'path'
 import { ipcMain, screen, BrowserWindow } from 'electron'
+import { resolvePath } from '../util'
 
 export interface DialogOptions {
   id?: number
@@ -139,9 +139,9 @@ export function useCustomDialog() {
       frame: false,
       x: windowParams.x,
       y: windowParams.y,
-      icon: 'public/static/img/peekaviewlogo.png',
+      icon: resolvePath('static/img/peekaviewlogo.png'),
       webPreferences: {
-        preload: path.join(__dirname, '../../public/static/js/dialog.js'),
+        preload: resolvePath('static/js/dialog.js'),
         additionalArguments: [hostname],
         nodeIntegration: true,
         contextIsolation: false,
@@ -150,7 +150,7 @@ export function useCustomDialog() {
       },
     })
 
-    dialogWindow.loadFile(`public/static/${windowParams.template}`)
+    dialogWindow.loadFile(resolvePath(`static/${windowParams.template}`))
     if (type === 'dialog')
       dialogWindow.center()
     dialogWindow.show()

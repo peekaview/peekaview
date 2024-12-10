@@ -29,6 +29,11 @@
       "from": "locales",
       "to": "./locales",
       "filter": ["**/*"]
+    },
+    {
+      "from": "static",
+      "to": "./static",
+      "filter": ["**/*"]
     }
   ],
   "asar": {

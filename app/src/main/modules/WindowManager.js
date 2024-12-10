@@ -1,5 +1,5 @@
-import path from 'path';
-import { screen, desktopCapturer, BrowserWindow } from 'electron';
+import { screen, desktopCapturer, BrowserWindow } from 'electron'
+import { resolvePath } from '../util'
 // import { getActiveWindow } from "@nut-tree/nut-js";
 // import focusWindow from 'mac-focus-window';
 // import { getWindows } from 'mac-windows';
@@ -117,7 +117,7 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`osascript 'public/static/scripts/mac_windowlist.osa'`).toString().replace(regex, '')
+      res = this.executeCmd(`osascript 'static/scripts/mac_windowlist.osa'`).toString().replace(regex, '')
 
       console.log('start mac-windowlist')
       console.log(res)
@@ -559,7 +559,7 @@ export class WindowManager {
 
     if (isLinux) {
       try {
-        const result = this.executeCmdCached(`bash public/static/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
+        const result = this.executeCmdCached(`bash static/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
         //const result = '1'
         return result === '1'
       } catch (error) {
@@ -867,7 +867,7 @@ export class WindowManager {
       });
 
       const queryString = new URLSearchParams(args).toString();
-      const filePath = path.join(__dirname, '../../public/static/sharewindow.html');
+      const filePath = resolvePath('static/sharewindow.html');
       this.overlaydebug.loadURL(`file://${filePath}?${queryString}`);
 
       // Open DevTools automatically
@@ -910,7 +910,7 @@ export class WindowManager {
       console.log(windowdimensions)
 
       this.overlayrecord.removeMenu()
-      this.overlayrecord.loadFile('public/static/windowoverlay.html')
+      this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
       this.overlayrecord.setIgnoreMouseEvents(true)
 
 

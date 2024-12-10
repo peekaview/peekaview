@@ -29,6 +29,7 @@ import { WindowManager } from './modules/WindowManager'
 
 import PeekaViewLogo from '../assets/img/peekaview.png'
 import { ScreenSource } from '../interface.js'
+import { resolvePath } from './util'
 
 declare const APP_VERSION: string
 declare const CSP_POLICY: string
@@ -70,12 +71,8 @@ interface StoreSchema {
 
   const i18nReady = i18n.use(backend).init({
     backend: {
-      loadPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'locales/{{lng}}.json')
-        : path.join(__dirname, '../../locales/{{lng}}.json'),
-      addPath: app.isPackaged
-        ? path.join(process.resourcesPath, 'locales/{{lng}}.missing.json')
-        : path.join(__dirname, '../../locales/{{lng}}.missing.json'),
+      loadPath: resolvePath('locales/{{lng}}.json'),
+      addPath: resolvePath('locales/{{lng}}.missing.json'),
     },
     lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
     fallbackLng: Object.keys(languages)[0],
@@ -538,9 +535,7 @@ interface StoreSchema {
     const url = `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`
     
     // Load and process template
-    const templatePath = app.isPackaged
-      ? path.join(process.resourcesPath, '/public/static/templates/sharing-active.html')
-      : path.join(__dirname, '../../public/static/templates/sharing-active.html')
+    const templatePath = resolvePath('/static/templates/sharing-active.html')
 
     let htmlContent = (await fs.promises.readFile(templatePath, 'utf8'))
       .replace('{{message}}', i18n.t('sharingActive.message'))

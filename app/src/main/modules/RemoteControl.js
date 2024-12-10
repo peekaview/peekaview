@@ -1,4 +1,3 @@
-import path from 'path';
 import {
   mouse,
   Point,
@@ -6,13 +5,13 @@ import {
   keyboard,
   Key,
   Button,
-} from '@nut-tree-fork/nut-js';
-import { BrowserWindow, screen } from 'electron';
-import { app } from 'electron';
+} from '@nut-tree-fork/nut-js'
+import { BrowserWindow, screen } from 'electron'
 // import SocketIO from 'socket.io-client';
 // import { fileTypeFromBlob } from 'file-type';
 // import { Streamer } from "./Streamer.js";
-import { WindowManager } from './WindowManager.js';
+import { WindowManager } from './WindowManager.js'
+import { resolvePath } from '../util'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -145,7 +144,7 @@ export class RemoteControl {
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
-        preload: path.join(app.getAppPath(), 'public/static/js/cursoroverlaysignal.js'),
+        preload: resolvePath('static/js/cursoroverlaysignal.js'),
         additionalArguments: [id, name, color],
       },
     })
@@ -153,7 +152,7 @@ export class RemoteControl {
     this.overlaycursorsignal[id].removeMenu()
     this.overlaycursorsignal[id].setIgnoreMouseEvents(true)
     // this.overlaycursorsignal[id].setAlwaysOnTop(true, 'screen-saver');
-    this.overlaycursorsignal[id].loadFile('public/static/cursoroverlaysignal.html')
+    this.overlaycursorsignal[id].loadFile(resolvePath('static/cursoroverlaysignal.html'))
     console.log(`show signal${cpoint}`)
 
     let currentoverlaysignal = this.overlaycursorsignal[id]
@@ -193,7 +192,7 @@ export class RemoteControl {
           webSecurity: false,
           nodeIntegration: true,
           contextIsolation: false,
-          preload: path.join(app.getAppPath(), 'public/static/js/drawer.js'),
+          preload: resolvePath('static/js/drawer.js'),
         },
       })
 
@@ -201,7 +200,7 @@ export class RemoteControl {
       this.overlaydrawer.removeMenu()
       this.overlaydrawer.setIgnoreMouseEvents(true)
       // this.overlaydrawer.setAlwaysOnTop(true, 'screen-saver');
-      this.overlaydrawer.loadFile('public/static/drawer.html')
+      this.overlaydrawer.loadFile(resolvePath('static/drawer.html'))
     }
     this.overlaydrawer.webContents.send(action, data)
   }
@@ -229,14 +228,14 @@ export class RemoteControl {
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
-          preload: path.join(app.getAppPath(), 'public/static/js/cursoroverlay.js'),
+          preload: resolvePath('static/js/cursoroverlay.js'),
           additionalArguments: [id, name, color],
         },
       })
 
       this.overlaycursor[id].removeMenu()
       this.overlaycursor[id].setAlwaysOnTop(true, 'screen-saver')
-      this.overlaycursor[id].loadFile('public/static/cursoroverlay.html')
+      this.overlaycursor[id].loadFile(resolvePath('static/cursoroverlay.html'))
       this.overlaycursor[id].setIgnoreMouseEvents(true)
 
       // const self = this
@@ -471,13 +470,13 @@ export class RemoteControl {
         webSecurity: false,
         nodeIntegration: true,
         contextIsolation: false,
-        preload: path.join(app.getAppPath(), 'public/static/js/clipboard.js'),
+        preload: resolvePath('static/js/clipboard.js'),
       },
     })
 
     this.clipboardwindow.removeMenu()
     this.clipboardwindow.setAlwaysOnTop(true, 'screen-saver')
-    this.clipboardwindow.loadFile('public/static/clipboard.html')
+    this.clipboardwindow.loadFile(resolvePath('static/clipboard.html'))
     //this.clipboardwindow.webContents.openDevTools();
     this.clipboardwindow.webContents.send('pasteFromFile', data)
     this.clipboardwindow.show()

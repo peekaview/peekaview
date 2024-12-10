@@ -113,7 +113,7 @@
     "sessionError": "There has been an error with your session. Please try to login again.",
     "waitForLogin": "Wait for login",
     "orEnterCode": "or enter code from browser",
-    "loginWithCode": "loginWithCode"
+    "loginWithCode": "Login with code"
   },
   "sourcesWindow": {
     "type": {
