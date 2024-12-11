@@ -24,8 +24,6 @@ services:
   #   volumes:
   #     - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
 
-  
-
   api:
     image: peekaview/api:${DOCKER_TAG}
     restart: unless-stopped
@@ -67,7 +65,7 @@ services:
       - "8082:80"
     networks:
       - internal
-#https://meetrix.io/blog/webrtc/turnserver/long_term_cred.html
+
   turnserver:
     image: coturn/coturn
     restart: unless-stopped
@@ -77,13 +75,12 @@ services:
       "--min-port=49160",
       "--max-port=49200",
       "--log-file=stdout",
-      "--lt-cred-mech",
       "--fingerprint",
+      "--allow-loopback-peers",
       "--no-multicast-peers",
-      "--no-cli",
-      "--no-tlsv1",
-      "--no-tlsv1_1",
-      "--use-auth-secret=test123",
+      "--cli-password=${TURN_CLI_PASSWORD}",
+      "--use-auth-secret",
+      "--static-auth-secret=${TURN_SHARED_SECRET}",
       "--realm=${TURN_DOMAIN}"
     ]
     ports:
