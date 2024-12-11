@@ -67,7 +67,7 @@ services:
       - "8082:80"
     networks:
       - internal
-
+#https://meetrix.io/blog/webrtc/turnserver/long_term_cred.html
   turnserver:
     image: coturn/coturn
     restart: unless-stopped
@@ -75,7 +75,15 @@ services:
       - DETECT_EXTERNAL_IP=yes
     command: [
       "--min-port=49160",
-      "--max-port=49200"
+      "--max-port=49200",
+      "--log-file=stdout",
+      "--lt-cred-mech",
+      "--fingerprint",
+      "--no-multicast-peers",
+      "--no-cli",
+      "--no-tlsv1",
+      "--no-tlsv1_1",
+      "--realm=${TURN_DOMAIN}"
     ]
     ports:
       - "3478:3478"
