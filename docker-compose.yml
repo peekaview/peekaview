@@ -83,7 +83,7 @@ services:
       "--no-cli",
       "--no-tlsv1",
       "--no-tlsv1_1",
-      "--use-auth-secret=test123"
+      "--use-auth-secret=test123",
       "--realm=${TURN_DOMAIN}"
     ]
     ports:
