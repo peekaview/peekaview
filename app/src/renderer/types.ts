@@ -15,20 +15,3 @@ export type ScreenShareData = {
   serverUrl: string
   controlServer?: string
 }
-
-export type ScreenPresent = Reactive<{
-  participants: Ref<Record<string, ViewingParticipant>>
-  addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
-}>
-
-export type ScreenView = Reactive<{
-  sharingParticipant: Ref<SharingParticipant | undefined>
-}>
-
-export type ViewingParticipant = {
-  name: string | undefined
-}
-
-export type SharingParticipant = {
-  name: string | undefined
-}

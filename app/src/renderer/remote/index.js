@@ -1,3 +1,6 @@
+import '../../assets/css/remoteviewer.css'
+import '../../assets/css/remoteviewer-overlay.css'
+
 var socket;
 
 // gedrückte Keys
@@ -254,7 +257,7 @@ window.onload = function () {
         var obj = JSON.parse(data);
         // Mauszeiger erstellen (nur bei Windowsharing, beim Screensharing bleibt stattdessen der Remotemauszeiger sichtbar)
         if (synchronized && overlaycursor[obj.id] == undefined && !screensharing) {
-            htmlString = '<div id="' + obj.id + '" style="transition: all 0.05s ease-out; pointer-events: none; float:left; width:300px; position: absolute; z-index:99">' + ((id != obj.id) ? '<img src="img/cursor.png" style="float: left; height: 25px; width: 25px; " />' : '') + '<div id="cursorname" style="float:left; width: auto; margin-left: 10px; margin-top: 10px; border: 1px solid #' + obj.color + '; background: white; color: #' + obj.color + '; font-size:12px; padding:4px">' + obj.name + '</div></div>';
+            const htmlString = '<div id="' + obj.id + '" style="transition: all 0.05s ease-out; pointer-events: none; float:left; width:300px; position: absolute; z-index:99">' + ((id != obj.id) ? '<img src="img/cursor.png" style="float: left; height: 25px; width: 25px; " />' : '') + '<div id="cursorname" style="float:left; width: auto; margin-left: 10px; margin-top: 10px; border: 1px solid #' + obj.color + '; background: white; color: #' + obj.color + '; font-size:12px; padding:4px">' + obj.name + '</div></div>';
             var div = document.createElement('div');
             div.innerHTML = htmlString.trim();
             overlaycursor[obj.id] = div.firstChild;
@@ -588,8 +591,8 @@ window.onload = function () {
 
     function calcScale() {
         document.querySelector("#overlay").style.border = '1px solid blue';
-        scale1 = document.querySelector("#overlay").getBoundingClientRect().width / remotevideosize.width;
-        scale2 = document.querySelector("#overlay").getBoundingClientRect().height / remotevideosize.height;
+        const scale1 = document.querySelector("#overlay").getBoundingClientRect().width / remotevideosize.width;
+        const scale2 = document.querySelector("#overlay").getBoundingClientRect().height / remotevideosize.height;
 
         scale = scale1 < scale2 ? scale1 : scale2;
         if (scale > 1) {
@@ -681,8 +684,8 @@ window.onload = function () {
             remotescale = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
         } else {*/
         //remotescale = message.scalefactor;
-        remotescaleheight = (remotevideosize.height / ((message.dimensions.bottom - message.dimensions.top) - 0));
-        remotescalewidth = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
+        const remotescaleheight = (remotevideosize.height / ((message.dimensions.bottom - message.dimensions.top) - 0));
+        const remotescalewidth = (remotevideosize.width / ((message.dimensions.right - message.dimensions.left) - 0));
         if (remotescaleheight < remotescalewidth) {
             remotescale = remotescaleheight;
         } else {

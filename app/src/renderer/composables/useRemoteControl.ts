@@ -123,7 +123,7 @@ export function useRemoteControl() {
     }
 
     let ifrm = document.createElement("iframe")
-    ifrm.setAttribute("src", `./static/remoteviewer.html?hostname=${hostname}&roomid=${roomid}&color=${color}&username=${username}&userid=${userid}`)
+    ifrm.setAttribute("src", `/remote/index.html?hostname=${hostname}&roomid=${roomid}&color=${color}&username=${username}&userid=${userid}`)
     ifrm.style.cssText = "min-width: 100vw; min-height: 100vh; width: 100%; height: 100%; position: absolute; top: 0px; border: 0px; z-index:9999"
     ifrm.id = "remoteviewer"
     ifrm.allow = "clipboard-write"

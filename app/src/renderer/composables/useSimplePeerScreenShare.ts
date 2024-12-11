@@ -1,5 +1,7 @@
 import {
+  Reactive,
   reactive,
+  Ref,
   ref,
   shallowRef,
   watch,
@@ -8,21 +10,61 @@ import {
 import SimplePeer from 'simple-peer'
 import { io, type Socket } from "socket.io-client"
 
-import { ScreenPresent, ScreenShareData, ScreenView, SharingParticipant, ViewingParticipant } from "../types"
+import { ScreenShareData } from "../types"
 
 interface ScreenPeer {
   socket: Socket
   initPeer: (socketId: string, initiator: boolean, stream?: MediaStream) => SimplePeer.Instance
 }
 
+interface ScreenPresentOptions {
+  remoteEnabled?: boolean
+  onRemote?: (data: RemoteData) => void
+}
+
 interface ScreenViewOptions {
   videoElement?: HTMLVideoElement
-  onRemote?: () => void
+  onRemote?: (data: RemoteData) => void
   onEnding?: () => void
 }
 
+export type ScreenPresent = Reactive<{
+  participants: Ref<Record<string, ViewingParticipant>>
+  addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
+  sendRemote: (data: RemoteData, socketId?: string, exclude?: boolean) => void
+}>
+
+export type ScreenView = Reactive<{
+  sharingParticipant: Ref<SharingParticipant | undefined>
+  sendRemote: (data: RemoteData) => void
+}>
+
+export type PeerData = {
+  type: 'identity'
+  name: string
+} | {
+  type: 'remote'
+  remote: RemoteData
+} | {
+  type: 'leave' | 'close'
+}
+
+export type RemoteData = {
+  enable?: boolean
+}
+
+export type ViewingParticipant = {
+  name: string | undefined
+}
+
+export type SharingParticipant = {
+  name: string | undefined
+}
+
+const rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
+
 async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean): Promise<ScreenPeer> {
-  const socket = io("wss://c1.peekaview.de")
+  const socket = io(import.meta.env.VITE_RTC_CONTROL_SERVER)
   
   const initPeer = (socketId: string, initiator: boolean, stream?: MediaStream) => {
     const peer = new SimplePeer({
@@ -32,11 +74,7 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          /*{
-            urls: 'turn:turn.speed.cloudflare.com:50000',
-            username: '03f2f3316d7c596c2674ab7af813864819b23b401772cb58f490a307141657f1fd9bbe2abd8553936072e921fcd30f7269f731501de30ceb85163f9757b9620a',
-            credential: 'aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb'
-          }*/
+          rtcIceServer,
         ]
       },
       offerOptions: {
@@ -79,7 +117,7 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
   )
 }
 
-export async function useScreenPresent(screenShareData: ScreenShareData, remote: boolean): Promise<ScreenPresent> {
+export async function useScreenPresent(screenShareData: ScreenShareData, options?: ScreenPresentOptions): Promise<ScreenPresent> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, true)
   const participants = ref<Record<string, ViewingParticipant>>({})
   const peers: Record<string, SimplePeer.Instance> = {}
@@ -88,13 +126,19 @@ export async function useScreenPresent(screenShareData: ScreenShareData, remote:
   socket.on('initReceive', (socketId) => {
     peers[socketId] = initPeer(socketId, true, stream)
 
-    peers[socketId].on('connect', () => 
-      peers[socketId].send(JSON.stringify({ type: 'identity', name: screenShareData.userName, remote }))
-    )
+    peers[socketId].on('connect', () => {
+      peers[socketId].send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
+      if (options?.remoteEnabled)
+        peers[socketId].send(JSON.stringify({ type: 'remote', remote: { enable: true } }))
+    })
     
     peers[socketId].on('data', (json) => {
-      const data = JSON.parse(json)
+      const data = JSON.parse(json) as PeerData
       switch (data.type) {
+        case 'remote':
+          options?.onRemote?.(data.remote)
+          sendRemote(data.remote, socketId, true)
+          break
         case 'identity':
           participants.value[socketId] = { name: data.name }
           break
@@ -140,7 +184,20 @@ export async function useScreenPresent(screenShareData: ScreenShareData, remote:
       peers[socketId].addStream(stream);
   }
 
-  return reactive({ participants, addStream, leave })
+  const sendRemote = (data: RemoteData, socketId?: string, exclude = false) => {
+    let sendToPeers = { ...peers }
+    if (socketId) {
+      if (exclude)
+        delete sendToPeers[socketId]
+      else
+        sendToPeers = peers[socketId] ? { socketId: peers[socketId] } : {}
+    }
+
+    for (const socketId in sendToPeers)
+      sendToPeers[socketId].send(JSON.stringify({ type: 'remote', data }))
+  }
+
+  return reactive({ participants, addStream, sendRemote, leave })
 }
 
 export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
@@ -183,14 +240,13 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
         stream.value = s
       })
       sharingPeer.on('data', (json) => {
-        const data = JSON.parse(json)
+        const data = JSON.parse(json) as PeerData
         switch (data.type) {
           case 'remote':
+            options?.onRemote?.(data.remote)
             break
           case 'identity':
             sharingParticipant.value = { name: data.name }
-            if (data.remote)
-              options?.onRemote?.()
             break
           case 'close':
             close()
@@ -198,12 +254,16 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
         }
       })
 
+      const sendRemote = (data: RemoteData) => {
+        sharingPeer?.send(JSON.stringify({ type: 'remote', data }))
+      }
+
       const leave = () => {
         sharingPeer?.send(JSON.stringify({ type: 'leave' }))
         close()
       }
 
-      resolve(reactive({ sharingParticipant, leave }))
+      resolve(reactive({ sharingParticipant, sendRemote, leave }))
     })
   })
 }

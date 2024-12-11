@@ -412,7 +412,7 @@ interface StoreSchema {
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
     streamer = useStreamer()
-    streamer.setArgs(sourceId, import.meta.env.VITE_CONTROLSERVER, roomName, roomId, userName, userId)
+    streamer.setArgs(sourceId, import.meta.env.VITE_RTC_CONTROL_SERVER, roomName, roomId, userName, userId)
     streamer.joinRoom()
     streamer.startSharing()
   }

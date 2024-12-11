@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch, useTemplateRef } from 'vue'
+import { ref, watch, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import RemoteControl from "./RemoteControl.vue"
 
-import type { AcceptedRequestData, ScreenShareData, ScreenView } from '../types'
+import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi } from '../api'
 import { notify } from '../util'
-import { useScreenView } from '../composables/useSimplePeerScreenShare'
+import { useScreenView, type RemoteData, type ScreenView } from '../composables/useSimplePeerScreenShare'
 import { useRemoteControl } from  '../composables/useRemoteControl'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
@@ -63,15 +63,16 @@ const trackRef = useTemplateRef('track')
 
 const { closeRemoteControl } = useRemoteControl()
 
-watch(screenShareData, async (data) => {
-  if (!data)
+watch(screenShareData, async (screenShareData) => {
+  if (!screenShareData)
     return
 
-  console.log('liveKitDebugUrl', liveKitDebugUrl.value)
-
-  screenView.value = await useScreenView(data, {
+  screenView.value = await useScreenView(screenShareData, {
     videoElement: trackRef.value ?? undefined,
-    onRemote: () => initializeRemoteViewer(data),
+    onRemote: (data: RemoteData) => {
+      if (data.enable)
+        initializeRemoteViewer(screenShareData)
+    },
     onEnding: () => {
       notify({
         type: 'info',
@@ -97,10 +98,6 @@ watch(requestStatus, (status) => {
 
   requestStatus.value = undefined
 })
-
-const liveKitDebugUrl = computed(() => 
-  screenShareData.value ? `https://meet.livekit.io/custom?liveKitUrl=wss://${screenShareData.value.serverUrl}&token=${screenShareData.value.jwtToken}` : undefined
-)
 
 function getRequestId(length = 8) {
   const requestId = localStorage.getItem('requestId')

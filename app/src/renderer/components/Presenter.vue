@@ -2,9 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { useScreenPresent } from "../composables/useSimplePeerScreenShare"
+import { useScreenPresent, type ScreenPresent } from "../composables/useSimplePeerScreenShare"
 
-import type { AcceptedRequestData, ScreenPresent, ScreenShareData } from '../types'
+import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { notify, prompt } from '../util'
 import { ScreenSource } from '../../interface'
@@ -181,7 +181,9 @@ async function startSession() {
       serverUrl: data.videoServer,
     }
 
-    screenPresent.value = await useScreenPresent(screenShareData.value, !!window.electronAPI)
+    screenPresent.value = await useScreenPresent(screenShareData.value, {
+      remoteEnabled: !!window.electronAPI,
+    })
     shareLocalScreen(data.roomId, data.roomId, props.email, props.email, undefined)
   } catch (error) {
     console.error('Error creating room:', error);
