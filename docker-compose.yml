@@ -28,8 +28,8 @@ services:
     image: peekaview/api:${DOCKER_TAG}
     restart: unless-stopped
     environment:
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+#      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+#      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - VIDEO_SERVERS=${VIDEO_SERVERS}
       - CONTROL_SERVERS=${CONTROL_SERVERS}
       - APP_DOMAIN=${APP_DOMAIN}
