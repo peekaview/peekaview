@@ -20,20 +20,23 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 // Validate required environment variables
-foreach (['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as $required) {
+foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as $required) {
     if (!getenv($required)) {
         die(json_encode(['error' => "Missing required environment variable: $required"]));
     }
 }
 
-define('LIVEKIT_API_KEY', getenv('LIVEKIT_API_KEY'));
-define('LIVEKIT_API_SECRET', getenv('LIVEKIT_API_SECRET'));
+//define('LIVEKIT_API_KEY', getenv('LIVEKIT_API_KEY'));
+//define('LIVEKIT_API_SECRET', getenv('LIVEKIT_API_SECRET'));
+define('TURN_SHARED_SECRET', getenv('TURN_SHARED_SECRET'));
+define('TURN_EXPIRE', 8640000);
 define('APP_DOMAIN', getenv('APP_DOMAIN'));
 define('CONTROL_SERVERS', array_filter(array_map('trim', explode(',', getenv('CONTROL_SERVERS')))));
 define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', getenv('VIDEO_SERVERS')))));
 define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
+
 
 
 // Input validation functions
@@ -247,6 +250,17 @@ function doesAnyoneWantToSeeMyScreen() {
     }
 }
 
+function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
+    $time = time();
+    $username = $time + $expiry;
+    $credential = base64_encode(hash_hmac('sha1', $username, $secret, true));
+    
+    return [
+        'username' => (string)$username,
+        'credential' => $credential
+    ];
+}
+
 function showMeYourScreen() {
     try {
         $email = validateEmail($_GET['email'] ?? '');
@@ -341,12 +355,15 @@ function showMeYourScreen() {
             }
             
             if ($status === 'request_accepted') {
+                $turnCredential = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
+
                 echo json_encode([
                     'status' => 'request_accepted',
                     'jwt' => generateJWT($name, $userData[3]),
                     'roomId' => $userData[3],
                     'videoServer' => $userData[4],
                     'controlServer' => $userData[5],
+                    'turnCredential' => $turnCredential,
                     'user_status' => $userStatus,
                     'last_seen' => $lastSeen
                 ]);
