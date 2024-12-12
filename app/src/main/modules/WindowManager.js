@@ -310,11 +310,13 @@ export class WindowManager {
   getWindowOuterDimensions() {
     if (this.isScreen()) {
       const cscreen = this.screen;
+      console.log('Screen:')
+      console.log(cscreen)
       return {
         left: cscreen.bounds.x,
         top: cscreen.bounds.y,
-        right: cscreen.bounds.x + cscreen.size.width,
-        bottom: cscreen.bounds.y + cscreen.size.height,
+        right: cscreen.bounds.width + 16,
+        bottom: cscreen.bounds.height,
       };
     }
 
@@ -742,7 +744,7 @@ export class WindowManager {
   }
 
   executeCmdCached(cmd) {
-    const maxcacheage = isMac ? 1000 : 1000
+    const maxcacheage = isMac ? 3000 : 1000
     const cacheKey = cmd.replace(/[^a-zA-Z0-9]/g, '')
 
     if (this.cache[cacheKey] === undefined)
@@ -860,9 +862,9 @@ export class WindowManager {
       const windowdimensions = this.getWindowOuterDimensions()
 
       const x = windowdimensions.left - 2
-      const y = windowdimensions.top - 32
+      const y = windowdimensions.top - 2
       const width = windowdimensions.right - windowdimensions.left + 20
-      const height = windowdimensions.bottom - windowdimensions.top + 34
+      const height = windowdimensions.bottom - windowdimensions.top + 4
       const scalefactor = this.getScaleFactor()
 
       console.log(scalefactor)
@@ -894,6 +896,30 @@ export class WindowManager {
 
 
       //this.overlayrecord.webContents.openDevTools();
+    } else {
+      const windowdimensions = this.getWindowOuterDimensions()
+
+      this.overlayrecord = new BrowserWindow({
+        x: windowdimensions.left,
+        y: windowdimensions.top,
+        width: windowdimensions.right - windowdimensions.left,
+        height: windowdimensions.bottom - windowdimensions.top,
+        transparent: true,
+        skipTaskbar: true,
+        focusable: false,
+        roundedCorners: false,
+        enableLargerThanScreen: true,
+        title: '__peekaview - WindowCapture',
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+          nodeIntegration: true,
+        },
+      })
+
+      this.overlayrecord.removeMenu()
+      this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
+      this.overlayrecord.setIgnoreMouseEvents(true)
     }
   }
 

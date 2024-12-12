@@ -81,19 +81,19 @@ export function useCustomDialog() {
 
     if (type === 'share')
       windowParams = {
-        width: 500,
+        width: 420,
         height: 50,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250),
+        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 210),
         y: screen.getPrimaryDisplay().bounds.y -8,
         template: 'dialogshare.html',
       }
     else if (type === 'tray')
       windowParams = {
         width: 600,
-        height: 300,
+        height: 220,
         //x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
         x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux || isWin32 ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 300 : screen.getPrimaryDisplay().workAreaSize.width - 600),
-        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux || isWin32 ? 30 : screen.getPrimaryDisplay().workAreaSize.height - 300),
+        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux || isWin32 ? 70 : screen.getPrimaryDisplay().workAreaSize.height - 200),
         template: 'dialogtray.html',
       }
     else if (type === 'dialog')
@@ -115,7 +115,7 @@ export function useCustomDialog() {
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
       message: '',
-      timeout: (type === 'tray' ? 8000 : 0),
+      timeout: (type === 'tray' ? 800000 : 0),
       detail: '',
       soundfile,
     }

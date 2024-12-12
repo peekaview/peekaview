@@ -27,7 +27,7 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
 
-import PeekaViewLogo from '../assets/img/peekaview.png'
+import PeekaViewLogo from '../assets/img/peekaviewicon_mono2.png'
 import { ScreenSource } from '../interface.js'
 import { resolvePath } from './util'
 
@@ -120,7 +120,8 @@ interface StoreSchema {
     }
 
     const trayIconPath = path.join(__dirname, PeekaViewLogo)
-    const trayIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
+    const trayIcon: Electron.NativeImage = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
+    trayIcon.setTemplateImage(true)
 
     tray = new Tray(trayIcon)
 

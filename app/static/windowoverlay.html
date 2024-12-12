@@ -8,18 +8,31 @@
         font-weight: 400;
         src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
       }
-      </style>
+
+        @keyframes pulse {
+            0% { border-color: hsla(0, 100%, 50%, 0.1); }
+            50% { border-color: hsla(0, 100%, 50%, 0.75); }
+            100% { border-color: hsla(0, 100%, 50%, 0.1); }
+        }
+
+        .border-container {
+            border: 4px solid hsla(0, 100%, 50%, 0.75);
+            width: calc(100vw - 24px);
+            height: calc(100vh - 8px);
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
     <link rel="stylesheet" href="css/remoteviewer.css" />
     <link rel="stylesheet" href="css/remoteviewer-overlay.css" />
 </head>
 
 
 <body style="margin: 0px; overflow: hidden; padding:0px">
-    <div
+    <!--<div
         style="margin-left: calc(25vw); margin-right: calc(25vw); background: hsla(0, 100%, 50%, 0.75); width: calc(50vw); height: 30px; color: white; font-size: 12px; font-weight: bold; padding-left: 20px; display: -webkit-flex; display: flex; align-items: center; ">
         <div>Fenster in PeekaView freigegeben</div>
-    </div>
-    <div style="border: 2px solid hsla(0, 100%, 50%, 0.75); width: calc(100vw - 20px); height: calc(100vh - 34px) ">
+    </div>-->
+    <div class="border-container">
     </div>
 </body>
 

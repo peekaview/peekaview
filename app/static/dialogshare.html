@@ -81,24 +81,43 @@
     <div style="height: 15px; width: 100%; position: absolute; top: 0; left: 0; -webkit-app-region: drag;"></div>
     <div class="modal-container settings_container" >
       <div class="modal-body">
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;">
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: 110px; margin:0px; padding: 4px; margin-bottom: 4px;">
           <label class="checkboxcontainer">&nbsp;&nbsp;Fernzugriff
             <input type="checkbox" onChange="toggleRemoteControl()" id="remotecontrolenabled"><span
               class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;">
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: 110px; margin:0px; padding: 4px;">
           <label class="checkboxcontainer">&nbsp;&nbsp;Mauszeiger
             <input type="checkbox" onChange="toggleMouse()" id="mouseenabled" checked="checked"><span
               class="checkmark"></span>
           </label>
         </div>
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 16px); margin:0px; padding: 4px;"
-          onClick="copyLink()">Link teilen</div>
-        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(25% - 17px); margin:0px; padding: 4px;"
-          onClick="stopSharing()">Beenden</div>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(10%); margin:0px; padding: 4px;"
+          onClick="copyLink()">
+          <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#666" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+          </svg>
+        </div>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(10%); margin:0px; padding: 4px;"
+          onClick="togglePause()">
+          <!-- Pause SVG -->
+          <svg id="pauseIcon" width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#666" d="M6 4h4v16H6zm8 0h4v16h-4z"/>
+          </svg>
+          <!-- Play SVG (hidden by default) -->
+          <svg id="playIcon" width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+            <path fill="#666" d="M8 5v14l11-7z"/>
+          </svg>
+        </div>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(10%); margin:0px; padding: 4px;"
+          onClick="stopSharing()">
+          <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#666" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </div>
         
-        <div style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width:32px; -webkit-user-select: none; -webkit-app-region: drag;">
+        <div style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width: 16px; -webkit-user-select: none; -webkit-app-region: drag; display: flex; justify-content: center; align-items: center;">
           <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path fill="none" stroke="#ccc" stroke-width="2"
               d="M15,5 L17,5 L17,3 L15,3 L15,5 Z M7,5 L9,5 L9,3 L7,3 L7,5 Z M15,13 L17,13 L17,11 L15,11 L15,13 Z M7,13 L9,13 L9,11 L7,11 L7,13 Z M15,21 L17,21 L17,19 L15,19 L15,21 Z M7,21 L9,21 L9,19 L7,19 L7,21 Z" />
@@ -160,6 +179,24 @@
 
   function copyLink() {
     electron.ipcRenderer.invoke("show-sharing-active");
+  }
+
+  let isPaused = false;
+
+  function togglePause() {
+    isPaused = !isPaused;
+    const pauseIcon = document.getElementById('pauseIcon');
+    const playIcon = document.getElementById('playIcon');
+    
+    if (isPaused) {
+      pauseIcon.style.display = 'none';
+      playIcon.style.display = 'inline';
+      electron.ipcRenderer.invoke("pause-sharing");
+    } else {
+      pauseIcon.style.display = 'inline';
+      playIcon.style.display = 'none';
+      electron.ipcRenderer.invoke("resume-sharing");
+    }
   }
 
 </script>
