@@ -140,7 +140,7 @@ export class RemoteControl {
       useContentSize: true,
       frame: false,
       alwaysOnTop: true,
-      title: `__meetzi - Cursorsignal ${name}`,
+      title: `__peekaview - Cursorsignal ${name}`,
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
@@ -186,7 +186,7 @@ export class RemoteControl {
         // useContentSize: true,
         frame: false,
         alwaysOnTop: true,
-        title: '__meetzi - Drawer ',
+        title: '__peekaview - Drawer ',
         // titleBarStyle: 'hidden',
         webPreferences: {
           webSecurity: false,
@@ -224,7 +224,7 @@ export class RemoteControl {
         useContentSize: true,
         frame: false,
         alwaysOnTop: true,
-        title: `__meetzi - Cursor ${name}`,
+        title: `__peekaview - Cursor ${name}`,
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
@@ -459,7 +459,7 @@ export class RemoteControl {
       frame: false,
       resizable: false,
       alwaysOnTop: true,
-      title: '__meetzi - Clipboard',
+      title: '__peekaview - Clipboard',
       titleBarStyle: 'hidden',
       skipTaskbar: true,
       //x: screen.getPrimaryDisplay().workAreaSize.width - 170,

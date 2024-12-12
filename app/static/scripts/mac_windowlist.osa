@@ -1,48 +1,54 @@
 tell application "System Events"
-    -- Get all visible processes and their windows in one go
     set windowList to {}
-    repeat with p in (processes whose visible is true)
-        set pName to name of p
-        set pID to id of p
-        set winTitles to {}
-        
-        -- Get window titles directly, filter out missing values in one pass
-        repeat with w in (windows of p)
-            if name of w is not missing value then
-                set end of winTitles to name of w
+    
+    -- Fetch all visible processes
+    set visibleProcesses to (processes whose visible is true)
+    
+    -- Iterate through each process
+    repeat with p in visibleProcesses
+        try
+            set pName to name of p
+            set pID to id of p
+            set winTitles to {}
+            
+            -- Safely retrieve window names
+            set allWindows to windows of p
+            repeat with w in allWindows
+                try
+                    set winName to name of w
+                    if winName is not missing value then
+                        set end of winTitles to winName
+                    end if
+                end try
+            end repeat
+            
+            -- Add process only if windows exist
+            if (count of winTitles) > 0 then
+                set end of windowList to {pName, pID, winTitles}
             end if
-        end repeat
-        
-        -- Only add process if it has windows
-        if length of winTitles > 0 then
-            set end of windowList to {pName, pID, winTitles}
-        end if
+        end try
     end repeat
 end tell
 
--- Build JSON string more efficiently using text item delimiters
-set {tid, AppleScript's text item delimiters} to {AppleScript's text item delimiters, ","}
+-- Build JSON
 set jsonString to "{ \"data\": ["
+set {tid, AppleScript's text item delimiters} to {AppleScript's text item delimiters, ","}
 
--- Build process entries
-repeat with i from 1 to length of windowList
-    set winO to item i of windowList
-    set windowsJSON to "\"" & (items of item 3 of winO as text) & "\""
-    set processJSON to "
+set jsonEntries to {}
+repeat with winO in windowList
+    set pName to item 1 of winO
+    set pID to item 2 of winO
+    set winTitles to "\"" & (items of item 3 of winO as text) & "\""
+    set end of jsonEntries to "
   {
-    \"processName\": \"" & item 1 of winO & "\",
-    \"id\": \"" & item 2 of winO & "\",
-    \"windows\": [" & windowsJSON & "]
+    \"processName\": \"" & pName & "\",
+    \"id\": \"" & pID & "\",
+    \"windows\": [" & winTitles & "]
   }"
-    
-    if i < length of windowList then
-        set jsonString to jsonString & processJSON & ","
-    else
-        set jsonString to jsonString & processJSON
-    end if
 end repeat
 
-set jsonString to jsonString & "]}"
+-- Combine JSON entries into one string
+set jsonString to jsonString & (jsonEntries as text) & "]}"
 set AppleScript's text item delimiters to tid
 
 return jsonString

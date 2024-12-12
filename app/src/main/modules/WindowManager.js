@@ -101,7 +101,7 @@ export class WindowManager {
   }
 
   isBlacklistedWindow(windowtitle) {
-    return windowtitle.startsWith('__meetzi') || windowtitle.startsWith('meetzi - Raum aktiv')
+    return windowtitle.startsWith('__peekaview') || windowtitle.trim() == 'peekaview'
   }
 
   isScreen() {
@@ -117,7 +117,7 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`osascript 'static/scripts/mac_windowlist.osa'`).toString().replace(regex, '')
+      res = this.executeCmd(`swift 'static/scripts/mac_windowlist.swift'`).toString().replace(regex, '')
 
       console.log('start mac-windowlist')
       console.log(res)
@@ -139,7 +139,7 @@ export class WindowManager {
 
     console.log("TEST2", isMac)
     // Mac doesn't provide enough information about the windows via desktopCapturer API, so we need our own way to get windows via osascript
-    if (isMac) {
+    /*if (isMac) {
       const processlist = await this.getMacWindowlist()
       console.log(processlist)
 
@@ -159,8 +159,8 @@ export class WindowManager {
         })
       })
     }
-    else {
-      const { desktopCapturer } = require('electron')
+    else {*/
+      /*const { desktopCapturer } = require('electron')
       await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { height: 0, width: 0 } })
         .then(async (sources) => {
           for (const source of sources) {
@@ -171,10 +171,12 @@ export class WindowManager {
             if (!this.isBlacklistedWindow(source.name))
               num++
           }
-        })
-    }
+        })*/
+    //}
 
-    return windowhwnd
+    //id = source.id.split(':')[1]
+
+    return id.split(':')[1]
   }
 
   async selectWindowByTitle(title) {
@@ -188,7 +190,7 @@ export class WindowManager {
         console.log(item)
         if (item.name == title) {
           windowByTitle = item.id.split(':')[1]
-          // console.log(windowByTitle);
+          console.log(windowByTitle);
           self.windowhwnd = windowByTitle
 
           return windowByTitle
@@ -474,33 +476,27 @@ export class WindowManager {
   }
 
   getWindowInnerDimensionsMac() {
-    const pid = this.windowhwnd.split(/,(.*)/s)[0]
-    const winname = this.windowhwnd.split(/,(.*)/s)[1]
-    const windowPos = this.executeCmdCached(`osascript -e 'tell application "System Events" to get the position of window "${winname}" of (first process whose id is ${pid})' || true`).toString().replaceAll(' ', '').replaceAll('\n', '').split(',')
-    const windowSize = this.executeCmdCached(`osascript -e 'tell application "System Events" to get the size of window "${winname}" of (first process whose id is ${pid})' || true`).toString().replaceAll(' ', '').replaceAll('\n', '').split(',')
-
-    const activeWindowInnerDimensions = {}
-    activeWindowInnerDimensions.left = Number.parseInt(windowPos[0])
-    activeWindowInnerDimensions.top = Number.parseInt(windowPos[1])
-    activeWindowInnerDimensions.right = activeWindowInnerDimensions.left + Number.parseInt(windowSize[0])
-    activeWindowInnerDimensions.bottom = activeWindowInnerDimensions.top + Number.parseInt(windowSize[1])
-
-    return activeWindowInnerDimensions
+    const windowNumber = this.windowhwnd;
+    const windowInfo = this.executeCmdCached(`swift static/scripts/mac_window_info.swift ${windowNumber}`).toString().trim();
+    
+    try {
+      const info = JSON.parse(windowInfo);
+      const activeWindowInnerDimensions = {
+        left: info.x,
+        top: info.y,
+        right: info.x + info.width,
+        bottom: info.y + info.height
+      };
+      return activeWindowInnerDimensions;
+    } catch (error) {
+      console.warn('Error parsing window info:', error);
+      return null;
+    }
   }
 
   getWindowOuterDimensionsMac() {
-    const pid = this.windowhwnd.split(/,(.*)/s)[0]
-    const winname = this.windowhwnd.split(/,(.*)/s)[1]
-    const windowPos = this.executeCmdCached(`osascript -e 'tell application "System Events" to get the position of window "${winname}" of (first process whose id is ${pid})' || true`).toString().replaceAll(' ', '').replaceAll('\n', '').split(',')
-    const windowSize = this.executeCmdCached(`osascript -e 'tell application "System Events" to get the size of window "${winname}" of (first process whose id is ${pid})' || true`).toString().replaceAll(' ', '').replaceAll('\n', '').split(',')
-
-    const activeWindowInnerDimensions = {}
-    activeWindowInnerDimensions.left = Number.parseInt(windowPos[0])
-    activeWindowInnerDimensions.top = Number.parseInt(windowPos[1])
-    activeWindowInnerDimensions.right = activeWindowInnerDimensions.left + Number.parseInt(windowSize[0])
-    activeWindowInnerDimensions.bottom = activeWindowInnerDimensions.top + Number.parseInt(windowSize[1])
-
-    return activeWindowInnerDimensions
+    // We can reuse the same function since CGWindow coordinates already include window chrome
+    return this.getWindowInnerDimensionsMac();
   }
 
   hideBrowserWindowWhenItAppears(title) {
@@ -567,8 +563,13 @@ export class WindowManager {
       }
     }
 
-    if (isMac)
-      return true
+    if (isMac) {
+      const result = this.executeCmdCached(`swift static/scripts/mac_window_overlap.swift ${this.windowhwnd}`).toString().trim()
+      console.log("overlapstatus: ", result)
+      return result === '1'
+    }
+    
+    return true
   }
 
   focus() {
@@ -622,10 +623,8 @@ export class WindowManager {
       }
 
       if (isMac) {
-        const pid = this.windowhwnd.split(/,(.*)/s)[0]
-        const winname = this.windowhwnd.split(/,(.*)/s)[1]
-        this.executeCmd(`osascript -e 'tell application "System Events" to set frontmost of first process whose id is ${pid} to true' || true`)
-        this.executeCmd(`osascript -e 'tell application "System Events" to tell (process 1 where frontmost is true) to perform action "AXRaise" of window "${winname}"' || true`)
+        // Use Swift script to bring window to front using window number
+        this.executeCmd(`swift static/scripts/mac_window_focus.swift ${this.windowhwnd}`)
       }
     }
   }
@@ -746,7 +745,7 @@ export class WindowManager {
   }
 
   executeCmdCached(cmd) {
-    const maxcacheage = isMac ? 10000 : 2000
+    const maxcacheage = isMac ? 1000 : 1000
     const cacheKey = cmd.replace(/[^a-zA-Z0-9]/g, '')
 
     if (this.cache[cacheKey] === undefined)
@@ -791,31 +790,14 @@ export class WindowManager {
     const self = this
     const windowlist = []
 
-    if (isMac) {
-      let screennum = 0
-      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { height: 0, width: 0 } })
-      for (const s in sources) {
-        windowlist.push(screennum)
-        screennum++
-      }
-      const processlist = await this.getMacWindowlist()
-
-      processlist.data.forEach((process) => {
-        process.windows.forEach((window) => {
-          if (!this.isBlacklistedWindow(window))
-            windowlist.push(`${process.id},${window}`)
-        })
-      })
-    }
-    else {
-      const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { height: 0, width: 0 } })
-      for (const s in sources) {
-        if (!this.isBlacklistedWindow(sources[s].name)) {
-          const hwnd = sources[s].id.split(':')[1]
-          windowlist.push(hwnd)
-        }
+    const sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { height: 0, width: 0 } })
+    for (const s in sources) {
+      if (!this.isBlacklistedWindow(sources[s].name)) {
+        const hwnd = sources[s].id.split(':')[1]
+        windowlist.push(hwnd)
       }
     }
+    
 
     self.windowlist = windowlist
     // console.log(windowlist);
@@ -898,7 +880,7 @@ export class WindowManager {
         focusable: false,
         roundedCorners: false,
         enableLargerThanScreen: true,
-        title: '__meetzi - WindowCapture',
+        title: '__peekaview - WindowCapture',
         frame: false,
         alwaysOnTop: true,
         webPreferences: {

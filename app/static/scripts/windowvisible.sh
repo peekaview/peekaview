@@ -75,9 +75,21 @@ window_area=$((window_width * window_height))
 #exit 1
 #echo "Target window geometry: X=$window_x, Y=$window_y, Width=$window_width, Height=$window_height, Area=$window_area"
 
+# Add this new function after the initial checks
+get_window_name() {
+    local wid=$1
+    xprop -id "$wid" WM_NAME 2>/dev/null | sed 's/WM_NAME(STRING) = "\(.*\)"/\1/'
+}
+
 # Gather geometry of windows above the target window
 declare -a coords
 for owid in "${above_windows[@]}"; do
+    # Get window name and check if it starts with __peekaview or peekaview - (case insensitive)
+    window_name=$(get_window_name "$owid")
+    if [[ "${window_name,,}" =~ ^(__peekaview|peekaview\ -) ]]; then
+        continue  # Skip this window
+    fi
+    
     if xwininfo -id "$owid" -stats | grep -q 'IsViewable'; then
         x=($(xwininfo -id "$owid" -stats | awk '
             /Absolute upper-left X:/ { x=$NF }

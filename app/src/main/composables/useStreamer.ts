@@ -198,7 +198,7 @@ export function useStreamer() {
         pausedState = undefined
       }
       
-      streamingState = 'active'
+      streamingState = 'off'
       console.log('resume')
       startStreaming()
     }
