@@ -285,6 +285,14 @@ function shareViaApp() {
       window.location.href = protocolUrl
   }, 1000);
 }
+
+function stopSharing() {
+  if (screenPresent.value)
+    screenPresent.value.leave()
+
+  window.electronAPI?.stopSharing()
+  sessionActive.value = false
+}
 </script>
 
 <template>
@@ -349,6 +357,9 @@ function shareViaApp() {
               <code>{{ appUrl }}?view={{ viewCode }}</code>
             </div>
           </div>
+          <button type="button" class="btn btn-secondary" @click="stopSharing">
+            {{ $t('general.stop') }}
+          </button>
         </div>
       </template>
     </div>

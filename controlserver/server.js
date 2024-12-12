@@ -37,15 +37,15 @@ app.get('/remoteviewer', (req, res) => {
 
 io.on('connection', (socket)=> {
     socket.on('join', (data) => {
+        console.log("join", data, socket.id);
         const roomId = data.roomId;
-        const isPresenter = data.isPresenter;
         socket.join(roomId);
         console.log('User ' + socket.id + ' joined in room: ' + roomId);
         roomdb[socket.id] = roomId;
     
         peers[socket.id] = socket;
     
-        if (isPresenter) {
+        if (data.role === "presenter") {
           presenters[roomId] = socket.id; // Speichert die presenter_id für den Raum
           console.log('Presenter in room ' + roomId + ': ' + socket.id);
         }
@@ -59,13 +59,13 @@ io.on('connection', (socket)=> {
           if (id === socket.id) continue;
           if (roomdb[id] === roomId) {
             console.log('sending initReceive to ' + id);
-            peers[id].emit('initReceive', socket.id);
+            peers[id].emit('initReceive', { socketId: socket.id, role: data.role });
           }
         }
       });
 
         socket.on('signal', data => {
-            console.log('sending signal from ' + socket.id + ' to ')
+            console.log('sending signal from ' + socket.id + ' to ' + data.socket_id)
             if(!peers[data.socket_id])return
             if(roomdb[data.socket_id] && roomdb[socket.id] && roomdb[data.socket_id] != roomdb[socket.id])return
 

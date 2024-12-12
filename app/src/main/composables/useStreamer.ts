@@ -3,7 +3,6 @@ import { dialog } from 'electron'
 import { io, type Socket } from 'socket.io-client'
 import { WindowManager } from '../modules/WindowManager.js'
 import { RemoteControl } from '../modules/RemoteControl.js'
-import { useCustomDialog } from './useCustomDialog.js'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -16,7 +15,6 @@ export type Streamer = ReturnType<typeof useStreamer>
 
 export function useStreamer() {
   // Dependencies
-  const customDialog = useCustomDialog()
   const windowManager = new WindowManager()
   const remoteControl = new RemoteControl('')
   
@@ -51,7 +49,7 @@ export function useStreamer() {
   function joinRoom() {
     if (!joined && args !== undefined) {
       socket = io(`${args.hostname}`)
-      socket.emit('join', { roomId: args.roomid, isPresenter: false })
+      socket.emit('join', { roomId: args.roomid, role: 'streamer' })
 
       console.log('joined room:', args.roomid)
       joined = true
@@ -103,8 +101,6 @@ export function useStreamer() {
     const windowList = await windowManager.getWindowList()
     if (windowList.includes(hwnd) || hwnd == '0') {
       console.log(`${hwnd} in windowList`)
-
-      showStreamerOverlay()
 
       windowManager.selectAndActivateWindow(hwnd)
       startStreaming()
@@ -163,7 +159,6 @@ export function useStreamer() {
     }
 
     console.log('stop sharing!!')
-    customDialog.closeShareDialogs()
     windowManager.hideRecordOverlay()
     remoteControl.hideRemoteControl()
     remoteControl.deactivate()
@@ -265,10 +260,6 @@ export function useStreamer() {
     socket!.volatile.emit('host-info', JSON.stringify(obj))
   }
 
-  function showStreamerOverlay() {
-    //customDialog.openShareDialog(args.hostname, {})
-  }
-
   return {
     remoteControl,
 
@@ -279,6 +270,5 @@ export function useStreamer() {
     pauseStreaming,
     resumeStreamingIfPaused,
     sendScaleFactor,
-    showStreamerOverlay
   }
 }

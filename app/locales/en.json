@@ -5,7 +5,8 @@
     "no": "No",
     "cancel": "Cancel",
     "areYouSure": "Are you sure?",
-    "copyToClipboard": "Copy to clipboard"
+    "copyToClipboard": "Copy to clipboard",
+    "stop": "Stop"
   },
   "labels": {
     "yourEmail": "Your email address",

@@ -117,11 +117,9 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
-      res = this.executeCmd(`swift 'static/scripts/mac_windowlist.swift'`).toString().replace(regex, '')
+      res = this.executeCmd(`swift '${resolvePath('static/scripts/mac_windowlist.swift')}'`).toString().replace(regex, '')
 
-      console.log('start mac-windowlist')
-      console.log(res)
-      console.log('end mac-windowlist')
+      console.log('mac-windowlist', res)
 
       processlist = JSON.parse(res.replace(regex, ''))
       console.log(processlist)
@@ -555,8 +553,7 @@ export class WindowManager {
 
     if (isLinux) {
       try {
-        const result = this.executeCmdCached(`bash static/scripts/windowvisible.sh ${this.windowhwnd}`).toString().trim()
-        //const result = '1'
+        const result = this.executeCmdCached(`bash ${resolvePath('static/scripts/windowvisible.sh')} ${this.windowhwnd}`).toString().trim()
         return result === '1'
       } catch (error) {
         return true // Default to visible if script fails

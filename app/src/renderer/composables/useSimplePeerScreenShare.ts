@@ -32,12 +32,15 @@ export type ScreenPresent = Reactive<{
   participants: Ref<Record<string, ViewingParticipant>>
   addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
   sendRemote: (data: RemoteData, socketId?: string, exclude?: boolean) => void
+  leave: () => void
 }>
 
 export type ScreenView = Reactive<{
   sharingParticipant: Ref<SharingParticipant | undefined>
   sendRemote: (data: RemoteData) => void
 }>
+
+export type PeerRole = 'presenter' | 'viewer' | 'streamer'
 
 export type PeerData = {
   type: 'identity'
@@ -63,7 +66,7 @@ export type SharingParticipant = {
 
 const rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
 
-async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean): Promise<ScreenPeer> {
+async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole): Promise<ScreenPeer> {
   const socket = io(import.meta.env.VITE_RTC_CONTROL_SERVER)
   
   const initPeer = (socketId: string, initiator: boolean, stream?: MediaStream) => {
@@ -110,7 +113,7 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
 
   return new Promise((resolve) =>
     socket.on('connect', async () => {
-      socket.emit('join', { roomId: roomName, isPresenter })
+      socket.emit('join', { roomId: roomName, role })
 
       resolve({ socket, initPeer })
     })
@@ -118,12 +121,15 @@ async function useScreenPeer({ roomName }: ScreenShareData, isPresenter: boolean
 }
 
 export async function useScreenPresent(screenShareData: ScreenShareData, options?: ScreenPresentOptions): Promise<ScreenPresent> {
-  const { socket, initPeer } = await useScreenPeer(screenShareData, true)
+  const { socket, initPeer } = await useScreenPeer(screenShareData, 'presenter')
   const participants = ref<Record<string, ViewingParticipant>>({})
   const peers: Record<string, SimplePeer.Instance> = {}
   let stream: MediaStream | undefined
 
-  socket.on('initReceive', (socketId) => {
+  socket.on('initReceive', ({ socketId, role }) => {
+    if (role !== 'viewer')
+      return
+
     peers[socketId] = initPeer(socketId, true, stream)
 
     peers[socketId].on('connect', () => {
@@ -201,7 +207,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
 }
 
 export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
-  const { socket, initPeer } = await useScreenPeer(screenShareData, false)
+  const { socket, initPeer } = await useScreenPeer(screenShareData, 'viewer')
   const sharingParticipant = ref<SharingParticipant>()
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined

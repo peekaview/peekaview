@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startRemoteControl: (source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => ipcRenderer.invoke('start-remote-control', source, roomName, roomId, userName, userId),
   sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => ipcRenderer.invoke('sharing-active', viewCode, source, roomName, roomId, userName, userId),
   handleAppClosing: () => ipcRenderer.invoke('handle-app-closing'),
+  stopSharing: () => ipcRenderer.invoke('stop-sharing'),
 });
 
 console.log('Preload script has been loaded');

@@ -26,6 +26,8 @@ export interface IElectronAPI {
   openScreenSourceSelection: () => Promise<void>,
   sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
   handleAppClosing: () => Promise<void>,
+  stopSharing: () => Promise<void>,
+  quit: () => Promise<void>,
 }
 
 export interface ScreenSource {

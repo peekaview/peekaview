@@ -1,5 +1,3 @@
-import { Reactive, Ref } from "vue"
-
 export type AcceptedRequestData = {
   jwt: string
   videoServer: string

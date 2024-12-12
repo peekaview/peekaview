@@ -585,6 +585,12 @@ interface StoreSchema {
 
   ipcMain.handle('stop-sharing', async (_event) => {
     console.log('stopSharing')
+    currentViewCode = undefined
+    streamer?.stopSharing()
+    customDialog.closeShareDialogs()
+  })
+
+  ipcMain.handle('quit', async (_event) => {
     quit()
   })
 })()

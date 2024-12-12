@@ -73,7 +73,7 @@ async function handleLogout() {
   })
   
   if (result === '0')
-    window.location.href = 'index.php'
+    window.location.href = '/'
 }
 </script>
 
