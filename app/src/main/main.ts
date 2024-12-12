@@ -27,7 +27,8 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
 
-import PeekaViewLogo from '../assets/img/peekaviewicon_mono2.png'
+import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
+import PeekaViewIcon from '../assets/img/peekaviewicon_mono2.png'
 import { ScreenSource } from '../interface.js'
 import { resolvePath } from './util'
 
@@ -119,7 +120,7 @@ interface StoreSchema {
       log.info('Set xdg-mime defaults for Linux')
     }
 
-    const trayIconPath = path.join(__dirname, PeekaViewLogo)
+    const trayIconPath = path.join(__dirname, PeekaViewIcon)
     const trayIcon: Electron.NativeImage = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
     trayIcon.setTemplateImage(true)
 
@@ -189,7 +190,7 @@ interface StoreSchema {
     })
 
     log.info("App initialization complete")
-    const notificationIcon = nativeImage.createFromPath(trayIconPath).resize({ width: 64, height: 64 })
+    const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
     new Notification({ title: 'PeekaView', body: "PeekaView is running", icon: notificationIcon }).show()
   })
 
