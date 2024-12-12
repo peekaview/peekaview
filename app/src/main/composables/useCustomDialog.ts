@@ -173,6 +173,7 @@ export function useCustomDialog() {
   return {
     getDialogResult,
     closeShareDialogs,
+    closeTrayDialogs,
     closeDialogs,
     playSoundOnOpen,
     openShareDialog,

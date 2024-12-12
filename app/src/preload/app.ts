@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => ipcRenderer.invoke('sharing-active', viewCode, source, roomName, roomId, userName, userId),
   handleAppClosing: () => ipcRenderer.invoke('handle-app-closing'),
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),
+  pauseSharing: () => ipcRenderer.invoke('pause-sharing'),
+  resumeSharing: () => ipcRenderer.invoke('resume-sharing'),
 });
 
 console.log('Preload script has been loaded');

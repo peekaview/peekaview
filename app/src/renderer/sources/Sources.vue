@@ -3,6 +3,8 @@ import { computed, onMounted, ref, toRaw } from 'vue'
 
 import { ScreenSource } from '../../interface'
 
+import ScreenIcon from './img/screen.png'
+
 const sources = ref<ScreenSource[]>()
 const selectedSource = ref<ScreenSource | undefined>()
 
@@ -35,7 +37,7 @@ function cancel() {
     </div>
     <div class="source-group p-2">
       <div v-for="source in sourceGroups[activeTab]" class="source-item" :class="{ selected: selectedSource?.id === source.id }" @click="selectedSource = source">
-        <img :src="source.thumbnail" :alt="source.name">
+        <img :src="source.thumbnail ?? ScreenIcon" :alt="source.name">
         <p>{{ source.name }}</p>
       </div>
     </div>
@@ -111,12 +113,5 @@ function cancel() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.btn-row {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: end;
-  gap: 0.5rem;
 }
 </style>

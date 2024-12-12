@@ -477,7 +477,7 @@ export class WindowManager {
 
   getWindowInnerDimensionsMac() {
     const windowNumber = this.windowhwnd;
-    const windowInfo = this.executeCmdCached(`swift static/scripts/mac_window_info.swift ${windowNumber}`).toString().trim();
+    const windowInfo = this.executeCmdCached(`swift ${resolvePath('static/scripts/mac_window_info.swift')} ${windowNumber}`).toString().trim();
     
     try {
       const info = JSON.parse(windowInfo);
@@ -563,7 +563,7 @@ export class WindowManager {
     }
 
     if (isMac) {
-      const result = this.executeCmdCached(`swift static/scripts/mac_window_overlap.swift ${this.windowhwnd}`).toString().trim()
+      const result = this.executeCmdCached(`swift ${resolvePath('static/scripts/mac_window_overlap.swift')} ${this.windowhwnd}`).toString().trim()
       console.log("overlapstatus: ", result)
       return result === '1'
     }
@@ -623,7 +623,7 @@ export class WindowManager {
 
       if (isMac) {
         // Use Swift script to bring window to front using window number
-        this.executeCmd(`swift static/scripts/mac_window_focus.swift ${this.windowhwnd}`)
+        this.executeCmd(`swift ${resolvePath('static/scripts/mac_window_focus.swift')} ${this.windowhwnd}`)
       }
     }
   }

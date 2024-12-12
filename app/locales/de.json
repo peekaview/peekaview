@@ -5,8 +5,7 @@
     "no": "Nein",
     "cancel": "Abbrechen",
     "areYouSure": "Sind Sie sicher?",
-    "copyToClipboard": "In Zwischenablage kopieren",
-    "stop": "Beenden"
+    "copyToClipboard": "In Zwischenablage kopieren"
   },
   "labels": {
     "yourEmail": "Ihre E-Mail-Adresse",
@@ -80,9 +79,13 @@
       "description": "Wählen Sie einen Bildschirm / ein Fenster zur Freigabe aus. Es wird ein separates Fenster geöffnet, in welchem eine Auswahl getroffen werden kann."
     },
     "activeSession": {
-      "title": "Bildschirmfreigabe aktiv",
+      "active": "Bildschirmfreigabe aktiv",
+      "paused": "Bildschirmfreigabe pausiert",
       "description": "Ihr Bildschirm wird aktuell geteilt.",
-      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
+      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:",
+      "stop": "Beenden",
+      "pause": "Pausieren",
+      "resume": "Fortfahren"
     },
     "requestAccess": {
       "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",

@@ -33,7 +33,7 @@ const latestRequest = ref<Request>()
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 
-const sessionActive = ref(false)
+const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
         
@@ -58,8 +58,11 @@ watch(offerDownload, async (flag) => {
 }, { immediate: true })
 
 let requestInterval: number | undefined
-watch(sessionActive, (flag) => {
-  if (!flag) {
+watch(sessionState, (state) => {
+  if (state === 'paused')
+    return
+
+  if (state === 'stopped') {
     clearInterval(requestInterval)
     requestInterval = undefined
     return
@@ -83,7 +86,7 @@ watch(sessionActive, (flag) => {
     console.error('Error checking requests:', error);
     handleError(error as Error)
 
-    sessionActive.value = false
+    sessionState.value = 'active'
   }
   }, 2000)
 })
@@ -238,7 +241,7 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
 
     console.debug('Screen stream obtained:', stream)
     await screenPresent.value.addStream(stream, shareAudio)
-    sessionActive.value = true
+    sessionState.value = 'active'
 
     //source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
     source && window.electronAPI?.sharingActive(viewCode.value, source, roomName, roomId, userName, userId)
@@ -286,12 +289,22 @@ function shareViaApp() {
   }, 1000);
 }
 
+function pauseSharing() {
+  window.electronAPI?.pauseSharing()
+  sessionState.value = 'paused'
+}
+
+function resumeSharing() {
+  window.electronAPI?.resumeSharing()
+  sessionState.value = 'active'
+}
+
 function stopSharing() {
   if (screenPresent.value)
     screenPresent.value.leave()
 
   window.electronAPI?.stopSharing()
-  sessionActive.value = false
+  sessionState.value = 'stopped'
 }
 </script>
 
@@ -336,7 +349,7 @@ function stopSharing() {
         </div>
       </template>
 
-      <template v-else-if="!sessionActive">
+      <template v-else-if="sessionState === 'stopped'">
         <div class="panel">
           <h3 class="mb-3">{{ $t('share.openSession.title') }}</h3>
           <p class="text-secondary mb-4">
@@ -347,7 +360,7 @@ function stopSharing() {
 
       <template v-else>
         <div class="panel">
-          <h3 class="mb-3 share-title">{{ $t('share.activeSession.title') }}</h3>
+          <h3 class="mb-3" :class="{ 'share-title': sessionState === 'active' }">{{ $t(`share.activeSession.${sessionState}`) }}</h3>
           <p class="text-secondary mb-4">
             {{ $t('share.activeSession.description') }}
           </p>
@@ -357,9 +370,17 @@ function stopSharing() {
               <code>{{ appUrl }}?view={{ viewCode }}</code>
             </div>
           </div>
-          <button type="button" class="btn btn-secondary" @click="stopSharing">
-            {{ $t('general.stop') }}
-          </button>
+          <div class="btn-row">
+            <button type="button" class="btn btn-secondary" @click="stopSharing">
+              {{ $t('share.activeSession.stop') }}
+            </button>
+            <button v-if="sessionState === 'paused'" type="button" class="btn btn-secondary" @click="resumeSharing">
+              {{ $t('share.activeSession.resume') }}
+            </button>
+            <button v-else type="button" class="btn btn-secondary" @click="pauseSharing">
+              {{ $t('share.activeSession.pause') }}
+            </button>
+          </div>
         </div>
       </template>
     </div>

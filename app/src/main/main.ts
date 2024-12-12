@@ -130,11 +130,11 @@ interface StoreSchema {
 
     tray.on('click', () => {
       if (process.platform === 'linux')
-        tryShareScreen()
+        onTrayClick()
     })
 
     tray.on('double-click', () => {
-      tryShareScreen()
+      onTrayClick()
     })
 
     updateContextMenu()
@@ -193,6 +193,24 @@ interface StoreSchema {
     const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
     new Notification({ title: 'PeekaView', body: "PeekaView is running", icon: notificationIcon }).show()
   })
+
+  const onTrayClick = () => {
+    if (sourcesWindow?.isMinimized()) {
+      sourcesWindow.restore()
+      sourcesWindow.show()
+      return
+    }
+
+    if (appWindow) {
+      if (!app.isPackaged) {
+        appWindow.restore()
+        appWindow.show()
+      }
+      return
+    }
+
+    tryShareScreen()
+  }
 
   const updateContextMenu = () => {
     i18nReady.then(() => {
@@ -381,13 +399,14 @@ interface StoreSchema {
       return
     }
 
-    if (appWindow) {
-      const url = appWindow.webContents.getURL()
-      const params = new URL(url).searchParams
-      const share = params.get('share')
-      if (share === code)
-        return
-    }
+    if (!appWindow)
+      return
+
+    const url = appWindow.webContents.getURL()
+    const params = new URL(url).searchParams
+    const share = params.get('share')
+    if (currentViewCode && share === code)
+      return
 
     loadParams({ share: code }, !app.isPackaged)
   }
@@ -417,6 +436,14 @@ interface StoreSchema {
     streamer.setArgs(sourceId, import.meta.env.VITE_RTC_CONTROL_SERVER, roomName, roomId, userName, userId)
     streamer.joinRoom()
     streamer.startSharing()
+  }
+
+  function stopSharing() {
+    currentViewCode = undefined
+    streamer?.stopSharing()
+    customDialog.closeShareDialogs()
+    customDialog.closeTrayDialogs()
+    appWindow?.hide()
   }
 
   function loadParams(params: Record<string, string>, show?: boolean) {
@@ -565,6 +592,18 @@ interface StoreSchema {
     await openShareMessage()
   })
 
+  ipcMain.handle('stop-sharing', async (_event) => {
+    stopSharing()
+  })
+
+  ipcMain.handle('pause-sharing', async (_event) => {
+    streamer.pauseStreaming()
+  })
+
+  ipcMain.handle('resume-sharing', async (_event) => {
+    streamer.resumeStreamingIfPaused()
+  })
+
   ipcMain.handle('enable-mouse', async (_event) => {
     console.log('Enabling mouse control')
     streamer.remoteControl.enableMouse()
@@ -583,13 +622,6 @@ interface StoreSchema {
   ipcMain.handle('disable-remote-control', async (_event) => {
     console.log('Disabling remote control')
     streamer.remoteControl.disableRemoteControl()
-  })
-
-  ipcMain.handle('stop-sharing', async (_event) => {
-    console.log('stopSharing')
-    currentViewCode = undefined
-    streamer?.stopSharing()
-    customDialog.closeShareDialogs()
   })
 
   ipcMain.handle('quit', async (_event) => {

@@ -113,6 +113,13 @@ body {
   box-shadow: 0 2px 4px rgba(26,115,232,0.2);
 }
 
+.btn-row {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: end;
+  gap: 0.5rem;
+}
+
 /* Waiting Spinner */
 .waiting-spinner {
   width: 48px;

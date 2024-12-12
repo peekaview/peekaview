@@ -5,8 +5,7 @@
     "no": "No",
     "cancel": "Cancel",
     "areYouSure": "Are you sure?",
-    "copyToClipboard": "Copy to clipboard",
-    "stop": "Stop"
+    "copyToClipboard": "Copy to clipboard"
   },
   "labels": {
     "yourEmail": "Your email address",
@@ -81,9 +80,13 @@
       "description": "Select a screen / window you want to share. A selection of screens / windows you can share will open in a separate window."
     },
     "activeSession": {
-      "title": "Sharing Session Active",
+      "active": "Sharing Session Active",
+      "paused": "Sharing Session Paused",
       "description": "Your screen is currently being shared.",
-      "invite": "You can invite someone to join your view your screen with this link:"
+      "invite": "You can invite someone to join your view your screen with this link:",
+      "stop": "Stop",
+      "pause": "Pause",
+      "resume": "Resume"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",

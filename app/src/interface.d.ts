@@ -27,6 +27,8 @@ export interface IElectronAPI {
   sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
   handleAppClosing: () => Promise<void>,
   stopSharing: () => Promise<void>,
+  pauseSharing: () => Promise<void>,
+  resumeSharing: () => Promise<void>,
   quit: () => Promise<void>,
 }
 

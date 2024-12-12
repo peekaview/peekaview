@@ -22,7 +22,7 @@ export function useStreamer() {
   let socket: Socket | undefined
   
   // Streaming control flags
-  let streamingState: 'paused' | 'active' | 'off' = 'off'
+  let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
   let joined = false
   
   // Intervals
@@ -113,18 +113,18 @@ export function useStreamer() {
           // pause streaming, if window is minimized
           if (windowManager.isMinimized()) {
             console.log('window is minimized')
-            pauseStreaming()
+            pauseStreaming(true)
           }
           else {
             // pause streaming, if window change position or size
             if (windowManager.checkWindowSizeAndReposition()) {
               console.log('window was resized')
-              pauseStreaming()
+              pauseStreaming(true)
               // resume streaming, if window is back to normal state
             }
             else {
               if (windowManager.isVisible()) {
-                resumeStreamingIfPaused()
+                resumeStreamingIfPaused(true)
               }
             }
           }
@@ -132,7 +132,7 @@ export function useStreamer() {
           if (!windowManager.isVisible()) {
             console.log('window is not visible')
             //stopSharing()
-            pauseStreaming()
+            pauseStreaming(true)
           }
         }, checkWindowIntervalTime)
       }
@@ -162,45 +162,47 @@ export function useStreamer() {
     windowManager.hideRecordOverlay()
     remoteControl.hideRemoteControl()
     remoteControl.deactivate()
-    streamingState = 'off'
+    streamingState = 'stopped'
   }
 
-  function pauseStreaming() {
-    if (streamingState !== 'paused') {
-      streamingState = 'paused'
+  function pauseStreaming(fromHidden = false) {
+    if (streamingState === 'paused' || (streamingState === 'hidden' && !fromHidden))
+      return
 
-      if (pausedState === undefined) {
-        pausedState = {
-          mouseenabled: remoteControl.mouseenabled,
-          remotecontrolinputenabled: remoteControl.remotecontrolinputenabled
-        }
-        remoteControl.mouseenabled = false
-        remoteControl.remotecontrolinputenabled = false
-        sendReset()
+    streamingState = fromHidden ? 'hidden' : 'paused'
+
+    if (pausedState === undefined) {
+      pausedState = {
+        mouseenabled: remoteControl.mouseenabled,
+        remotecontrolinputenabled: remoteControl.remotecontrolinputenabled
       }
-
-      console.log('pause')
-      windowManager.hideRecordOverlay()
-      remoteControl.hideRemoteControl()
+      remoteControl.mouseenabled = false
+      remoteControl.remotecontrolinputenabled = false
+      sendReset()
     }
+
+    console.log('pause')
+    windowManager.hideRecordOverlay()
+    remoteControl.hideRemoteControl()
   }
 
-  function resumeStreamingIfPaused() {
-    if (streamingState === 'paused') {
-      if (pausedState !== undefined) {
-        remoteControl.mouseenabled = pausedState.mouseenabled
-        remoteControl.remotecontrolinputenabled = pausedState.remotecontrolinputenabled
-        pausedState = undefined
-      }
-      
-      streamingState = 'off'
-      console.log('resume')
-      startStreaming()
+  function resumeStreamingIfPaused(fromHidden = false) {
+    if (streamingState !== 'hidden' && (streamingState !== 'paused' || fromHidden))
+      return
+
+    if (pausedState !== undefined) {
+      remoteControl.mouseenabled = pausedState.mouseenabled
+      remoteControl.remotecontrolinputenabled = pausedState.remotecontrolinputenabled
+      pausedState = undefined
     }
+    
+    streamingState = 'stopped'
+    console.log('resume')
+    startStreaming()
   }
 
   function startStreaming() {
-    if (args !== undefined && streamingState === 'off') {
+    if (args !== undefined && streamingState === 'stopped') {
       console.log("startStreaming")
 
       sendReset()
