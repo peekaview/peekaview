@@ -117,7 +117,11 @@ export class WindowManager {
     let processlist = {}
     if (store.get('windowlist') == undefined || store.get('windowlist').timestamp < Date.now() - 3000) {
       const regex = /\,(?=\s*?[\}\]])/g
+<<<<<<< HEAD
       res = this.executeCmd(`swift '${resolvePath('static/scripts/mac_windowlist.swift')}'`).toString().replace(regex, '')
+=======
+      res = this.executeCmd(`osascript '${resolvePath('static/scripts/mac_windowlist.osa')}'`).toString().replace(regex, '')
+>>>>>>> 86d2514 (stop sharing, peer roles)
 
       console.log('mac-windowlist', res)
 
