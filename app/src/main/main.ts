@@ -557,7 +557,7 @@ interface StoreSchema {
       .replace('{{message}}', i18n.t('sharingActive.message'))
       .replaceAll('{{url}}', url)
 
-    customDialog.playSoundOnOpen('ping.wav')
+    
     customDialog.openTrayDialog(import.meta.env.VITE_APP_URL, {
       title: i18n.t('sharingActive.title'),
       detail: htmlContent,
@@ -571,6 +571,7 @@ interface StoreSchema {
     currentViewCode = viewCode
     startRemoteControl(source, roomName, roomId, userName, userId)
     
+    customDialog.playSoundOnOpen('ping.wav')
     customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
     await openShareMessage()
   })
@@ -588,6 +589,12 @@ interface StoreSchema {
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
+    customDialog.playSoundOnOpen('ping.wav')
+    customDialog.openDialog('dialog', {
+      title: 'Sharing resumed',
+      detail: "Sharing resumed, other users can now see your shared screen or application",
+      timeout: 3000
+    })
     streamer.resumeStreamingIfPaused()
   })
 

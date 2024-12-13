@@ -7,6 +7,7 @@ interface DialogOptions {
   html?: string
   confirmButtonText?: string
   cancelButtonText?: string
+  sound?: string | null
 }
 
 interface NotifyOptions extends DialogOptions {
@@ -59,7 +60,7 @@ export async function notify({ type, title, text, html, confirmButtonText, cance
   }
 }
 
-export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText }: DialogOptions) {
+export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, sound = null }: DialogOptions) {
   if (window.electronAPI) {
     const id = increment++
 
@@ -68,6 +69,7 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
       id,
       type,
       title,
+      sound,
       message: text ?? html,
       buttons: [
         confirmButtonText ?? 'Yes', // result === '0'

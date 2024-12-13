@@ -935,6 +935,9 @@ export class WindowManager {
         },
       })
 
+      this.overlayrecord.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      this.overlayrecord.setAlwaysOnTop(true, 'screen-saver', 1);
+
       this.overlayrecord.removeMenu()
       this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
       this.overlayrecord.setIgnoreMouseEvents(true)

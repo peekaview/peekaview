@@ -14,6 +14,7 @@ export interface DialogOptions {
   defaultId?: number
   cancelId?: number
   timeout?: number
+  sound?: string | null
   data?: any
 }
 
@@ -84,7 +85,7 @@ export function useCustomDialog() {
         width: 420,
         height: 50,
         x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 210),
-        y: screen.getPrimaryDisplay().bounds.y -8,
+        y: 0,
         template: 'dialogshare.html',
       }
     else if (type === 'tray')
@@ -115,7 +116,7 @@ export function useCustomDialog() {
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
       message: '',
-      timeout: (type === 'tray' ? 800000 : 0),
+      timeout: (type === 'tray' ? 8000 : 0),
       detail: '',
       soundfile,
     }
@@ -150,9 +151,11 @@ export function useCustomDialog() {
       },
     })
 
+    
     dialogWindow.loadFile(resolvePath(`static/${windowParams.template}`))
     if (type === 'dialog')
       dialogWindow.center()
+
     dialogWindow.show()
     //dialogWindow.webContents.openDevTools()
     dialogWindow.webContents.once('dom-ready', () => {

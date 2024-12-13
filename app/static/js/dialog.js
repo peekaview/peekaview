@@ -12,21 +12,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById('title') && params.title) {
       document.getElementById('title').innerHTML = params.title;
     }
-    document.getElementById('detail').innerHTML = (params.message != '' ? '<b>' + params.message + '</b>' : '') + (params.message != '' && params.detail != '' ? '<br>' : '') + (params.detail != '' ? params.detail : '');
 
-    if (params.type == 'error') {
+    try {
+      document.getElementById('detail').innerHTML = (params.message != '' ? '<b>' + params.message + '</b>' : '') + (params.message != '' && params.detail != '' ? '<br>' : '') + (params.detail != '' ? params.detail : '');
+    } catch (error) {
+    }
+    
+    if (params.type == 'error' && document.querySelector('.f-modal-error')) {
       document.querySelector('.f-modal-error').style.display = 'block'
     }
-    if (params.type == 'warning') {
+    if (params.type == 'warning' && document.querySelector('.f-modal-warning')) {
       document.querySelector('.f-modal-warning').style.display = 'block'
     }
-    if (params.type == 'info') {
+    if (params.type == 'info' && document.querySelector('.f-modal-info')) {
       document.querySelector('.f-modal-info').style.display = 'block'
     }
-    if (params.type == 'success') {
+    if (params.type == 'success' && document.querySelector('.f-modal-success')) {
       document.querySelector('.f-modal-success').style.display = 'block'
     }
-    if (params.type == 'download') {
+    if (params.type == 'download' && document.querySelector('.lds-ring')) {
       document.querySelector('.lds-ring').style.display = 'block'
     }
 
@@ -85,10 +89,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }, params.timeout)
     }
 
-    document.getElementById('close').addEventListener("click", (event) => {
-      reply(params.id, params.cancelId);
+    const closeButton = document.getElementById('close');
+    if (closeButton) {
+      closeButton.addEventListener("click", (event) => {
+        reply(params.id, params.cancelId);
+      });
     }
-    );
 
     window.addEventListener("beforeunload", function (e) {
       reply(params.id, params.cancelId);
@@ -116,10 +122,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 200)
   }
 
-  window.api.receive('dialog-data', (data) => {
-    if (data.shareUrl) {
-      setShareUrl(data.shareUrl)
-    }
-  })
+  try {
+    window.api.receive('dialog-data', (data) => {
+      if (data.shareUrl) {
+        setShareUrl(data.shareUrl)
+      }
+    })
+  } catch (error) {
+    
+  }
 });
 //}

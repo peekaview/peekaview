@@ -3,6 +3,10 @@ import Foundation
 
 let DEBUG = false
 
+// Sleep for 3 seconds before starting monitoring
+sleep(3)
+
+
 func windowExists(windowNumber: Int) -> Bool {
     guard let windowList = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] else {
         return false

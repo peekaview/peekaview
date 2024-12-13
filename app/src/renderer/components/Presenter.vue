@@ -280,6 +280,7 @@ function shareViaApp() {
         t('share.appDialog.message') + '<br><br>' +
         t('share.appDialog.download', { link: downloadLink.value }),
       type: 'info',
+      sound: 'ringtone.wav',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
     })
