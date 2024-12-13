@@ -80,7 +80,8 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
       config: {
         iceServers: [{
           urls: rtcIceServer.urls,
-          ...(turnCredentials ?? {})
+          username: turnCredentials?.username,
+          credential: turnCredentials?.credential,
         }]
       },
       offerOptions: {
@@ -124,7 +125,7 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
 }
 
 export async function useScreenPresent(screenShareData: ScreenShareData, options?: ScreenPresentOptions): Promise<ScreenPresent> {
-  const { socket, initPeer } = await useScreenPeer(screenShareData, 'presenter', options?.turnCredentials)
+  const { socket, initPeer } = await useScreenPeer(screenShareData, 'presenter', screenShareData.turnCredentials)
   const participants = ref<Record<string, ViewingParticipant>>({})
   const peers: Record<string, SimplePeer.Instance> = {}
   let stream: MediaStream | undefined
@@ -210,7 +211,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
 }
 
 export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
-  const { socket, initPeer } = await useScreenPeer(screenShareData, 'viewer', options?.turnCredentials)
+  const { socket, initPeer } = await useScreenPeer(screenShareData, 'viewer', screenShareData.turnCredentials)
   const sharingParticipant = ref<SharingParticipant>()
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined
