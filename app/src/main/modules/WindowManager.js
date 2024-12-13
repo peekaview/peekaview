@@ -598,16 +598,8 @@ export class WindowManager {
       }
 
       if (isMac && this.lastfocus < (Date.now() - 1000)) {
-        this.lastfocus = Date.now()
-        const pid = this.windowhwnd.split(/,(.*)/s)[0]
-        const winname = this.windowhwnd.split(/,(.*)/s)[1]
-
-        const frontmostwinname = this.executeCmd('osascript -e \'tell application "System Events" to name of first process where it is frontmost\'').toString().replaceAll(' ', '')
-        console.log(`${frontmostwinname.replace(/[^a-zA-Z0-9]/g, '')} : ${winname.replace(/[^a-zA-Z0-9]/g, '')}`)
-        if (frontmostwinname.replace(/[^a-zA-Z0-9]/g, '') !== winname.replace(/[^a-zA-Z0-9]/g, '')) {
-          this.executeCmd(`osascript -e 'tell application "System Events" to set frontmost of first process whose id is ${pid} to true' || true`)
-          this.executeCmd(`osascript -e 'tell application "System Events" to tell (process 1 where frontmost is true) to perform action "AXRaise" of window "${winname}"' || true`)
-        }
+        // Use Swift script to bring window to front using window number
+        this.executeCmd(`swift ${resolvePath('static/scripts/mac_window_focus.swift')} ${this.windowhwnd}`)
       }
     }
   }

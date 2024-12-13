@@ -99,6 +99,7 @@ watch(latestRequest, async (request) => {
     text: t('share.requestAccess.message', { name: request.name }),
     confirmButtonText: t('share.requestAccess.accept'),
     cancelButtonText: t('share.requestAccess.deny'),
+    soundfile: 'ringtone.wav',
   })
       
   if (result === '0')
@@ -280,7 +281,6 @@ function shareViaApp() {
         t('share.appDialog.message') + '<br><br>' +
         t('share.appDialog.download', { link: downloadLink.value }),
       type: 'info',
-      sound: 'ringtone.wav',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
     })

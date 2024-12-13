@@ -14,7 +14,6 @@ export interface DialogOptions {
   defaultId?: number
   cancelId?: number
   timeout?: number
-  sound?: string | null
   data?: any
 }
 

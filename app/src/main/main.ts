@@ -29,7 +29,7 @@ import { resolvePath } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
-import PeekaViewIcon from '../assets/img/peekaviewicon_mono2.png'
+import PeekaViewIcon from '../assets/img/peekaviewicon_mono3.png'
 
 import HelpIcon from '../assets/img/help.png'
 import InfoIcon from '../assets/img/info.png'
@@ -218,13 +218,13 @@ interface StoreSchema {
       )
       
       menuItems.push(
-        { icon: nativeImage.createFromPath(path.join(__dirname, PresentIcon)), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
-        { icon: nativeImage.createFromPath(path.join(__dirname, RequestIcon)), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
+        { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
+        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
         { type: 'separator' },
-        { icon: nativeImage.createFromPath(path.join(__dirname, LogoutIcon)), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
-        { icon: nativeImage.createFromPath(path.join(__dirname, HelpIcon)), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
-          { icon: nativeImage.createFromPath(path.join(__dirname,   InfoIcon)), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
-          { icon: nativeImage.createFromPath(path.join(__dirname, LanguageIcon)), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
+        { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
+        { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
+          { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
+          { icon: createMenuIcon(LanguageIcon), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
             { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
               appWindow?.webContents.send('change-language', locale)
               sourcesWindow?.webContents.send('change-language', locale)
@@ -233,7 +233,7 @@ interface StoreSchema {
             })}
           ))},
         ] },
-        { icon: nativeImage.createFromPath(path.join(__dirname, QuitIcon)), label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
+        { icon: createMenuIcon(QuitIcon), label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
       )
       
       const contextMenu = Menu.buildFromTemplate(menuItems)
@@ -332,7 +332,7 @@ interface StoreSchema {
     sourcesWindow = new BrowserWindow({
       icon: path.join(__dirname, PeekaViewLogo),
       width: 960,
-      height: 540,
+      height: 640,
       autoHideMenuBar: true,
       webPreferences: {
         nodeIntegration: true,
@@ -621,4 +621,12 @@ interface StoreSchema {
   ipcMain.handle('quit', async (_event) => {
     quit()
   })
+
+  // Create a helper function to create resized template menu icons
+  const createMenuIcon = (iconPath: string): Electron.NativeImage => {
+    const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
+      .resize({ width: 16, height: 16 })
+    icon.setTemplateImage(true)
+    return icon
+  }
 })()
