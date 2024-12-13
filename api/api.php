@@ -173,9 +173,12 @@ function createScreenShareRoom() {
         $userData[5] = $controlServer;
         file_put_contents($userFile, implode(';', $userData));
         
+        $turnCredential = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
+
         echo json_encode([
             'videoServer' => $videoServer,
             'controlServer' => $controlServer,
+            'turnCredential' => $turnCredential,
             'roomId' => $roomId
         ]);
     } catch (Exception $e) {
