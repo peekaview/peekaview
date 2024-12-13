@@ -189,6 +189,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     roomId: data.roomId,
     serverUrl: data.videoServer,
     controlServer: data.controlServer,
+    turnCredentials: data.turnCredentials,
   }
 }
 
