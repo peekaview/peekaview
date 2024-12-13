@@ -213,13 +213,13 @@ interface StoreSchema {
       )
 
       menuItems.push(
-        { label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
-        { label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
+        { label: '⛶  ' + i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
+        { label: '⤓  ' + i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
         { type: 'separator' },
-        { label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
-        { label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
-          { label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
-          { label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
+        { label: '⎋  ' + i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
+        { label: '?    ' + i18n.t('trayMenu.help'), type: 'submenu', submenu: [
+          { label: 'ℹ  ' + i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
+          { label: '⚑  ' + i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
             { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
               appWindow?.webContents.send('change-language', locale)
               sourcesWindow?.webContents.send('change-language', locale)
@@ -228,7 +228,7 @@ interface StoreSchema {
             })}
           ))},
         ] },
-        { label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
+        { label: '⏻  ' + i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
       )
       
       const contextMenu = Menu.buildFromTemplate(menuItems)

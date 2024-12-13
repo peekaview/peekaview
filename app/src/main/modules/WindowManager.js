@@ -744,7 +744,7 @@ export class WindowManager {
   }
 
   executeCmdCached(cmd) {
-    const maxcacheage = isMac ? 3000 : 1000
+    const maxcacheage = isMac ? 1000 : 1000
     const cacheKey = cmd.replace(/[^a-zA-Z0-9]/g, '')
 
     if (this.cache[cacheKey] === undefined)
