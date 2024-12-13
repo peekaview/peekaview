@@ -79,7 +79,6 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
       stream,
       config: {
         iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
           {
             ...rtcIceServer,
             ...(turnCredentials ?? {}),
