@@ -20,14 +20,13 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 // Validate required environment variables
-foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as $required) {
+foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'JWT_SECRET', 'TURN_SHARED_SECRET'] as $required) {
     if (!getenv($required)) {
         die(json_encode(['error' => "Missing required environment variable: $required"]));
     }
 }
 
-//define('LIVEKIT_API_KEY', getenv('LIVEKIT_API_KEY'));
-//define('LIVEKIT_API_SECRET', getenv('LIVEKIT_API_SECRET'));
+define('JWT_SECRET', getenv('JWT_SECRET'));
 define('TURN_SHARED_SECRET', getenv('TURN_SHARED_SECRET'));
 define('TURN_EXPIRE', 8640000);
 define('APP_DOMAIN', getenv('APP_DOMAIN'));
@@ -108,7 +107,6 @@ function generateJWT($email, $roomId) {
     
     // Payload
     $payload = [
-        'iss' => LIVEKIT_API_KEY,
         'sub' => $email,
         'exp' => time() + 3600,
         'video' => [
@@ -127,7 +125,7 @@ function generateJWT($email, $roomId) {
     
     // Create signature
     $unsignedToken = "$headerEncoded.$payloadEncoded";
-    $signature = hash_hmac('sha256', $unsignedToken, LIVEKIT_API_SECRET, true);
+    $signature = hash_hmac('sha256', $unsignedToken, JWT_SECRET, true);
     $signatureEncoded = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
     
     // Combine all parts
