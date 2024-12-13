@@ -19,7 +19,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                service: [api, app, controlserver, ingress, livekit]
+                service: [api, controlserver, ingress, livekit]
         steps:
             - uses: actions/checkout@v4
               with:
