@@ -78,12 +78,10 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
       trickle: false,
       stream,
       config: {
-        iceServers: [
-          {
-            ...rtcIceServer,
-            ...(turnCredentials ?? {}),
-          }
-        ]
+        iceServers: [{
+          urls: rtcIceServer.urls,
+          ...(turnCredentials ?? {})
+        }]
       },
       offerOptions: {
         offerToReceiveVideo: true,
