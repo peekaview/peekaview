@@ -41,7 +41,9 @@ jobs:
           npm install -g pnpm
           echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
           echo "VITE_API_URL=https://api.peekaview.de/" >> .env
-          echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
+          echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
+          echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
+          echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
           
       - name: Install dependencies
         working-directory: ./app
