@@ -3,7 +3,7 @@
 Description of the overall project and its components.
 
 ## Components
-- LiveKit: Real-time audio/video functionality
+- Simple-Peer: Real-time video functionality
 - Caddy: Reverse proxy and SSL termination
 - Redis: Caching and temporary data storage
 - Control Server: Backend management
@@ -13,4 +13,8 @@ Description of the overall project and its components.
 
 ## Installation
 
-1. Clone repository:
+TODO
+
+## Imprint (Impressum)
+
+For legal information and contact details, please visit our [Imprint page](https://www.limtec.de/#imprint).

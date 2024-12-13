@@ -415,7 +415,7 @@ function setUserOnline($email) {
     }*/
 }
 
-function youAreAllowedToSeeMyScreen() {
+function handleIfAllowedToSeeMyScreen($requestStatus) {
     try {
         $email = validateEmail($_GET['email'] ?? '');
         $token = validateToken($_GET['token'] ?? '');
@@ -438,43 +438,7 @@ function youAreAllowedToSeeMyScreen() {
         $requestFile = getRequestFilename($email, $requestId);
         if (file_exists($requestFile)) {
             $requestData = explode(',', file_get_contents($requestFile));
-            $requestData[2] = 'request_accepted';
-            file_put_contents($requestFile, implode(',', $requestData));
-            echo json_encode(['success' => true]);
-        } else {
-            throw new Exception('Request not found');
-        }
-        
-    } catch (Exception $e) {
-        http_response_code(400);
-        echo json_encode(['error' => $e->getMessage()]);
-    }
-}
-
-function youAreNotAllowedToSeeMyScreen() {
-    try {
-        $email = validateEmail($_GET['email'] ?? '');
-        $token = validateToken($_GET['token'] ?? '');
-        $requestId = validateRequestId($_GET['request_id'] ?? '');
-        
-        $userFile = getEmailFilename($email);
-        if (!file_exists($userFile)) {
-            throw new Exception('User not found');
-        }
-        
-        $userData = explode(';', file_get_contents($userFile));
-        $storedToken = $userData[1] ?? '';
-        
-        if ($token !== $storedToken) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return;
-        }
-        
-        $requestFile = getRequestFilename($email, $requestId);
-        if (file_exists($requestFile)) {
-            $requestData = explode(',', file_get_contents($requestFile));
-            $requestData[2] = 'request_denied';
+            $requestData[2] = $requestStatus;
             file_put_contents($requestFile, implode(',', $requestData));
             echo json_encode(['success' => true]);
         } else {
@@ -532,10 +496,10 @@ try {
             doesAnyoneWantToSeeMyScreen();
             break;
         case 'youAreAllowedToSeeMyScreen':
-            youAreAllowedToSeeMyScreen();
+            handleIfAllowedToSeeMyScreen('request_accepted');
             break;
         case 'youAreNotAllowedToSeeMyScreen':
-            youAreNotAllowedToSeeMyScreen();
+            handleIfAllowedToSeeMyScreen('request_denied');
             break;
         case 'registerMyEmail':
             registerMyEmail();
