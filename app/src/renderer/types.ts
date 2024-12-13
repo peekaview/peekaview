@@ -15,6 +15,7 @@ export type ScreenShareData = {
 }
 
 export type TurnCredentials = {
+  urls: string[]
   username: string
   credential: string
 }

@@ -73,15 +73,26 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
   const socket = io(import.meta.env.VITE_RTC_CONTROL_SERVER)
   
   const initPeer = (socketId: string, initiator: boolean, stream?: MediaStream) => {
+    const iceServers = [
+      rtcIceServer
+    ]
+
+    if (turnCredentials) {
+      iceServers.push({
+        urls: turnCredentials.urls,
+        username: turnCredentials.username,
+        credential: turnCredentials.credential
+      })
+    }
+
+    console.debug('Initializing peer with ICE servers:', iceServers)
+
     const peer = new SimplePeer({
       initiator,
       trickle: false,
       stream,
       config: {
-        iceServers: [{
-          ...rtcIceServer,
-          ...(turnCredentials ?? {})
-        }]
+        iceServers
       },
       offerOptions: {
         offerToReceiveVideo: true,
@@ -105,6 +116,10 @@ async function useScreenPeer({ roomName }: ScreenShareData, role: PeerRole, turn
         return
 
       peer.signal(data.signal)
+    })
+
+    peer.on('iceStateChange', (state) => {
+      console.debug('ICE state changed:', state)
     })
 
     return peer
