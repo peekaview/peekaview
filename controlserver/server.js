@@ -2,9 +2,12 @@ var app = require('express')();
 
 // Add Express middleware for regular HTTP endpoints
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://peekaview.de');
-    res.header('Access-Control-Allow-Origin', 'https://*.peekaview.de'); 
-    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.header('Access-Control-Allow-Origin', [
+        'https://peekaview.de',
+        'https://develop.peekaview.de',
+        'https://app.peekaview.local',
+        'http://localhost:5173'
+    ].join(', '));
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -18,7 +21,12 @@ var io = require('socket.io')(http, {
         threshold: 32768
     },
     cors: {
-        origin: ["http://localhost:5173", "https://*.peekaview.de", "https://peekaview.de"],
+        origin: [
+            "http://localhost:5173",
+            "https://peekaview.de",
+            "https://develop.peekaview.de",
+            "https://app.peekaview.local"
+        ],
         methods: ["GET", "POST", "PUT", "DELETE"],
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true
