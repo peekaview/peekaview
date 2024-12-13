@@ -11,6 +11,7 @@ export type ScreenShareData = {
   roomId: string
   serverUrl: string
   controlServer?: string
+  turnCredentials?: TurnCredentials
 }
 
 export type TurnCredentials = {

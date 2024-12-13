@@ -173,12 +173,12 @@ function createScreenShareRoom() {
         $userData[5] = $controlServer;
         file_put_contents($userFile, implode(';', $userData));
         
-        $turnCredential = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
+        $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
         echo json_encode([
             'videoServer' => $videoServer,
             'controlServer' => $controlServer,
-            'turnCredential' => $turnCredential,
+            'turnCredentials' => $turnCredentials,
             'roomId' => $roomId
         ]);
     } catch (Exception $e) {
@@ -353,7 +353,7 @@ function showMeYourScreen() {
             }
             
             if ($status === 'request_accepted') {
-                $turnCredential = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
+                $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
                 echo json_encode([
                     'status' => 'request_accepted',
@@ -361,7 +361,7 @@ function showMeYourScreen() {
                     'roomId' => $userData[3],
                     'videoServer' => $userData[4],
                     'controlServer' => $userData[5],
-                    'turnCredential' => $turnCredential,
+                    'turnCredentials' => $turnCredentials,
                     'user_status' => $userStatus,
                     'last_seen' => $lastSeen
                 ]);

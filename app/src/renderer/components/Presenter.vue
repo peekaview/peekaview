@@ -180,6 +180,7 @@ async function startSession() {
     screenShareData.value = {
       roomName: data.roomId,
       roomId: data.roomId,
+      turnCredentials: data.turnCredentials,
       serverUrl: data.videoServer,
     }
 
