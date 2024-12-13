@@ -20,13 +20,12 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 // Validate required environment variables
-foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'JWT_SECRET', 'TURN_SHARED_SECRET'] as $required) {
+foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'TURN_SHARED_SECRET'] as $required) {
     if (!getenv($required)) {
         die(json_encode(['error' => "Missing required environment variable: $required"]));
     }
 }
 
-define('JWT_SECRET', getenv('JWT_SECRET'));
 define('TURN_SHARED_SECRET', getenv('TURN_SHARED_SECRET'));
 define('TURN_EXPIRE', 8640000);
 define('APP_DOMAIN', getenv('APP_DOMAIN'));
@@ -125,7 +124,7 @@ function generateJWT($email, $roomId) {
     
     // Create signature
     $unsignedToken = "$headerEncoded.$payloadEncoded";
-    $signature = hash_hmac('sha256', $unsignedToken, JWT_SECRET, true);
+    $signature = hash_hmac('sha256', $unsignedToken, 'JWT_SECRET', true);
     $signatureEncoded = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
     
     // Combine all parts
@@ -167,7 +166,6 @@ function createScreenShareRoom() {
         $videoServer = VIDEO_SERVERS[array_rand(VIDEO_SERVERS)];
         $controlServer = CONTROL_SERVERS[array_rand(CONTROL_SERVERS)];
         $roomId = generateRandomString(8);
-        $jwt = generateJWT($email, $roomId);
         
         $userData[2] = 'active';
         $userData[3] = $roomId;
@@ -176,7 +174,6 @@ function createScreenShareRoom() {
         file_put_contents($userFile, implode(';', $userData));
         
         echo json_encode([
-            'jwt' => $jwt,
             'videoServer' => $videoServer,
             'controlServer' => $controlServer,
             'roomId' => $roomId
@@ -357,7 +354,7 @@ function showMeYourScreen() {
 
                 echo json_encode([
                     'status' => 'request_accepted',
-                    'jwt' => generateJWT($name, $userData[3]),
+                    //'jwt' => generateJWT($name, $userData[3]),
                     'roomId' => $userData[3],
                     'videoServer' => $userData[4],
                     'controlServer' => $userData[5],
