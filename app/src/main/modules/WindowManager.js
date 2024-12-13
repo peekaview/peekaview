@@ -86,6 +86,7 @@ export class WindowManager {
     this.lastfocus = 0
 
     // this.overlapping = false
+    this.currentMonitorProcess = null;
   }
 
   selectAndActivateWindow(hwnd) {
@@ -93,11 +94,14 @@ export class WindowManager {
     this.bringToFront()
   }
 
-  selectWindow(hwnd) {
+  async selectWindow(hwnd) {
     this.windowhwnd = `${hwnd}`
 
-    if (this.isScreen())
+    if (this.isScreen()) {
       this.getScreen()
+    } else {
+      this.startWindowMonitoring();
+    }
   }
 
   isBlacklistedWindow(windowtitle) {
@@ -477,20 +481,20 @@ export class WindowManager {
 
   getWindowInnerDimensionsMac() {
     const windowNumber = this.windowhwnd;
-    const windowInfo = this.executeCmdCached(`swift ${resolvePath('static/scripts/mac_window_info.swift')} ${windowNumber}`).toString().trim();
-    
     try {
-      const info = JSON.parse(windowInfo);
-      const activeWindowInnerDimensions = {
-        left: info.x,
-        top: info.y,
-        right: info.x + info.width,
-        bottom: info.y + info.height
-      };
-      return activeWindowInnerDimensions;
+        // Read from the temp file instead of executing the Swift script
+        const windowInfo = require('fs').readFileSync('/tmp/.peekaview_windowinfo', 'utf8').trim();
+        const info = JSON.parse(windowInfo);
+        const activeWindowInnerDimensions = {
+            left: info.x,
+            top: info.y,
+            right: info.x + info.width,
+            bottom: info.y + info.height
+        };
+        return activeWindowInnerDimensions;
     } catch (error) {
-      console.warn('Error parsing window info:', error);
-      return null;
+        console.warn('Error reading window info from temp file:', error);
+        return null;
     }
   }
 
@@ -563,9 +567,15 @@ export class WindowManager {
     }
 
     if (isMac) {
-      const result = this.executeCmdCached(`swift ${resolvePath('static/scripts/mac_window_overlap.swift')} ${this.windowhwnd}`).toString().trim()
-      console.log("overlapstatus: ", result)
-      return result === '1'
+      try {
+        // Read from the temp file instead of executing the Swift script
+        const result = require('fs').readFileSync('/tmp/.peekaview_windowoverlap', 'utf8').trim();
+        console.log("overlapstatus: ", result)
+        return result === '1'
+      } catch (error) {
+        console.warn('Error reading window overlap status from temp file:', error);
+        return true // Default to visible if file read fails
+      }
     }
     
     return true
@@ -751,7 +761,7 @@ export class WindowManager {
       this.cache[cacheKey] = { time: 0, result: null }
 
     if (this.cache[cacheKey].time < (Date.now() - maxcacheage) || this.cache[cacheKey].result == null) {
-      //console.log(cmd)
+      console.log(cmd)
       this.cache[cacheKey] = { time: Date.now(), result: require('child_process').execSync(cmd) }
     }
 
@@ -764,8 +774,16 @@ export class WindowManager {
   }
 
   executeCmdAsync(cmd) {
-    // console.log("System Cmd: "+cmd)
-    require('child_process').exec(cmd)
+    return new Promise((resolve, reject) => {
+      require('child_process').exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          console.warn(`Error executing command: ${error}`);
+          reject(error);
+          return;
+        }
+        resolve(stdout);
+      });
+    });
   }
 
   getWindowListFormatted(options) {
@@ -1035,4 +1053,48 @@ export class WindowManager {
 
     return this.overlapping
   } */
+
+  // Add cleanup method to be called when app is closing
+  cleanup() {
+    if (this.currentMonitorProcess) {
+      try {
+        process.kill(-this.currentMonitorProcess.pid);
+      } catch (error) {
+        console.warn('Error killing monitor process during cleanup:', error);
+      }
+      this.currentMonitorProcess = null;
+    }
+  }
+
+  startWindowMonitoring() {
+    if (!isMac) return;
+
+    // Kill any existing monitor process
+    if (this.currentMonitorProcess) {
+      try {
+        process.kill(-this.currentMonitorProcess.pid); // Kill process group
+      } catch (error) {
+        console.warn('Error killing previous monitor process:', error);
+      }
+      this.currentMonitorProcess = null;
+    }
+
+    // Start new monitor process
+    this.currentMonitorProcess = require('child_process').spawn('swift', 
+      [resolvePath('static/scripts/mac_window_monitor.swift'), this.windowhwnd], 
+      { detached: true }
+    );
+
+    // Handle process cleanup
+    this.currentMonitorProcess.on('error', (error) => {
+      console.warn('Monitor process error:', error);
+    });
+
+    this.currentMonitorProcess.on('exit', (code) => {
+      if (code !== 0) {
+        console.warn(`Monitor process exited with code ${code}`);
+      }
+      this.currentMonitorProcess = null;
+    });
+  }
 }
