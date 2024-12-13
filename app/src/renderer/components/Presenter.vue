@@ -180,7 +180,6 @@ async function startSession() {
     screenShareData.value = {
       roomName: data.roomId,
       roomId: data.roomId,
-      jwtToken: data.jwt,
       serverUrl: data.videoServer,
     }
 

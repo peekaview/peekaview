@@ -54,6 +54,7 @@
       "hoursAgo": "one hour ago | {n} hours ago",
       "daysAgo": "one day ago | {n} days ago"
     },
+    "stop": "Stop",
     "sharingEnded": "Screen sharing connection has been closed.",
     "keepWindowOpen": "You can keep this window open. Once your request is accepted, the connection will be established automatically.",
     "connectionError": "There was a problem connecting to the server. Please try again."

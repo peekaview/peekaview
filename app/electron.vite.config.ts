@@ -39,6 +39,7 @@ const define = {
 export default defineConfig({
   main: {
     build: {
+      assetsInlineLimit: 0,
       rollupOptions: {
         input: resolve('src/main/main.ts'),
         output: {

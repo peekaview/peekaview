@@ -19,7 +19,6 @@ type UnacceptedRequestResponse = {
   status: Exclude<RequestStatus, "request_accepted">
   user_status: RequestUserStatus
   last_seen: number
-  jwt: undefined
   videoServer: undefined
   controlServer: undefined
   roomId: undefined
@@ -153,10 +152,10 @@ async function requestScreen(params: RequestParams, initial = false) {
       switch (data.status) {
         case 'request_accepted':
           handleRequestAccepted({
-            jwt: data.jwt,
             videoServer: data.videoServer,
             controlServer: data.controlServer,
             roomId: data.roomId,
+            turnCredentials: data.turnCredentials,
           })
           return
         case 'request_denied':
@@ -188,7 +187,6 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     userName: inputName.value,
     roomName: data.roomId,
     roomId: data.roomId,
-    jwtToken: data.jwt,
     serverUrl: data.videoServer,
     controlServer: data.controlServer,
   }
@@ -265,6 +263,13 @@ function formatLastSeen(timestamp: number | undefined) {
   const days = Math.floor(seconds / 86400)
   return t('viewer.lastSeen.daysAgo', days)
 }
+
+function stopViewing() {
+  screenView.value?.leave()
+  screenView.value = undefined
+  waitingStatus.value = undefined
+  requestStatus.value = undefined
+}
 </script>
 
 <template>
@@ -276,6 +281,11 @@ function formatLastSeen(timestamp: number | undefined) {
       <video ref="track" playsinline autoplay/>
       <slot />
     </RemoteControl>
+    <div class="btn-row">
+      <button type="button" class="btn btn-secondary" @click="stopViewing">
+        {{ $t('viewer.stop') }}
+      </button>
+    </div>
   </div>
   <div v-if="!screenView"  class="content-wrapper">
     <div v-if="!waitingStatus" class="section-content">

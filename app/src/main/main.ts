@@ -17,8 +17,6 @@ import {
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
-import i18n from 'i18next'
-import backend from 'i18next-fs-backend'
 import fs from 'fs'
 
 import { useCustomDialog, type DialogOptions } from './composables/useCustomDialog'
@@ -26,11 +24,20 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
+import { ScreenSource } from '../interface.js'
+import { resolvePath } from './util'
+import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import PeekaViewIcon from '../assets/img/peekaviewicon_mono2.png'
-import { ScreenSource } from '../interface.js'
-import { resolvePath } from './util'
+
+import HelpIcon from '../assets/img/help.png'
+import InfoIcon from '../assets/img/info.png'
+import LanguageIcon from '../assets/img/language.png'
+import LogoutIcon from '../assets/img/logout.png'
+import PresentIcon from '../assets/img/present.png'
+import RequestIcon from '../assets/img/request.png'
+import QuitIcon from '../assets/img/quit.png'
 
 declare const APP_VERSION: string
 declare const CSP_POLICY: string
@@ -64,26 +71,6 @@ interface StoreSchema {
   }
   // allow superhigh cpu usage for faster video-encoding
   app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
-
-  const languages = {
-    en: 'English',
-    de: 'Deutsch',
-  }
-
-  const i18nReady = i18n.use(backend).init({
-    backend: {
-      loadPath: resolvePath('locales/{{lng}}.json'),
-      addPath: resolvePath('locales/{{lng}}.missing.json'),
-    },
-    lng: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
-    fallbackLng: Object.keys(languages)[0],
-    preload: Object.keys(languages),
-    ns: ['translation'],
-    /*interpolation: {
-      prefix: '{', 
-      suffix: '}',
-    }*/
-  })
 
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
@@ -229,15 +216,15 @@ interface StoreSchema {
         },
           { type: 'separator' }
       )
-
+      
       menuItems.push(
-        { label: '⛶  ' + i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
-        { label: '⤓  ' + i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
+        { icon: nativeImage.createFromPath(path.join(__dirname, PresentIcon)), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
+        { icon: nativeImage.createFromPath(path.join(__dirname, RequestIcon)), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
         { type: 'separator' },
-        { label: '⎋  ' + i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
-        { label: '?    ' + i18n.t('trayMenu.help'), type: 'submenu', submenu: [
-          { label: 'ℹ  ' + i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
-          { label: '⚑  ' + i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
+        { icon: nativeImage.createFromPath(path.join(__dirname, LogoutIcon)), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
+        { icon: nativeImage.createFromPath(path.join(__dirname, HelpIcon)), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
+          { icon: nativeImage.createFromPath(path.join(__dirname,   InfoIcon)), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
+          { icon: nativeImage.createFromPath(path.join(__dirname, LanguageIcon)), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
             { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
               appWindow?.webContents.send('change-language', locale)
               sourcesWindow?.webContents.send('change-language', locale)
@@ -246,7 +233,7 @@ interface StoreSchema {
             })}
           ))},
         ] },
-        { label: '⏻  ' + i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
+        { icon: nativeImage.createFromPath(path.join(__dirname, QuitIcon)), label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
       )
       
       const contextMenu = Menu.buildFromTemplate(menuItems)

@@ -1,15 +1,19 @@
 export type AcceptedRequestData = {
-  jwt: string
   videoServer: string
   controlServer: string
   roomId: string
+  turnCredentials: TurnCredentials
 }
 
 export type ScreenShareData = {
   userName?: string
   roomName: string
   roomId: string
-  jwtToken: string
   serverUrl: string
   controlServer?: string
+}
+
+export type TurnCredentials = {
+  username: string
+  credential: string
 }

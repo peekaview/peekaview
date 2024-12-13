@@ -53,6 +53,7 @@
       "hoursAgo": "vor einer Stunde | vor {n} Stunden",
       "daysAgo": "vor einem Tag | vor {n} Tagen"
     },
+    "stop": "Beenden",
     "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
     "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
     "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
