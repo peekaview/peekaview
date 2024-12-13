@@ -626,7 +626,21 @@ interface StoreSchema {
   const createMenuIcon = (iconPath: string): Electron.NativeImage => {
     const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
       .resize({ width: 16, height: 16 })
-    icon.setTemplateImage(true)
-    return icon
+    
+    // Get bitmap data
+    const bitmap = icon.getBitmap()
+    
+    // Invert colors (each pixel has 4 values: R,G,B,A)
+    for (let i = 0; i < bitmap.length; i += 4) {
+      bitmap[i] = 255 - bitmap[i]     // R
+      bitmap[i + 1] = 255 - bitmap[i + 1] // G
+      bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      // Leave alpha channel (i + 3) unchanged
+    }
+    
+    // Create new image from inverted bitmap
+    const invertedIcon = nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
+    invertedIcon.setTemplateImage(true)
+    return invertedIcon
   }
 })()
