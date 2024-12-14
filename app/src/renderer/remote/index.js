@@ -936,7 +936,12 @@ window.onload = function () {
         }
         if (e.keyCode == 192) {
             skip = false;
-            keyToSend = '^';
+            if (shiftpressed) {
+                keyToSend = '°';
+            }
+            else {
+                keyToSend = '^';
+            }
         }
 
 
