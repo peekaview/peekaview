@@ -950,14 +950,11 @@ window.onload = function () {
             }
         }
 
-        // Paint mode enabled
-        if (e.key == 'Control' || e.key == 'Meta') {
-            socket.emit('paintmode-enabled', JSON.stringify(obj));
-        }
+
         
         
         if (!skip) {
-            console.log("keyToSend: " + keyToSend);
+            console.log(keyToSend);
 
             var obj = {
                 "socketid": socket.id,
@@ -996,11 +993,6 @@ window.onload = function () {
             setTimeout(() => {
                 altpressed = false;
             }, 100);
-        }
-
-        // Paint mode enabled
-        if (controlpressed && (e.key == 'Control' || e.key == 'Meta')) {
-            socket.emit('paintmode-disabled', JSON.stringify(obj));
         }
 
         clearInterval(keypressed);
@@ -1189,11 +1181,11 @@ window.onload = function () {
     });
 
     // Also hide the help message when mouse leaves the overlay
-    /*document.querySelector("#overlay").addEventListener('mouseleave', function() {
+    document.querySelector("#overlay").addEventListener('mouseleave', function() {
         if (document.body.contains(msgmousehelp)) {
             msgmousehelp.remove();
         }
-    });*/
+    });
 }
 
 

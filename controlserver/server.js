@@ -120,6 +120,12 @@ io.on('connection', (socket)=> {
         socket.broadcast.to(room).emit('reset', data);
     })
 
+    socket.on("paint-mouse-move", function(data) {
+        var room = JSON.parse(data).room;
+        io.in(room).volatile.emit("paint-mouse-move", data);
+        //socket.to(room).emit("mouse-move", data);
+    })
+
     socket.on("mouse-move", function(data) {
         var room = JSON.parse(data).room;
         io.in(room).volatile.emit("mouse-move", data);
@@ -147,6 +153,11 @@ io.on('connection', (socket)=> {
         io.in(room).volatile.emit("mouse-down", data);
     })
 
+    socket.on("paint-mouse-down", function(data) {
+        var room = JSON.parse(data).room;
+        io.in(room).volatile.emit("paint-mouse-down", data);
+    })
+
     socket.on("mouse-leftclick", function(data) {
         var room = JSON.parse(data).room;
         io.in(room).emit("mouse-leftclick", data);
@@ -161,6 +172,12 @@ io.on('connection', (socket)=> {
         var room = JSON.parse(data).room;
         //socket.broadcast.to(room).emit("mouse-up", data);
         io.in(room).volatile.emit("mouse-up", data);
+    })
+
+    socket.on("paint-mouse-up", function(data) {
+        var room = JSON.parse(data).room;
+        //socket.broadcast.to(room).emit("mouse-up", data);
+        io.in(room).volatile.emit("paint-mouse-up", data);
     })
 
     socket.on("electroncmd", function(data) {
@@ -181,16 +198,6 @@ io.on('connection', (socket)=> {
     socket.on("paste", function(data) {
         var room = JSON.parse(data).room;
         socket.broadcast.to(room).emit("paste", data);
-    })
-
-    socket.on("paintmode-enabled", function(data) {
-        var room = JSON.parse(data).room;
-        socket.broadcast.to(room).emit("paintmode-enabled", data);
-    })
-
-    socket.on("paintmode-disabled", function(data) {
-        var room = JSON.parse(data).room;
-        socket.broadcast.to(room).emit("paintmode-disabled", data);
     })
 
     socket.on("pastefile", function(data) {
