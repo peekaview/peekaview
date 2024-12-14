@@ -43,6 +43,8 @@ var cursorcheckinterval = null;
 // Remote-Funktionen
 var mouseenabled = true;
 var remotecontrol = false;
+var mousedown = false;
+var dragdetected = false;
 
 // URL-Params
 let params = new URLSearchParams(document.location.search);
@@ -488,6 +490,7 @@ window.onload = function () {
             pointhistory[id] = [];
         }
 
+
         pointhistory[id].push({ color: color, from: latestPoint[id], to: newPoint, timestamp: Date.now(), opacity: 1.0 });
         latestPoint[id] = newPoint;
         repaintStrokes();
@@ -848,23 +851,21 @@ window.onload = function () {
     var lastobjclick = null;
     document.querySelector("#overlay").addEventListener('mousedown', function(e) {
         if (!mouseenabled) return false;
-        if ((ignoremouse < Date.now() - 200)) {
+        //if ((ignoremouse < Date.now() - 100)) {
             if (e.which == 3) {
                 sendMouseClick("mouse-click", e, this.getBoundingClientRect());
             } else {
                 sendMouseClick('mouse-down', e, this.getBoundingClientRect());
             }
-        } else {
+        /*} else {
             ignoremouse = Date.now();
-        }
+        }*/
         lastobj = obj;
     });
 
     document.querySelector("#overlay").addEventListener('mouseup', function(e) {
         if (!mouseenabled) return false;
-        if ((ignoremouse < Date.now() - 200)) {
-            sendMouseClick('mouse-up', e, this.getBoundingClientRect());
-        }
+        sendMouseClick('mouse-up', e, this.getBoundingClientRect());
     });
 
     var eventToSend = null;
@@ -875,15 +876,54 @@ window.onload = function () {
 
     function sendMouseClick(event, e, offset) {
         if (event == 'mouse-click') {
+
+            mousedown = false;
             lastmousedown = 0;
             //lastclick = 0;
             console.log("mouse-rightclick");
             socket.volatile.emit("mouse-click", JSON.stringify(obj));
         }
         if (event == 'mouse-down' && lastmousedown == 0) {
-
+            dragdetected = false;
             lastmousedown = Date.now();
+            mousedown = true;
 
+            // Store initial cursor position
+            const initialX = e.clientX;
+            const initialY = e.clientY;
+
+            // Add mousemove handler to check distance
+            const moveHandler = (moveEvent) => {
+                const deltaX = moveEvent.clientX - initialX;
+                const deltaY = moveEvent.clientY - initialY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                
+                if (distance > 3) {
+                    // Clear the delayed event since we're sending immediately
+                    clearTimeout(eventToSend);
+                    eventToSend = null;
+                    dragdetected = true;
+                    
+                    console.log("mouse-down (immediate due to movement)");
+                    if (!controlpressed) {
+                        socket.volatile.emit("mouse-down", JSON.stringify(lastobj));
+                    } else {
+                        socket.volatile.emit("paint-mouse-down", JSON.stringify(lastobj));
+                    }
+                    
+                    // Remove this handler since we've triggered the event
+                    document.removeEventListener('mousemove', moveHandler);
+                }
+            };
+            
+            document.addEventListener('mousemove', moveHandler);
+            
+            // Clean up move handler on mouse up
+            const cleanupHandler = () => {
+                document.removeEventListener('mousemove', moveHandler);
+                document.removeEventListener('mouseup', cleanupHandler);
+            };
+            document.addEventListener('mouseup', cleanupHandler);
             
 
             eventToSend = setTimeout(function () {
@@ -898,7 +938,10 @@ window.onload = function () {
             }, 150);
         }
         if (event == 'mouse-up') {
-            if (lastmousedown > (Date.now() - 120)) {
+
+            mousedown = false;
+
+            if (!dragdetected) {
                 clearTimeout(eventToSend);
                 console.log("mouse-leftclick");
                 if (!controlpressed) {
