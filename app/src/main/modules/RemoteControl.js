@@ -26,6 +26,8 @@ const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 
 export class RemoteControl {
   constructor(url) {
+    this.lastDeadKeyTime = null
+    this.nextKeyAfterDead = null
     this.overlaycursor = {}
     this.overlaydrawer = null
     this.overlaycursorlastaction = {}
@@ -515,7 +517,57 @@ export class RemoteControl {
       return
 
     const key = obj.key
-    const specialkeys = ['@', ';', ':', '_', '°', '^', '!', '"', '§', '$', '%', '&', '/', '=', '?', '`', '´', '{', '[', ']', '}', '\\', '\'', '*', '~', '<', '>', '|']
+    const specialkeys = [
+      // Original characters
+      '@', ';', ':', '_', '°', '^', '!', '"', '§', '$', '%', '&', '/', '=', '?', '`', '´', 
+      '{', '[', ']', '}', '\\', '\'', '*', '~', '<', '>', '|',
+      'ß', 'ö', 'ä', 'ü', 'Ö', 'Ä', 'Ü',
+      
+      // Additional European characters
+      // Scandinavian
+      'å', 'Å', 'ø', 'Ø', 'æ', 'Æ',
+      
+      // French
+      'é', 'è', 'ê', 'ë', 'É', 'È', 'Ê', 'Ë',
+      'à', 'â', 'À', 'Â',
+      'ù', 'û', 'Ù', 'Û',
+      'ï', 'î', 'Ï', 'Î',
+      'ç', 'Ç',
+      'œ', 'Œ',
+      
+      // Spanish/Portuguese
+      'ñ', 'Ñ',
+      'á', 'Á',
+      'í', 'Í',
+      'ó', 'Ó',
+      'ú', 'Ú',
+      'ã', 'Ã',
+      'õ', 'Õ',
+      
+      // Italian
+      'ì', 'Ì',
+      
+      // Polish
+      'ą', 'Ą',
+      'ć', 'Ć',
+      'ę', 'Ę',
+      'ł', 'Ł',
+      'ń', 'Ń',
+      'ś', 'Ś',
+      'ź', 'Ź',
+      'ż', 'Ż',
+      
+      // Czech/Slovak
+      'ě', 'Ě',
+      'š', 'Š',
+      'č', 'Č',
+      'ř', 'Ř',
+      'ž', 'Ž',
+      'ý', 'Ý',
+      'ť', 'Ť',
+      'ď', 'Ď',
+      'ň', 'Ň'
+    ]
 
     if (key == 'Space') {
       keyboard.type(Key.Space)
@@ -600,6 +652,24 @@ export class RemoteControl {
     }
     else if (key == 'Alt') {
       keyboard.type(Key.LeftAlt)
+    }
+    else if (key == 'Dead') {
+      // Store the time of Dead key press
+      this.lastDeadKeyTime = Date.now()
+      
+      // Wait 100ms to check for space
+      setTimeout(() => {
+        // If next key was space and it happened within 100ms window
+        if (this.nextKeyAfterDead === 'Space' && 
+            Date.now() - this.lastDeadKeyTime < 150) { // Using 150ms to give some buffer
+          keyboard.type('^')
+        } else {
+          keyboard.type(Key.Grave) 
+        }
+        // Reset tracking variables
+        this.nextKeyAfterDead = null
+        this.lastDeadKeyTime = null
+      }, 100)
     }
     else if (key == 'AltGraph') {
       keyboard.type(Key.RightAlt)

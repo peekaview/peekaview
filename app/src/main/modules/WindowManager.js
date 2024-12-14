@@ -753,7 +753,7 @@ export class WindowManager {
       this.cache[cacheKey] = { time: 0, result: null }
 
     if (this.cache[cacheKey].time < (Date.now() - maxcacheage) || this.cache[cacheKey].result == null) {
-      console.log(cmd)
+      //console.log(cmd)
       this.cache[cacheKey] = { time: Date.now(), result: require('child_process').execSync(cmd) }
     }
 
@@ -761,7 +761,7 @@ export class WindowManager {
   }
 
   executeCmd(cmd) {
-    console.log(cmd)
+    //console.log(cmd)
     return require('child_process').execSync(cmd)
   }
 
