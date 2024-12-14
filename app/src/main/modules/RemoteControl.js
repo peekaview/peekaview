@@ -783,8 +783,8 @@ export class RemoteControl {
     })
 
     socket.on('paint-mouse-move', (data) => {
-      console.log('paint-mouse-move')
       if (this.mouseenabled)
+        this.mouseMove(data)
         this.showDrawCanvas('mouse-move', data)
     })
 

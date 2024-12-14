@@ -624,6 +624,12 @@ window.onload = function () {
 
         obj = JSON.parse(data);
     });
+    socket.on("paint-mouse-leftclick", function (data) {
+        obj = JSON.parse(data);
+        if (drawing[obj.id] != undefined && drawing[obj.id]) {
+            continueStroke(obj.id, obj.color, [obj.x, obj.y]);
+        }
+    });
 
     socket.on("mouse-move", function (data) {
 
@@ -633,6 +639,14 @@ window.onload = function () {
             continueStroke(obj.id, obj.color, [obj.x, obj.y]);
         }
 
+        mouseMove(data);
+    });
+
+    socket.on("paint-mouse-move", function (data) {
+        obj = JSON.parse(data);
+        if (drawing[obj.id] != undefined && drawing[obj.id]) {
+            continueStroke(obj.id, obj.color, [obj.x, obj.y]);
+        }
         mouseMove(data);
     });
 
@@ -654,6 +668,13 @@ window.onload = function () {
         //createRectangle(obj);
     });
 
+    socket.on("paint-mouse-down", function (data) {
+        obj = JSON.parse(data);
+        if (drawing[obj.id] == undefined || !drawing[obj.id]) {
+            startStroke(obj.id, [obj.x, obj.y]);
+        }
+    });
+
     socket.on("mouse-up", function (data) {
         obj = JSON.parse(data);
         //mousepressed[obj.id] = false;
@@ -662,6 +683,11 @@ window.onload = function () {
 
         drawing[obj.id] = false;
         //finishRectangle(obj);
+    });
+
+    socket.on("paint-mouse-up", function (data) {
+        obj = JSON.parse(data);
+        drawing[obj.id] = false;
     });
 
 
@@ -872,10 +898,14 @@ window.onload = function () {
             }, 150);
         }
         if (event == 'mouse-up') {
-            if (lastmousedown > (Date.now() - 150)) {
+            if (lastmousedown > (Date.now() - 120)) {
                 clearTimeout(eventToSend);
                 console.log("mouse-leftclick");
-                socket.volatile.emit("mouse-leftclick", JSON.stringify(lastobj));
+                if (!controlpressed) {
+                    socket.volatile.emit("mouse-leftclick", JSON.stringify(lastobj));
+                } else {
+                    socket.volatile.emit("paint-mouse-leftclick", JSON.stringify(lastobj));
+                }
             } else {
                 //lastclick = 0;
                 //lastmouseup = Date.now();

@@ -163,6 +163,11 @@ io.on('connection', (socket)=> {
         io.in(room).emit("mouse-leftclick", data);
     })
 
+    socket.on("paint-mouse-leftclick", function(data) {
+        var room = JSON.parse(data).room;
+        io.in(room).emit("paint-mouse-leftclick", data);
+    })
+
     socket.on("mouse-dblclick", function(data) {
         var room = JSON.parse(data).room;
         socket.broadcast.to(room).emit("mouse-dblclick", data);
