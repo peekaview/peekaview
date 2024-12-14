@@ -791,7 +791,11 @@ window.onload = function () {
             (lastmove < Date.now() - 100) || 
             (lastmove < Date.now() - 50 && (Math.abs(lastposx - x) < 3 || Math.abs(lastposy - y) < 3))) {
             lastmove = Date.now()
-            socket.volatile.emit("mouse-move", JSON.stringify(obj));
+            if (!controlpressed) {
+                socket.volatile.emit("mouse-move", JSON.stringify(obj));
+            } else {
+                socket.volatile.emit("paint-mouse-move", JSON.stringify(obj));
+            }
         }
 
         lastposx = x;
@@ -818,7 +822,7 @@ window.onload = function () {
     var lastobjclick = null;
     document.querySelector("#overlay").addEventListener('mousedown', function(e) {
         if (!mouseenabled) return false;
-        if (!controlpressed && (ignoremouse < Date.now() - 500)) {
+        if ((ignoremouse < Date.now() - 200)) {
             if (e.which == 3) {
                 sendMouseClick("mouse-click", e, this.getBoundingClientRect());
             } else {
@@ -832,7 +836,7 @@ window.onload = function () {
 
     document.querySelector("#overlay").addEventListener('mouseup', function(e) {
         if (!mouseenabled) return false;
-        if (!controlpressed && (ignoremouse < Date.now() - 500)) {
+        if ((ignoremouse < Date.now() - 200)) {
             sendMouseClick('mouse-up', e, this.getBoundingClientRect());
         }
     });
@@ -860,8 +864,11 @@ window.onload = function () {
                 console.log("mouse-down");
                 //mousepressed[lastobj.id] = true;
                 
-                
-                socket.volatile.emit("mouse-down", JSON.stringify(lastobj));
+                if (!controlpressed) {
+                    socket.volatile.emit("mouse-down", JSON.stringify(lastobj));
+                } else {
+                    socket.volatile.emit("paint-mouse-down", JSON.stringify(lastobj));
+                }
             }, 150);
         }
         if (event == 'mouse-up') {
@@ -876,7 +883,11 @@ window.onload = function () {
 
                 //mousepressed[obj.id] = false;
                 //finishRectangle(obj);
-                socket.volatile.emit("mouse-up", JSON.stringify(obj));
+                if (!controlpressed) {
+                    socket.volatile.emit("mouse-up", JSON.stringify(obj));
+                } else {
+                    socket.volatile.emit("paint-mouse-up", JSON.stringify(obj));
+                }
                 clearTimeout(eventToSend);
                 eventToSend = null;
             }

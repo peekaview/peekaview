@@ -782,6 +782,12 @@ export class RemoteControl {
       }
     })
 
+    socket.on('paint-mouse-move', (data) => {
+      console.log('paint-mouse-move')
+      if (this.mouseenabled)
+        this.showDrawCanvas('mouse-move', data)
+    })
+
     socket.on('mouse-click', (data) => {
       console.log('mouse-click')
       if (this.remotecontrolinputenabled)
@@ -807,11 +813,23 @@ export class RemoteControl {
       }
     })
 
+    socket.on('paint-mouse-leftclick', (data) => {
+      console.log('paint-mouse-leftclick')
+      if (this.mouseenabled)
+        this.mouseSignal(data)
+    })
+
     socket.on('mouse-down', (data) => {
       console.log('mouse-down')
       if (this.remotecontrolinputenabled)
         this.mouseDown(data)
       else if (this.mouseenabled)
+        this.showDrawCanvas('mouse-down', data)
+    })
+
+    socket.on('paint-mouse-down', (data) => {
+      console.log('paint-mouse-down')
+      if (this.mouseenabled)
         this.showDrawCanvas('mouse-down', data)
     })
 
@@ -826,6 +844,12 @@ export class RemoteControl {
       if (this.remotecontrolinputenabled)
         this.mouseUp(data)
       else if (this.mouseenabled)
+        this.showDrawCanvas('mouse-up', data)
+    })
+
+    socket.on('paint-mouse-up', (data) => {
+      console.log('paint-mouse-up')
+      if (this.mouseenabled)
         this.showDrawCanvas('mouse-up', data)
     })
 
