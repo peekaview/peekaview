@@ -54,7 +54,7 @@ jobs:
         run: pnpm run build
 
       - name: Add _headers file
-        working-directory: ./app
+        working-directory: ./app/out/renderer
         run: |
           echo "/*" > _headers
           echo "! X-Content-Type-Options" >> _headers
