@@ -10,6 +10,7 @@ var shiftpressed = false;
 var spacepressed = false;
 var synchronized = false;
 var remoteclipboard = false;
+var skip = false
 
 // Skalierungsinfos
 var scale = 1;          // Skalierung im Browser im Verhältnis zur Videogröße

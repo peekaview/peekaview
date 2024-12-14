@@ -91,7 +91,7 @@ export default defineConfig({
       }
     },
     plugins: [vue()],
-    publicDir: resolve('public'),
+    publicDir: resolve('static'),
     server: {
       fs: {
         allow: [
