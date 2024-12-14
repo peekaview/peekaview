@@ -53,6 +53,13 @@ jobs:
         working-directory: ./app
         run: pnpm run build
 
+      - name: Add _headers file
+        working-directory: ./app
+        run: |
+          echo "/*" > _headers
+          echo "! X-Content-Type-Options" >> _headers
+          echo "! X-Frame-Options" >> _headers
+        
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
