@@ -81,7 +81,7 @@ var msgmousesync = document.createElement('div');
 msgmousesync.id = 'mousesync';
 msgmousesync.classList.add('message');
 msgmousesync.style.cssText = 'opacity: 0.8; z-index: 1001; pointer-events: none';
-msgmousesync.innerHTML = '<b>aktive Remotesitzung - Verbindung wird hergestellt</b><img style="float: left; margin-right: 50px;" src="img/loading_dark.gif"><br><br>' + (!is_touch_enabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '');
+msgmousesync.innerHTML = '<b>aktive Remotesitzung - Verbindung wird hergestellt</b><img style="float: left; margin-right: 50px;" src="../img/loading_dark.gif"><br><br>' + (!is_touch_enabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '');
 
 var msgmousehelp = document.createElement('div');
 msgmousehelp.id = 'mousehelp';
@@ -99,7 +99,7 @@ var msgfileupload = document.createElement('div');
 msgfileupload.id = 'transfer';
 msgfileupload.classList.add('message');
 msgfileupload.style.cssText = 'padding-left: 100px; position: absolute; z-index: 1003; color: white; background: #000; opacity: 0.8; padding:20px; min-width: 500px; width: 100vw; pointer-events: none';
-msgfileupload.innerHTML = '<b>Datei wird hochgeladen...</b><br><br>Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.<img style="float: left; margin-right: 50px;" src="img/loading_dark.gif">';
+msgfileupload.innerHTML = '<b>Datei wird hochgeladen...</b><br><br>Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.<img style="float: left; margin-right: 50px;" src="../img/loading_dark.gif">';
 
 var msgremotecontrol = document.createElement('div');
 msgremotecontrol.id = 'remotecontrol';
@@ -873,6 +873,7 @@ window.onload = function () {
     //var lastclick = 0;
     var lastobj = null;
     //var mousepressed = {};
+    var moveHandler = null;
 
     function sendMouseClick(event, e, offset) {
         if (event == 'mouse-click') {
@@ -886,23 +887,24 @@ window.onload = function () {
         if (event == 'mouse-down' && lastmousedown == 0) {
             dragdetected = false;
             lastmousedown = Date.now();
-            mousedown = true;
+            mousedown = false;
 
             // Store initial cursor position
             const initialX = e.clientX;
             const initialY = e.clientY;
 
             // Add mousemove handler to check distance
-            const moveHandler = (moveEvent) => {
+            moveHandler = (moveEvent) => {
                 const deltaX = moveEvent.clientX - initialX;
                 const deltaY = moveEvent.clientY - initialY;
                 const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
                 
-                if (distance > 3) {
+                if (distance > 5) {
                     // Clear the delayed event since we're sending immediately
                     clearTimeout(eventToSend);
                     eventToSend = null;
                     dragdetected = true;
+                    mousedown = true;
                     
                     console.log("mouse-down (immediate due to movement)");
                     if (!controlpressed) {
@@ -918,53 +920,46 @@ window.onload = function () {
             
             document.addEventListener('mousemove', moveHandler);
             
-            // Clean up move handler on mouse up
-            const cleanupHandler = () => {
-                document.removeEventListener('mousemove', moveHandler);
-                document.removeEventListener('mouseup', cleanupHandler);
-            };
-            document.addEventListener('mouseup', cleanupHandler);
-            
-
             eventToSend = setTimeout(function () {
+                mousedown = true;
                 console.log("mouse-down");
-                //mousepressed[lastobj.id] = true;
-                
                 if (!controlpressed) {
                     socket.volatile.emit("mouse-down", JSON.stringify(lastobj));
                 } else {
                     socket.volatile.emit("paint-mouse-down", JSON.stringify(lastobj));
                 }
-            }, 150);
+            }, 120);
         }
         if (event == 'mouse-up') {
-
-            mousedown = false;
-
-            if (!dragdetected) {
+            if (moveHandler != null) {
+                document.removeEventListener('mousemove', moveHandler);
+                moveHandler = null;
+            }
+            if (eventToSend != null) {
                 clearTimeout(eventToSend);
+                eventToSend = null;
+            }
+
+            if (mousedown || dragdetected) {
+                console.log("mouse-up");
+
+                if (!controlpressed) {
+                    socket.volatile.emit("mouse-up", JSON.stringify(obj));
+                } else {
+                    socket.volatile.emit("paint-mouse-up", JSON.stringify(obj));
+                }
+            } else {
                 console.log("mouse-leftclick");
                 if (!controlpressed) {
                     socket.volatile.emit("mouse-leftclick", JSON.stringify(lastobj));
                 } else {
                     socket.volatile.emit("paint-mouse-leftclick", JSON.stringify(lastobj));
                 }
-            } else {
-                //lastclick = 0;
-                //lastmouseup = Date.now();
-                console.log("mouse-up");
-
-                //mousepressed[obj.id] = false;
-                //finishRectangle(obj);
-                if (!controlpressed) {
-                    socket.volatile.emit("mouse-up", JSON.stringify(obj));
-                } else {
-                    socket.volatile.emit("paint-mouse-up", JSON.stringify(obj));
-                }
-                clearTimeout(eventToSend);
-                eventToSend = null;
+                
             }
+
             //mousepressed[obj.id] = false;
+            mousedown = false;
             lastmousedown = 0;
         }
     }
@@ -1162,7 +1157,7 @@ window.onload = function () {
     //var isafile = false;
     window.addEventListener('paste', function (e) {
         var items = (e.clipboardData || e.originalEvent.clipboardData).items;
-        for (index in items) {
+        for (let index in items) {
             var item = items[index];
 
             console.log(item);
