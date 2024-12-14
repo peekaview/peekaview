@@ -55,7 +55,7 @@ jobs:
 
       - name: add static files
         working-directory: ./app
-        run: rsync -av ./out/static/ ./app/out/renderer/
+        run: rsync -av static/ out/renderer/
         
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
