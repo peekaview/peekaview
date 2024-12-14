@@ -183,6 +183,16 @@ io.on('connection', (socket)=> {
         socket.broadcast.to(room).emit("paste", data);
     })
 
+    socket.on("paintmode-enabled", function(data) {
+        var room = JSON.parse(data).room;
+        socket.broadcast.to(room).emit("paintmode-enabled", data);
+    })
+
+    socket.on("paintmode-disabled", function(data) {
+        var room = JSON.parse(data).room;
+        socket.broadcast.to(room).emit("paintmode-disabled", data);
+    })
+
     socket.on("pastefile", function(data) {
         var room = JSON.parse(data).room;
         //socket.broadcast.to(room).emit("pastefile", data);
