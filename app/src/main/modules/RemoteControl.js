@@ -39,6 +39,7 @@ export class RemoteControl {
     this.lastkey = null
     this.remotecontrolactive = false
     this.remotecontrolinputenabled = false
+    this.paintmodeenabled = false;
     this.lastposx = 0
     this.lastposy = 0
     this.lastrectwidth = 0
@@ -755,6 +756,16 @@ export class RemoteControl {
     console.log('register eventlistener')
     this.socket = socket
 
+    socket.on('paintmode-enabled', (data) => {
+      console.log('paintmode-enabled')
+      this.paintmodeenabled = true;
+    })
+
+    socket.on('paintmode-disabled', (data) => {
+      console.log('paintmode-disabled')
+      this.paintmodeenabled = false;
+    })
+
     socket.on('copy', (data) => {
       if (this.remotecontrolinputenabled)
         this.copyToClipboard(socket, data, false)
@@ -776,7 +787,7 @@ export class RemoteControl {
     })
 
     socket.on('mouse-move', (data) => {
-      if (this.mouseenabled) {
+      if (this.mouseenabled || this.paintmodeenabled) {
         this.mouseMove(data)
         this.showDrawCanvas('mouse-move', data)
       }
@@ -796,22 +807,22 @@ export class RemoteControl {
 
     socket.on('mouse-leftclick', (data) => {
       console.log('mouse-leftclick')
-      if (this.remotecontrolinputenabled) {
+      if (this.remotecontrolinputenabled && !this.paintmodeenabled) {
         if (!isMac)
           this.mouseSignal(data)
 
         this.mouseLeftClick(data)
       }
-      else if (this.mouseenabled) {
+      else if (this.mouseenabled || this.paintmodeenabled) {
         this.mouseSignal(data)
       }
     })
 
     socket.on('mouse-down', (data) => {
       console.log('mouse-down')
-      if (this.remotecontrolinputenabled)
+      if (this.remotecontrolinputenabled && !this.paintmodeenabled)
         this.mouseDown(data)
-      else if (this.mouseenabled)
+      else if (this.mouseenabled || this.paintmodeenabled)
         this.showDrawCanvas('mouse-down', data)
     })
 
@@ -823,9 +834,9 @@ export class RemoteControl {
 
     socket.on('mouse-up', (data) => {
       console.log('mouse-up')
-      if (this.remotecontrolinputenabled)
+      if (this.remotecontrolinputenabled && !this.paintmodeenabled)
         this.mouseUp(data)
-      else if (this.mouseenabled)
+      else if (this.mouseenabled || this.paintmodeenabled)
         this.showDrawCanvas('mouse-up', data)
     })
 

@@ -79,7 +79,13 @@ var msgmousesync = document.createElement('div');
 msgmousesync.id = 'mousesync';
 msgmousesync.classList.add('message');
 msgmousesync.style.cssText = 'opacity: 0.8; z-index: 1001; pointer-events: none';
-msgmousesync.innerHTML = '<b>aktive Remotesitzung - Verbindung wird hergestellt</b><img style="float: left; margin-right: 50px;" src="img/loading_dark.gif"><br><br>' + (!is_touch_enabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>CTRL + C/CTRL + V zum Einfügen von Texten/Dateien/Bildern' : '');
+msgmousesync.innerHTML = '<b>aktive Remotesitzung - Verbindung wird hergestellt</b><img style="float: left; margin-right: 50px;" src="img/loading_dark.gif"><br><br>' + (!is_touch_enabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '');
+
+var msgmousehelp = document.createElement('div');
+msgmousehelp.id = 'mousehelp';
+msgmousehelp.classList.add('message');
+msgmousehelp.style.cssText = 'opacity: 0.8; z-index: 1001; pointer-events: none';
+msgmousehelp.innerHTML = '<b>Hilfe für die Maussteuerung</b><br><br>' + (!is_touch_enabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '');
 
 var msgfiledrop = document.createElement('div');
 msgfiledrop.id = 'filedrop';
@@ -944,11 +950,14 @@ window.onload = function () {
             }
         }
 
-
+        // Paint mode enabled
+        if (e.key == 'Control' || e.key == 'Meta') {
+            socket.emit('paintmode-enabled', JSON.stringify(obj));
+        }
         
         
         if (!skip) {
-            console.log(keyToSend);
+            console.log("keyToSend: " + keyToSend);
 
             var obj = {
                 "socketid": socket.id,
@@ -976,11 +985,22 @@ window.onload = function () {
             console.log('shift released');
             shiftpressed = false;
         }
+        if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+            console.log('space released');
+            setTimeout(() => {
+                spacepressed = false;
+            }, 100);
+        }
         if (e.key == 'Alt' || e.key == 'AltGraph') {
             console.log('alt released');
             setTimeout(() => {
                 altpressed = false;
             }, 100);
+        }
+
+        // Paint mode enabled
+        if (controlpressed && (e.key == 'Control' || e.key == 'Meta')) {
+            socket.emit('paintmode-disabled', JSON.stringify(obj));
         }
 
         clearInterval(keypressed);
@@ -1146,6 +1166,34 @@ window.onload = function () {
         if (remoteclipboard)
             socket.emit('cut', JSON.stringify(obj));
     });
+
+    // Add this near the other event listeners
+    document.querySelector("#overlay").addEventListener('mousemove', function(e) {
+        // Get the vertical position of the mouse relative to the overlay
+        const mouseY = e.clientY;
+        
+        // Define a threshold for the "top" area (e.g., top 50 pixels)
+        const topThreshold = 3;
+        
+        if (mouseY <= topThreshold) {
+            // Show help message when mouse is near top
+            if (!document.body.contains(msgmousehelp)) {
+                document.body.appendChild(msgmousehelp);
+            }
+        } else {
+            // Hide help message when mouse moves away
+            if (document.body.contains(msgmousehelp)) {
+                msgmousehelp.remove();
+            }
+        }
+    });
+
+    // Also hide the help message when mouse leaves the overlay
+    /*document.querySelector("#overlay").addEventListener('mouseleave', function() {
+        if (document.body.contains(msgmousehelp)) {
+            msgmousehelp.remove();
+        }
+    });*/
 }
 
 
