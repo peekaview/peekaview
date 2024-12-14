@@ -881,6 +881,9 @@ window.onload = function () {
 
 
     window.addEventListener('keydown', function(e) {
+
+        console.log(e.keyCode);
+
         skip = false;
         if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
             console.log('space pressed');
@@ -909,11 +912,36 @@ window.onload = function () {
         }
         let keyToSend = e.key;
 
-        if (altpressed && e.key == 'Dead') {
+        // Special keys ~,+,^,`,´ and how to detect them
+        if (altpressed && e.keyCode == 78) {
             skip = false;
             keyToSend = '~';
         }
+        if (e.keyCode === 187) {  // Both ´ and + share keyCode 187
+            if (e.code === 'Equal') {  // Physical key is always 'Equal'
+                if (e.key === 'Dead') {
+                    // This is ´ (acute accent)
+                    skip = false;
+                    if (shiftpressed) {
+                        keyToSend = '`';
+                    } else {
+                        keyToSend = '´';
+                    }
+                } else if (e.key === '+') {
+                    // This is the + key
+                    skip = false;
+                    keyToSend = '+';
+                }
+            }
+        }
+        if (e.keyCode == 192) {
+            skip = false;
+            keyToSend = '^';
+        }
 
+
+        
+        
         if (!skip) {
             console.log(keyToSend);
 
@@ -935,7 +963,9 @@ window.onload = function () {
     window.addEventListener('keyup', function(e) {
         if (e.key == 'Control' || e.key == 'Meta') {
             console.log('control released');
-            controlpressed = false;
+            setTimeout(() => {
+                controlpressed = false;
+            }, 100);
         }
         if (e.key == 'Shift') {
             console.log('shift released');

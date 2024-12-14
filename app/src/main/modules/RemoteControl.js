@@ -515,6 +515,8 @@ export class RemoteControl {
     if (obj.key === undefined)
       return
 
+
+    console.log(obj.key)
     const key = obj.key
     const specialkeys = [
       // Original characters
