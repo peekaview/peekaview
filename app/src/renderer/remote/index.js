@@ -893,6 +893,10 @@ window.onload = function () {
             console.log('control pressed');
             controlpressed = true;
         }
+        if (e.key == 'Alt' || e.key == 'AltGraph') {
+            console.log('alt pressed');
+            altpressed = true;
+        }
         if (e.key == 'Alt' || e.key == 'AltGraph' || e.key == 'Shift' || e.key == 'CapsLock') {
             skip = true;
         }
@@ -901,6 +905,10 @@ window.onload = function () {
         }
         if (controlpressed && e.key != 'v' && e.key != 'c' && e.key != 'x' && (e.key.length === 1 && e.key.toLowerCase().match(/[a-z]/i) || e.key == 'Enter')) {
             e.key = '_____strg+' + e.key.toLowerCase();
+        }
+        if (altpressed && e.key == 'Dead') {
+            skip = false;
+            e.key = '~';
         }
 
         if (!skip) {

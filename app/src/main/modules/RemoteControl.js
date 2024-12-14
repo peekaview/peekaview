@@ -26,8 +26,6 @@ const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 
 export class RemoteControl {
   constructor(url) {
-    this.lastDeadKeyTime = null
-    this.nextKeyAfterDead = null
     this.overlaycursor = {}
     this.overlaydrawer = null
     this.overlaycursorlastaction = {}
@@ -652,24 +650,6 @@ export class RemoteControl {
     }
     else if (key == 'Alt') {
       keyboard.type(Key.LeftAlt)
-    }
-    else if (key == 'Dead') {
-      // Store the time of Dead key press
-      this.lastDeadKeyTime = Date.now()
-      
-      // Wait 100ms to check for space
-      setTimeout(() => {
-        // If next key was space and it happened within 100ms window
-        if (this.nextKeyAfterDead === 'Space' && 
-            Date.now() - this.lastDeadKeyTime < 150) { // Using 150ms to give some buffer
-          keyboard.type('^')
-        } else {
-          keyboard.type(Key.Grave) 
-        }
-        // Reset tracking variables
-        this.nextKeyAfterDead = null
-        this.lastDeadKeyTime = null
-      }, 100)
     }
     else if (key == 'AltGraph') {
       keyboard.type(Key.RightAlt)
