@@ -36,6 +36,7 @@ export class RemoteControl {
     this.localclipboardtime = 0
     this.lasttargetpoint = []
     this.mouseenabled = true
+    this.lastkey = null
     this.remotecontrolactive = false
     this.remotecontrolinputenabled = false
     this.lastposx = 0
@@ -568,7 +569,12 @@ export class RemoteControl {
     ]
 
     if (key == 'Space') {
-      keyboard.type(Key.Space)
+      if (lastkey == 'Dead') {
+        keyboard.type('^')
+      }
+      else {
+        keyboard.type(Key.Space)
+      }
     }
     else if (key == 'Escape') {
       keyboard.type(Key.Escape)
@@ -650,6 +656,9 @@ export class RemoteControl {
     }
     else if (key == 'Alt') {
       keyboard.type(Key.LeftAlt)
+    }
+    else if (key == 'Dead') {
+      this.lastkey = 'Dead'
     }
     else if (key == 'AltGraph') {
       keyboard.type(Key.RightAlt)

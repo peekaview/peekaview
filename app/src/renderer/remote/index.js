@@ -6,6 +6,7 @@ var socket;
 // gedrückte Keys
 var keypressed;
 var controlpressed = false;
+var altpressed = false;
 var shiftpressed = false;
 var spacepressed = false;
 var synchronized = false;
@@ -906,17 +907,19 @@ window.onload = function () {
         if (controlpressed && e.key != 'v' && e.key != 'c' && e.key != 'x' && (e.key.length === 1 && e.key.toLowerCase().match(/[a-z]/i) || e.key == 'Enter')) {
             e.key = '_____strg+' + e.key.toLowerCase();
         }
+        let keyToSend = e.key;
+
         if (altpressed && e.key == 'Dead') {
             skip = false;
-            e.key = '~';
+            keyToSend = '~';
         }
 
         if (!skip) {
-            console.log(e.key);
+            console.log(keyToSend);
 
             var obj = {
                 "socketid": socket.id,
-                "key": e.key,
+                "key": keyToSend,
                 "room": room,
                 "name": user,
                 "color": color
@@ -937,6 +940,12 @@ window.onload = function () {
         if (e.key == 'Shift') {
             console.log('shift released');
             shiftpressed = false;
+        }
+        if (e.key == 'Alt' || e.key == 'AltGraph') {
+            console.log('alt released');
+            setTimeout(() => {
+                altpressed = false;
+            }, 100);
         }
 
         clearInterval(keypressed);
