@@ -111,6 +111,8 @@ var sizeinfo = document.createElement('div');
 sizeinfo.id = 'sizeinfo';
 sizeinfo.style.cssText = '';
 
+// Add this near the top of the file with other variable declarations
+var clipboarddata;
 
 // Drawing state
 let drawing = {};           // Benutzer malt gerade? 
