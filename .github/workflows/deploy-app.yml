@@ -53,12 +53,9 @@ jobs:
         working-directory: ./app
         run: pnpm run build
 
-      - name: Add _headers file
-        working-directory: ./app/out/renderer
-        run: |
-          echo "/*" > _headers
-          echo "! X-Content-Type-Options" >> _headers
-          echo "! X-Frame-Options" >> _headers
+      - name: add static files
+        working-directory: ./app
+        run: rsync -av ./out/static/ ./app/out/renderer/
         
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
