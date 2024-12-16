@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, useTemplateRef } from 'vue'
+import { ref, watch, useTemplateRef, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import RemoteControl from "./RemoteControl.vue"
@@ -44,6 +44,10 @@ const props = defineProps<{
   name?: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'toggle-full-video', active: boolean): void
+}>()
+
 const { t } = useI18n()
 
 const inputEmail = ref<string>()
@@ -61,6 +65,23 @@ const remoteControlRef = useTemplateRef('remoteControl')
 const trackRef = useTemplateRef('track')
 
 const { closeRemoteControl } = useRemoteControl()
+
+let lastViewActiveInterval = window.setInterval(() => {
+  if (!screenView.value)
+    return
+
+  localStorage.setItem('lastViewActive', Date.now().toString())
+}, 1000)
+
+onBeforeUnmount(() => {
+  clearInterval(lastViewActiveInterval)
+  localStorage.removeItem('lastViewActive')
+})
+
+window.addEventListener('beforeunload', () => {
+  clearInterval(lastViewActiveInterval)
+  localStorage.removeItem('lastViewActive')
+})
 
 watch(screenShareData, async (screenShareData) => {
   if (!screenShareData)
@@ -80,6 +101,7 @@ watch(screenShareData, async (screenShareData) => {
       })
       screenView.value = undefined
 
+      emit('toggle-full-video', false)
       closeRemoteControl()
     }
   })
@@ -115,6 +137,16 @@ function getRequestId(length = 8) {
 async function handleSubmit(e: Event) {
   e.preventDefault()
 
+  if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
+    notify({
+      type: 'error',
+      title: t('viewer.sessionAlreadyActiveTitle'),
+      text: t('viewer.sessionAlreadyActive'),
+      confirmButtonText: t('general.ok'),
+    })
+    return
+  }
+
   if ((!props.email && !inputEmail.value) || !inputName.value)
     return
 
@@ -133,7 +165,7 @@ async function handleSubmit(e: Event) {
 
 async function requestScreen(params: RequestParams, initial = false) {
   try {
-    if (waitingStatus.value === undefined || waitingStatus.value === 'notified')
+    if (waitingStatus.value === undefined)
       return
 
     const data = await callApi<Response>({
@@ -163,7 +195,7 @@ async function requestScreen(params: RequestParams, initial = false) {
           return
         case 'request_notified':
           waitingStatus.value = 'notified'
-          return
+          break
         case 'request_open':
           if (!requestStatus.value)
             waitingStatus.value = 'waiting'
@@ -205,8 +237,8 @@ function initializeRemoteViewer(data: ScreenShareData) {
   }
 
   console.log('Generated params:', params)
-  
-  document.querySelector('.main-header')?.classList.add('d-none')
+
+  emit('toggle-full-video', true)
 
   remoteControlRef.value?.openRemoteControl(
     params.roomid,
@@ -236,7 +268,7 @@ function handleError() {
   
   notify({
     type: 'error',
-    title: 'Connection Error',
+    title: t('viewer.connectionErrorTitle'),
     text: t('viewer.connectionError'),
     confirmButtonText: t('general.ok'),
   })
@@ -270,6 +302,8 @@ function stopViewing() {
   screenView.value = undefined
   waitingStatus.value = undefined
   requestStatus.value = undefined
+
+  emit('toggle-full-video', false)
 }
 </script>
 
@@ -324,13 +358,12 @@ function stopViewing() {
               <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
               <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
             </p>
-            <p class="text-muted small mt-10">
-              {{ $t('viewer.keepWindowOpen') }}
-            </p>
           </div>
-          <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
-            {{ $t('general.cancel') }}
-          </button>
+          <div class="btn-row">
+            <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+              {{ $t('general.cancel') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>

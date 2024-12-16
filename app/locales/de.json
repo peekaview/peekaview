@@ -37,7 +37,7 @@
     "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
     "waitingStatus": {
       "establishing": "Verbindung wird aufgebaut...",
-      "notified": "Wir haben eine E-Mail an {email} gesendet. Sie können das Fenster geöffnet lassen.",
+      "notified": "Wir haben eine E-Mail an {email} gesendet.",
       "waiting": "Warten auf Antwort von {email}..."
     },
     "userStatus": {
@@ -55,8 +55,10 @@
     },
     "stop": "Beenden",
     "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
-    "keepWindowOpen": "Sie können das Fenster geöffnet lassen. Sobald Ihre Anfrage akzeptiert wird, wird die Verbindung automatisch hergestellt.",
-    "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+    "connectionErrorTitle": "Verbindungsfehler",
+    "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut.",
+    "sessionAlreadyActiveTitle": "Sitzung bereits aktiv",
+    "sessionAlreadyActive": "Sie sind bereits mit einer aktiven Sitzung verbunden."
   },
   "share": {
     "howToShare": "Wie möchten Sie Ihren Bildschirm teilen?",
