@@ -308,7 +308,7 @@ function showMeYourScreen() {
             $status = $requestData[2];
             
             // if request is not accepted in time or user seems to be offline
-            if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
+            if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline' || $status === 'request_denied') {
                 
                 $token = $userData[1];
                 // Update status to not answered and send email
