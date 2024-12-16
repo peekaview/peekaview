@@ -331,7 +331,16 @@ function showMeYourScreen() {
                         'last_seen' => $lastSeen,
                     ]);
                     return;
-                } else {
+                } elseif ($status === 'request_denied') {
+                    echo json_encode([
+                        'status' => 'request_denied',
+                        'message' => "$email hat die Anfrage abgelehnt",
+                        'user_status' => $userStatus,
+                        'last_seen' => $lastSeen
+                    ]);
+                    return;
+                }
+                else {
                     echo json_encode([
                         'status' => 'request_not_answered',
                         'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
@@ -341,15 +350,7 @@ function showMeYourScreen() {
                     return;
                 }
 
-                if ($status === 'request_denied') {
-                    echo json_encode([
-                        'status' => 'request_denied',
-                        'message' => "$email hat die Anfrage abgelehnt",
-                        'user_status' => $userStatus,
-                        'last_seen' => $lastSeen
-                    ]);
-                    return;
-                }
+                
             }
             
             if ($status === 'request_accepted') {
