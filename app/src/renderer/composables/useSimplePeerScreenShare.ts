@@ -78,13 +78,17 @@ async function useScreenPeer({ roomName, turnCredentials }: ScreenShareData, rol
   const initPeer = (socketId: string, initiator: boolean, stream?: MediaStream) => {
     const peer = new SimplePeer({
       initiator,
-      trickle: false,
+      trickle: true,
       stream,
       config: {
         iceServers: [{
           ...rtcIceServer,
           ...(turnCredentials ?? {})
         }]
+      },
+      channelConfig: {
+        ordered: false,
+        maxRetransmits: 0,
       },
       offerOptions: {
         offerToReceiveVideo: true,
@@ -146,6 +150,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
     
     peers[socketId].on('data', (json) => {
       const data = JSON.parse(json) as PeerData
+      console.log('peer on data', data)
       switch (data.type) {
         case 'remote':
           options?.onRemote?.(data.remote)
@@ -158,6 +163,10 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
           close(socketId)
           break
       }
+    })
+    
+    peers[socketId].on('close', (json) => {
+      console.log('peer on close', json)
     })
   })
 

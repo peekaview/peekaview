@@ -27,7 +27,6 @@ const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
 const screenPresent = ref<ScreenPresent>()
-//const incomingRequests = reactive<{ [id: string]: string }>({})
 const latestRequest = ref<Request>()
 
 const pingInterval = ref<number>()
@@ -36,6 +35,8 @@ const lastPingTime = ref<number>()
 const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
+
+let stream: MediaStream
         
 document.addEventListener('visibilitychange', () => {
   if (document.hidden)
@@ -200,7 +201,6 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
     return
 
   try {
-    let stream: MediaStream
     if (window.electronAPI) {
       console.debug('Electron environment detected')
       if (!source) {
@@ -292,11 +292,15 @@ function shareViaApp() {
 
 function pauseSharing() {
   window.electronAPI?.pauseSharing()
+  if (stream)
+    stream.getTracks()[0].enabled = false
   sessionState.value = 'paused'
 }
 
 function resumeSharing() {
   window.electronAPI?.resumeSharing()
+  if (stream)
+    stream.getTracks()[0].enabled = true
   sessionState.value = 'active'
 }
 

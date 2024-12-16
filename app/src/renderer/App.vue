@@ -27,6 +27,7 @@ const email = ref<string | undefined>(localStorage.getItem('email') ?? undefined
 const name = ref<string | undefined>(localStorage.getItem('name') ?? undefined)
 const target = ref<string | undefined>()
 const viewEmail = ref<string | undefined>()
+const hideHeaderAndFooter = ref(false)
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
@@ -79,7 +80,7 @@ async function handleLogout() {
 
 <template>
   <!-- Header -->
-  <header class="main-header">
+  <header v-if="!hideHeaderAndFooter" class="main-header">
     <div class="header-content">
       <div class="logo-container">
         <a href="/">
@@ -114,12 +115,13 @@ async function handleLogout() {
       v-else
       :email="viewEmail"
       :name="name"
+      @toggle-full-video="hideHeaderAndFooter = $event"
     />
   </div>
 
   <About v-if="showAbout" @click="showAbout = false"/>
 
-  <footer class="main-footer">
+  <footer v-if="!hideHeaderAndFooter" class="main-footer">
     <div class="footer-content">
       <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
     </div>

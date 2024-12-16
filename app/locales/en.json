@@ -38,7 +38,7 @@
     "requestDenied": "{email} has denied your request.",
     "waitingStatus": {
       "establishing": "Establishing connection...",
-      "notified": "We've sent a mail to {email}. You can keep this window open.",
+      "notified": "We've sent a mail to {email}.",
       "waiting": "Waiting for a response from {email}..."
     },
     "userStatus": {
@@ -56,8 +56,10 @@
     },
     "stop": "Stop",
     "sharingEnded": "Screen sharing connection has been closed.",
-    "keepWindowOpen": "You can keep this window open. Once your request is accepted, the connection will be established automatically.",
-    "connectionError": "There was a problem connecting to the server. Please try again."
+    "connectionErrorTitle": "Connection Error",
+    "connectionError": "There was a problem connecting to the server. Please try again.",
+    "sessionAlreadyActiveTitle": "Session Already Active",
+    "sessionAlreadyActive": "You are already connected to an active session."
   },
   "share": {
     "howToShare": "How would you like to share your screen?",
