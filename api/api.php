@@ -308,7 +308,7 @@ function showMeYourScreen() {
             $status = $requestData[2];
             
             // if request is not accepted in time or user seems to be offline
-            if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline' || $status === 'request_denied') {
+            if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
                 
                 $token = $userData[1];
                 // Update status to not answered and send email
@@ -331,16 +331,7 @@ function showMeYourScreen() {
                         'last_seen' => $lastSeen,
                     ]);
                     return;
-                } elseif ($status === 'request_denied') {
-                    echo json_encode([
-                        'status' => 'request_denied',
-                        'message' => "$email hat die Anfrage abgelehnt",
-                        'user_status' => $userStatus,
-                        'last_seen' => $lastSeen
-                    ]);
-                    return;
-                }
-                else {
+                } else {
                     echo json_encode([
                         'status' => 'request_not_answered',
                         'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
@@ -349,8 +340,16 @@ function showMeYourScreen() {
                     ]);
                     return;
                 }
+            }
 
-                
+            if ($status === 'request_denied') {
+                echo json_encode([
+                    'status' => 'request_denied',
+                    'message' => "$email hat die Anfrage abgelehnt",
+                    'user_status' => $userStatus,
+                    'last_seen' => $lastSeen
+                ]);
+                return;
             }
             
             if ($status === 'request_accepted') {
