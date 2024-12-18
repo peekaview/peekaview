@@ -4,6 +4,8 @@ import { io, type Socket } from 'socket.io-client'
 import { WindowManager } from '../modules/WindowManager.js'
 import { RemoteControl } from '../modules/RemoteControl.js'
 
+import type { ResetMessage } from '../../interface.d.ts'
+
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
@@ -238,7 +240,7 @@ export function useStreamer() {
     }
 
     resetInterval = setInterval(() => {
-      const obj = {
+      const message: ResetMessage = {
         room: args!.roomid,
         scalefactor: windowManager.getScaleFactor(),
         iscreen: windowManager.isScreen(),
@@ -246,7 +248,7 @@ export function useStreamer() {
         mouseenabled: remoteControl.mouseenabled,
         dimensions: windowManager.getWindowOuterDimensions(),
       }
-      socket!.emit('reset', JSON.stringify(obj))
+      socket!.emit('reset', JSON.stringify(message))
     }, 2000)
   }
 

@@ -165,9 +165,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
       }
     })
     
-    peers[socketId].on('close', (json) => {
-      console.log('peer on close', json)
-    })
+    peers[socketId].on('close', () => close(socketId))
   })
 
   socket.on('viewerLeft', data => close(data.socketId))
@@ -274,6 +272,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
             break
         }
       })
+      sharingPeer.on('close', () => close())
 
       const sendRemote = (data: RemoteData) => {
         sharingPeer?.send(JSON.stringify({ type: 'remote', data }))

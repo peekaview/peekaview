@@ -15,7 +15,8 @@
   "app": {
     "logout": "Logout",
     "confirmLogout": "Are you sure you want to logout?",
-    "about": "Impressum"
+    "imprint": "Imprint",
+    "gdpr": "GDPR"
   },
   "login": {
     "register": "Register",

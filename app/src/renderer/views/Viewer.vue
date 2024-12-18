@@ -2,13 +2,12 @@
 import { ref, watch, useTemplateRef, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import RemoteControl from "./RemoteControl.vue"
+import RemoteControl from "../components/RemoteControl.vue"
 
-import type { AcceptedRequestData, ScreenShareData } from '../types'
+import type { AcceptedRequestData, RemoteControlData, ScreenShareData } from '../types'
 import { callApi } from '../api'
-import { notify } from '../util'
+import { notify, stringToColor } from '../util'
 import { useScreenView, type RemoteData, type ScreenView } from '../composables/useSimplePeerScreenShare'
-import { useRemoteControl } from  '../composables/useRemoteControl'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -60,11 +59,9 @@ const requestLastSeen = ref<number>()
 const screenShareData = ref<ScreenShareData>()
 const screenView = ref<ScreenView>()
 const waitingStatus = ref<WaitingStatus | undefined>()
+const remoteControlData = ref<RemoteControlData>()
 
-const remoteControlRef = useTemplateRef('remoteControl')
 const trackRef = useTemplateRef('track')
-
-const { closeRemoteControl } = useRemoteControl()
 
 let lastViewActiveInterval = window.setInterval(() => {
   if (!screenView.value)
@@ -87,11 +84,20 @@ watch(screenShareData, async (screenShareData) => {
   if (!screenShareData)
     return
 
+  console.log('trackRef', trackRef.value)
   screenView.value = await useScreenView(screenShareData, {
     videoElement: trackRef.value ?? undefined,
     onRemote: (data: RemoteData) => {
-      if (data.enable)
-        initializeRemoteViewer(screenShareData)
+      if (data.enable) {
+        remoteControlData.value = {
+          roomid: screenShareData.roomName,
+          username: screenShareData.userName,
+          userid: screenShareData.userName, //TODO: generate userid
+          color: stringToColor(screenShareData.userName ?? 'Anonymous'),
+          hostname: screenShareData.controlServer
+        }
+        emit('toggle-full-video', true)
+      }
     },
     onEnding: () => {
       notify({
@@ -102,10 +108,9 @@ watch(screenShareData, async (screenShareData) => {
       screenView.value = undefined
 
       emit('toggle-full-video', false)
-      closeRemoteControl()
     }
   })
-})
+}, { flush: 'post' })
 
 watch(requestStatus, (status) => {
   if (status !== 'request_denied')
@@ -225,43 +230,6 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   }
 }
 
-function initializeRemoteViewer(data: ScreenShareData) {
-  console.log('initializeRemoteViewer called')
-
-  const params = {
-    roomid: data.roomName,
-    username: data.userName,
-    userid: data.userName, //TODO: generate userid
-    color: stringToColor(data.userName ?? 'Anonymous'),
-    hostname: data.controlServer
-  }
-
-  console.log('Generated params:', params)
-
-  emit('toggle-full-video', true)
-
-  remoteControlRef.value?.openRemoteControl(
-    params.roomid,
-    params.username!,
-    params.userid!,
-    params.color,
-    params.hostname!
-  )
-}
-
-function stringToColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  let color = '#';
-  for (let i = 0; i < 3; i++) {
-    const value = (((hash >> (i * 8)) & 0xFF) % 120) + 60;
-    color += ('00' + value.toString(16)).substr(-2);
-  }
-  return color.substring(1); // Remove # prefix to match existing format
-}
-
 function handleError() {
   waitingStatus.value = undefined
   requestStatus.value = undefined
@@ -308,21 +276,22 @@ function stopViewing() {
 </script>
 
 <template>
-  <div v-show="screenView" class="viewer">
-    <RemoteControl 
-      ref="remoteControl" 
-      style="width: 800px; height: 600px;"
+  <div v-if="screenShareData" v-show="screenView" class="viewer">
+    <RemoteControl
+      :data="remoteControlData"
     >
-      <video ref="track" playsinline autoplay/>
+      <video ref="track" playsinline autoplay />
       <slot />
     </RemoteControl>
+
     <div class="btn-row">
       <button type="button" class="btn btn-secondary" @click="stopViewing">
         {{ $t('viewer.stop') }}
       </button>
     </div>
   </div>
-  <div v-if="!screenView"  class="content-wrapper">
+  
+  <div v-if="!screenView" class="content-wrapper">
     <div v-if="!waitingStatus" class="section-content">
       <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 

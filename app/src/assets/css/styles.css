@@ -120,6 +120,53 @@ body {
   gap: 0.5rem;
 }
 
+.info-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #0008;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.info-container .panel {
+  max-width: 800px;
+  margin-top: 8rem;
+  margin-bottom: 5rem;
+  overflow-y: auto;
+}
+
+.info-container section {
+  margin-bottom: 2rem;
+}
+
+.info-container h1 {
+  margin-bottom: 2rem;
+  color: var(--primary-color);
+}
+
+.info-container h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.info-container p {
+  margin-bottom: 0.5rem;
+}
+
+.info-container a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.info-container a:hover {
+  text-decoration: underline;
+}
+
 /* Waiting Spinner */
 .waiting-spinner {
   width: 48px;

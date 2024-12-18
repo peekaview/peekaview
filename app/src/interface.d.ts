@@ -1,3 +1,4 @@
+import { PanzoomEvent } from '@panzoom/panzoom';
 import { type DialogOptions } from './main/composables/useCustomDialog'
 
 declare global {
@@ -7,6 +8,14 @@ declare global {
 
   interface MediaTrackConstraints {
     mandatory?: any
+  }
+
+  interface HTMLElement {
+    addEventListener<K extends keyof PanzoomEvent>(type: K, listener: (this: HTMLElement, ev: { detail: PanzoomEventDetail }) => any, options?: boolean | AddEventListenerOptions): void;
+  }
+
+  interface HTMLDivElement {
+    addEventListener<K extends keyof PanzoomEvent>(type: K, listener: (this: HTMLDivElement, ev: { detail: PanzoomEventDetail }) => any, options?: boolean | AddEventListenerOptions): void;
   }
 }
 
@@ -36,4 +45,23 @@ export interface ScreenSource {
   id: string
   name: string
   thumbnail: string
+}
+
+export type ResetMessage = {
+  room: string
+  scalefactor: number
+  iscreen: boolean
+  remotecontrol: boolean
+  mouseenabled: boolean
+  dimensions: {
+    left: number
+    top: number
+    right: number
+    bottom: number
+  }
+}
+
+export type PasteFileMessage = {
+  filename?: string
+  filecontent: string
 }

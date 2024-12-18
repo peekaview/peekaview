@@ -15,7 +15,8 @@
   "app": {
     "logout": "Abmelden",
     "confirmLogout": "Möchten Sie sich wirklich ausloggen?",
-    "about": "Impressum"
+    "imprint": "Impressum",
+    "gdpr": "Datenschutzerklärung"
   },
   "login": {
     "register": "Registrieren",

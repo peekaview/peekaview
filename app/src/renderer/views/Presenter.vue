@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { useScreenPresent, type ScreenPresent } from "../composables/useSimplePeerScreenShare"
@@ -29,6 +29,7 @@ const screenShareData = ref<ScreenShareData>()
 const screenPresent = ref<ScreenPresent>()
 const latestRequest = ref<Request>()
 
+const requestInterval = ref<number>()
 const pingInterval = ref<number>()
 const lastPingTime = ref<number>()
 
@@ -37,12 +38,16 @@ const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
 
 let stream: MediaStream
-        
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden)
-    clearInterval(pingInterval.value)
-  else
-    startPingInterval()
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', togglePingInterval)
+  togglePingInterval()
+})
+
+onBeforeUnmount(() => {
+  clearInterval(requestInterval.value)
+  clearInterval(pingInterval.value)
+  document.removeEventListener('visibilitychange', togglePingInterval)
 })
 
 window.electronAPI?.onSendScreenSource((source) => {
@@ -58,37 +63,38 @@ watch(offerDownload, async (flag) => {
   await startSession()
 }, { immediate: true })
 
-let requestInterval: number | undefined
 watch(sessionState, (state) => {
   if (state === 'paused')
     return
 
   if (state === 'stopped') {
-    clearInterval(requestInterval)
-    requestInterval = undefined
+    clearInterval(requestInterval.value)
+    requestInterval.value = undefined
     return
   }
 
-  requestInterval = window.setInterval(async () => {
-  try {
-    if (latestRequest.value)
-      return
+  if (requestInterval.value)
+    return
 
-    const requests = await callApi<Request[]>({
-      action: 'doesAnyoneWantToSeeMyScreen',
-      email: props.email,
-      token: props.token,
-    })
-    
-    if (requests.length > 0) {
-      latestRequest.value = requests[0];
+  requestInterval.value = window.setInterval(async () => {
+    console.log('Checking for requests')
+    try {
+      if (latestRequest.value)
+        return
+
+      const requests = await callApi<Request[]>({
+        action: 'doesAnyoneWantToSeeMyScreen',
+        email: props.email,
+        token: props.token,
+      })
+      
+      if (requests.length > 0) {
+        latestRequest.value = requests[0];
+      }
+    } catch (error) {
+      console.error('Error checking requests:', error);
+      handleError(error as Error)
     }
-  } catch (error) {
-    console.error('Error checking requests:', error);
-    handleError(error as Error)
-
-    sessionState.value = 'active'
-  }
   }, 2000)
 })
 
@@ -109,7 +115,13 @@ watch(latestRequest, async (request) => {
     denyRequest()
 })
 
-function startPingInterval() {
+function togglePingInterval() {
+  if (document.hidden) {
+    clearInterval(pingInterval.value)
+    return
+  }
+
+  window.electronAPI?.log('startPingInterval')
   pingInterval.value = window.setInterval(() => {
     updateOnlineStatus();
   }, 10000) // Ping every 10 seconds
@@ -117,6 +129,7 @@ function startPingInterval() {
 }
     
 async function updateOnlineStatus() {
+  console.log('Updating online status')
   try {
     await callApi({
       action: 'doesAnyoneWantToSeeMyScreen',
@@ -125,7 +138,7 @@ async function updateOnlineStatus() {
     })
     lastPingTime.value = Date.now();
   } catch (error) {
-    console.error('Error updating online status:', error);
+    console.error('Error updating online status:', error)
     handleError(error as Error)
   }
 }
@@ -180,10 +193,12 @@ async function startSession() {
     })
 
     screenShareData.value = {
+      userName: props.email,
       roomName: data.roomId,
       roomId: data.roomId,
       turnCredentials: data.turnCredentials,
       serverUrl: data.videoServer,
+      controlServer: data.controlServer,
     }
 
     screenPresent.value = await useScreenPresent(screenShareData.value, {
@@ -252,7 +267,6 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
 }
     
 function handleError(error: Error) {
-  console.log("handleError", error)
   if (error instanceof UnauthorizedError) {
     if (window.electronAPI)
       window.electronAPI.logout(true)
@@ -287,7 +301,7 @@ function shareViaApp() {
     
     if (result === '0')
       window.location.href = protocolUrl
-  }, 1000);
+  }, 1000)
 }
 
 function pauseSharing() {
@@ -308,8 +322,12 @@ function stopSharing() {
   if (screenPresent.value)
     screenPresent.value.leave()
 
-  window.electronAPI?.stopSharing()
+  clearInterval(requestInterval.value)
+  clearInterval(pingInterval.value)
+  document.removeEventListener('visibilitychange', togglePingInterval)
+  
   sessionState.value = 'stopped'
+  window.electronAPI?.stopSharing()
 }
 </script>
 

@@ -1,5 +1,6 @@
 import '../../assets/css/remoteviewer.css'
 import '../../assets/css/remoteviewer-overlay.css'
+import Panzoom from '@panzoom/panzoom'
 
 var socket;
 
@@ -160,10 +161,8 @@ window.onload = function () {
     console.log("connect to controlserver:", hostname)
     socket.emit("join", { roomId: room, isPresenter: false });
 
-
     document.body.appendChild(msgmousesync);    // display syncmessage
     document.body.appendChild(sizeinfo);        // show rectangular with sizeinfo
-
 
     // allow panning and zooming for #overlay element
     var overlay = document.querySelector("#overlay");
@@ -851,7 +850,9 @@ window.onload = function () {
 
     var ignoremouse = 0;
     var lastobjclick = null;
+    console.log('overlayEl', document.querySelector("#overlay"))
     document.querySelector("#overlay").addEventListener('mousedown', function(e) {
+        console.log('mousedown', mouseenabled, e)
         if (!mouseenabled) return false;
         //if ((ignoremouse < Date.now() - 100)) {
             if (e.which == 3) {
@@ -1272,6 +1273,7 @@ window.onload = function () {
 
 
 function is_touch_enabled() {
+    console.log("is_touch_enabled", window.matchMedia("(pointer: coarse)").matches)
     if (window.matchMedia("(pointer: coarse)").matches) {
         return true;
     }

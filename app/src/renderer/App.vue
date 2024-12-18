@@ -2,10 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import About from './components/About.vue'
-import Login from './components/Login.vue'
-import Viewer from './components/Viewer.vue'
-import Present from './components/Presenter.vue'
+import Login from './views/Login.vue'
+import Viewer from './views/Viewer.vue'
+import Present from './views/Presenter.vue'
+
+import GDPR from './components/GDPR.vue'
+import Imprint from './components/Imprint.vue'
 
 import { prompt } from './util'
 
@@ -19,7 +21,7 @@ enum Action {
 
 const { t } = useI18n()
 
-const showAbout = ref(false)
+const showInfo = ref<"imprint" | "gdpr">()
 
 const action = ref<Action>(Action.View)
 const token = ref<string | undefined>(localStorage.getItem('token') ?? undefined)
@@ -119,11 +121,12 @@ async function handleLogout() {
     />
   </div>
 
-  <About v-if="showAbout" @click="showAbout = false"/>
+  <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
+  <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
 
   <footer v-if="!hideHeaderAndFooter" class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 PeekaView | <a href="#" @click="showAbout = true">{{ $t('app.about') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
+      <p>&copy; 2024 PeekaView | <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
     </div>
   </footer>
 </template>

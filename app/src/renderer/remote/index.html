@@ -9,8 +9,32 @@
         font-weight: 400;
         src: local('Abel Regular'), local('Abel-Regular'), url('../fonts/abel-v10-latin-regular.woff2') format('woff2');
       }
+
+      .cursor {
+        transition: all 0.05s ease-out;
+        pointer-events: none;
+        float: left;
+        width: 300px;
+        position: absolute;
+        z-index: 99;
+      }
+
+      .cursor img {
+        height: 25px;
+        width: 25px;
+      }
+
+      .cursor .cursor-name {
+        float: left;
+        width: auto;
+        margin-left: 10px;
+        margin-top: 10px;
+        background: white;
+        font-size: 12px;
+        padding: 4px;
+      }
     </style>
-    <script src="./index.js" type="module"></script>
+    <script src="./index.ts" type="module"></script>
   </head>
   <body>
     <div id="overlay"></div>
@@ -19,12 +43,5 @@
       <div class="cursorsignal" style="animation-delay: -0.5s"></div>
       <div class="cursorsignal" style="animation-delay: 0s"></div>
     </div>
-    <script src="../js/socket.io.min.js" type="application/javascript"></script>
-    <script src="../js/panzoom.js" type="application/javascript"></script>
-    <script>
-      document.addEventListener('contextmenu', event => {
-        event.preventDefault();
-      });
-    </script>
   </body>
 </html>

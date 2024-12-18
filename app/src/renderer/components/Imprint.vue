@@ -1,5 +1,5 @@
 <template>
-  <div class="about-container">
+  <div class="info-container">
     <div class="panel">
       <h1>Impressum</h1>
       
@@ -38,50 +38,3 @@
     </div>
   </div>
 </template>
-
-<style scoped>
-.about-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #0008;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-.about-container .panel {
-  max-width: 800px;
-  margin-top: 8rem;
-}
-
-section {
-  margin-bottom: 2rem;
-}
-
-h1 {
-  margin-bottom: 2rem;
-  color: var(--primary-color);
-}
-
-h2 {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-  color: var(--primary-color);
-}
-
-p {
-  margin-bottom: 0.5rem;
-}
-
-a {
-  color: var(--primary-color);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-</style>

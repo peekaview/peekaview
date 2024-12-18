@@ -95,3 +95,16 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
 
   return result.isConfirmed ? '0' : '1'
 }
+
+export function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (((hash >> (i * 8)) & 0xFF) % 120) + 60;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color.substring(1); // Remove # prefix to match existing format
+}
