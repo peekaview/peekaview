@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, useTemplateRef, onBeforeUnmount } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import RemoteControl from "../components/RemoteControl.vue"
-
-import type { AcceptedRequestData, RemoteControlData, ScreenShareData } from '../types'
-import { callApi } from '../api'
-import { notify, stringToColor } from '../util'
-import { useScreenView, type RemoteData, type ScreenView } from '../composables/useSimplePeerScreenShare'
+import type { AcceptedRequestData, ScreenShareData } from '../../types'
+import { callApi } from '../../api'
+import { notify } from '../../util'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -43,8 +40,8 @@ const props = defineProps<{
   name?: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'toggle-full-video', active: boolean): void
+const emit =defineEmits<{
+  (e: 'accept', data: ScreenShareData): void
 }>()
 
 const { t } = useI18n()
@@ -55,62 +52,6 @@ const inputName = ref<string>(props.name ?? '')
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
-
-const screenShareData = ref<ScreenShareData>()
-const screenView = ref<ScreenView>()
-const waitingStatus = ref<WaitingStatus | undefined>()
-const remoteControlData = ref<RemoteControlData>()
-
-const trackRef = useTemplateRef('track')
-
-let lastViewActiveInterval = window.setInterval(() => {
-  if (!screenView.value)
-    return
-
-  localStorage.setItem('lastViewActive', Date.now().toString())
-}, 1000)
-
-onBeforeUnmount(() => {
-  clearInterval(lastViewActiveInterval)
-  localStorage.removeItem('lastViewActive')
-})
-
-window.addEventListener('beforeunload', () => {
-  clearInterval(lastViewActiveInterval)
-  localStorage.removeItem('lastViewActive')
-})
-
-watch(screenShareData, async (screenShareData) => {
-  if (!screenShareData)
-    return
-
-  console.log('trackRef', trackRef.value)
-  screenView.value = await useScreenView(screenShareData, {
-    videoElement: trackRef.value ?? undefined,
-    onRemote: (data: RemoteData) => {
-      if (data.enable) {
-        remoteControlData.value = {
-          roomid: screenShareData.roomName,
-          username: screenShareData.userName,
-          userid: screenShareData.userName, //TODO: generate userid
-          color: stringToColor(screenShareData.userName ?? 'Anonymous'),
-          hostname: screenShareData.controlServer
-        }
-        emit('toggle-full-video', true)
-      }
-    },
-    onEnding: () => {
-      notify({
-        type: 'info',
-        text: t('viewer.sharingEnded'),
-        confirmButtonText: t('general.ok'),
-      })
-      screenView.value = undefined
-
-      emit('toggle-full-video', false)
-    }
-  })
-}, { flush: 'post' })
 
 watch(requestStatus, (status) => {
   if (status !== 'request_denied')
@@ -124,6 +65,8 @@ watch(requestStatus, (status) => {
 
   requestStatus.value = undefined
 })
+
+const waitingStatus = ref<WaitingStatus | undefined>()
 
 function getRequestId(length = 8) {
   const requestId = localStorage.getItem('requestId')
@@ -219,15 +162,15 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined
   requestStatus.value = undefined
-  
-  screenShareData.value = {
+
+  emit('accept', {
     userName: inputName.value,
     roomName: data.roomId,
     roomId: data.roomId,
     serverUrl: data.videoServer,
     controlServer: data.controlServer,
     turnCredentials: data.turnCredentials,
-  }
+  })
 }
 
 function handleError() {
@@ -264,34 +207,10 @@ function formatLastSeen(timestamp: number | undefined) {
   const days = Math.floor(seconds / 86400)
   return t('viewer.lastSeen.daysAgo', days)
 }
-
-function stopViewing() {
-  screenView.value?.leave()
-  screenView.value = undefined
-  waitingStatus.value = undefined
-  requestStatus.value = undefined
-
-  emit('toggle-full-video', false)
-}
 </script>
 
 <template>
-  <div v-if="screenShareData" v-show="screenView" class="viewer">
-    <RemoteControl
-      :data="remoteControlData"
-    >
-      <video ref="track" playsinline autoplay />
-      <slot />
-    </RemoteControl>
-
-    <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="stopViewing">
-        {{ $t('viewer.stop') }}
-      </button>
-    </div>
-  </div>
-  
-  <div v-if="!screenView" class="content-wrapper">
+  <div class="content-wrapper">
     <div v-if="!waitingStatus" class="section-content">
       <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
 
@@ -338,23 +257,3 @@ function stopViewing() {
     </div>
   </div>
 </template>
-
-<style>
-.viewer {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 0;
-}
-
-.viewer video {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: cover;
-}
-</style>

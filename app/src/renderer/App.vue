@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
-import Viewer from './views/Viewer.vue'
+import Viewer from './views/viewer/Viewer.vue'
 import Present from './views/Presenter.vue'
 
 import GDPR from './components/GDPR.vue'
