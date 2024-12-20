@@ -30,7 +30,12 @@ if (isWin32) {
       GetClientRect: lib.func('__stdcall', 'GetClientRect', 'bool', ['int64', 'void *']),
       ClientToScreen: lib.func('__stdcall', 'ClientToScreen', 'bool', ['int64', 'void *']),
       SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
-      SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64'])
+      SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64']),
+      GetWindow: lib.func('__stdcall', 'GetWindow', 'int64', ['int64', 'uint32']),
+      EnumWindows: lib.func('__stdcall', 'EnumWindows', 'bool', ['void *', 'void *']),
+      GetWindowTextW: lib.func('__stdcall', 'GetWindowTextW', 'bool', ['int64', 'void *', 'int']),
+      GetClassNameW: lib.func('__stdcall', 'GetClassNameW', 'bool', ['int64', 'void *', 'int']),
+      GetWindowLongA: lib.func('__stdcall', 'GetWindowLongA', 'int64', ['int64', 'int']),
     };
     isUser32Available = true;
   } catch (error) {
@@ -554,7 +559,10 @@ export class WindowManager {
       return true
     if (isWin32) {
       const hwnd = parseInt(this.windowhwnd);
-      return user32.IsWindowVisible(hwnd)
+      if (!user32.IsWindowVisible(hwnd)) return false;
+      
+      // Check for overlap
+      return !this.isSignificantlyOverlapped();
     }
 
     if (isLinux) {
@@ -579,6 +587,118 @@ export class WindowManager {
     }
     
     return true
+  }
+
+  isSignificantlyOverlapped() {
+    if (this.isScreen() || !isWin32 || !isUser32Available) return false;
+
+    // Windows constants
+    const GW_HWNDPREV = 3;
+    const WS_VISIBLE = 0x10000000;
+    const WS_POPUP = 0x80000000;
+    const WS_CHILD = 0x40000000;
+    const WS_MINIMIZE = 0x20000000;
+    const WS_DISABLED = 0x8000000;
+    const GWL_STYLE = -16;
+    const GWL_EXSTYLE = -20;
+    const WS_EX_TOOLWINDOW = 0x00000080;
+    const WS_EX_NOACTIVATE = 0x08000000;
+
+    const thisRect = this.getWindowOuterDimensions();
+    if (!thisRect) return false;
+
+    const thisArea = Math.abs((thisRect.right - thisRect.left) * (thisRect.bottom - thisRect.top));
+    let maxOverlapArea = 0;
+    
+    const processedWindows = new Set();
+    const titleBuffer = Buffer.alloc(256);
+    
+    let hwndCurrent = user32.GetWindow(parseInt(this.windowhwnd), GW_HWNDPREV);
+    
+    while (hwndCurrent) {
+        try {
+            if (processedWindows.has(hwndCurrent)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+            processedWindows.add(hwndCurrent);
+
+            // Get window styles
+            const style = user32.GetWindowLongA(hwndCurrent, GWL_STYLE);
+            const exStyle = user32.GetWindowLongA(hwndCurrent, GWL_EXSTYLE);
+
+            // Skip if window is not a normal application window
+            if ((style & WS_CHILD) || 
+                (style & WS_POPUP) ||
+                (style & WS_MINIMIZE) ||
+                (style & WS_DISABLED) ||
+                !(style & WS_VISIBLE) ||
+                (exStyle & WS_EX_TOOLWINDOW) ||
+                (exStyle & WS_EX_NOACTIVATE)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Skip PeekaView windows
+            user32.GetWindowTextW(hwndCurrent, titleBuffer, 256);
+            const windowTitle = titleBuffer.toString('utf16le').split('\0')[0].trim();
+            if (windowTitle.startsWith('__peekaview') || 
+                windowTitle.startsWith('peekaview - ')) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Get window rect
+            const rectPointer = Buffer.alloc(16);
+            if (!user32.GetWindowRect(hwndCurrent, rectPointer)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            const otherRect = pointerToRect(rectPointer);
+
+            // Skip invalid windows
+            if (!otherRect || 
+                otherRect.right <= otherRect.left || 
+                otherRect.bottom <= otherRect.top ||
+                (otherRect.right - otherRect.left) < 100 ||
+                (otherRect.bottom - otherRect.top) < 100) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Calculate overlap
+            const xOverlap = Math.max(0, Math.min(thisRect.right, otherRect.right) 
+                                       - Math.max(thisRect.left, otherRect.left));
+            const yOverlap = Math.max(0, Math.min(thisRect.bottom, otherRect.bottom) 
+                                       - Math.max(thisRect.top, otherRect.top));
+            
+            if (xOverlap > 0 && yOverlap > 0) {
+                const overlapArea = Math.abs(xOverlap * yOverlap);
+                maxOverlapArea += overlapArea;
+            }
+
+        } catch (error) {
+            console.warn('Error processing window:', error);
+        }
+        
+        hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+    }
+
+    return (maxOverlapArea / thisArea) * 100 > 5;
+  }
+
+  isWindowAbove(otherHwnd) {
+    let hwnd = parseInt(this.windowhwnd);
+    let currentHwnd = user32.GetWindow(hwnd, 3); // GW_HWNDPREV = 3
+
+    while (currentHwnd) {
+        if (currentHwnd === otherHwnd) {
+            return true;
+        }
+        currentHwnd = user32.GetWindow(currentHwnd, 3);
+    }
+    return false;
   }
 
   focus() {
