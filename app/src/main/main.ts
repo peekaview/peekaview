@@ -600,22 +600,22 @@ interface StoreSchema {
 
   ipcMain.handle('enable-mouse', async (_event) => {
     console.log('Enabling mouse control')
-    streamer.remoteControl.enableMouse()
+    streamer.remotePresenter.enableMouse()
   })
 
   ipcMain.handle('disable-mouse', async (_event) => {
     console.log('Disabling mouse control')
-    streamer.remoteControl.disableMouse()
+    streamer.remotePresenter.disableMouse()
   })
 
   ipcMain.handle('enable-remote-control', async (_event) => {
     console.log('Enabling remote control')
-    streamer.remoteControl.enableRemoteControl()
+    streamer.remotePresenter.enableRemoteControl()
   })
 
   ipcMain.handle('disable-remote-control', async (_event) => {
     console.log('Disabling remote control')
-    streamer.remoteControl.disableRemoteControl()
+    streamer.remotePresenter.disableRemoteControl()
   })
 
   ipcMain.handle('quit', async (_event) => {

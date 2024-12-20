@@ -72,7 +72,6 @@ export default defineConfig({
           app: resolve('src/renderer/index.html'),
           login: resolve('src/renderer/login/index.html'),
           sources: resolve('src/renderer/sources/index.html'),
-          remote: resolve('src/renderer/remote/index.html'),
         },
         output: {
           preserveModules: false

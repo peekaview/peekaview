@@ -2,9 +2,9 @@ import { dialog } from 'electron'
 
 import { io, type Socket } from 'socket.io-client'
 import { WindowManager } from '../modules/WindowManager.js'
-import { RemoteControl } from '../modules/RemoteControl.js'
+import { useRemotePresenter } from './useRemotePresenter.js'
 
-import type { ResetMessage } from '../../interface.d.ts'
+import type { RemoteResetData } from '../../interface.d.ts'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -18,7 +18,7 @@ export type Streamer = ReturnType<typeof useStreamer>
 export function useStreamer() {
   // Dependencies
   const windowManager = new WindowManager()
-  const remoteControl = new RemoteControl('')
+  const remotePresenter = useRemotePresenter()
   
   // Socket connection
   let socket: Socket | undefined
@@ -33,8 +33,8 @@ export function useStreamer() {
   
   // Last state for pause/resume
   let pausedState: {
-    mouseenabled: boolean;
-    remotecontrolinputenabled: boolean;
+    mouseEnabled: boolean;
+    remoteControlInputEnabled: boolean;
   } | undefined
   
   // Room arguments
@@ -77,12 +77,11 @@ export function useStreamer() {
       hash = username.charCodeAt(i) + ((hash << 5) - hash);
     }
     // Convert to hex color, ensuring good contrast and saturation
-    const color = Math.abs(hash).toString(16).substring(0, 6).padEnd(6, 'f');
-    return color;
+    return Math.abs(hash).toString(16).substring(0, 6).padEnd(6, 'f')
   }
 
   async function startSharing() {
-    if (args === undefined)
+    if (args === undefined || !joined)
       return
 
     const hwnd = `${args.hwnd}`
@@ -106,7 +105,7 @@ export function useStreamer() {
 
       windowManager.selectAndActivateWindow(hwnd)
       startStreaming()
-      remoteControl.registerEventListener(socket, windowManager)
+      remotePresenter.registerEventListener(socket!)
 
       windowManager.checkWindowSizeAndReposition()
 
@@ -162,8 +161,8 @@ export function useStreamer() {
 
     console.log('stop sharing!!')
     windowManager.hideRecordOverlay()
-    remoteControl.hideRemoteControl()
-    remoteControl.deactivate()
+    remotePresenter.hideRemoteControl()
+    remotePresenter.deactivate()
     streamingState = 'stopped'
   }
 
@@ -175,17 +174,17 @@ export function useStreamer() {
 
     if (pausedState === undefined) {
       pausedState = {
-        mouseenabled: remoteControl.mouseenabled,
-        remotecontrolinputenabled: remoteControl.remotecontrolinputenabled
+        mouseEnabled: remotePresenter.mouseEnabled,
+        remoteControlInputEnabled: remotePresenter.remoteControlInputEnabled
       }
-      remoteControl.mouseenabled = false
-      remoteControl.remotecontrolinputenabled = false
+      remotePresenter.mouseEnabled = false
+      remotePresenter.remoteControlInputEnabled = false
       sendReset()
     }
 
     console.log('pause')
     windowManager.hideRecordOverlay()
-    remoteControl.hideRemoteControl()
+    remotePresenter.hideRemoteControl()
   }
 
   function resumeStreamingIfPaused(fromHidden = false) {
@@ -193,8 +192,8 @@ export function useStreamer() {
       return
 
     if (pausedState !== undefined) {
-      remoteControl.mouseenabled = pausedState.mouseenabled
-      remoteControl.remotecontrolinputenabled = pausedState.remotecontrolinputenabled
+      remotePresenter.mouseEnabled = pausedState.mouseEnabled
+      remotePresenter.remoteControlInputEnabled = pausedState.remoteControlInputEnabled
       pausedState = undefined
     }
     
@@ -214,7 +213,7 @@ export function useStreamer() {
       windowManager.selectWindow(args.hwnd)
       windowManager.showRecordOverlay()
       //windowManager.showDebugOverlay(args)
-      remoteControl.activate(args.hwnd)
+      remotePresenter.activate(args.hwnd)
     }
   }
 
@@ -226,8 +225,8 @@ export function useStreamer() {
       room: args.roomid,
       scalefactor: windowManager.getScaleFactor(),
       iscreen: windowManager.isScreen(),
-      remotecontrol: remoteControl.remotecontrolinputenabled,
-      mouseenabled: remoteControl.mouseenabled,
+      remotecontrol: remotePresenter.remoteControlInputEnabled,
+      mouseenabled: remotePresenter.mouseEnabled,
       dimensions: windowManager.getWindowOuterDimensions(),
     }
 
@@ -240,12 +239,12 @@ export function useStreamer() {
     }
 
     resetInterval = setInterval(() => {
-      const message: ResetMessage = {
+      const message: RemoteResetData = {
         room: args!.roomid,
         scalefactor: windowManager.getScaleFactor(),
         iscreen: windowManager.isScreen(),
-        remotecontrol: remoteControl.remotecontrolinputenabled,
-        mouseenabled: remoteControl.mouseenabled,
+        remotecontrol: remotePresenter.remoteControlInputEnabled,
+        mouseenabled: remotePresenter.mouseEnabled,
         dimensions: windowManager.getWindowOuterDimensions(),
       }
       socket!.emit('reset', JSON.stringify(message))
@@ -265,7 +264,7 @@ export function useStreamer() {
   }
 
   return {
-    remoteControl,
+    remotePresenter,
 
     joinRoom,
     setArgs,

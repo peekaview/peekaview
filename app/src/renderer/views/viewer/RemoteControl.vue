@@ -6,7 +6,7 @@ import RemoteViewer from './RemoteViewer.vue'
 
 import type { RemoteControlData, ScaleInfo, ScreenShareData, VideoTransform } from '../../types'
 import { notify, stringToColor } from '../../util'
-import { ScreenView, useScreenView, type RemoteData } from '../../composables/useSimplePeerScreenShare'
+import { ScreenView, useScreenView } from '../../composables/useSimplePeerScreenShare'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -23,6 +23,7 @@ const { t } = useI18n()
 
 const screenView = ref<ScreenView>()
 const remoteControlData = ref<RemoteControlData>()
+const remoteViewerRef = useTemplateRef('remoteViewer')
 const trackRef = useTemplateRef('track')
 const trackStyle = ref<Record<string, string>>({
   transform: 'scale(1) translate(0px,0px)',
@@ -50,12 +51,10 @@ watch(() => props.data, async (screenShareData) => {
     return
   }
 
-  console.log("screenShareData", trackRef.value)
   screenView.value = await useScreenView(screenShareData, {
     videoElement: trackRef.value ?? undefined,
-    onRemote: (data: RemoteData) => {
-      console.log("onRemote", data)
-      if (data.enable) {
+    onRemote: (event, data) => {
+      if (event === 'enable') {
         remoteControlData.value = {
           roomid: screenShareData.roomName,
           username: screenShareData.userName,
@@ -64,7 +63,10 @@ watch(() => props.data, async (screenShareData) => {
           hostname: screenShareData.controlServer
         }
         emit('toggle-full-video', true)
+        return
       }
+
+      remoteViewerRef.value?.receive(event, data)
     },
     onEnding: () => {
       notify({
@@ -126,18 +128,12 @@ function rescale(scaleinfo: ScaleInfo) {
 
   let scaledowny = 1
   let scaledownx = 1
-  let scaledown = 1
-  if (scaleinfo.height > window.innerHeight) {
+  if (scaleinfo.height > window.innerHeight)
     scaledowny = window.innerHeight / scaleinfo.height
-  }
-  if (scaleinfo.width > window.innerWidth) {
+  if (scaleinfo.width > window.innerWidth)
     scaledownx = window.innerWidth / scaleinfo.width
-  }
-  if (scaledowny < scaledownx) {
-    scaledown = scaledowny
-  } else {
-    scaledown = scaledownx
-  }
+
+  let scaledown = scaledowny < scaledownx ? scaledowny : scaledownx
   
   if (scaleinfo.height != currentHeight || scaleinfo.width != currentWidth) {
     containerStyle.value.height = scaleinfo.height * scaledown + 'px'
@@ -184,6 +180,7 @@ function stop() {
     <div ref="container" class="remote-container" :style="containerStyle">
       <video ref="track" playsinline autoplay :style="trackStyle" />
       <RemoteViewer
+        ref="remoteViewer"
         v-if="remoteControlData"
         :room="remoteControlData?.roomid"
         :user="remoteControlData?.username"
@@ -193,6 +190,7 @@ function stop() {
         :video-transform="videoTransform"
         :style="viewerStyle"
         @rescale="rescale"
+        @send="screenView?.sendRemote($event.event, $event.data)"
       />
       <slot />
     </div>

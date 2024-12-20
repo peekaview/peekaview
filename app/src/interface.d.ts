@@ -47,21 +47,63 @@ export interface ScreenSource {
   thumbnail: string
 }
 
-export type ResetMessage = {
-  room: string
-  scalefactor: number
-  iscreen: boolean
-  remotecontrol: boolean
-  mouseenabled: boolean
-  dimensions: {
-    left: number
-    top: number
-    right: number
-    bottom: number
-  }
-}
+export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "pastefile" | "cut" | "reset"
 
-export type PasteFileMessage = {
-  filename?: string
-  filecontent: string
-}
+export type RemoteData<T extends RemoteEvent> = 
+  T extends "enable" ? { }
+  : T extends "getclipboard" ? { text: string }
+  : T extends "mouse-click" ? RemoteMouseData
+  : T extends "mouse-dblclick" ? RemoteMouseData
+  : T extends "mouse-leftclick" ? RemoteMouseData
+  : T extends "paint-mouse-leftclick" ? RemoteMouseData
+  : T extends "mouse-move" ? RemoteMouseData
+  : T extends "paint-mouse-move" ? RemoteMouseData
+  : T extends "mouse-down" ? RemoteMouseData
+  : T extends "paint-mouse-down" ? RemoteMouseData
+  : T extends "mouse-up" ? RemoteMouseData
+  : T extends "paint-mouse-up" ? RemoteMouseData
+  : T extends "mouse-wheel" ? RemoteMouseData
+  : T extends "type" ? { socketid: string, key: string, room: string, name: string, color: string }
+  : T extends "copy" ? { room: string, socketid: string }
+  : T extends "cut" ? { room: string, socketid: string }
+  : T extends "paste" ? RemotePasteData
+  : T extends "pastefile" ? RemotePasteFileData
+  : T extends "reset" ? RemoteResetData
+  : never
+
+  export type RemoteMouseData = {
+    id: string
+    color: string
+    x: number
+    y: number
+  }
+
+  export type RemotePasteData = {
+    text: string
+    room: string
+    name: string
+    color: string
+    time: number
+  }
+
+  export type RemotePasteFileData = {
+    filename?: string
+    filecontent: string
+    room: string
+    name: string
+    color: string
+  }
+
+  export type RemoteResetData = {
+    room: string
+    scalefactor: number
+    iscreen: boolean
+    remotecontrol: boolean
+    mouseenabled: boolean
+    dimensions: {
+      left: number
+      top: number
+      right: number
+      bottom: number
+    }
+  }

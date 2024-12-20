@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue"
 import { io, type Socket } from "socket.io-client"
 import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
 
-import type { PasteFileMessage, ResetMessage } from '../../../interface.d.ts'
+import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
 import { b64DecodeUnicode, hexToRgb } from "../../util.js";
 import { ScaleInfo, VideoTransform } from "../../types.js";
-import { onBeforeUnmount, onMounted, watch } from "vue";
 
 type Pan = {
   x: number
@@ -43,6 +43,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'rescale', scaleinfo: ScaleInfo): void
+  <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
 
 document.addEventListener('contextmenu', event => {
@@ -77,7 +78,7 @@ let lastMove = 0
 
 // Screensharing oder Windowsharing aktiv?
 let screensharing = true
-let lastmessage: ResetMessage
+let lastmessage: RemoteResetData | undefined
 
 // Maus-Overlays
 const signals: Record<string, HTMLDivElement> = {}
@@ -90,14 +91,6 @@ let mouseenabled = true
 let remotecontrol = false
 let mousedown = false
 let dragdetected = false
-
-// URL-Params
-let params = new URLSearchParams(document.location.search)
-console.log("Full URL:", document.location.href)
-console.log("Search string:", document.location.search)
-console.log("All params:", Object.fromEntries(params))
-
-console.log(props.hostname)
 
 // Websocket-Message Object
 let obj: MouseMessage = {
@@ -143,12 +136,9 @@ msgremotecontrol.classList.add('message')
 msgremotecontrol.style.cssText = 'padding-left: 100px position: absolute z-index: 1004 color: white background: #000 opacity: 0.8 padding:20px min-width: 500px width: 100vw pointer-events: none'
 msgremotecontrol.innerHTML = '<b>Maus/Tastatursteuerung wurde aktiviert</b>'
 
-// Add this near the top of the file with other constiable declarations
-let clipboarddata
-
 // Drawing state
 const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
-const drawcanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
+const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
 const pointHistory: Record<string, Stroke[]> = {}    // Punktarrays der Benutzer
 const latestPoint: Record<string, [number, number]> = {}     // jeweils letzter Punkt
 let paintcheckinterval: number  // Repaint-Intervall
@@ -168,6 +158,18 @@ const handleWheel = (e: WheelEvent) => {
 document.addEventListener("wheel", handleWheel, { passive: false })
 //})()
 
+const overlayStyle = ref<Record<string, string>>({
+  border: '0',
+  width: '0px',
+  height: '0px',
+  left: '0px',
+  top: '0px',
+})
+
+const remoteViewerRef = useTemplateRef('remoteViewer')
+const overlayRef = useTemplateRef('overlay')
+const containerRef = useTemplateRef('container')
+
 onMounted(() => {
   // get the color for a user
   //fetch("https://" + document.location.hostname.replace('ps-', '') + "/api/clientapi.php?action=color&user=" + user).then(response => response.text()).then(response => { color = response })
@@ -182,17 +184,15 @@ onMounted(() => {
     socket.close()
   })
 
-  const overlayEl = document.querySelector("#overlay") as HTMLDivElement
-  const containerEl = document.querySelector("#container") as HTMLDivElement
-  const sizeinfoEl = document.createElement('div')
-  sizeinfoEl.id = 'sizeinfo'
-  sizeinfoEl.style.cssText = ''
-  
+  const sizeInfoEl = document.createElement('div')
+  sizeInfoEl.id = 'sizeinfo'
+  sizeInfoEl.style.cssText = ''
+
   console.log("connect to controlserver:", props.hostname)
   socket.emit("join", { roomId: props.room, isPresenter: false })
 
   document.body.appendChild(mouseSyncEl)  // display syncmessage
-  document.body.appendChild(sizeinfoEl)    // show rectangular with sizeinfo
+  document.body.appendChild(sizeInfoEl)    // show rectangular with sizeinfo
 
   // allow panning and zooming for #overlay element
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
@@ -206,12 +206,10 @@ onMounted(() => {
       }
     }
 
-  console.log("overlayEl", overlayEl)
-  const panzoom = Panzoom(overlayEl, options)
+  const panzoom = Panzoom(overlayRef.value!, options)
 
   // Mousewheel-Zoom
-  const overlaycontainer = overlayEl.parentElement as HTMLBodyElement
-  overlaycontainer.addEventListener('wheel', (event) => {
+  remoteViewerRef.value?.addEventListener('wheel', (event) => {
     if (!event.ctrlKey) return
     if (event.deltaY < 0) {
       panzoom.zoom(panzoom.getScale() + 0.1, { animate: true })
@@ -221,7 +219,7 @@ onMounted(() => {
   })
 
   // Änderungen zoom/panning in Variable zwischenspeichern
-  overlayEl.addEventListener('panzoomchange', (event) => {
+  overlayRef.value!.addEventListener('panzoomchange', (event) => {
     zoom = event.detail
     console.log(zoom) // => { x: 0, y: 0, scale: 1 }
   })
@@ -279,20 +277,20 @@ onMounted(() => {
       sizeInfoEl.style.top = (transform.y - 2) + "px"
 
       // Canvas anpassen
-      Object.keys(drawcanvas).forEach(key => {
-        drawcanvas[key].style.width = transform.fullwidth + "px"
-        drawcanvas[key].style.height = transform.fullheight + "px"
-        const drawcanvascontext = drawcanvas[key].getContext("2d")!
-        if (transform.fullwidth != drawcanvascontext.canvas.width) {
-          drawcanvascontext.canvas.width = transform.fullwidth
-          drawcanvascontext.canvas.height = transform.fullheight
+      Object.keys(drawCanvas).forEach(key => {
+        drawCanvas[key].style.width = transform.fullwidth + "px"
+        drawCanvas[key].style.height = transform.fullheight + "px"
+        const drawCanvascontext = drawCanvas[key].getContext("2d")!
+        if (transform.fullwidth != drawCanvascontext.canvas.width) {
+          drawCanvascontext.canvas.width = transform.fullwidth
+          drawCanvascontext.canvas.height = transform.fullheight
         }
       })
 
-      overlayEl.style.width = (transform.width) + "px"
-      overlayEl.style.height = (transform.height) + "px"
-      overlayEl.style.left = Math.round((transform.x - 2) - (transform.fullwidth / transform.width * lastPan.x) + ((transform.fullwidth - transform.width) / 2)) + "px"
-      overlayEl.style.top = Math.round((transform.y - 2) - (transform.fullwidth / transform.width * lastPan.y) + ((transform.fullheight - transform.height) / 2)) + "px"
+      overlayStyle.value!.width = (transform.width) + "px"
+      overlayStyle.value!.height = (transform.height) + "px"
+      overlayStyle.value!.left = Math.round((transform.x - 2) - (transform.fullwidth / transform.width * lastPan.x) + ((transform.fullwidth - transform.width) / 2)) + "px"
+      overlayStyle.value!.top = Math.round((transform.y - 2) - (transform.fullwidth / transform.width * lastPan.y) + ((transform.fullheight - transform.height) / 2)) + "px"
   })
 
   // virtueller Mauszeiger
@@ -309,7 +307,7 @@ onMounted(() => {
       else
         cursor.innerHTML = '<div class="cursor-name" style="border: 1px solid #' + data.color + ';color: #' + data.color + ';">' + data.name + '</div>'
       overlayCursor[data.id] = cursor
-      overlayEl.appendChild(overlayCursor[data.id]!)
+      overlayRef.value!.appendChild(overlayCursor[data.id]!)
 
       // Mauszeiger nach 10 Sekunden Inaktivität ausblenden
       if (cursorcheckinterval === undefined) {
@@ -320,7 +318,6 @@ onMounted(() => {
     }
 
     // Positionierung
-    console.log("mouseMove", data, scale, remotescale)
     overlayCursorLastAction[data.id] = Date.now()
     overlayCursor[data.id]!.style.left = Math.round(data.x * (scale * remotescale)) + "px"
     overlayCursor[data.id]!.style.top = Math.round(data.y * (scale * remotescale)) + "px"
@@ -342,7 +339,7 @@ onMounted(() => {
 
   // virtuelles Clipboard, Filesharing via Websockets
   // Todo, in eigene JS auslagern, da mehr oder weniger baugleich mit Filesharing in meetzi-App
-  function pasteFile(data: PasteFileMessage) {
+  function pasteFile(data: RemotePasteFileData) {
     const clipboardContainerEl = document.querySelector('#clipboardcontainer')
     if (clipboardContainerEl !== null)
       clipboardContainerEl.remove()
@@ -360,7 +357,6 @@ onMounted(() => {
     
     const datestring = (new Date().toLocaleString().replaceAll('/', '-').replaceAll(', ', '_').replaceAll(':', '-'))
 
-    //console.log(data)
     document.querySelectorAll('#transfer').forEach((message) => { message.remove() })
     if (data.filecontent.startsWith('data:application/octet-stream')) {
       try {
@@ -406,14 +402,13 @@ onMounted(() => {
         canvas.height = extensionImageEl.naturalHeight
         const context = canvas.getContext('2d')!
         context.drawImage(extensionImageEl, 0, 0)
-        canvas.toBlob(blob => {
-          navigator.clipboard.write([
+        canvas.toBlob(async (blob) => {
+          await navigator.clipboard.write([
             new ClipboardItem({
               [blob!.type]: blob!
             })
-          ]).then(() => {
-            console.log('Copied')
-          })
+          ])
+          console.log('Copied')
         })
       }
 
@@ -450,8 +445,6 @@ onMounted(() => {
       textareaEl.value = decoded
 
       div.append(textareaEl)
-
-      //console.log(decoded)
 
       clipboardAreaEl.append(div)
 
@@ -492,8 +485,6 @@ onMounted(() => {
         extension = data.filename.split('.').pop() ?? extension
       }
 
-      //console.log(extension)
-
       const div = document.createElement('div')
       div.innerHTML = '<center><img id="extensionimage" src="icons/' + extension + '.svg" style="max-height:150px"></center>'
       clipboardAreaEl.append(div)
@@ -520,7 +511,7 @@ onMounted(() => {
       pointHistory[id] = []
     }
 
-    pointHistory[id].push({ color: color, from: latestPoint[id], to: newPoint, timestamp: Date.now(), opacity: 1.0 })
+    pointHistory[id].push({ color, from: latestPoint[id], to: newPoint, timestamp: Date.now(), opacity: 1.0 })
     latestPoint[id] = newPoint
     repaintStrokes()
   }
@@ -529,27 +520,27 @@ onMounted(() => {
     Object.keys(pointHistory).forEach(key => {
       //console.log("stroke for "+key)
       // add a canvas for the user strokes
-      if (drawcanvas[key] == undefined) {
+      if (drawCanvas[key] == undefined) {
         //console.log("canvas for "+key)
-        drawcanvas[key] = document.createElement('canvas')
-        drawcanvas[key].id = 'canvas_' + key
-        drawcanvas[key].style.cssText = 'position: absolute'
-        overlayEl.appendChild(drawcanvas[key])
+        drawCanvas[key] = document.createElement('canvas')
+        drawCanvas[key].id = 'canvas_' + key
+        drawCanvas[key].style.cssText = 'position: absolute'
+        overlayRef.value!.appendChild(drawCanvas[key])
       }
 
-      const drawcanvascontext = drawcanvas[key].getContext("2d")!
-      drawcanvascontext.clearRect(0, 0, drawcanvas[key].width, drawcanvas[key].height)
+      const drawCanvascontext = drawCanvas[key].getContext("2d")!
+      drawCanvascontext.clearRect(0, 0, drawCanvas[key].width, drawCanvas[key].height)
       pointHistory[key].forEach((item) => {
         //console.log(item)
         if (item.from != undefined) {
-          drawcanvascontext.beginPath()
-          drawcanvascontext.moveTo(Math.round(item.from[0] * (scale * remotescale)), Math.round(item.from[1] * (scale * remotescale)))
-          drawcanvascontext.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
-          drawcanvascontext.lineWidth = 5
-          drawcanvascontext.lineCap = "round"
-          drawcanvascontext.lineJoin = "round"
-          drawcanvascontext.lineTo(Math.round(item.to[0] * (scale * remotescale)), Math.round(item.to[1] * (scale * remotescale)))
-          drawcanvascontext.stroke()
+          drawCanvascontext.beginPath()
+          drawCanvascontext.moveTo(Math.round(item.from[0] * (scale * remotescale)), Math.round(item.from[1] * (scale * remotescale)))
+          drawCanvascontext.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
+          drawCanvascontext.lineWidth = 5
+          drawCanvascontext.lineCap = "round"
+          drawCanvascontext.lineJoin = "round"
+          drawCanvascontext.lineTo(Math.round(item.to[0] * (scale * remotescale)), Math.round(item.to[1] * (scale * remotescale)))
+          drawCanvascontext.stroke()
         }
       })
     })
@@ -588,9 +579,9 @@ onMounted(() => {
         signals[obj.id].remove()
       }
 
-      signals[obj.id] = containerEl.cloneNode(true) as HTMLDivElement
+      signals[obj.id] = containerRef.value!.cloneNode(true) as HTMLDivElement
       signals[obj.id].id = 'signal_' + obj.id
-      overlayEl.appendChild(signals[obj.id])
+      overlayRef.value!.appendChild(signals[obj.id])
 
       signals[obj.id].style.left = Math.round(obj.x * (scale * remotescale) - 150) + "px"
       signals[obj.id].style.top = Math.round(obj.y * (scale * remotescale) - 150) + "px"
@@ -615,9 +606,9 @@ onMounted(() => {
   window.onresize = () => calcScale()
 
   function calcScale() {
-    overlayEl.style.border = '1px solid blue'
-    const scale1 = overlayEl.getBoundingClientRect().width / props.videoTransform.width
-    const scale2 = overlayEl.getBoundingClientRect().height / props.videoTransform.height
+    overlayStyle.value.border = '1px solid blue'
+    const scale1 = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
+    const scale2 = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
 
     scale = scale1 < scale2 ? scale1 : scale2
     if (scale > 1) {
@@ -625,92 +616,82 @@ onMounted(() => {
     }
   }
 
-  socket.on("getclipboard", (data) => {
-    const obj = JSON.parse(data)
-    console.log("getclipboard", obj)
+  onReceive("getclipboard", (data) => {
+    console.log("getclipboard", data)
 
-    navigator.clipboard.writeText(obj.text)
+    navigator.clipboard.writeText(data.text)
   })
 
-  socket.on("mouse-leftclick", (data) => {
-    obj = JSON.parse(data) as MouseMessage
+  onReceive("mouse-leftclick", (data) => {
     if (!remotecontrol) {
-      mouseSignal(obj)
+      mouseSignal(data)
     }
   })
 
-  socket.on("paint-mouse-leftclick", (data) => {
-    obj = JSON.parse(data) as MouseMessage
-    if (drawing[obj.id] != undefined && drawing[obj.id]) {
-      continueStroke(obj.id, obj.color, [obj.x, obj.y])
+  onReceive("paint-mouse-leftclick", (data) => {
+    if (drawing[data.id] != undefined && drawing[data.id]) {
+      continueStroke(data.id, data.color, [data.x, data.y])
     }
   })
 
-  socket.on("mouse-move", (data) => {
-    obj = JSON.parse(data) as MouseMessage
-    if (!remotecontrol && drawing[obj.id] != undefined && drawing[obj.id]) {
-      continueStroke(obj.id, obj.color, [obj.x, obj.y])
+  onReceive("mouse-move", (data) => {
+    if (!remotecontrol && drawing[data.id] != undefined && drawing[data.id]) {
+      continueStroke(data.id, data.color, [data.x, data.y])
     }
 
-    mouseMove(obj)
+    mouseMove(data)
   })
 
-  socket.on("paint-mouse-move", (data) => {
-    obj = JSON.parse(data) as MouseMessage
-    if (drawing[obj.id] != undefined && drawing[obj.id]) {
-      continueStroke(obj.id, obj.color, [obj.x, obj.y])
+  onReceive("paint-mouse-move", (data) => {
+    if (drawing[data.id] != undefined && drawing[data.id]) {
+      continueStroke(data.id, data.color, [data.x, data.y])
     }
-    mouseMove(obj)
+    mouseMove(data)
   })
 
-  /*socket.on("rectangle", (data) => {
-    obj = JSON.parse(data)
-    //createRectangle(obj)
+  /*onReceive("rectangle", (data) => {
+    //createRectangle(data)
   })*/
 
-  socket.on("mouse-down", (data) => {
-    obj = JSON.parse(data)
-    console.log("mouse-down", obj)
+  onReceive("mouse-down", (data) => {
+    console.log("mouse-down", data)
 
-    if (!fileTransfer && (drawing[obj.id] == undefined || !drawing[obj.id])) {
-      startStroke(obj.id, [obj.x, obj.y])
+    if (!fileTransfer && (drawing[data.id] == undefined || !drawing[data.id])) {
+      startStroke(data.id, [data.x, data.y])
     }
-    //createRectangle(obj)
+    //createRectangle(data)
   })
 
-  socket.on("paint-mouse-down", (data) => {
-    obj = JSON.parse(data)
-    if (drawing[obj.id] == undefined || !drawing[obj.id]) {
-      startStroke(obj.id, [obj.x, obj.y])
+  onReceive("paint-mouse-down", (data) => {
+    if (drawing[data.id] == undefined || !drawing[data.id]) {
+      startStroke(data.id, [data.x, data.y])
     }
   })
 
-  socket.on("mouse-up", (data) => {
-    obj = JSON.parse(data)
-    //mousepressed[obj.id] = false
-    console.log("mouse-up", obj)
+  onReceive("mouse-up", (data) => {
+    //mousepressed[data.id] = false
+    console.log("mouse-up", data)
 
-    drawing[obj.id] = false
-    //finishRectangle(obj)
+    drawing[data.id] = false
+    //finishRectangle(data)
   })
 
-  socket.on("paint-mouse-up", (data) => {
-    obj = JSON.parse(data)
-    drawing[obj.id] = false
+  onReceive("paint-mouse-up", (data) => {
+    drawing[data.id] = false
   })
 
-  socket.on("pastefile", (data) => {
+  onReceive("pastefile", (data) => {
     console.log("pastefile", data)
-    pasteFile(JSON.parse(data) as PasteFileMessage)
+    pasteFile(data)
   })
 
-  socket.on('reset', (message: ResetMessage) => {
+  onReceive('reset', (data) => {
     // Bei Screensharing sieht man den Remotemauszeige, daher den eigenen durch ein feines Crosshair ersetzen
-    if (message.iscreen) {
-      overlayEl.style.cursor = 'url(img/minicrosshair.png) 5 5, auto'
+    if (data.iscreen) {
+      overlayStyle.value.cursor = 'url(img/minicrosshair.png) 5 5, auto'
       screensharing = true
     } else {
-      overlayEl.style.cursor = 'default'
+      overlayStyle.value.cursor = 'default'
       screensharing = false
     }
 
@@ -718,8 +699,8 @@ onMounted(() => {
       remotescale = (props.videoTransform.width / ((message.dimensions.right - message.dimensions.left) - 0))
     } else {*/
     //remotescale = message.scalefactor
-    const remotescaleheight = (props.videoTransform.height / ((message.dimensions.bottom - message.dimensions.top) - 0))
-    const remotescalewidth = (props.videoTransform.width / ((message.dimensions.right - message.dimensions.left) - 0))
+    const remotescaleheight = (props.videoTransform.height / ((data.dimensions.bottom - data.dimensions.top) - 0))
+    const remotescalewidth = (props.videoTransform.width / ((data.dimensions.right - data.dimensions.left) - 0))
     if (remotescaleheight < remotescalewidth) {
       remotescale = remotescaleheight
     } else {
@@ -728,11 +709,11 @@ onMounted(() => {
     //}
 
     // Speichern der Fensterabmessungen
-    windowdimensions.width = message.dimensions.right - message.dimensions.left
-    windowdimensions.height = message.dimensions.bottom - message.dimensions.top
+    windowdimensions.width = data.dimensions.right - data.dimensions.left
+    windowdimensions.height = data.dimensions.bottom - data.dimensions.top
 
     // Skalierungsinfos und Mauszeigerposition mit Remote-App synchronisiert
-    if (lastmessage == null || lastmessage.dimensions.left != message.dimensions.left || lastmessage.dimensions.right != message.dimensions.right || lastmessage.dimensions.top != message.dimensions.top || lastmessage.dimensions.bottom != message.dimensions.bottom) {
+    if (!lastmessage || lastmessage.dimensions.left != data.dimensions.left || lastmessage.dimensions.right != data.dimensions.right || lastmessage.dimensions.top != data.dimensions.top || lastmessage.dimensions.bottom != data.dimensions.bottom) {
       synchronized = false
       calcScale()
     } else {
@@ -744,58 +725,58 @@ onMounted(() => {
     }
 
     // Maus-Zeigermodus aktiviert/deaktiviert
-    if ((lastmessage == null || mouseenabled != message.mouseenabled) && mouseSyncEl == null) {
-      msgremotecontrol.innerHTML = message.mouseenabled ? '<b>Remote-Mauszeiger ist nun aktiviert</b>' : '<b>Remote-Mauszeiger wurde deaktiviert</b>'
+    if ((!lastmessage || mouseenabled != data.mouseenabled) && mouseSyncEl == null) {
+      msgremotecontrol.innerHTML = data.mouseenabled ? '<b>Remote-Mauszeiger ist nun aktiviert</b>' : '<b>Remote-Mauszeiger wurde deaktiviert</b>'
       const messageEls = document.querySelectorAll('.message')
       messageEls.forEach((message) => { message.remove() })
       document.body.appendChild(msgremotecontrol)
       setTimeout(() => {
         messageEls.forEach((message) => { message.remove() })
       }, 3000)
-      mouseenabled = message.mouseenabled
+      mouseenabled = data.mouseenabled
       if (!mouseenabled) {
         clearMouseCursors()
       }
     }
 
     // Maus/Tastatursteuerung aktiviert/deaktiviert
-    if ((lastmessage == null || remotecontrol != message.remotecontrol) && mouseSyncEl == null) {
-      msgremotecontrol.innerHTML = message.remotecontrol ? '<b>Fernzugriff ist jetzt aktiviert</b>' : '<b>Fernzugriff wurde deaktiviert</b>'
+    if ((!lastmessage || remotecontrol != data.remotecontrol) && mouseSyncEl == null) {
+      msgremotecontrol.innerHTML = data.remotecontrol ? '<b>Fernzugriff ist jetzt aktiviert</b>' : '<b>Fernzugriff wurde deaktiviert</b>'
       document.querySelectorAll('.message').forEach((message) => { message.remove() })
       document.body.appendChild(msgremotecontrol)
       setTimeout(() => {
         document.querySelectorAll('.message').forEach((message) => { message.remove() })
       }, 3000)
-      remotecontrol = message.remotecontrol
+      remotecontrol = data.remotecontrol
     }
-    lastmessage = message
+    lastmessage = data
   })
 
   let lastPosX = 0
   let lastPosY = 0
 
-  overlayEl.addEventListener('mouseleave', handleMouseUp)
+  overlayRef.value!.addEventListener('mouseleave', handleMouseUp)
   window.addEventListener('blur', handleMouseUp)
 
   function handleMouseUp() {
     if (lastMouseDown > 0) {
-      socket.volatile.emit("mouse-up", JSON.stringify(obj))
+      send("mouse-up", obj, true)
       clearTimeout(eventToSend)
       eventToSend = undefined
       lastMouseDown = 0
     }
   }
 
-  overlayEl.addEventListener('mouseenter', () => { 
+  overlayRef.value!.addEventListener('mouseenter', () => { 
     remoteClipboard = true 
   })
 
-  overlayEl.addEventListener('mousemove', (e) => {
+  overlayRef.value!.addEventListener('mousemove', (e) => {
     if (!mouseenabled) return false
     if (!synchronized) return false
     remoteClipboard = true
 
-    const rect = overlayEl.getBoundingClientRect()
+    const rect = overlayRef.value!.getBoundingClientRect()
     x = e.pageX - rect.left
     y = e.pageY - rect.top
 
@@ -812,11 +793,7 @@ onMounted(() => {
       (lastMove < Date.now() - 100) || 
       (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
       lastMove = Date.now()
-      if (!controlpressed) {
-        socket.volatile.emit("mouse-move", JSON.stringify(obj))
-      } else {
-        socket.volatile.emit("paint-mouse-move", JSON.stringify(obj))
-      }
+      send(controlpressed ? "paint-mouse-move" : "mouse-move", obj, true)
     }
 
     lastPosX = x
@@ -827,21 +804,21 @@ onMounted(() => {
   })
 
   let lastWheel = 0
-  overlayEl.addEventListener('wheel', (e) => {
+  overlayRef.value!.addEventListener('wheel', (e) => {
     if (e.ctrlKey) return
 
     if (lastWheel < (Date.now() - 200)) {
       console.log(e)
       obj.delta = e.deltaY
       lastWheel = Date.now()
-      socket.emit("mouse-wheel", JSON.stringify(obj))
+      send("mouse-wheel", obj)
     }
   })
 
   //let ignoremouse = 0
   let lastObj: MouseMessage
 
-  overlayEl.addEventListener('mousedown', (e) => {
+  overlayRef.value!.addEventListener('mousedown', (e) => {
     if (!mouseenabled) return
     //if ((ignoremouse < Date.now() - 100)) {
       if (e.which == 3) {
@@ -855,7 +832,7 @@ onMounted(() => {
     lastObj = obj
   })
 
-  overlayEl.addEventListener('mouseup', () => {
+  overlayRef.value!.addEventListener('mouseup', () => {
     if (!mouseenabled) return
     sendMouseUp()
   })
@@ -871,7 +848,7 @@ onMounted(() => {
     lastMouseDown = 0
     //lastclick = 0
     console.log("mouse-rightclick")
-    socket.volatile.emit("mouse-click", JSON.stringify(obj))
+    send("mouse-click", obj, true)
   }
 
   function sendMouseDown(e: MouseEvent) {
@@ -900,11 +877,7 @@ onMounted(() => {
         mousedown = true
         
         console.log("mouse-down (immediate due to movement)")
-        if (!controlpressed) {
-          socket.volatile.emit("mouse-down", JSON.stringify(lastObj))
-        } else {
-          socket.volatile.emit("paint-mouse-down", JSON.stringify(lastObj))
-        }
+        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, true)
         
         // Remove this handler since we've triggered the event
         moveHandler && document.removeEventListener('mousemove', moveHandler)
@@ -917,11 +890,7 @@ onMounted(() => {
     eventToSend = window.setTimeout(() => {
       mousedown = true
       console.log("mouse-down")
-      if (!controlpressed) {
-        socket.volatile.emit("mouse-down", JSON.stringify(lastObj))
-      } else {
-        socket.volatile.emit("paint-mouse-down", JSON.stringify(lastObj))
-      }
+      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, true)
     }, 120)
   }
 
@@ -938,19 +907,10 @@ onMounted(() => {
     if (mousedown || dragdetected) {
       console.log("mouse-up")
 
-      if (!controlpressed) {
-        socket.volatile.emit("mouse-up", JSON.stringify(obj))
-      } else {
-        socket.volatile.emit("paint-mouse-up", JSON.stringify(obj))
-      }
+      send(controlpressed ? "paint-mouse-up" : "mouse-up", obj, true)
     } else {
       console.log("mouse-leftclick")
-      if (!controlpressed) {
-        socket.volatile.emit("mouse-leftclick", JSON.stringify(lastObj))
-      } else {
-        socket.volatile.emit("paint-mouse-leftclick", JSON.stringify(lastObj))
-      }
-      
+      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastObj, true)
     }
 
     //mousepressed[obj.id] = false
@@ -1020,15 +980,13 @@ onMounted(() => {
     if (!skip) {
       console.log(keyToSend)
 
-      const obj = {
-        "socketid": socket.id,
-        "key": keyToSend,
-        "room": props.room,
-        "name": props.user,
-        "color": props.color
-      }
-      //keypressmessage = JSON.stringify(obj)
-      socket.emit('type', JSON.stringify(obj))
+      send('type', {
+        socketid: socket.id!,
+        key: keyToSend,
+        room: props.room,
+        name: props.user,
+        color: props.color
+      })
       e.preventDefault()
     }
   })
@@ -1057,7 +1015,7 @@ onMounted(() => {
     return false
   })
 
-  overlayEl.addEventListener('contextmenu', () => {
+  overlayRef.value!.addEventListener('contextmenu', () => {
     return false
   })
 
@@ -1080,21 +1038,15 @@ onMounted(() => {
           const blob = item.getAsFile()!
           const reader = new FileReader()
           reader.onload = (event) => {
-            const obj = {
-              "filecontent": event.target?.result,
-              "filename": blob.name,
-              "room": props.room,
-              "name": props.user,
-              "color": props.color
-            }
-            clipboarddata = JSON.stringify(obj)
-            socket.emit('pastefile', clipboarddata)
-
-
+            send('pastefile', {
+              filecontent: event.target!.result as string,
+              filename: blob.name,
+              room: props.room,
+              name: props.user,
+              color: props.color
+            })
           } // data url!
           reader.readAsDataURL(blob)
-
-
 
           //const file = item.getAsFile()
           //console.log(`… file[${i}].name = ${file.name}`)
@@ -1139,48 +1091,41 @@ onMounted(() => {
       if (item.kind === 'string' && item.type.match('^text/plain')) {
         //alert('paste text')
         item.getAsString((clipText) => {
-          const obj = {
-            "text": clipText.replace(/\r/g, ""),
-            "room": props.room,
-            "name": props.user,
-            "color": props.color,
-            "time": Date.now()
-          }
-          //keypressmessage = 
-          socket.emit('paste', JSON.stringify(obj))
+          send('paste', {
+            text: clipText.replace(/\r/g, ""),
+            room: props.room,
+            name: props.user,
+            color: props.color,
+            time: Date.now()
+          })
         })
       } else if (item.kind === 'string' && item.type.match('^text/html')) {
         // Drag data item is HTML
         item.getAsString((clipText) => {
-          const obj = {
-            "text": clipText.replace(/\r/g, ""),
-            "room": props.room,
-            "name": props.user,
-            "color": props.color,
-            "time": Date.now()
-          }
-          //keypressmessage = 
-          socket.emit('paste', JSON.stringify(obj))
+          send('paste', {
+            text: clipText.replace(/\r/g, ""),
+            room: props.room,
+            name: props.user,
+            color: props.color,
+            time: Date.now()
+          })
         })
         //alert('paste html')
       } else if (item.kind === 'file') {
         const blob = item.getAsFile()!
         const reader = new FileReader()
         reader.onload = (event) => {
-          const obj = {
-            "filecontent": event.target?.result,
-            "room": props.room,
-            "name": props.user,
-            "color": props.color
-          }
-          clipboarddata = JSON.stringify(obj)
-          socket.emit('pastefile', clipboarddata)
+          send('pastefile', {
+            filecontent: event.target!.result as string,
+            room: props.room,
+            name: props.user,
+            color: props.color
+          })
 
           const obj2: Record<string, Blob> = {}
           obj2[item.type] = blob
 
           navigator.clipboard.write([
-
             new ClipboardItem(obj2),
           ])
 
@@ -1193,25 +1138,23 @@ onMounted(() => {
   })
 
   window.addEventListener('copy', () => {
-    const obj = {
-      "room": props.room,
-      "socketid": socket.id,
-    }
     if (remoteClipboard)
-      socket.emit('copy', JSON.stringify(obj))
+      send('copy', {
+        room: props.room,
+        socketid: socket.id!,
+      })
   })
 
   window.addEventListener('cut', () => {
-    const obj = {
-      "room": props.room,
-      "socketid": socket.id,
-    }
     if (remoteClipboard)
-      socket.emit('cut', JSON.stringify(obj))
+      send('cut', {
+        room: props.room,
+        socketid: socket.id!,
+      })
   })
 
   // Add this near the other event listeners
-  overlayEl.addEventListener('mousemove', (e) => {
+  overlayRef.value!.addEventListener('mousemove', (e) => {
     // Get the vertical position of the mouse relative to the overlay
     const mouseY = e.clientY
     
@@ -1232,7 +1175,7 @@ onMounted(() => {
   })
 
   // Also hide the help message when mouse leaves the overlay
-  overlayEl.addEventListener('mouseleave', () => {
+  overlayRef.value!.addEventListener('mouseleave', () => {
     if (document.body.contains(msgmousehelp)) {
       msgmousehelp.remove()
     }
@@ -1249,12 +1192,38 @@ function isTouchEnabled() {
     (navigator.maxTouchPoints > 0) ||
     (navigator.msMaxTouchPoints > 0)*/
 }
+
+function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, volatile = false) {
+  if (volatile)
+    socket.volatile.emit(event, JSON.stringify(data))
+  else
+    socket.emit(event, JSON.stringify(data))
+
+  //emit('send', { event, data, volatile })
+}
+
+const receiveEvents: Partial<Record<RemoteEvent, (data: RemoteData<RemoteEvent>) => void>> = {}
+
+function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
+  receiveEvents[event]?.(data)
+}
+
+function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
+  socket.on<RemoteEvent>(event, data => 
+    handler(event === 'reset' ? data : JSON.parse(data)) // TODO: make serialization consistent
+  )
+  //receiveEvents[event] = handler
+}
+
+defineExpose({
+  receive
+})
 </script>
 
 <template>
-  <div class="remote-viewer">
-    <div id="overlay"></div>
-    <div id="container" class="container">
+  <div class="remote-viewer" ref="remoteViewer">
+    <div id="overlay" ref="overlay" :style="overlayStyle"></div>
+    <div id="container" class="container" ref="container">
       <div class="cursorsignal" style="animation-delay: -1s"></div>
       <div class="cursorsignal" style="animation-delay: -0.5s"></div>
       <div class="cursorsignal" style="animation-delay: 0s"></div>
@@ -1337,17 +1306,17 @@ function isTouchEnabled() {
       padding-left: 100px; position: absolute; z-index: 100; color: white; background: #000; padding:20px; min-width: 500px; width: 100vw
   }
 
-    /* Common button styles */
-    .remote-viewer .button, .remote-viewer .recordoverlayclosebutton {
-      cursor: pointer;
-      line-height: 10px;
-      text-align: center;
-      padding: 5px 0;
-      border: 1px solid #404040;
-      color: #aaa;
-      font-family: Abel;
-      font-size: 10px;
-      background: #2a2a2a;
+  /* Common button styles */
+  .remote-viewer .button, .remote-viewer .recordoverlayclosebutton {
+    cursor: pointer;
+    line-height: 10px;
+    text-align: center;
+    padding: 5px 0;
+    border: 1px solid #404040;
+    color: #aaa;
+    font-family: Abel;
+    font-size: 10px;
+    background: #2a2a2a;
   }
 
   .remote-viewer .button:hover, .remote-viewer .recordoverlayclosebutton:hover {
