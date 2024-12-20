@@ -32,7 +32,10 @@ if (isWin32) {
       SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
       SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64']),
       GetWindow: lib.func('__stdcall', 'GetWindow', 'int64', ['int64', 'uint32']),
-      GetWindowTextW: lib.func('__stdcall', 'GetWindowTextW', 'int', ['int64', 'void*', 'int']),
+      EnumWindows: lib.func('__stdcall', 'EnumWindows', 'bool', ['void *', 'void *']),
+      GetWindowTextW: lib.func('__stdcall', 'GetWindowTextW', 'bool', ['int64', 'void *', 'int']),
+      GetClassNameW: lib.func('__stdcall', 'GetClassNameW', 'bool', ['int64', 'void *', 'int']),
+      GetWindowLongA: lib.func('__stdcall', 'GetWindowLongA', 'int64', ['int64', 'int']),
     };
     isUser32Available = true;
   } catch (error) {
@@ -554,99 +557,12 @@ export class WindowManager {
   isVisible() {
     if (this.isScreen())
       return true
-
-    if (isWin32 && isUser32Available) {
+    if (isWin32) {
       const hwnd = parseInt(this.windowhwnd);
-      if (!user32.IsWindowVisible(hwnd)) {
-        return false;
-      }
-
-      // Get dimensions of our window
-      const rectPointer = Buffer.alloc(16);
-      if (!user32.GetWindowRect(hwnd, rectPointer)) {
-        return true; // Default to visible if we can't get dimensions
-      }
-      const rect1 = pointerToRect(rectPointer);
-      const ourArea = (rect1.right - rect1.left) * (rect1.bottom - rect1.top);
-      let totalOverlapArea = 0;
-
-      // Use the existing user32.dll library instance
-      const lib = user32.GetWindowRect.library;
+      if (!user32.IsWindowVisible(hwnd)) return false;
       
-      // Define EnumWindows using the existing library
-      const EnumWindows = lib.func('__stdcall', 'EnumWindows', 'bool', ['pointer', 'void*']);
-      
-      // Create callback function for window enumeration
-      const callback = lib.callback('bool WindowEnumProc(int64, void*)', (otherHwnd) => {
-        try {
-          // Skip if it's our own window or not visible
-          if (otherHwnd === hwnd || !user32.IsWindowVisible(otherHwnd)) {
-            return true; // Continue enumeration
-          }
-
-          // Get window title to skip peekaview windows
-          const titleLength = 256;
-          const titleBuffer = Buffer.alloc(titleLength * 2); // UTF-16 characters
-          if (!user32.GetWindowTextW(otherHwnd, titleBuffer, titleLength)) {
-            return true; // Continue enumeration
-          }
-          const title = titleBuffer.toString('utf16le').replace(/\0+$/, '');
-          
-          if (title.startsWith('__peekaview')) {
-            return true; // Continue enumeration
-          }
-
-          // Check if window is above our window in Z-order
-          let testHwnd = user32.GetWindow(hwnd, 3); // GW_HWNDPREV = 3
-          let isAbove = false;
-          
-          while (testHwnd) {
-            if (testHwnd === otherHwnd) {
-              isAbove = true;
-              break;
-            }
-            testHwnd = user32.GetWindow(testHwnd, 3);
-          }
-
-          if (!isAbove) {
-            return true; // Continue enumeration
-          }
-
-          // Get other window dimensions
-          const otherRectPointer = Buffer.alloc(16);
-          if (!user32.GetWindowRect(otherHwnd, otherRectPointer)) {
-            return true; // Continue enumeration
-          }
-          const rect2 = pointerToRect(otherRectPointer);
-
-          // Calculate overlap area
-          const xOverlap = Math.max(0,
-            Math.min(rect1.right, rect2.right) - Math.max(rect1.left, rect2.left)
-          );
-          const yOverlap = Math.max(0,
-            Math.min(rect1.bottom, rect2.bottom) - Math.max(rect1.top, rect2.top)
-          );
-          
-          totalOverlapArea += xOverlap * yOverlap;
-
-          // If overlap is already more than 10%, we can stop enumeration
-          if ((totalOverlapArea / ourArea) * 100 > 10) {
-            return false; // Stop enumeration
-          }
-
-          return true; // Continue enumeration
-        } catch (error) {
-          console.warn('Error in window enumeration callback:', error);
-          return true; // Continue enumeration
-        }
-      });
-
-      // Enumerate windows
-      EnumWindows(callback, null);
-
-      // Calculate final overlap percentage
-      const overlapPercentage = (totalOverlapArea / ourArea) * 100;
-      return overlapPercentage <= 10;
+      // Check for overlap
+      return !this.isSignificantlyOverlapped();
     }
 
     if (isLinux) {
@@ -660,6 +576,7 @@ export class WindowManager {
 
     if (isMac) {
       try {
+        // Read from the temp file instead of executing the Swift script
         const result = require('fs').readFileSync('/tmp/.peekaview_windowoverlap', 'utf8').trim();
         console.log("overlapstatus: ", result)
         return result === '1'
@@ -670,6 +587,118 @@ export class WindowManager {
     }
     
     return true
+  }
+
+  isSignificantlyOverlapped() {
+    if (this.isScreen() || !isWin32 || !isUser32Available) return false;
+
+    // Windows constants
+    const GW_HWNDPREV = 3;
+    const WS_VISIBLE = 0x10000000;
+    const WS_POPUP = 0x80000000;
+    const WS_CHILD = 0x40000000;
+    const WS_MINIMIZE = 0x20000000;
+    const WS_DISABLED = 0x8000000;
+    const GWL_STYLE = -16;
+    const GWL_EXSTYLE = -20;
+    const WS_EX_TOOLWINDOW = 0x00000080;
+    const WS_EX_NOACTIVATE = 0x08000000;
+
+    const thisRect = this.getWindowOuterDimensions();
+    if (!thisRect) return false;
+
+    const thisArea = Math.abs((thisRect.right - thisRect.left) * (thisRect.bottom - thisRect.top));
+    let maxOverlapArea = 0;
+    
+    const processedWindows = new Set();
+    const titleBuffer = Buffer.alloc(256);
+    
+    let hwndCurrent = user32.GetWindow(parseInt(this.windowhwnd), GW_HWNDPREV);
+    
+    while (hwndCurrent) {
+        try {
+            if (processedWindows.has(hwndCurrent)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+            processedWindows.add(hwndCurrent);
+
+            // Get window styles
+            const style = user32.GetWindowLongA(hwndCurrent, GWL_STYLE);
+            const exStyle = user32.GetWindowLongA(hwndCurrent, GWL_EXSTYLE);
+
+            // Skip if window is not a normal application window
+            if ((style & WS_CHILD) || 
+                (style & WS_POPUP) ||
+                (style & WS_MINIMIZE) ||
+                (style & WS_DISABLED) ||
+                !(style & WS_VISIBLE) ||
+                (exStyle & WS_EX_TOOLWINDOW) ||
+                (exStyle & WS_EX_NOACTIVATE)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Skip PeekaView windows
+            user32.GetWindowTextW(hwndCurrent, titleBuffer, 256);
+            const windowTitle = titleBuffer.toString('utf16le').split('\0')[0].trim();
+            if (windowTitle.startsWith('__peekaview') || 
+                windowTitle.startsWith('peekaview - ')) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Get window rect
+            const rectPointer = Buffer.alloc(16);
+            if (!user32.GetWindowRect(hwndCurrent, rectPointer)) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            const otherRect = pointerToRect(rectPointer);
+
+            // Skip invalid windows
+            if (!otherRect || 
+                otherRect.right <= otherRect.left || 
+                otherRect.bottom <= otherRect.top ||
+                (otherRect.right - otherRect.left) < 100 ||
+                (otherRect.bottom - otherRect.top) < 100) {
+                hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+                continue;
+            }
+
+            // Calculate overlap
+            const xOverlap = Math.max(0, Math.min(thisRect.right, otherRect.right) 
+                                       - Math.max(thisRect.left, otherRect.left));
+            const yOverlap = Math.max(0, Math.min(thisRect.bottom, otherRect.bottom) 
+                                       - Math.max(thisRect.top, otherRect.top));
+            
+            if (xOverlap > 0 && yOverlap > 0) {
+                const overlapArea = Math.abs(xOverlap * yOverlap);
+                maxOverlapArea += overlapArea;
+            }
+
+        } catch (error) {
+            console.warn('Error processing window:', error);
+        }
+        
+        hwndCurrent = user32.GetWindow(hwndCurrent, GW_HWNDPREV);
+    }
+
+    return (maxOverlapArea / thisArea) * 100 > 5;
+  }
+
+  isWindowAbove(otherHwnd) {
+    let hwnd = parseInt(this.windowhwnd);
+    let currentHwnd = user32.GetWindow(hwnd, 3); // GW_HWNDPREV = 3
+
+    while (currentHwnd) {
+        if (currentHwnd === otherHwnd) {
+            return true;
+        }
+        currentHwnd = user32.GetWindow(currentHwnd, 3);
+    }
+    return false;
   }
 
   focus() {
