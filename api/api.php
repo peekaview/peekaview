@@ -457,10 +457,17 @@ function registerMyEmail() {
         $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
         
         $userFile = getEmailFilename($email);
-
-        $token = generateRandomString(16);
-        $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
-        file_put_contents($userFile, $userData);
+        
+        if (file_exists($userFile)) {
+            // User already exists, get existing token
+            $userData = explode(';', file_get_contents($userFile));
+            $token = $userData[1];
+        } else {
+            // New user, generate token
+            $token = generateRandomString(16);
+            $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
+            file_put_contents($userFile, $userData);
+        }
         
         require_once __DIR__.'/helper/EmailHelper.php';
         $emailHelper = new EmailHelper();
