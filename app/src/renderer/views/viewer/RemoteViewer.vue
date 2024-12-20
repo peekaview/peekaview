@@ -140,7 +140,7 @@ msgremotecontrol.innerHTML = '<b>Maus/Tastatursteuerung wurde aktiviert</b>'
 const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
 const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
 const pointHistory: Record<string, Stroke[]> = {}    // Punktarrays der Benutzer
-const latestPoint: Record<string, [number, number] | undefined> = {}     // jeweils letzter Punkt
+const latestPoint: Record<string, [number, number]> = {}     // jeweils letzter Punkt
 let paintcheckinterval: number  // Repaint-Intervall
 
 // Add this near other state declarations (around line 40-50)
@@ -194,8 +194,8 @@ onMounted(() => {
   console.log("connect to controlserver:", props.hostname)
   socket.emit("join", { roomId: props.room, isPresenter: false })
 
-  document.body.appendChild(mouseSyncEl)  // display syncmessage
-  document.body.appendChild(sizeInfoEl)    // show rectangular with sizeinfo
+  remoteViewerRef.value?.appendChild(mouseSyncEl)  // display syncmessage
+  remoteViewerRef.value?.appendChild(sizeInfoEl)    // show rectangular with sizeinfo
 
   // allow panning and zooming for #overlay element
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
@@ -351,10 +351,9 @@ onMounted(() => {
     clipboarddiv.style.cssText = 'position: absolute right:0px bottom:0px'
     clipboarddiv.id = 'clipboardcontainer'
     clipboarddiv.innerHTML = '<div class="button" onClick="document.querySelector(\'#clipboardcontainer\').remove()" style="margin-bottom: 5px">Clipboard schliessen</div><div class="button copybutton" id="copybutton">Kopieren</div><div class="button downloadbutton" id="downloadbutton">Download</div><div id="clipboardarea"></div>'
-    document.body.append(clipboarddiv)
+    remoteViewerRef.value?.append(clipboarddiv)
 
     const clipboardAreaEl = document.getElementById('clipboardarea') as HTMLDivElement
-    const extensionImageEl = document.querySelector("#extensionimage") as HTMLImageElement
     const downloadButtonEl = document.querySelector("#downloadbutton") as HTMLButtonElement
     const copyButtonEl = document.querySelector("#copybutton") as HTMLButtonElement
     
@@ -387,11 +386,12 @@ onMounted(() => {
       clipboardAreaEl.append(div)
 
       // Klick aufs Bild = Download
+      const extensionImageEl = document.querySelector("#extensionimage") as HTMLImageElement
       extensionImageEl.onclick = () => downloadButtonEl.click()
 
       downloadButtonEl.onclick = () => {
         const downloadLink = document.createElement('a')
-        document.body.appendChild(downloadLink)
+        remoteViewerRef.value?.appendChild(downloadLink)
         downloadLink.href = data.filecontent
         downloadLink.target = '_self'
         downloadLink.download = data.filename ?? 'download_' + datestring + '.' + extension
@@ -453,7 +453,7 @@ onMounted(() => {
 
       downloadButtonEl.onclick = () => {
         const downloadLink = document.createElement('a')
-        document.body.appendChild(downloadLink)
+        remoteViewerRef.value?.appendChild(downloadLink)
         downloadLink.href = data.filecontent
         downloadLink.target = '_self'
         if (data.filename != undefined) {
@@ -492,11 +492,12 @@ onMounted(() => {
       div.innerHTML = '<center><img id="extensionimage" src="icons/' + extension + '.svg" style="max-height:150px"></center>'
       clipboardAreaEl.append(div)
 
+      const extensionImageEl = document.querySelector("#extensionimage") as HTMLImageElement
       extensionImageEl.onclick = () => downloadButtonEl.click()
 
       downloadButtonEl.onclick = () => {
         const downloadLink = document.createElement('a')
-        document.body.appendChild(downloadLink)
+        remoteViewerRef.value?.appendChild(downloadLink)
         downloadLink.href = data.filecontent
         downloadLink.target = '_self'
         if (data.filename != undefined) {
@@ -699,7 +700,7 @@ onMounted(() => {
 
   onReceive("paint-mouse-up", (data) => {
     drawing[data.id] = false
-    latestPoint[data.id] = undefined
+    delete latestPoint[data.id]
   })
 
   onReceive("pastefile", (data) => {
@@ -751,7 +752,7 @@ onMounted(() => {
       msgremotecontrol.innerHTML = data.mouseenabled ? '<b>Remote-Mauszeiger ist nun aktiviert</b>' : '<b>Remote-Mauszeiger wurde deaktiviert</b>'
       const messageEls = document.querySelectorAll('.message')
       messageEls.forEach((message) => { message.remove() })
-      document.body.appendChild(msgremotecontrol)
+      remoteViewerRef.value?.appendChild(msgremotecontrol)
       setTimeout(() => {
         messageEls.forEach((message) => { message.remove() })
       }, 3000)
@@ -765,7 +766,7 @@ onMounted(() => {
     if ((!lastmessage || remotecontrol != data.remotecontrol) && mouseSyncEl == null) {
       msgremotecontrol.innerHTML = data.remotecontrol ? '<b>Fernzugriff ist jetzt aktiviert</b>' : '<b>Fernzugriff wurde deaktiviert</b>'
       document.querySelectorAll('.message').forEach((message) => { message.remove() })
-      document.body.appendChild(msgremotecontrol)
+      remoteViewerRef.value?.appendChild(msgremotecontrol)
       setTimeout(() => {
         document.querySelectorAll('.message').forEach((message) => { message.remove() })
       }, 3000)
@@ -1047,7 +1048,7 @@ onMounted(() => {
     ev.preventDefault()
 
     document.querySelectorAll('.message').forEach((message) => { message.remove() })
-    document.body.appendChild(msgfileupload)
+    remoteViewerRef.value?.appendChild(msgfileupload)
 
     const items = ev.dataTransfer?.items
     if (items) {
@@ -1066,6 +1067,9 @@ onMounted(() => {
               color: props.color
             })
           } // data url!
+          reader.onerror = (e) => {
+            console.error("Error reading file", e);
+          }
           reader.readAsDataURL(blob)
 
           //const file = item.getAsFile()
@@ -1087,7 +1091,7 @@ onMounted(() => {
 
 
       document.querySelectorAll('.message').forEach((message) => { message.remove() })
-      document.body.appendChild(msgfiledrop)
+      remoteViewerRef.value?.appendChild(msgfiledrop)
 
       setTimeout(() => {
         document.querySelectorAll('#filedrop').forEach((message) => { message.remove() })
@@ -1183,12 +1187,12 @@ onMounted(() => {
     
     if (mouseY <= topThreshold) {
       // Show help message when mouse is near top
-      if (!document.body.contains(msgmousehelp)) {
-        document.body.appendChild(msgmousehelp)
+      if (!remoteViewerRef.value?.contains(msgmousehelp)) {
+        remoteViewerRef.value?.appendChild(msgmousehelp)
       }
     } else {
       // Hide help message when mouse moves away
-      if (document.body.contains(msgmousehelp)) {
+      if (remoteViewerRef.value?.contains(msgmousehelp)) {
         msgmousehelp.remove()
       }
     }
@@ -1196,7 +1200,7 @@ onMounted(() => {
 
   // Also hide the help message when mouse leaves the overlay
   overlayRef.value!.addEventListener('mouseleave', () => {
-    if (document.body.contains(msgmousehelp)) {
+    if (remoteViewerRef.value?.contains(msgmousehelp)) {
       msgmousehelp.remove()
     }
   })
