@@ -626,13 +626,18 @@ window.onload = function () {
             mouseSignal(data);
         }
 
+
+        
         obj = JSON.parse(data);
+        drawing[obj.id] = false;
     });
     socket.on("paint-mouse-leftclick", function (data) {
-        obj = JSON.parse(data);
+        /*obj = JSON.parse(data);
         if (drawing[obj.id] != undefined && drawing[obj.id]) {
             continueStroke(obj.id, obj.color, [obj.x, obj.y]);
-        }
+        }*/
+        obj = JSON.parse(data);
+        drawing[obj.id] = false;
     });
 
     socket.on("mouse-move", function (data) {

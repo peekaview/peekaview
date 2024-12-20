@@ -30,7 +30,9 @@ if (isWin32) {
       GetClientRect: lib.func('__stdcall', 'GetClientRect', 'bool', ['int64', 'void *']),
       ClientToScreen: lib.func('__stdcall', 'ClientToScreen', 'bool', ['int64', 'void *']),
       SetWindowPos: lib.func('__stdcall', 'SetWindowPos', 'bool', ['int64', 'int64', 'int', 'int', 'int', 'int', 'uint32']),
-      SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64'])
+      SetFocus: lib.func('__stdcall', 'SetFocus', 'int64', ['int64']),
+      GetWindow: lib.func('__stdcall', 'GetWindow', 'int64', ['int64', 'uint32']),
+      GetWindowTextW: lib.func('__stdcall', 'GetWindowTextW', 'int', ['int64', 'void*', 'int']),
     };
     isUser32Available = true;
   } catch (error) {
@@ -552,9 +554,99 @@ export class WindowManager {
   isVisible() {
     if (this.isScreen())
       return true
-    if (isWin32) {
+
+    if (isWin32 && isUser32Available) {
       const hwnd = parseInt(this.windowhwnd);
-      return user32.IsWindowVisible(hwnd)
+      if (!user32.IsWindowVisible(hwnd)) {
+        return false;
+      }
+
+      // Get dimensions of our window
+      const rectPointer = Buffer.alloc(16);
+      if (!user32.GetWindowRect(hwnd, rectPointer)) {
+        return true; // Default to visible if we can't get dimensions
+      }
+      const rect1 = pointerToRect(rectPointer);
+      const ourArea = (rect1.right - rect1.left) * (rect1.bottom - rect1.top);
+      let totalOverlapArea = 0;
+
+      // Use the existing user32.dll library instance
+      const lib = user32.GetWindowRect.library;
+      
+      // Define EnumWindows using the existing library
+      const EnumWindows = lib.func('__stdcall', 'EnumWindows', 'bool', ['pointer', 'void*']);
+      
+      // Create callback function for window enumeration
+      const callback = lib.callback('bool WindowEnumProc(int64, void*)', (otherHwnd) => {
+        try {
+          // Skip if it's our own window or not visible
+          if (otherHwnd === hwnd || !user32.IsWindowVisible(otherHwnd)) {
+            return true; // Continue enumeration
+          }
+
+          // Get window title to skip peekaview windows
+          const titleLength = 256;
+          const titleBuffer = Buffer.alloc(titleLength * 2); // UTF-16 characters
+          if (!user32.GetWindowTextW(otherHwnd, titleBuffer, titleLength)) {
+            return true; // Continue enumeration
+          }
+          const title = titleBuffer.toString('utf16le').replace(/\0+$/, '');
+          
+          if (title.startsWith('__peekaview')) {
+            return true; // Continue enumeration
+          }
+
+          // Check if window is above our window in Z-order
+          let testHwnd = user32.GetWindow(hwnd, 3); // GW_HWNDPREV = 3
+          let isAbove = false;
+          
+          while (testHwnd) {
+            if (testHwnd === otherHwnd) {
+              isAbove = true;
+              break;
+            }
+            testHwnd = user32.GetWindow(testHwnd, 3);
+          }
+
+          if (!isAbove) {
+            return true; // Continue enumeration
+          }
+
+          // Get other window dimensions
+          const otherRectPointer = Buffer.alloc(16);
+          if (!user32.GetWindowRect(otherHwnd, otherRectPointer)) {
+            return true; // Continue enumeration
+          }
+          const rect2 = pointerToRect(otherRectPointer);
+
+          // Calculate overlap area
+          const xOverlap = Math.max(0,
+            Math.min(rect1.right, rect2.right) - Math.max(rect1.left, rect2.left)
+          );
+          const yOverlap = Math.max(0,
+            Math.min(rect1.bottom, rect2.bottom) - Math.max(rect1.top, rect2.top)
+          );
+          
+          totalOverlapArea += xOverlap * yOverlap;
+
+          // If overlap is already more than 10%, we can stop enumeration
+          if ((totalOverlapArea / ourArea) * 100 > 10) {
+            return false; // Stop enumeration
+          }
+
+          return true; // Continue enumeration
+        } catch (error) {
+          console.warn('Error in window enumeration callback:', error);
+          return true; // Continue enumeration
+        }
+      });
+
+      // Enumerate windows
+      EnumWindows(callback, null);
+
+      // Calculate final overlap percentage
+      const overlapPercentage = (totalOverlapArea / ourArea) * 100;
+      return overlapPercentage <= 10;
     }
 
     if (isLinux) {
@@ -568,7 +660,6 @@ export class WindowManager {
 
     if (isMac) {
       try {
-        // Read from the temp file instead of executing the Swift script
         const result = require('fs').readFileSync('/tmp/.peekaview_windowoverlap', 'utf8').trim();
         console.log("overlapstatus: ", result)
         return result === '1'

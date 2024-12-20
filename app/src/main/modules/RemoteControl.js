@@ -262,7 +262,7 @@ export class RemoteControl {
     if (this.lasttargetpoint[id] == undefined || this.lasttargetpoint[id] == null)
       this.lasttargetpoint[id] = new Point(0, 0)
 
-    this.mousePressed[id] = false
+    //this.mousePressed[id] = false
   }
 
   hideOverlays() {
@@ -348,7 +348,7 @@ export class RemoteControl {
 
     this.mouseMove(data)
     mouse.setPosition(this.mousePosition(obj))
-    setTimeout(() => { console.log('leftClick'); mouse.leftClick() }, 50)
+    setTimeout(() => { console.log('leftClick'); mouse.leftClick(); this.mousePressed[obj.id] = false }, 50)
   }
 
   mouseDblClick(data) {
