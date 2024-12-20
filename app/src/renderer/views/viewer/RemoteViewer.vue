@@ -140,8 +140,11 @@ msgremotecontrol.innerHTML = '<b>Maus/Tastatursteuerung wurde aktiviert</b>'
 const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
 const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
 const pointHistory: Record<string, Stroke[]> = {}    // Punktarrays der Benutzer
-const latestPoint: Record<string, [number, number]> = {}     // jeweils letzter Punkt
+const latestPoint: Record<string, [number, number] | undefined> = {}     // jeweils letzter Punkt
 let paintcheckinterval: number  // Repaint-Intervall
+
+// Add this near other state declarations (around line 40-50)
+const tmpPointHistory: Record<string, Stroke[]> = {}
 
 // Disable Browser-Zoom
 //(() => {
@@ -209,7 +212,7 @@ onMounted(() => {
   const panzoom = Panzoom(overlayRef.value!, options)
 
   // Mousewheel-Zoom
-  remoteViewerRef.value?.addEventListener('wheel', (event) => {
+  remoteViewerRef.value?.addEventListener('wheel', (event: WheelEvent) => {
     if (!event.ctrlKey) return
     if (event.deltaY < 0) {
       panzoom.zoom(panzoom.getScale() + 0.1, { animate: true })
@@ -219,7 +222,7 @@ onMounted(() => {
   })
 
   // Änderungen zoom/panning in Variable zwischenspeichern
-  overlayRef.value!.addEventListener('panzoomchange', (event) => {
+  overlayRef.value!.addEventListener('panzoomchange', (event: any) => {
     zoom = event.detail
     console.log(zoom) // => { x: 0, y: 0, scale: 1 }
   })
@@ -506,14 +509,56 @@ onMounted(() => {
     }
   }
 
+  function startStroke(id: string, point: [number, number]) {
+    // Initialize point history if needed
+    if (pointHistory[id] == undefined) {
+      pointHistory[id] = []
+    }
+    
+    drawing[id] = true
+    latestPoint[id] = point
+
+    if (paintcheckinterval === undefined) {
+      paintcheckinterval = window.setInterval(() => {
+        Object.keys(pointHistory).forEach(key => {
+          tmpPointHistory[key] = []
+          pointHistory[key].forEach((item) => {
+            if (item.timestamp >= (Date.now() - 8000)) {
+              tmpPointHistory[key].push(item)
+            }
+            if (item.timestamp < (Date.now() - 8000) && item.timestamp > (Date.now() - 20000)) {
+              item.opacity = item.opacity - 0.03
+              tmpPointHistory[key].push(item)
+            }
+          })
+          pointHistory[key] = tmpPointHistory[key]
+        })
+        repaintStrokes()
+      }, 50)
+    }
+  }
+
   function continueStroke(id: string, color: string, newPoint: [number, number]) {
+    if (!drawing[id] || !latestPoint[id]) {
+      return
+    }
+
     if (pointHistory[id] == undefined) {
       pointHistory[id] = []
     }
 
-    pointHistory[id].push({ color, from: latestPoint[id], to: newPoint, timestamp: Date.now(), opacity: 1.0 })
-    latestPoint[id] = newPoint
-    repaintStrokes()
+    // Only add point if it's different from the last point
+    if (latestPoint[id][0] !== newPoint[0] || latestPoint[id][1] !== newPoint[1]) {
+      pointHistory[id].push({
+        color,
+        from: latestPoint[id],
+        to: newPoint,
+        timestamp: Date.now(),
+        opacity: 1.0
+      })
+      latestPoint[id] = newPoint
+      repaintStrokes()
+    }
   }
 
   function repaintStrokes() {
@@ -544,32 +589,6 @@ onMounted(() => {
         }
       })
     })
-  }
-
-  // Event helpers
-  const tmpPointHistory: Record<string, Stroke[]> = {}
-  function startStroke(id: string, point: [number, number]) {
-    drawing[id] = true
-    latestPoint[id] = point
-
-    if (paintcheckinterval === undefined) {
-      paintcheckinterval = window.setInterval(() => {
-        Object.keys(pointHistory).forEach(key => {
-          tmpPointHistory[key] = []
-          pointHistory[key].forEach((item) => {
-            if (item.timestamp >= (Date.now() - 8000)) {
-              tmpPointHistory[key].push(item)
-            }
-            if (item.timestamp < (Date.now() - 8000) && item.timestamp > (Date.now() - 20000)) {
-              item.opacity = item.opacity - 0.03
-              tmpPointHistory[key].push(item)
-            }
-          })
-          pointHistory[key] = tmpPointHistory[key]
-        })
-        repaintStrokes()
-      }, 50)
-    }
   }
 
   // Signal einblenden bei Mausklick für 2000ms
@@ -626,12 +645,14 @@ onMounted(() => {
     if (!remotecontrol) {
       mouseSignal(data)
     }
+    drawing[data.id] = false;
   })
 
   onReceive("paint-mouse-leftclick", (data) => {
-    if (drawing[data.id] != undefined && drawing[data.id]) {
+    /*if (drawing[data.id] != undefined && drawing[data.id]) {
       continueStroke(data.id, data.color, [data.x, data.y])
-    }
+    }*/
+    drawing[data.id] = false;
   })
 
   onReceive("mouse-move", (data) => {
@@ -643,7 +664,7 @@ onMounted(() => {
   })
 
   onReceive("paint-mouse-move", (data) => {
-    if (drawing[data.id] != undefined && drawing[data.id]) {
+    if (drawing[data.id]) {
       continueStroke(data.id, data.color, [data.x, data.y])
     }
     mouseMove(data)
@@ -678,6 +699,7 @@ onMounted(() => {
 
   onReceive("paint-mouse-up", (data) => {
     drawing[data.id] = false
+    latestPoint[data.id] = undefined
   })
 
   onReceive("pastefile", (data) => {
@@ -906,14 +928,12 @@ onMounted(() => {
 
     if (mousedown || dragdetected) {
       console.log("mouse-up")
-
       send(controlpressed ? "paint-mouse-up" : "mouse-up", obj, true)
     } else {
       console.log("mouse-leftclick")
       send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastObj, true)
     }
 
-    //mousepressed[obj.id] = false
     mousedown = false
     lastMouseDown = 0
   }

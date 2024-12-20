@@ -325,7 +325,7 @@ export function useRemotePresenter() {
 
     mouseMove(data)
     mouse.setPosition(mousePosition(obj))
-    setTimeout(() => { console.log('leftClick'); mouse.leftClick() }, 50)
+    setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[obj.id] = false;}, 50)
   }
 
   function mouseDblClick(data: any) {
