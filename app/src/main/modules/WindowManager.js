@@ -499,7 +499,13 @@ export class WindowManager {
         return activeWindowInnerDimensions;
     } catch (error) {
         console.warn('Error reading window info from temp file:', error);
-        return null;
+        const activeWindowInnerDimensions = {
+            left: 0,
+            top: 0,
+            right: 800,
+            bottom: 600
+        };
+        return activeWindowInnerDimensions;
     }
   }
 
