@@ -66,7 +66,7 @@ watch(() => props.data, async (screenShareData) => {
         return
       }
 
-      remoteViewerRef.value?.receive(event, data)
+      remoteViewerRef.value?.receive(event, event === 'reset' ? data : JSON.parse(data as string)) // TODO: make serialization consistent
     },
     onEnding: () => {
       notify({

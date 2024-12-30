@@ -9,7 +9,8 @@
     "src/renderer/**/*",
     "src/renderer/**/*.vue",
     "src/preload/*.d.ts",
-    "src/interface.d.ts"
+    "src/interface.d.ts",
+    "src/composables/**/*"
   ],
   "compilerOptions": {
     "composite": true,

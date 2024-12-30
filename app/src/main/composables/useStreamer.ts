@@ -1,10 +1,13 @@
 import { dialog } from 'electron'
+import SimplePeer from 'simple-peer'
+import wrtc from 'wrtc'
 
-import { io, type Socket } from 'socket.io-client'
+import { type Socket } from 'socket.io-client'
 import { WindowManager } from '../modules/WindowManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
+import { useScreenPeer } from '../../composables/useScreenPeer.js'
 
-import type { RemoteResetData } from '../../interface.d.ts'
+import type { PeerData, RemoteResetData, TurnCredentials } from '../../interface.d.ts'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -22,6 +25,7 @@ export function useStreamer() {
   
   // Socket connection
   let socket: Socket | undefined
+  let peer: SimplePeer.Instance | undefined
   
   // Streaming control flags
   let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
@@ -40,25 +44,44 @@ export function useStreamer() {
   // Room arguments
   let args: {
     hwnd: string,
-    hostname: string,
     roomid: string,
     roomname: string,
     username: string,
     userid: string,
+    turnCredentials: TurnCredentials,
     color: string,
   } | undefined
 
-  function joinRoom() {
-    if (!joined && args !== undefined) {
-      socket = io(`${args.hostname}`)
-      socket.emit('join', { roomId: args.roomid, role: 'streamer' })
+  async function joinRoom() {
+    if (joined || args === undefined)
+      return
 
-      console.log('joined room:', args.roomid)
-      joined = true
-    }
+    const screenPeer = await useScreenPeer({ roomId: args.roomid, turnCredentials: args.turnCredentials }, 'streamer', wrtc)
+    socket = screenPeer.socket
+    return new Promise((resolve) => {
+      socket!.on('presenterId', (socketId) => {
+        if (peer)
+          return
+
+        peer = screenPeer.initPeer(socketId, false)
+        peer.on('connect', () => {
+          joined = true
+          resolve(true)
+        })
+
+        peer.on('data', (json) => {
+          const data = JSON.parse(json) as PeerData
+          switch (data.type) {
+            case 'close':
+              stopSharing()
+              break
+          }
+        })
+      })
+    })
   }
 
-  function setArgs(hwnd: string, hostname: string, roomname: string, roomid: string, username: string, userid: string) {
+  function setArgs(hwnd: string, roomname: string, roomid: string, username: string, userid: string, turnCredentials: TurnCredentials) {
     // Extract just the number if hwnd is in 'window:number:0' format
     hwnd = String(hwnd).includes(':') 
       ? String(hwnd).split(':')[1]
@@ -67,7 +90,7 @@ export function useStreamer() {
     // Generate a color from username if not provided
     let color = generateColorFromUsername(username)
     
-    args = { hwnd, hostname, roomname, roomid, username, userid, color }
+    args = { hwnd, roomname, roomid, username, userid, turnCredentials, color }
   }
 
   // Helper method to generate consistent colors from username
@@ -105,7 +128,7 @@ export function useStreamer() {
 
       windowManager.selectAndActivateWindow(hwnd)
       startStreaming()
-      remotePresenter.registerEventListener(socket!)
+      remotePresenter.registerEventListener(peer!)
 
       windowManager.checkWindowSizeAndReposition()
 
@@ -116,18 +139,13 @@ export function useStreamer() {
             console.log('window is minimized')
             pauseStreaming(true)
           }
-          else {
-            // pause streaming, if window change position or size
-            if (windowManager.checkWindowSizeAndReposition()) {
-              console.log('window was resized')
-              pauseStreaming(true)
-              // resume streaming, if window is back to normal state
-            }
-            else {
-              if (windowManager.isVisible()) {
-                resumeStreamingIfPaused(true)
-              }
-            }
+          else if (windowManager.checkWindowSizeAndReposition()) {
+            console.log('window was resized')
+            pauseStreaming(true)
+            // resume streaming, if window is back to normal state
+          }
+          else if (windowManager.isVisible()) {
+            resumeStreamingIfPaused(true)
           }
 
           if (!windowManager.isVisible()) {
@@ -145,6 +163,7 @@ export function useStreamer() {
 
   function stopSharing() {
     if (joined) {
+      peer!.destroy()
       socket!.disconnect()
       socket!.close()
     }
@@ -231,7 +250,8 @@ export function useStreamer() {
     }
 
     console.log(JSON.stringify(obj))
-    socket!.emit('reset', JSON.stringify(obj))
+    //socket!.emit('reset', JSON.stringify(obj))
+    peer!.send(JSON.stringify({ type: 'remote', event: 'reset', data: obj }))
 
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
@@ -247,7 +267,8 @@ export function useStreamer() {
         mouseenabled: remotePresenter.mouseEnabled,
         dimensions: windowManager.getWindowOuterDimensions(),
       }
-      socket!.emit('reset', JSON.stringify(message))
+      //socket!.emit('reset', JSON.stringify(message))
+      peer!.send(JSON.stringify({ type: 'remote', event: 'reset', data: message }))
     }, 2000)
   }
 
@@ -260,7 +281,8 @@ export function useStreamer() {
       scalefactor: windowManager.getScaleFactor(),
     }
     // socket!.sendBuffer = [];
-    socket!.volatile.emit('host-info', JSON.stringify(obj))
+    //socket!.volatile.emit('host-info', JSON.stringify(obj))
+    peer!.send(JSON.stringify({ type: 'host-info', data: obj }))
   }
 
   return {

@@ -7,7 +7,7 @@ import { useScreenPresent, type ScreenPresent } from "../composables/useSimplePe
 import type { AcceptedRequestData, ScreenShareData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { notify, prompt } from '../util'
-import { ScreenSource } from '../../interface'
+import { ScreenSource, TurnCredentials } from '../../interface'
 
 interface Request {
   request_id: string
@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
 
 window.electronAPI?.onSendScreenSource((source) => {
   if (screenShareData.value && source) {
-    shareLocalScreen(screenShareData.value.roomName, screenShareData.value.roomId, props.email, props.email, source)
+    shareLocalScreen(screenShareData.value.roomName, screenShareData.value.roomId, screenShareData.value.turnCredentials, source)
   }
 })
 
@@ -204,14 +204,14 @@ async function startSession() {
     screenPresent.value = await useScreenPresent(screenShareData.value, {
       remoteEnabled: !!window.electronAPI,
     })
-    shareLocalScreen(data.roomId, data.roomId, props.email, props.email, undefined)
+    shareLocalScreen(data.roomId, data.roomId, data.turnCredentials, undefined)
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(roomName: string, roomId: string, userName: string, userId: string, source?: ScreenSource, shareAudio = false) {
+async function shareLocalScreen(roomName: string, roomId: string, turnCredentials: TurnCredentials, source?: ScreenSource, shareAudio = false) {
   if (!screenPresent.value)
     return
 
@@ -260,7 +260,7 @@ async function shareLocalScreen(roomName: string, roomId: string, userName: stri
     sessionState.value = 'active'
 
     //source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
-    source && window.electronAPI?.sharingActive(viewCode.value, source, roomName, roomId, userName, userId)
+    source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomName, roomId, userName: props.email, userId: props.email, turnCredentials }))
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }

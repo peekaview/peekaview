@@ -30,10 +30,10 @@ export interface IElectronAPI {
   getScreenSources: () => Promise<ScreenSource[]>,
   selectScreenSource: (source: ScreenSource | undefined) => Promise<void>,
   onSendScreenSource: (callback: (source: ScreenSource) => void) => Electron.IpcRenderer,
-  startRemoteControl: (source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
+  startRemoteControl: (data: StreamerData) => Promise<void>,
   createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
-  sharingActive: (viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => Promise<void>,
+  sharingActive: (viewCode: string, data: string) => Promise<void>,
   handleAppClosing: () => Promise<void>,
   stopSharing: () => Promise<void>,
   pauseSharing: () => Promise<void>,
@@ -45,6 +45,32 @@ export interface ScreenSource {
   id: string
   name: string
   thumbnail: string
+}
+
+export type PeerData = {
+  type: 'identity'
+  name: string
+} | {
+  type: 'remote'
+  event: RemoteEvent
+  data: RemoteData<RemoteEvent>
+} | {
+  type: 'leave' | 'close' | 'reset'
+}
+
+export type TurnCredentials = {
+  urls?: string[]
+  username: string
+  credential: string
+}
+
+export type StreamerData = {
+  source: ScreenSource
+  roomName: string
+  roomId: string
+  userName: string
+  userId: string
+  turnCredentials: TurnCredentials
 }
 
 export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "pastefile" | "cut" | "reset"
@@ -63,9 +89,9 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-up" ? RemoteMouseData
   : T extends "paint-mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
-  : T extends "type" ? { socketid: string, key: string, room: string, name: string, color: string }
-  : T extends "copy" ? { room: string, socketid: string }
-  : T extends "cut" ? { room: string, socketid: string }
+  : T extends "type" ? { key: string }
+  : T extends "copy" ? {}
+  : T extends "cut" ? {}
   : T extends "paste" ? RemotePasteData
   : T extends "pastefile" ? RemotePasteFileData
   : T extends "reset" ? RemoteResetData

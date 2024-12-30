@@ -1,3 +1,6 @@
+import { ScreenPeerData } from "src/composables/useScreenPeer"
+import { TurnCredentials } from "src/interface"
+
 export type AcceptedRequestData = {
   videoServer: string
   controlServer: string
@@ -5,19 +8,11 @@ export type AcceptedRequestData = {
   turnCredentials: TurnCredentials
 }
 
-export type ScreenShareData = {
+export type ScreenShareData = ScreenPeerData & {
   userName: string
   roomName: string
-  roomId: string
   serverUrl: string
   controlServer: string
-  turnCredentials: TurnCredentials
-}
-
-export type TurnCredentials = {
-  urls?: string[]
-  username: string
-  credential: string
 }
 
 export type RemoteControlData = {

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue"
-import { io, type Socket } from "socket.io-client"
+import { onMounted, ref, useTemplateRef, watch } from "vue"
 import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
 
 import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
@@ -49,8 +48,6 @@ const emit = defineEmits<{
 document.addEventListener('contextmenu', event => {
   event.preventDefault()
 })
-
-let socket: Socket
 
 // gedrückte Keys
 let controlpressed = false
@@ -177,22 +174,11 @@ onMounted(() => {
   // get the color for a user
   //fetch("https://" + document.location.hostname.replace('ps-', '') + "/api/clientapi.php?action=color&user=" + user).then(response => response.text()).then(response => { color = response })
 
-  socket = io('wss://' + props.hostname, {
-    transports: ['websocket', 'polling'],
-    withCredentials: true
-  })
-
-  onBeforeUnmount(() => {
-    socket.disconnect()
-    socket.close()
-  })
-
   const sizeInfoEl = document.createElement('div')
   sizeInfoEl.id = 'sizeinfo'
   sizeInfoEl.style.cssText = ''
 
   console.log("connect to controlserver:", props.hostname)
-  socket.emit("join", { roomId: props.room, isPresenter: false })
 
   remoteViewerRef.value?.appendChild(mouseSyncEl)  // display syncmessage
   remoteViewerRef.value?.appendChild(sizeInfoEl)    // show rectangular with sizeinfo
@@ -783,7 +769,7 @@ onMounted(() => {
 
   function handleMouseUp() {
     if (lastMouseDown > 0) {
-      send("mouse-up", obj, true)
+      send("mouse-up", obj, { receiveSelf: true, volatile: true })
       clearTimeout(eventToSend)
       eventToSend = undefined
       lastMouseDown = 0
@@ -816,7 +802,7 @@ onMounted(() => {
       (lastMove < Date.now() - 100) || 
       (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
       lastMove = Date.now()
-      send(controlpressed ? "paint-mouse-move" : "mouse-move", obj, true)
+      send(controlpressed ? "paint-mouse-move" : "mouse-move", obj, { receiveSelf: true, volatile: true })
     }
 
     lastPosX = x
@@ -834,7 +820,7 @@ onMounted(() => {
       console.log(e)
       obj.delta = e.deltaY
       lastWheel = Date.now()
-      send("mouse-wheel", obj)
+      send("mouse-wheel", obj, { receiveSelf: true })
     }
   })
 
@@ -871,7 +857,7 @@ onMounted(() => {
     lastMouseDown = 0
     //lastclick = 0
     console.log("mouse-rightclick")
-    send("mouse-click", obj, true)
+    send("mouse-click", obj, { receiveSelf: true, volatile: true })
   }
 
   function sendMouseDown(e: MouseEvent) {
@@ -900,7 +886,7 @@ onMounted(() => {
         mousedown = true
         
         console.log("mouse-down (immediate due to movement)")
-        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, true)
+        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, { receiveSelf: true, volatile: true })
         
         // Remove this handler since we've triggered the event
         moveHandler && document.removeEventListener('mousemove', moveHandler)
@@ -913,7 +899,7 @@ onMounted(() => {
     eventToSend = window.setTimeout(() => {
       mousedown = true
       console.log("mouse-down")
-      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, true)
+      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, { receiveSelf: true, volatile: true })
     }, 120)
   }
 
@@ -929,10 +915,10 @@ onMounted(() => {
 
     if (mousedown || dragdetected) {
       console.log("mouse-up")
-      send(controlpressed ? "paint-mouse-up" : "mouse-up", obj, true)
+      send(controlpressed ? "paint-mouse-up" : "mouse-up", obj, { receiveSelf: true, volatile: true })
     } else {
       console.log("mouse-leftclick")
-      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastObj, true)
+      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastObj, { receiveSelf: true, volatile: true })
     }
 
     mousedown = false
@@ -1001,13 +987,7 @@ onMounted(() => {
     if (!skip) {
       console.log(keyToSend)
 
-      send('type', {
-        socketid: socket.id!,
-        key: keyToSend,
-        room: props.room,
-        name: props.user,
-        color: props.color
-      })
+      send('type', { key: keyToSend }, { receiveSelf: true })
       e.preventDefault()
     }
   })
@@ -1065,7 +1045,7 @@ onMounted(() => {
               room: props.room,
               name: props.user,
               color: props.color
-            })
+            }, { receiveSelf: true })
           } // data url!
           reader.onerror = (e) => {
             console.error("Error reading file", e);
@@ -1121,7 +1101,7 @@ onMounted(() => {
             name: props.user,
             color: props.color,
             time: Date.now()
-          })
+          }, { receiveSelf: true })
         })
       } else if (item.kind === 'string' && item.type.match('^text/html')) {
         // Drag data item is HTML
@@ -1132,7 +1112,7 @@ onMounted(() => {
             name: props.user,
             color: props.color,
             time: Date.now()
-          })
+          }, { receiveSelf: true })
         })
         //alert('paste html')
       } else if (item.kind === 'file') {
@@ -1144,7 +1124,7 @@ onMounted(() => {
             room: props.room,
             name: props.user,
             color: props.color
-          })
+          }, { receiveSelf: true })
 
           const obj2: Record<string, Blob> = {}
           obj2[item.type] = blob
@@ -1165,16 +1145,14 @@ onMounted(() => {
     if (remoteClipboard)
       send('copy', {
         room: props.room,
-        socketid: socket.id!,
-      })
+      }, { receiveSelf: true })
   })
 
   window.addEventListener('cut', () => {
     if (remoteClipboard)
       send('cut', {
         room: props.room,
-        socketid: socket.id!,
-      })
+      }, { receiveSelf: true })
   })
 
   // Add this near the other event listeners
@@ -1217,26 +1195,29 @@ function isTouchEnabled() {
     (navigator.msMaxTouchPoints > 0)*/
 }
 
-function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, volatile = false) {
-  if (volatile)
-    socket.volatile.emit(event, JSON.stringify(data))
-  else
-    socket.emit(event, JSON.stringify(data))
-
-  //emit('send', { event, data, volatile })
+type SendOptions = {
+  volatile?: boolean
+  receiveSelf?: boolean
 }
 
-const receiveEvents: Partial<Record<RemoteEvent, (data: RemoteData<RemoteEvent>) => void>> = {}
+function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
+  emit('send', { event, data, volatile: options.volatile ?? false })
+  if (options.receiveSelf)
+    receive(event, data)
+}
+
+type ReceiveEventHandlers = {
+  [K in RemoteEvent]: (data: RemoteData<K>) => void
+}
+
+const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
 function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
   receiveEvents[event]?.(data)
 }
 
 function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
-  socket.on<RemoteEvent>(event, data => 
-    handler(event === 'reset' ? data : JSON.parse(data)) // TODO: make serialization consistent
-  )
-  //receiveEvents[event] = handler
+  receiveEvents[event] = handler as ReceiveEventHandlers[T]
 }
 
 defineExpose({

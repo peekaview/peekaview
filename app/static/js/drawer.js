@@ -23,20 +23,17 @@ window.onload = function () {
 
 
     electron.ipcRenderer.on('mouse-down', async function (e, args) {
+        //electron.ipcRenderer.invoke('log', ["drawer mouse-down", args]);
         var obj = JSON.parse(args);
-        console.log("mouse-down");
-        console.log(args);
         startStroke(obj.id, [obj.x, obj.y]);
     });
     electron.ipcRenderer.on('mouse-up', async function (e, args) {
-        var obj = JSON.parse(args);
-        console.log("mouse-up");
+        //electron.ipcRenderer.invoke('log', ["drawer mouse-up", args]);
         drawing = false;
     });
     electron.ipcRenderer.on('mouse-move', async function (e, args) {
+        //electron.ipcRenderer.invoke('log', ["drawer mouse-move", args]);
         var obj = JSON.parse(args);
-        console.log("mouse-move");
-        console.log(args);
         if (drawing) {
             continueStroke(obj.id, obj.color, [obj.x, obj.y]);
         }

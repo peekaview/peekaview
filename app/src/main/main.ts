@@ -24,7 +24,7 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
-import { ScreenSource } from '../interface.js'
+import { ScreenSource, StreamerData } from '../interface.js'
 import { resolvePath } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -405,23 +405,23 @@ interface StoreSchema {
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) {
-    if (!source) {
+  async function startRemoteControl(data: StreamerData) {
+    if (!data.source) {
       log.error('Invalid sourceId or name for remote control')
       return
     }
-    let sourceId = source.id
-    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', source.name)
+    let sourceId = data.source.id
+    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
 
     if (process.platform === 'darwin') {
       windowManager = new WindowManager()
-      sourceId = await windowManager.getHwndForWindowByTitleAndId(source.name, sourceId)
+      sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
     }
 
     // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
     streamer = useStreamer()
-    streamer.setArgs(sourceId, import.meta.env.VITE_RTC_CONTROL_SERVER, roomName, roomId, userName, userId)
-    streamer.joinRoom()
+    streamer.setArgs(sourceId, data.roomName, data.roomId, data.userName, data.userId, data.turnCredentials)
+    await streamer.joinRoom()
     streamer.startSharing()
   }
 
@@ -539,8 +539,8 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  /*ipcMain.handle('start-remote-control', async (_event, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
-    startRemoteControl(source, roomName, roomId, userName, userId)
+  /*ipcMain.handle('start-remote-control', async (_event, data: StreamerData) => {
+    startRemoteControl(data)
   })*/
 
   let currentViewCode: string | undefined
@@ -565,11 +565,12 @@ interface StoreSchema {
     })
   }
 
-  ipcMain.handle('sharing-active', async (_event, viewCode: string, source: ScreenSource, roomName: string, roomId: string, userName: string, userId: string) => {
-    log.info('sharing-active handler called with source:', source.id)
+  ipcMain.handle('sharing-active', async (_event, viewCode: string, data: string) => {
+    const streamerData = JSON.parse(data) as StreamerData
+    log.info('sharing-active handler called with source:', streamerData.source.id)
     
     currentViewCode = viewCode
-    startRemoteControl(source, roomName, roomId, userName, userId)
+    startRemoteControl(streamerData)
     
     customDialog.playSoundOnOpen('ping.wav')
     customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})

@@ -7,12 +7,13 @@ import {
   Button,
 } from '@nut-tree-fork/nut-js'
 import { BrowserWindow, screen } from 'electron'
-// import SocketIO from 'socket.io-client';
+import SimplePeer from 'simple-peer'
 // import { fileTypeFromBlob } from 'file-type';
+
 // import { Streamer } from "./Streamer.js";
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath } from '../util.js'
-import { Socket } from 'socket.io-client'
+import { PeerData } from '../../interface.d'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -45,7 +46,7 @@ export function useRemotePresenter() {
   let lastMousePos = new Point(0, 0)
   let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
-  let socket
+  let peer: SimplePeer.Instance | undefined
 
   function deactivate() {
     if (cursorCheckInterval) {
@@ -84,26 +85,26 @@ export function useRemotePresenter() {
   function enableMouse() {
     console.log('Enabling mouse control')
     mouseEnabled = true
-    socket.emit('mouse-control', { enabled: true })
+    peer?.send(JSON.stringify({ type: 'mouse-control', data: { enabled: true } }))
   }
 
   function disableMouse() {
     console.log('Disabling mouse control')
     mouseEnabled = false
     hideOverlays()
-    socket.emit('mouse-control', { enabled: false })
+    peer?.send(JSON.stringify({ type: 'mouse-control', data: { enabled: false } }))
   }
 
   function enableRemoteControl() {
     console.log('Enabling remote control')
     remoteControlInputEnabled = true
-    socket.emit('remote-control', { enabled: true })
+    peer?.send(JSON.stringify({ type: 'remote-control', data: { enabled: true } }))
   }
 
   function disableRemoteControl() {
     console.log('Disabling remote control')
     remoteControlInputEnabled = false
-    socket.emit('remote-control', { enabled: false })
+    peer?.send(JSON.stringify({ type: 'remote-control', data: { enabled: false } }))
   }
 
   function showoverlayCursorSignal(id: string, name: string, color: string) {
@@ -150,8 +151,7 @@ export function useRemotePresenter() {
   }
 
   function showDrawCanvas(action: string, data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id || !remoteControlActive)
+    if (!data.id || !remoteControlActive)
       return
 
     if (!overlayDrawer) {
@@ -184,7 +184,7 @@ export function useRemotePresenter() {
       // overlayDrawer.setAlwaysOnTop(true, 'screen-saver');
       overlayDrawer.loadFile(resolvePath('static/drawer.html'))
     }
-    overlayDrawer.webContents.send(action, data)
+    overlayDrawer.webContents.send(action, JSON.stringify(data))
   }
 
   function showoverlayCursorWindow(id: string, name: string, color: string) {
@@ -271,120 +271,111 @@ export function useRemotePresenter() {
   }
 
   function mouseMove(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
-    if (!overlayCursor[obj.id]) {
-      console.log(obj)
-      console.log(`show cursor ${obj.id}`)
-      showoverlayCursorWindow(obj.id, obj.name, obj.color)
+    if (!overlayCursor[data.id]) {
+      console.log(data)
+      console.log(`show cursor ${data.id}`)
+      showoverlayCursorWindow(data.id, data.name, data.color)
     }
 
-    overlayCursorLastAction[obj.id] = Date.now()
+    overlayCursorLastAction[data.id] = Date.now()
 
-    if (overlayCursor[obj.id])
-      overlayCursor[obj.id].setPosition(obj.x + windowBorders.left - 210, obj.y + windowBorders.top - 10)
+    if (overlayCursor[data.id])
+      overlayCursor[data.id].setPosition(data.x + windowBorders.left - 210, data.y + windowBorders.top - 10)
 
-    lastTargetPoints[obj.id] = new Point(obj.x + windowBorders.left, obj.y + windowBorders.top)
-    if (mousePressed[obj.id])
-      mouse.setPosition(mousePosition(obj))
+    lastTargetPoints[data.id] = new Point(data.x + windowBorders.left, data.y + windowBorders.top)
+    if (mousePressed[data.id])
+      mouse.setPosition(mousePosition(data))
   }
 
   function mouseSignal(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
-    showoverlayCursorSignal(obj.id, obj.name, obj.color)
+    showoverlayCursorSignal(data.id, data.name, data.color)
   }
 
   function mouseWheel(data: any) {
-    const obj = JSON.parse(data)
-
-    console.log(`scroll ${obj.delta}`)
-    if (obj.delta < 0)
+    console.log(`scroll ${data.delta}`)
+    if (data.delta < 0)
       keyboard.type(Key.PageUp)
     else
       keyboard.type(Key.PageDown)
   }
 
   function mouseLeftClick(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
-    if (overlayCursorSignal[obj.id]) {
-      overlayCursorSignal[obj.id].close()
-      delete overlayCursorSignal[obj.id]
+    if (overlayCursorSignal[data.id]) {
+      overlayCursorSignal[data.id].close()
+      delete overlayCursorSignal[data.id]
     }
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[obj.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.id]}`)
 
     mouseMove(data)
-    mouse.setPosition(mousePosition(obj))
-    setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[obj.id] = false;}, 50)
+    mouse.setPosition(mousePosition(data))
+    setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[data.id] = false;}, 50)
   }
 
   function mouseDblClick(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[obj.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.id]}`)
     mouseMove(data)
-    mouse.setPosition(mousePosition(obj))
+    mouse.setPosition(mousePosition(data))
     setTimeout(() => { console.log('dblclick1'); mouse.leftClick() }, 50)
     setTimeout(() => { console.log('dblclick2'); mouse.leftClick() }, 100)
     setTimeout(() => { mouse.setPosition(lastMousePos) }, 250)
   }
 
   function mouseClick(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[obj.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.id]}`)
     mouseMove(data)
-    mouse.setPosition(mousePosition(obj))
+    mouse.setPosition(mousePosition(data))
     setTimeout(() => { console.log('rightClick'); mouse.rightClick() }, 50)
     setTimeout(() => { mouse.setPosition(lastMousePos) }, 200)
   }
 
   function mouseDown(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
     mouseMove(data)
-    mouse.setPosition(mousePosition(obj))
+    mouse.setPosition(mousePosition(data))
 
-    if (!mousePressed[obj.id]) {
-      console.log(`setposition: ${lastTargetPoints[obj.id]}`)
-      mouse.setPosition(convertObjToAbsolutePosition(obj))
+    if (!mousePressed[data.id]) {
+      console.log(`setposition: ${lastTargetPoints[data.id]}`)
+      mouse.setPosition(convertObjToAbsolutePosition(data))
       setTimeout(() => { console.log('mouseDown'); mouse.pressButton(Button.LEFT) }, 50)
     }
-    mousePressed[obj.id] = true
+    mousePressed[data.id] = true
   }
 
   function mouseUp(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.id)
+    if (!data.id)
       return
 
-    if (mousePressed[obj.id]) {
-      console.log(`setposition: ${lastTargetPoints[obj.id]}`)
+    if (mousePressed[data.id]) {
+      console.log(`setposition: ${lastTargetPoints[data.id]}`)
       mouseMove(data)
-      mouse.setPosition(mousePosition(obj))
+      mouse.setPosition(mousePosition(data))
       setTimeout(() => { console.log('mouseUp'); mouse.releaseButton(Button.LEFT) }, 50)
-      mousePressed[obj.id] = false
+      mousePressed[data.id] = false
 
       setTimeout(() => { mouse.setPosition(lastMousePos) }, 200)
     }
@@ -395,7 +386,6 @@ export function useRemotePresenter() {
 
     console.log(data)
 
-    const obj = JSON.parse(data);
     const tmpclipboard = await clipboard.getContent()
     await keyboard.pressKey(controlkey, Key.C)
     await keyboard.releaseKey(controlkey, Key.C)
@@ -410,11 +400,10 @@ export function useRemotePresenter() {
     }
 
     const sendobj = {
-      socketid: obj.socketid,
-      room: obj.room,
+      room: data.room,
       text: remoteclipboard,
     }
-    socket.volatile.emit('getclipboard', sendobj)
+    peer?.send(JSON.stringify({ type: 'getclipboard', data: sendobj }))
 
     // @ts-ignore: nut-js does not support clipboard.copy
     await clipboard.copy(tmpclipboard)
@@ -456,7 +445,7 @@ export function useRemotePresenter() {
     clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
     clipboardWindow.loadFile(resolvePath('static/clipboard.html'))
     //clipboardWindow.webContents.openDevTools();
-    clipboardWindow.webContents.send('pasteFromFile', data)
+    clipboardWindow.webContents.send('pasteFromFile', JSON.stringify(data))
     clipboardWindow.show()
 
     clipboardWindow.on('closed', () => {
@@ -465,20 +454,19 @@ export function useRemotePresenter() {
   }
 
   function pasteFromClipboard(data: any) {
-    const obj = JSON.parse(data)
-    if (obj.filecontent)
+    if (data.filecontent)
       return
 
     if (!remoteControlActive || !remoteControlInputEnabled) {
-      const obj2 = { filecontent: `data:text/plain;base64,${btoa(obj.text)}` }
+      const obj2 = { filecontent: `data:text/plain;base64,${btoa(data.text)}` }
       pasteFromFile(JSON.stringify(obj2))
     }
     else {
-      console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${obj.time}`)
-      if (obj.time > localClipboardTime) {
+      console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
+      if (data.time > localClipboardTime) {
         (async () => {
           const tmpclipboard = await clipboard.getContent()
-          await clipboard.setContent(obj.text)
+          await clipboard.setContent(data.text)
           await keyboard.pressKey(controlkey, Key.V)
           await keyboard.releaseKey(controlkey, Key.V)
           await clipboard.setContent(tmpclipboard)
@@ -488,13 +476,12 @@ export function useRemotePresenter() {
   }
 
   function typeKey(data: any) {
-    const obj = JSON.parse(data)
-    if (!obj.key)
+    if (!data.key)
       return
 
 
-    console.log(obj.key)
-    const key = obj.key
+    console.log(data.key)
+    const key = data.key
     const specialkeys = [
       // Original characters
       '@', ';', ':', '_', '°', '^', '!', '"', '§', '$', '%', '&', '/', '=', '?', '`', '´', 
@@ -727,112 +714,97 @@ export function useRemotePresenter() {
     return new Point(posx, posy)
   }
 
-  function registerEventListener(newSocket: Socket) {
+  function registerEventListener(newPeer: SimplePeer.Instance) {
     console.log('register eventlistener')
-    socket = newSocket
-
-    socket.on('copy', (data) => {
-      if (remoteControlInputEnabled)
-        copyToClipboard(data, false)
-    })
-
-    socket.on('paste', (data) => {
-      //if (remoteControlInputEnabled)
-      pasteFromClipboard(data)
-    })
-
-    socket.on('pastefile', (data) => {
-      if (mouseEnabled)
-        pasteFromFile(data)
-    })
-
-    socket.on('cut', (data) => {
-      if (remoteControlInputEnabled)
-        copyToClipboard(data, true)
-    })
-
-    socket.on('mouse-move', (data) => {
-      if (mouseEnabled) {
-        mouseMove(data)
-        showDrawCanvas('mouse-move', data)
-      }
-    })
-
-    socket.on('paint-mouse-move', (data) => {
-      if (mouseEnabled)
-        mouseMove(data)
-        showDrawCanvas('mouse-move', data)
-    })
-
-    socket.on('mouse-click', (data) => {
-      console.log('mouse-click')
-      if (remoteControlInputEnabled)
-        mouseClick(data)
-    })
-
-    socket.on('mouse-dblclick', (data) => {
-      console.log('mouse-dblclick')
-      if (remoteControlInputEnabled)
-        mouseDblClick(data)
-    })
-
-    socket.on('mouse-leftclick', (data) => {
-      console.log('mouse-leftclick')
-      if (remoteControlInputEnabled) {
-        if (!isMac)
-          mouseSignal(data)
-
-        mouseLeftClick(data)
-      }
-      else if (mouseEnabled) {
-        mouseSignal(data)
-      }
-    })
-
-    socket.on('paint-mouse-leftclick', (data) => {
-      console.log('paint-mouse-leftclick')
-      if (mouseEnabled)
-        mouseSignal(data)
-    })
-
-    socket.on('mouse-down', (data) => {
-      console.log('mouse-down')
-      if (remoteControlInputEnabled)
-        mouseDown(data)
-      else if (mouseEnabled)
-        showDrawCanvas('mouse-down', data)
-    })
-
-    socket.on('paint-mouse-down', (data) => {
-      console.log('paint-mouse-down')
-      if (mouseEnabled)
-        showDrawCanvas('mouse-down', data)
-    })
-
-    socket.on('mouse-wheel', (data) => {
-      console.log('mouse-wheel')
-      if (remoteControlInputEnabled)
-        mouseWheel(data)
-    })
-
-    socket.on('mouse-up', (data) => {
-      console.log('mouse-up')
-      if (remoteControlInputEnabled)
-        mouseUp(data)
-      else if (mouseEnabled)
-        showDrawCanvas('mouse-up', data)
-    })
-
-    socket.on('paint-mouse-up', (data) => {
-      console.log('paint-mouse-up')
-      if (mouseEnabled)
-        showDrawCanvas('mouse-up', data)
-    })
+    peer = newPeer
 
     keyboard.config.autoDelayMs = 5
-    socket.on('type', (data) => {
-      if (remoteControlInputEnabled)
-        typeKey(data)
+    peer.on('data', (json) => {
+      const data = JSON.parse(json) as PeerData
+      if (data.type !== 'remote')
+        return
+
+      switch (data.event) {
+        case 'copy':
+          if (remoteControlInputEnabled)
+            copyToClipboard(data.data, false)
+          break
+        case 'paste':
+          //if (remoteControlInputEnabled)
+            pasteFromClipboard(data.data)
+          break
+        case 'pastefile':
+          if (mouseEnabled)
+            pasteFromFile(data.data)
+          break
+        case 'cut':
+          if (remoteControlInputEnabled)
+            copyToClipboard(data.data, true)
+          break
+        case 'mouse-move':
+          if (mouseEnabled) {
+            mouseMove(data.data)
+            showDrawCanvas('mouse-move', data.data)
+          }
+          break
+        case 'paint-mouse-move':
+          if (mouseEnabled) {
+            mouseMove(data.data)
+            showDrawCanvas('mouse-move', data.data)
+          }
+          break
+        case 'mouse-click':
+          if (remoteControlInputEnabled)
+            mouseClick(data.data)
+          break
+        case 'mouse-dblclick':
+          if (remoteControlInputEnabled)
+            mouseDblClick(data.data)
+          break
+        case 'mouse-leftclick':
+          if (remoteControlInputEnabled) {
+            if (!isMac)
+              mouseSignal(data.data)
+    
+            mouseLeftClick(data.data)
+          }
+          else if (mouseEnabled) {
+            mouseSignal(data.data)
+          }
+          break
+        case 'paint-mouse-leftclick':
+          if (mouseEnabled)
+            mouseSignal(data.data)
+          break
+        case 'mouse-down':
+          if (remoteControlInputEnabled)
+            mouseDown(data.data)
+          else if (mouseEnabled)
+            showDrawCanvas('mouse-down', data.data)
+          break;
+        case 'paint-mouse-down':
+          if (mouseEnabled)
+            showDrawCanvas('mouse-down', data.data)
+          break;
+        case 'mouse-wheel':
+          if (remoteControlInputEnabled)
+            mouseWheel(data.data)
+          break;
+        case 'mouse-up':
+          if (remoteControlInputEnabled)
+            mouseUp(data.data)
+          else if (mouseEnabled)
+            showDrawCanvas('mouse-up', data.data)
+          break;
+        case 'paint-mouse-up':
+          if (mouseEnabled)
+            showDrawCanvas('mouse-up', data.data)
+          break;
+        case 'type':
+          if (remoteControlInputEnabled)
+            typeKey(data.data)
+          break;
+      }
     })
   }
 
