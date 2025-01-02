@@ -22,7 +22,7 @@ import fs from 'fs'
 import { useCustomDialog, type DialogOptions } from './composables/useCustomDialog'
 import { useStreamer, type Streamer } from './composables/useStreamer'
 
-import { WindowManager } from './modules/WindowManager'
+//import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
 import { RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface.js'
 import { resolvePath } from './util'
@@ -75,7 +75,7 @@ interface StoreSchema {
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
-  let windowManager: WindowManager | undefined
+  //let windowManager: WindowManager | undefined
 
   let tray: Tray
 
