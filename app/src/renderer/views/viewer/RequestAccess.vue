@@ -2,9 +2,10 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData, ScreenShareData } from '../../types'
+import type { AcceptedRequestData } from '../../types'
 import { callApi } from '../../api'
 import { notify } from '../../util'
+import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"

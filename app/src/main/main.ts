@@ -24,7 +24,7 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 
 import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
-import { ScreenSource, StreamerData } from '../interface.js'
+import { RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface.js'
 import { resolvePath } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -418,11 +418,8 @@ interface StoreSchema {
       sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
     }
 
-    // Todo: replace hard coded roomname, roomid, username, userid with the ones from api
-    streamer = useStreamer()
-    streamer.setArgs(sourceId, data.roomName, data.roomId, data.userName, data.userId, data.turnCredentials)
-    await streamer.joinRoom()
-    streamer.startSharing()
+    streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
+    streamer.startSharing(sourceId, data.roomId)
   }
 
   function stopSharing() {
@@ -498,7 +495,11 @@ interface StoreSchema {
   })
 
   ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
-    appWindow?.webContents.send('on-reply-dialog', id, result)
+    appWindow?.webContents.send('reply-dialog', id, result)
+  })
+
+  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
+    streamer?.onRemote(event, data)
   })
 
   ipcMain.handle('open-screen-source-selection', async () => {

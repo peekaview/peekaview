@@ -7,13 +7,12 @@ import {
   Button,
 } from '@nut-tree-fork/nut-js'
 import { BrowserWindow, screen } from 'electron'
-import SimplePeer from 'simple-peer'
 // import { fileTypeFromBlob } from 'file-type';
 
 // import { Streamer } from "./Streamer.js";
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath } from '../util.js'
-import { PeerData } from '../../interface.d'
+import { RemoteData, RemoteEvent } from '../../interface.d'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -21,7 +20,7 @@ const isMac = process.platform === 'darwin'
 
 const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 
-export function useRemotePresenter() {
+export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) {
   const overlayCursor: Record<string, BrowserWindow> = {}
   const overlayCursorLastAction: Record<string, number> = {}
   const overlayCursorSignal: Record<string, BrowserWindow> = {}
@@ -46,7 +45,6 @@ export function useRemotePresenter() {
   let lastMousePos = new Point(0, 0)
   let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
-  let peer: SimplePeer.Instance | undefined
 
   function deactivate() {
     if (cursorCheckInterval) {
@@ -85,26 +83,26 @@ export function useRemotePresenter() {
   function enableMouse() {
     console.log('Enabling mouse control')
     mouseEnabled = true
-    peer?.send(JSON.stringify({ type: 'mouse-control', data: { enabled: true } }))
+    sendRemote('mouse-control', { enabled: true })
   }
 
   function disableMouse() {
     console.log('Disabling mouse control')
     mouseEnabled = false
     hideOverlays()
-    peer?.send(JSON.stringify({ type: 'mouse-control', data: { enabled: false } }))
+    sendRemote('mouse-control', { enabled: false })
   }
 
   function enableRemoteControl() {
     console.log('Enabling remote control')
     remoteControlInputEnabled = true
-    peer?.send(JSON.stringify({ type: 'remote-control', data: { enabled: true } }))
+    sendRemote('remote-control', { enabled: true })
   }
 
   function disableRemoteControl() {
     console.log('Disabling remote control')
     remoteControlInputEnabled = false
-    peer?.send(JSON.stringify({ type: 'remote-control', data: { enabled: false } }))
+    sendRemote('remote-control', { enabled: false })
   }
 
   function showoverlayCursorSignal(id: string, name: string, color: string) {
@@ -403,7 +401,7 @@ export function useRemotePresenter() {
       room: data.room,
       text: remoteclipboard,
     }
-    peer?.send(JSON.stringify({ type: 'getclipboard', data: sendobj }))
+    sendRemote('getclipboard', sendobj)
 
     // @ts-ignore: nut-js does not support clipboard.copy
     await clipboard.copy(tmpclipboard)
@@ -454,12 +452,13 @@ export function useRemotePresenter() {
   }
 
   function pasteFromClipboard(data: any) {
+    console.log("pasteFromClipboard", data)
     if (data.filecontent)
       return
 
     if (!remoteControlActive || !remoteControlInputEnabled) {
       const obj2 = { filecontent: `data:text/plain;base64,${btoa(data.text)}` }
-      pasteFromFile(JSON.stringify(obj2))
+      pasteFromFile(obj2)
     }
     else {
       console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
@@ -714,98 +713,89 @@ export function useRemotePresenter() {
     return new Point(posx, posy)
   }
 
-  function registerEventListener(newPeer: SimplePeer.Instance) {
-    console.log('register eventlistener')
-    peer = newPeer
-
+  function onRemote<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
     keyboard.config.autoDelayMs = 5
-    peer.on('data', (json) => {
-      const data = JSON.parse(json) as PeerData
-      if (data.type !== 'remote')
-        return
-
-      switch (data.event) {
-        case 'copy':
-          if (remoteControlInputEnabled)
-            copyToClipboard(data.data, false)
-          break
-        case 'paste':
-          //if (remoteControlInputEnabled)
-            pasteFromClipboard(data.data)
-          break
-        case 'pastefile':
-          if (mouseEnabled)
-            pasteFromFile(data.data)
-          break
-        case 'cut':
-          if (remoteControlInputEnabled)
-            copyToClipboard(data.data, true)
-          break
-        case 'mouse-move':
-          if (mouseEnabled) {
-            mouseMove(data.data)
-            showDrawCanvas('mouse-move', data.data)
-          }
-          break
-        case 'paint-mouse-move':
-          if (mouseEnabled) {
-            mouseMove(data.data)
-            showDrawCanvas('mouse-move', data.data)
-          }
-          break
-        case 'mouse-click':
-          if (remoteControlInputEnabled)
-            mouseClick(data.data)
-          break
-        case 'mouse-dblclick':
-          if (remoteControlInputEnabled)
-            mouseDblClick(data.data)
-          break
-        case 'mouse-leftclick':
-          if (remoteControlInputEnabled) {
-            if (!isMac)
-              mouseSignal(data.data)
-    
-            mouseLeftClick(data.data)
-          }
-          else if (mouseEnabled) {
-            mouseSignal(data.data)
-          }
-          break
-        case 'paint-mouse-leftclick':
-          if (mouseEnabled)
-            mouseSignal(data.data)
-          break
-        case 'mouse-down':
-          if (remoteControlInputEnabled)
-            mouseDown(data.data)
-          else if (mouseEnabled)
-            showDrawCanvas('mouse-down', data.data)
-          break;
-        case 'paint-mouse-down':
-          if (mouseEnabled)
-            showDrawCanvas('mouse-down', data.data)
-          break;
-        case 'mouse-wheel':
-          if (remoteControlInputEnabled)
-            mouseWheel(data.data)
-          break;
-        case 'mouse-up':
-          if (remoteControlInputEnabled)
-            mouseUp(data.data)
-          else if (mouseEnabled)
-            showDrawCanvas('mouse-up', data.data)
-          break;
-        case 'paint-mouse-up':
-          if (mouseEnabled)
-            showDrawCanvas('mouse-up', data.data)
-          break;
-        case 'type':
-          if (remoteControlInputEnabled)
-            typeKey(data.data)
-          break;
-      }
-    })
+    switch (event) {
+      case 'copy':
+        if (remoteControlInputEnabled)
+          copyToClipboard(data, false)
+        break
+      case 'paste':
+        //if (remoteControlInputEnabled)
+          pasteFromClipboard(data)
+        break
+      case 'pastefile':
+        if (mouseEnabled)
+          pasteFromFile(data)
+        break
+      case 'cut':
+        if (remoteControlInputEnabled)
+          copyToClipboard(data, true)
+        break
+      case 'mouse-move':
+        if (mouseEnabled) {
+          mouseMove(data)
+          showDrawCanvas('mouse-move', data)
+        }
+        break
+      case 'paint-mouse-move':
+        if (mouseEnabled) {
+          mouseMove(data)
+          showDrawCanvas('mouse-move', data)
+        }
+        break
+      case 'mouse-click':
+        if (remoteControlInputEnabled)
+          mouseClick(data)
+        break
+      case 'mouse-dblclick':
+        if (remoteControlInputEnabled)
+          mouseDblClick(data)
+        break
+      case 'mouse-leftclick':
+        if (remoteControlInputEnabled) {
+          if (!isMac)
+            mouseSignal(data)
+  
+          mouseLeftClick(data)
+        }
+        else if (mouseEnabled) {
+          mouseSignal(data)
+        }
+        break
+      case 'paint-mouse-leftclick':
+        if (mouseEnabled)
+          mouseSignal(data)
+        break
+      case 'mouse-down':
+        if (remoteControlInputEnabled)
+          mouseDown(data)
+        else if (mouseEnabled)
+          showDrawCanvas('mouse-down', data)
+        break;
+      case 'paint-mouse-down':
+        if (mouseEnabled)
+          showDrawCanvas('mouse-down', data)
+        break;
+      case 'mouse-wheel':
+        if (remoteControlInputEnabled)
+          mouseWheel(data)
+        break;
+      case 'mouse-up':
+        if (remoteControlInputEnabled)
+          mouseUp(data)
+        else if (mouseEnabled)
+          showDrawCanvas('mouse-up', data)
+        break;
+      case 'paint-mouse-up':
+        if (mouseEnabled)
+          showDrawCanvas('mouse-up', data)
+        break;
+      case 'type':
+        if (remoteControlInputEnabled)
+          typeKey(data)
+        break;
+    }
   }
 
   /*
@@ -844,6 +834,6 @@ export function useRemotePresenter() {
     disableRemoteControl,
     toggleRemoteControl,
     hideRemoteControl,
-    registerEventListener,
+    onRemote,
   }
 }

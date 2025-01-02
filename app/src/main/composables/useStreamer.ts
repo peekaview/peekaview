@@ -1,13 +1,9 @@
 import { dialog } from 'electron'
-import SimplePeer from 'simple-peer'
-import wrtc from 'wrtc'
 
-import { type Socket } from 'socket.io-client'
 import { WindowManager } from '../modules/WindowManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
-import { useScreenPeer } from '../../composables/useScreenPeer.js'
 
-import type { PeerData, RemoteResetData, TurnCredentials } from '../../interface.d.ts'
+import type { RemoteData, RemoteEvent, RemoteResetData } from '../../interface.d.ts'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -18,18 +14,13 @@ const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 100
 
 export type Streamer = ReturnType<typeof useStreamer>
 
-export function useStreamer() {
+export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) {
   // Dependencies
   const windowManager = new WindowManager()
-  const remotePresenter = useRemotePresenter()
-  
-  // Socket connection
-  let socket: Socket | undefined
-  let peer: SimplePeer.Instance | undefined
+  const remotePresenter = useRemotePresenter(sendRemote)
   
   // Streaming control flags
   let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
-  let joined = false
   
   // Intervals
   let checkWindowInterval: NodeJS.Timeout | undefined
@@ -40,87 +31,17 @@ export function useStreamer() {
     mouseEnabled: boolean;
     remoteControlInputEnabled: boolean;
   } | undefined
-  
-  // Room arguments
-  let args: {
-    hwnd: string,
-    roomid: string,
-    roomname: string,
-    username: string,
-    userid: string,
-    turnCredentials: TurnCredentials,
-    color: string,
-  } | undefined
 
-  async function joinRoom() {
-    if (joined || args === undefined)
-      return
+  let hwnd: string | undefined
+  let roomid: string | undefined
 
-    const screenPeer = await useScreenPeer({ roomId: args.roomid, turnCredentials: args.turnCredentials }, 'streamer', wrtc)
-    socket = screenPeer.socket
-    return new Promise((resolve) => {
-      socket!.on('presenterId', (socketId) => {
-        if (peer)
-          return
-
-        peer = screenPeer.initPeer(socketId, false)
-        peer.on('connect', () => {
-          joined = true
-          resolve(true)
-        })
-
-        peer.on('data', (json) => {
-          const data = JSON.parse(json) as PeerData
-          switch (data.type) {
-            case 'close':
-              stopSharing()
-              break
-          }
-        })
-      })
-    })
-  }
-
-  function setArgs(hwnd: string, roomname: string, roomid: string, username: string, userid: string, turnCredentials: TurnCredentials) {
-    // Extract just the number if hwnd is in 'window:number:0' format
-    hwnd = String(hwnd).includes(':') 
-      ? String(hwnd).split(':')[1]
+  async function startSharing(sourceId: string, roomId: string) {
+    hwnd = sourceId.includes(':') 
+      ? sourceId.split(':')[1]
       : hwnd
-
-    // Generate a color from username if not provided
-    let color = generateColorFromUsername(username)
-    
-    args = { hwnd, roomname, roomid, username, userid, turnCredentials, color }
-  }
-
-  // Helper method to generate consistent colors from username
-  function generateColorFromUsername(username: string) {
-    let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    // Convert to hex color, ensuring good contrast and saturation
-    return Math.abs(hash).toString(16).substring(0, 6).padEnd(6, 'f')
-  }
-
-  async function startSharing() {
-    if (args === undefined || !joined)
-      return
-
-    const hwnd = `${args.hwnd}`
-    //const windowtitle = args.windowtitle
+    roomid = roomId
 
     console.log(`hwndstreamer:${hwnd}`)
-
-    /* const { desktopCapturer } = require('electron')
-    desktopCapturer.getSources({ types: ['window', 'screen'] }).then(async (sources) => {
-      for (const source of sources) {
-        if ((!isMac || source.id.split(':')[0] == 'screen') && source.id.split(':')[1] === hwnd)
-          showStreamerOverlay(source.id)
-        if (isMac && source.name.replace(/[^a-zA-Z0-9]/g, '').startsWith(windowtitle.replace(/[^a-zA-Z0-9]/g, '')))
-          showStreamerOverlay(source.id)
-      }
-    }) */
 
     const windowList = await windowManager.getWindowList()
     if (windowList.includes(hwnd) || hwnd == '0') {
@@ -128,7 +49,6 @@ export function useStreamer() {
 
       windowManager.selectAndActivateWindow(hwnd)
       startStreaming()
-      remotePresenter.registerEventListener(peer!)
 
       windowManager.checkWindowSizeAndReposition()
 
@@ -162,12 +82,6 @@ export function useStreamer() {
   }
 
   function stopSharing() {
-    if (joined) {
-      peer!.destroy()
-      socket!.disconnect()
-      socket!.close()
-    }
-
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
       resetInterval = undefined
@@ -222,26 +136,26 @@ export function useStreamer() {
   }
 
   function startStreaming() {
-    if (args !== undefined && streamingState === 'stopped') {
+    if (hwnd !== undefined && streamingState === 'stopped') {
       console.log("startStreaming")
 
       sendReset()
 
       streamingState = 'active'
 
-      windowManager.selectWindow(args.hwnd)
+      windowManager.selectWindow(hwnd)
       windowManager.showRecordOverlay()
       //windowManager.showDebugOverlay(args)
-      remotePresenter.activate(args.hwnd)
+      remotePresenter.activate(hwnd)
     }
   }
 
   function sendReset() {
-    if (args === undefined)
+    if (roomid === undefined)
       return
 
     const obj = {
-      room: args.roomid,
+      room: roomid,
       scalefactor: windowManager.getScaleFactor(),
       iscreen: windowManager.isScreen(),
       remotecontrol: remotePresenter.remoteControlInputEnabled,
@@ -249,9 +163,7 @@ export function useStreamer() {
       dimensions: windowManager.getWindowOuterDimensions(),
     }
 
-    console.log(JSON.stringify(obj))
-    //socket!.emit('reset', JSON.stringify(obj))
-    peer!.send(JSON.stringify({ type: 'remote', event: 'reset', data: obj }))
+    sendRemote('reset', obj)
 
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
@@ -260,40 +172,28 @@ export function useStreamer() {
 
     resetInterval = setInterval(() => {
       const message: RemoteResetData = {
-        room: args!.roomid,
+        room: roomid!,
         scalefactor: windowManager.getScaleFactor(),
         iscreen: windowManager.isScreen(),
         remotecontrol: remotePresenter.remoteControlInputEnabled,
         mouseenabled: remotePresenter.mouseEnabled,
         dimensions: windowManager.getWindowOuterDimensions(),
       }
-      //socket!.emit('reset', JSON.stringify(message))
-      peer!.send(JSON.stringify({ type: 'remote', event: 'reset', data: message }))
+      sendRemote('reset', message)
     }, 2000)
   }
 
-  function sendScaleFactor() {
-    if (args === undefined)
-      return
-
-    const obj = {
-      room: args.roomid,
-      scalefactor: windowManager.getScaleFactor(),
-    }
-    // socket!.sendBuffer = [];
-    //socket!.volatile.emit('host-info', JSON.stringify(obj))
-    peer!.send(JSON.stringify({ type: 'host-info', data: obj }))
+  function onRemote<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
+    remotePresenter.onRemote(event, data)
   }
 
   return {
     remotePresenter,
 
-    joinRoom,
-    setArgs,
     startSharing,
     stopSharing,
     pauseStreaming,
     resumeStreamingIfPaused,
-    sendScaleFactor,
+    onRemote,
   }
 }

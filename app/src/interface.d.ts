@@ -22,6 +22,8 @@ declare global {
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
+  sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => Promise<void>,
+  onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => Electron.IpcRenderer,
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => Electron.IpcRenderer,
   onChangeLanguage: (callback: (locale: string) => void) => Electron.IpcRenderer,
   logout: (discardSession?: boolean) => Promise<void>,
@@ -66,14 +68,10 @@ export type TurnCredentials = {
 
 export type StreamerData = {
   source: ScreenSource
-  roomName: string
   roomId: string
-  userName: string
-  userId: string
-  turnCredentials: TurnCredentials
 }
 
-export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "pastefile" | "cut" | "reset"
+export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "pastefile" | "cut" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "enable" ? { }
@@ -95,6 +93,8 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "paste" ? RemotePasteData
   : T extends "pastefile" ? RemotePasteFileData
   : T extends "reset" ? RemoteResetData
+  : T extends "mouse-control" ? { enabled: boolean }
+  : T extends "remote-control" ? { enabled: boolean }
   : never
 
   export type RemoteMouseData = {

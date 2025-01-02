@@ -2,12 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { useScreenPresent, type ScreenPresent } from "../composables/useSimplePeerScreenShare"
+import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "../composables/useSimplePeerScreenShare"
 
-import type { AcceptedRequestData, ScreenShareData } from '../types'
+import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { notify, prompt } from '../util'
-import { ScreenSource, TurnCredentials } from '../../interface'
+import { ScreenSource } from '../../interface'
 
 interface Request {
   request_id: string
@@ -52,7 +52,13 @@ onBeforeUnmount(() => {
 
 window.electronAPI?.onSendScreenSource((source) => {
   if (screenShareData.value && source) {
-    shareLocalScreen(screenShareData.value.roomName, screenShareData.value.roomId, screenShareData.value.turnCredentials, source)
+    shareLocalScreen(screenShareData.value.roomId, source)
+  }
+})
+
+window.electronAPI?.onRemote((event, data) => {
+  if (screenPresent.value) {
+    screenPresent.value.sendRemote(event, data)
   }
 })
 
@@ -203,15 +209,16 @@ async function startSession() {
 
     screenPresent.value = await useScreenPresent(screenShareData.value, {
       remoteEnabled: !!window.electronAPI,
+      onRemote: (event, data) => window.electronAPI?.sendRemote(event, data)
     })
-    shareLocalScreen(data.roomId, data.roomId, data.turnCredentials, undefined)
+    shareLocalScreen(data.roomId)
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(roomName: string, roomId: string, turnCredentials: TurnCredentials, source?: ScreenSource, shareAudio = false) {
+async function shareLocalScreen(roomId: string, source?: ScreenSource, shareAudio = false) {
   if (!screenPresent.value)
     return
 
@@ -259,14 +266,14 @@ async function shareLocalScreen(roomName: string, roomId: string, turnCredential
     await screenPresent.value.addStream(stream, shareAudio)
     sessionState.value = 'active'
 
-    //source && window.electronAPI?.startRemoteControl(source, roomName, roomId, userName, userId)
-    source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomName, roomId, userName: props.email, userId: props.email, turnCredentials }))
+    source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId, userName: props.email }))
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }
 }
     
 function handleError(error: Error) {
+  window.electronAPI?.log("presenter error", error)
   if (error instanceof UnauthorizedError) {
     if (window.electronAPI)
       window.electronAPI.logout(true)
