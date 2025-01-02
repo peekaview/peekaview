@@ -324,7 +324,7 @@ export class WindowManager {
       return {
         left: cscreen.bounds.x,
         top: cscreen.bounds.y,
-        right: cscreen.bounds.width + 16,
+        right: cscreen.bounds.width,
         bottom: cscreen.bounds.height,
       };
     }
@@ -999,7 +999,7 @@ export class WindowManager {
 
       const x = windowdimensions.left - 2
       const y = windowdimensions.top - 2
-      const width = windowdimensions.right - windowdimensions.left + 20
+      const width = windowdimensions.right - windowdimensions.left + 10
       const height = windowdimensions.bottom - windowdimensions.top + 4
       const scalefactor = this.getScaleFactor()
 
@@ -1026,6 +1026,9 @@ export class WindowManager {
       console.log('Overlay:')
       console.log(windowdimensions)
 
+      this.overlayrecord.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      this.overlayrecord.setAlwaysOnTop(true, 'screen-saver', 1);
+
       this.overlayrecord.removeMenu()
       this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
       this.overlayrecord.setIgnoreMouseEvents(true)
@@ -1038,7 +1041,7 @@ export class WindowManager {
       this.overlayrecord = new BrowserWindow({
         x: windowdimensions.left,
         y: windowdimensions.top,
-        width: windowdimensions.right - windowdimensions.left,
+        width: windowdimensions.right - windowdimensions.left + 16,
         height: windowdimensions.bottom - windowdimensions.top,
         transparent: true,
         skipTaskbar: true,
@@ -1053,12 +1056,25 @@ export class WindowManager {
         },
       })
 
+      console.log('Screen:')
+      console.log(windowdimensions)
+
       this.overlayrecord.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       this.overlayrecord.setAlwaysOnTop(true, 'screen-saver', 1);
 
       this.overlayrecord.removeMenu()
       this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
       this.overlayrecord.setIgnoreMouseEvents(true)
+
+      // Add after window creation
+      if (isWin32) {
+        this.overlayrecord.setBounds({
+          x: windowdimensions.left,
+          y: windowdimensions.top,
+        width: windowdimensions.right - windowdimensions.left + 16,
+        height: windowdimensions.bottom - windowdimensions.top
+      }, false) // false means don't animate the change
+      } 
     }
   }
 
