@@ -18,19 +18,51 @@ if let window = targetWindow,
     let apps = workspace.runningApplications
     
     if let app = apps.first(where: { $0.processIdentifier == ownerPID }) {
-        if #available(macOS 14.0, *) {
-            app.activate()
-        } else {
-            app.activate(options: .activateIgnoringOtherApps)
-        }
+        // First activate the app
+        app.activate(options: .activateIgnoringOtherApps)
         
-        // Attempt to bring the window to the front
+        // Get the accessibility element for the app
         let axApp = AXUIElementCreateApplication(ownerPID)
         var value: AnyObject?
-        AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &value)
-        if let windows = value as? [AXUIElement] {
-            for window in windows {
-                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        
+        // Get all windows
+        if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &value) == .success,
+           let windows = value as? [AXUIElement] {
+            
+            // Find the specific window by matching window ID
+            for axWindow in windows {
+                var windowIDRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(axWindow, "_AXWindowID" as CFString, &windowIDRef) == .success,
+                   let windowNum = (windowIDRef as? NSNumber)?.intValue,
+                   windowNum == windowNumber {
+                    
+                    // Ensure window is not minimized
+                    AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, false as CFTypeRef)
+                    
+                    // Raise the window
+                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    
+                    // Force a window refresh by slightly moving it and back
+                    var position = CGPoint.zero
+                    var positionRef: AnyObject?
+                    if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef) == .success,
+                       let posValue = positionRef,
+                       CFGetTypeID(posValue) == AXValueGetTypeID() {
+                        AXValueGetValue(posValue as! AXValue, .cgPoint, &position)
+                        
+                        // Move slightly right
+                        var newPos = CGPoint(x: position.x + 1, y: position.y)
+                        if let moveValue = AXValueCreate(.cgPoint, &newPos) {
+                            AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, moveValue)
+                            
+                            // Move back to original position
+                            if let originalValue = AXValueCreate(.cgPoint, &position) {
+                                AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, originalValue)
+                            }
+                        }
+                    }
+                    break
+                }
             }
         }
     }
