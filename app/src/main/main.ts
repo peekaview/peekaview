@@ -413,10 +413,10 @@ interface StoreSchema {
     let sourceId = data.source.id
     log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
 
-    if (process.platform === 'darwin') {
+    /*if (process.platform === 'darwin') {
       windowManager = new WindowManager()
       sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
-    }
+    }*/
 
     streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
     streamer.startSharing(sourceId, data.roomId)
