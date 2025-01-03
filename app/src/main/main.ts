@@ -344,7 +344,7 @@ interface StoreSchema {
     sourcesWindow.on('close', (e) => {
       if (selectedScreenSource) {
         appWindow?.webContents.send('send-screen-source', selectedScreenSource)
-      } else if (!isQuitting) {
+      } else if (!currentViewCode && !isQuitting) {
         const response = dialog.showMessageBoxSync({
           message: i18n.t('sourcesWindow.confirmCancel'),
           title: i18n.t('general.areYouSure'),
@@ -418,6 +418,9 @@ interface StoreSchema {
       sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
     }*/
 
+    if (currentViewCode)
+      stopSharing()
+
     streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
     streamer.startSharing(sourceId, data.roomId)
   }
@@ -427,7 +430,6 @@ interface StoreSchema {
     streamer?.stopSharing()
     customDialog.closeShareDialogs()
     customDialog.closeTrayDialogs()
-    appWindow?.hide()
   }
 
   function loadParams(params: Record<string, string>, show?: boolean) {
@@ -584,6 +586,7 @@ interface StoreSchema {
 
   ipcMain.handle('stop-sharing', async (_event) => {
     stopSharing()
+    appWindow?.hide()
   })
 
   ipcMain.handle('pause-sharing', async (_event) => {

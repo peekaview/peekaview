@@ -272,7 +272,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (!data.id)
       return
 
-    if (!overlayCursor[data.id]) {
+    if (!overlayCursor[data.id] && remoteControlActive) {
       console.log(data)
       console.log(`show cursor ${data.id}`)
       showoverlayCursorWindow(data.id, data.name, data.color)

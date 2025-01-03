@@ -90,7 +90,8 @@
       "invite": "You can invite someone to join your view your screen with this link:",
       "stop": "Stop",
       "pause": "Pause",
-      "resume": "Resume"
+      "resume": "Resume",
+      "shareDifferentScreen": "Share Different Screen"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",

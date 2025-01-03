@@ -89,7 +89,8 @@
       "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:",
       "stop": "Beenden",
       "pause": "Pausieren",
-      "resume": "Fortfahren"
+      "resume": "Fortfahren",
+      "shareDifferentScreen": "Anderen Bildschirm teilen"
     },
     "requestAccess": {
       "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",

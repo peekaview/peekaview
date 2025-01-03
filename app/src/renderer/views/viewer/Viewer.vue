@@ -4,7 +4,7 @@ import { ref, onBeforeUnmount } from 'vue'
 import RemoteControl from "./RemoteControl.vue"
 import RequestAccess from './RequestAccess.vue'
 
-import { ScreenShareData } from '../../composables/useSimplePeerScreenShare';
+import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 
 defineProps<{
   email?: string

@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
 
 window.electronAPI?.onSendScreenSource((source) => {
   if (screenShareData.value && source) {
-    shareLocalScreen(screenShareData.value.roomId, source)
+    shareLocalScreen(source)
   }
 })
 
@@ -211,14 +211,14 @@ async function startSession() {
       remoteEnabled: !!window.electronAPI,
       onRemote: (event, data) => window.electronAPI?.sendRemote(event, data)
     })
-    shareLocalScreen(data.roomId)
+    shareLocalScreen()
   } catch (error) {
     console.error('Error creating room:', error);
     handleError(error as Error)
   }
 }
 
-async function shareLocalScreen(roomId: string, source?: ScreenSource, shareAudio = false) {
+async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
   if (!screenPresent.value)
     return
 
@@ -266,7 +266,7 @@ async function shareLocalScreen(roomId: string, source?: ScreenSource, shareAudi
     await screenPresent.value.addStream(stream, shareAudio)
     sessionState.value = 'active'
 
-    source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId, userName: props.email }))
+    source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: props.email }))
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }
@@ -403,6 +403,9 @@ function stopSharing() {
           <div class="btn-row">
             <button type="button" class="btn btn-secondary" @click="stopSharing">
               {{ $t('share.activeSession.stop') }}
+            </button>
+            <button type="button" class="btn btn-secondary" @click="shareLocalScreen()">
+              {{ $t('share.activeSession.shareDifferentScreen') }}
             </button>
             <button v-if="sessionState === 'paused'" type="button" class="btn btn-secondary" @click="resumeSharing">
               {{ $t('share.activeSession.resume') }}

@@ -102,6 +102,10 @@ html, body {
               class="checkmark"></span>
           </label>
         </div>
+        <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: 110px; margin:0px; padding: 4px;"
+          onClick="shareDifferentScreen()">
+          <label>Bildschirm auswählen</label>
+        </div>
         <div class="btn btn-sm mr-1 btn-secondary" style="line-height: 20px; float:left; width: calc(10%); margin:0px; padding: 4px;"
           onClick="copyLink()">
           <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -184,6 +188,10 @@ html, body {
     } else {
       electron.ipcRenderer.invoke("disable-mouse");
     }
+  }
+
+  function shareDifferentScreen() {
+    electron.ipcRenderer.invoke("open-screen-source-selection");
   }
 
   function copyLink() {
