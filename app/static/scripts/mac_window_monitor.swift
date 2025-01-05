@@ -4,7 +4,7 @@ import Foundation
 let DEBUG = false
 
 // Sleep for 3 seconds before starting monitoring
-sleep(3)
+//sleep(3)
 
 
 func windowExists(windowNumber: Int) -> Bool {

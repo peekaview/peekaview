@@ -37,11 +37,15 @@ const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
 
-let stream: MediaStream
+let stream: MediaStream | undefined
 
 onMounted(() => {
   document.addEventListener('visibilitychange', togglePingInterval)
   togglePingInterval()
+
+  window.electronAPI?.onCleanUpStream(() => {
+    cleanUpStream()
+  })
 })
 
 onBeforeUnmount(() => {
@@ -325,9 +329,20 @@ function resumeSharing() {
   sessionState.value = 'active'
 }
 
+function cleanUpStream() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop())
+    stream = undefined
+  }
+}
+
 function stopSharing() {
+  cleanUpStream()
+
   if (screenPresent.value)
     screenPresent.value.leave()
+
+  alert('stopSharing')
 
   clearInterval(requestInterval.value)
   clearInterval(pingInterval.value)

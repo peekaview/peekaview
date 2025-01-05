@@ -345,6 +345,7 @@ interface StoreSchema {
 
     sourcesWindow.on('close', (e) => {
       if (selectedScreenSource) {
+        appWindow?.webContents.send('clean-up-stream')
         appWindow?.webContents.send('send-screen-source', selectedScreenSource)
       } else if (!currentViewCode && !isQuitting) {
         const response = dialog.showMessageBoxSync({
@@ -422,6 +423,8 @@ interface StoreSchema {
 
     //if (currentViewCode)
     //  stopSharing()
+    
+    //streamer?.stopSharing()
 
     streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
     streamer.startSharing(sourceId, data.roomId)
@@ -430,6 +433,7 @@ interface StoreSchema {
   function stopSharing() {
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
+    appWindow?.webContents.send('clean-up-stream')
     streamer?.stopSharing()
     customDialog.closeShareDialogs()
     customDialog.closeTrayDialogs()

@@ -31,7 +31,7 @@ export interface IElectronAPI {
   loginWithCode: (code: string) => Promise<void>,
   getScreenSources: () => Promise<ScreenSource[]>,
   selectScreenSource: (source: ScreenSource | undefined) => Promise<void>,
-  onSendScreenSource: (callback: (source: ScreenSource) => void) => Electron.IpcRenderer,
+  onSendScreenSource: (callback: (source: ScreenSource | undefined) => void) => void,
   startRemoteControl: (data: StreamerData) => Promise<void>,
   createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
@@ -41,6 +41,7 @@ export interface IElectronAPI {
   pauseSharing: () => Promise<void>,
   resumeSharing: () => Promise<void>,
   quit: () => Promise<void>,
+  onCleanUpStream: (callback: () => void) => void
 }
 
 export interface ScreenSource {

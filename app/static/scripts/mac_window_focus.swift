@@ -101,12 +101,6 @@ if let window = targetWindow,
                     } else {
                         app.activate(options: .activateIgnoringOtherApps)
                     }
-
-                    do {
-                        try "1".write(toFile: windowOverlapPath, atomically: true, encoding: .utf8)
-                    } catch {
-                        print("Failed to write to file: \(error)")
-                    }
                     
                     break
                 }

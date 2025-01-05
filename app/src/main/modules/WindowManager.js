@@ -502,8 +502,8 @@ export class WindowManager {
         const activeWindowInnerDimensions = {
             left: 0,
             top: 0,
-            right: 800,
-            bottom: 600
+            right: 2,
+            bottom: 2
         };
         return activeWindowInnerDimensions;
     }
@@ -724,6 +724,8 @@ export class WindowManager {
       }
 
       if (isMac && this.lastfocus < (Date.now() - 1000)) {
+        // Write 0 to overlap file to indicate window is overlapped/invalid
+        require('fs').writeFileSync('/tmp/.peekaview_windowoverlap', '1');
         // Use Swift script to bring window to front using window number
         this.executeCmd(`swift ${resolvePath('static/scripts/mac_window_focus.swift')} ${this.windowhwnd}`)
       }
@@ -999,7 +1001,7 @@ export class WindowManager {
 
       const x = windowdimensions.left - 2
       const y = windowdimensions.top - 2
-      const width = windowdimensions.right - windowdimensions.left + (isMac ? 20 : 10)
+      const width = windowdimensions.right - windowdimensions.left + (isMac ? 20 : isWin32 ? 20 : 0)
       const height = windowdimensions.bottom - windowdimensions.top + 4
       const scalefactor = this.getScaleFactor()
 
@@ -1206,6 +1208,8 @@ export class WindowManager {
   startWindowMonitoring() {
     if (!isMac) return;
 
+    //require('fs').writeFileSync('/tmp/.peekaview_windowoverlap', '0');
+
     // Kill any existing monitor process
     if (this.currentMonitorProcess) {
       try {
@@ -1215,6 +1219,12 @@ export class WindowManager {
       }
       this.currentMonitorProcess = null;
     }
+
+    /*require('fs').unlink('/tmp/.peekaview_windowinfo', (err) => {
+      if (err) {
+        console.error('Error deleting windowinfo file:', err);
+      }
+    }); */
 
     // Start new monitor process
     this.currentMonitorProcess = require('child_process').spawn('swift', 
@@ -1230,6 +1240,8 @@ export class WindowManager {
     this.currentMonitorProcess.on('exit', (code) => {
       if (code !== 0) {
         console.warn(`Monitor process exited with code ${code}`);
+        // Write 0 to overlap file to indicate window is overlapped/invalid
+        //require('fs').writeFileSync('/tmp/.peekaview_windowoverlap', '1');
       }
       this.currentMonitorProcess = null;
     });
