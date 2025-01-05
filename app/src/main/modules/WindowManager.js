@@ -999,7 +999,7 @@ export class WindowManager {
 
       const x = windowdimensions.left - 2
       const y = windowdimensions.top - 2
-      const width = windowdimensions.right - windowdimensions.left + 10
+      const width = windowdimensions.right - windowdimensions.left + (isMac ? 20 : 10)
       const height = windowdimensions.bottom - windowdimensions.top + 4
       const scalefactor = this.getScaleFactor()
 

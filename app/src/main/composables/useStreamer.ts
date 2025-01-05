@@ -96,6 +96,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     windowManager.hideRecordOverlay()
     remotePresenter.hideRemoteControl()
     remotePresenter.deactivate()
+
     streamingState = 'stopped'
   }
 
@@ -139,7 +140,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     if (hwnd !== undefined && streamingState === 'stopped') {
       console.log("startStreaming")
 
-      sendReset()
+      
 
       streamingState = 'active'
 
@@ -147,6 +148,8 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       windowManager.showRecordOverlay()
       //windowManager.showDebugOverlay(args)
       remotePresenter.activate(hwnd)
+
+      sendReset()
     }
   }
 

@@ -81,9 +81,9 @@ export function useCustomDialog() {
 
     if (type === 'share')
       windowParams = {
-        width: 640,
+        width: 440,
         height: 50,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 320),
+        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 220),
         y: 0,
         template: 'dialogshare.html',
       }
