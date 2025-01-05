@@ -818,7 +818,7 @@ export class WindowManager {
 
     if (sizechanged) {
       if (isWin32) {
-        const hwnd = parseInt(this.windowhwnd);
+        /*const hwnd = parseInt(this.windowhwnd);
         user32.ShowWindow(hwnd, 9)
         user32.SetWindowPos([
           hwnd, 
@@ -828,7 +828,7 @@ export class WindowManager {
           activeWindowWidth, 
           activeWindowHeight, 
           0x4000 | 0x0020 | 0x0020 | 0x0040
-        ])
+        ])*/
 
         formatchanged = true
       }

@@ -664,7 +664,8 @@ onMounted(() => {
   onReceive("mouse-down", (data) => {
     console.log("mouse-down", data)
 
-    if (!fileTransfer && (drawing[data.id] == undefined || !drawing[data.id])) {
+    if (!remotecontrol && !fileTransfer && (drawing[data.id] == undefined || !drawing[data.id])) {
+      console.log("startStroke", data)
       startStroke(data.id, [data.x, data.y])
     }
     //createRectangle(data)

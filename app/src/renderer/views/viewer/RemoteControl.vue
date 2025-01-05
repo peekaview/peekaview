@@ -66,7 +66,18 @@ watch(() => props.data, async (screenShareData) => {
         return
       }
 
-      remoteViewerRef.value?.receive(event, event === 'reset' ? data : JSON.parse(data as string)) // TODO: make serialization consistent
+      let parsedData = data
+      if (typeof data === 'string' && event !== 'reset') {
+        try {
+          parsedData = JSON.parse(data)
+        } catch (err) {
+          console.error('Failed to parse remote control data:', err)
+          return
+        }
+      }
+
+      remoteViewerRef.value?.receive(event, parsedData)
+      console.log("remote control", event, parsedData)
     },
     onEnding: () => {
       notify({
@@ -219,7 +230,7 @@ function stop() {
   height: 100%;
   max-width: 100%;
   max-height: 100%;
-  object-fit: none;
+  object-fit: cover;
 }
 
 .remote-container {
