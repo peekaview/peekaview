@@ -82,6 +82,8 @@ interface StoreSchema {
   let selectedScreenSource: ScreenSource | undefined
   let isQuitting = false
 
+  let currentViewCode: string | undefined
+
   let streamer: Streamer
   const customDialog = useCustomDialog()
 
@@ -418,14 +420,15 @@ interface StoreSchema {
       sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
     }*/
 
-    if (currentViewCode)
-      stopSharing()
+    //if (currentViewCode)
+    //  stopSharing()
 
     streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
     streamer.startSharing(sourceId, data.roomId)
   }
 
   function stopSharing() {
+    log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
     streamer?.stopSharing()
     customDialog.closeShareDialogs()
@@ -546,10 +549,14 @@ interface StoreSchema {
     startRemoteControl(data)
   })*/
 
-  let currentViewCode: string | undefined
+  
 
   const openShareMessage = async () => {
-    if (!currentViewCode) return
+    log.info('Opening share message, currentViewCode:', currentViewCode)
+    if (!currentViewCode) {
+      log.warn('No currentViewCode available')
+      return
+    }
 
     const url = `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`
     
@@ -570,22 +577,27 @@ interface StoreSchema {
 
   ipcMain.handle('sharing-active', async (_event, viewCode: string, data: string) => {
     const streamerData = JSON.parse(data) as StreamerData
-    log.info('sharing-active handler called with source:', streamerData.source.id)
+    log.info('sharing-active handler called with source: ', streamerData.source.id, viewCode)
     
-    currentViewCode = viewCode
-    startRemoteControl(streamerData)
+    if (viewCode !== null) {
+      currentViewCode = viewCode
+      startRemoteControl(streamerData)
     
-    customDialog.playSoundOnOpen('ping.wav')
-    customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
-    await openShareMessage()
+    
+      customDialog.playSoundOnOpen('ping.wav')
+      customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
+      await openShareMessage()
+    }
   })
 
   ipcMain.handle('show-sharing-active', async (_event) => {
+    log.info('show-sharing-active handler called with currentViewCode:', currentViewCode)
     await openShareMessage()
   })
 
   ipcMain.handle('stop-sharing', async (_event) => {
     stopSharing()
+    console.log('stop-sharing handler called')
     appWindow?.hide()
   })
 
