@@ -820,9 +820,11 @@ onMounted(() => {
     x = e.pageX - rect.left
     y = e.pageY - rect.top
 
+    
+
     obj = {
-      x: Math.round(x / (scale * remotescale * zoom!.scale)),
-      y: Math.round(y / (scale * remotescale * zoom!.scale)),
+      x: Math.round(x / ((scale || 1) * (remotescale || 1) * (zoom?.scale || 1))),
+      y: Math.round(y / ((scale || 1) * (remotescale || 1) * (zoom?.scale || 1))),
       room: props.room,
       id: props.id,
       name: props.user,
@@ -1300,7 +1302,7 @@ defineExpose({
   }
 
   .remote-viewer #overlay {
-      margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px; margin-left: 10px; margin-right: 10px;
+      margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px;
   }
 
   .remote-viewer #sizeinfo {
