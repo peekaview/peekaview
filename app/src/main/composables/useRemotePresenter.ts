@@ -179,10 +179,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       // overlayDrawer.openDevTools();
       overlayDrawer.removeMenu()
       overlayDrawer.setIgnoreMouseEvents(true)
-
+      
       overlayDrawer.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       overlayDrawer.setAlwaysOnTop(true, 'screen-saver', 1);
-      
       overlayDrawer.loadFile(resolvePath('static/drawer.html'))
     }
     overlayDrawer.webContents.send(action, JSON.stringify(data))

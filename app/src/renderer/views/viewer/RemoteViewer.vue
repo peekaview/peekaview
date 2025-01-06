@@ -170,9 +170,10 @@ const remoteViewerRef = useTemplateRef('remoteViewer')
 const overlayRef = useTemplateRef('overlay')
 const containerRef = useTemplateRef('container')
 
+// Add this with other state declarations near the top of the script
+let oldbackground: string | undefined
+
 onMounted(() => {
-  // get the color for a user
-  //fetch("https://" + document.location.hostname.replace('ps-', '') + "/api/clientapi.php?action=color&user=" + user).then(response => response.text()).then(response => { color = response })
 
   const sizeInfoEl = document.createElement('div')
   sizeInfoEl.id = 'sizeinfo'
@@ -336,7 +337,27 @@ onMounted(() => {
     const clipboarddiv = document.createElement('div')
     clipboarddiv.style.cssText = 'position: absolute right:0px bottom:0px'
     clipboarddiv.id = 'clipboardcontainer'
-    clipboarddiv.innerHTML = '<div class="button" onClick="document.querySelector(\'#clipboardcontainer\').remove()" style="margin-bottom: 5px">Clipboard schliessen</div><div class="button copybutton" id="copybutton">Kopieren</div><div class="button downloadbutton" id="downloadbutton">Download</div><div id="clipboardarea"></div>'
+    clipboarddiv.innerHTML = `
+      <div class="button" onClick="document.querySelector('#clipboardcontainer').remove()" style="margin-bottom: 5px">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </div>
+      <div class="button copybutton" id="copybutton">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </div>
+      <div class="button downloadbutton" id="downloadbutton">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </div>
+      <div id="clipboardarea"></div>`
     remoteViewerRef.value?.append(clipboarddiv)
 
     const clipboardAreaEl = document.getElementById('clipboardarea') as HTMLDivElement
@@ -368,7 +389,7 @@ onMounted(() => {
       }
 
       const div = document.createElement('div')
-      div.innerHTML = '<center><img id="extensionimage" src="' + data.filecontent + '" style="max-height:150px max-width:150px opacity: 0.8"></center>'
+      div.innerHTML = '<center><img id="extensionimage" src="' + data.filecontent + '" style="max-height:120px; max-width:140px; opacity: 0.8"></center>'
       clipboardAreaEl.append(div)
 
       // Klick aufs Bild = Download
@@ -434,6 +455,8 @@ onMounted(() => {
       textareaEl.value = decoded
 
       div.append(textareaEl)
+
+
 
       clipboardAreaEl.append(div)
 
@@ -705,6 +728,12 @@ onMounted(() => {
       screensharing = false
     }
 
+    
+    if (!oldbackground) {
+      oldbackground = document.getElementById('app')!.style.background
+      document.getElementById('app')!.style.background = 'repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px'
+    }
+
     /*if (((message.dimensions.right - message.dimensions.left) - 0) * message.scalefactor > props.videoTransform.width) {
       remotescale = (props.videoTransform.width / ((message.dimensions.right - message.dimensions.left) - 0))
     } else {*/
@@ -730,12 +759,13 @@ onMounted(() => {
       synchronized = true
     }
 
-    if (synchronized && mouseSyncEl !== undefined) {
+    if (synchronized && remoteViewerRef.value?.contains(mouseSyncEl)) {
       mouseSyncEl.remove()
     }
 
     // Maus-Zeigermodus aktiviert/deaktiviert
-    if ((!lastmessage || mouseenabled != data.mouseenabled) && mouseSyncEl == null) {
+    console.log(synchronized, remotecontrol, data.remotecontrol, mouseenabled, data.mouseenabled, mouseSyncEl)
+    if ((!lastmessage || mouseenabled != data.mouseenabled) && !remoteViewerRef.value?.contains(mouseSyncEl)) {
       msgremotecontrol.innerHTML = data.mouseenabled ? '<b>Remote-Mauszeiger ist nun aktiviert</b>' : '<b>Remote-Mauszeiger wurde deaktiviert</b>'
       const messageEls = document.querySelectorAll('.message')
       messageEls.forEach((message) => { message.remove() })
@@ -750,7 +780,7 @@ onMounted(() => {
     }
 
     // Maus/Tastatursteuerung aktiviert/deaktiviert
-    if ((!lastmessage || remotecontrol != data.remotecontrol) && mouseSyncEl == null) {
+    if ((!lastmessage || remotecontrol != data.remotecontrol) && !remoteViewerRef.value?.contains(mouseSyncEl)) {
       msgremotecontrol.innerHTML = data.remotecontrol ? '<b>Fernzugriff ist jetzt aktiviert</b>' : '<b>Fernzugriff wurde deaktiviert</b>'
       document.querySelectorAll('.message').forEach((message) => { message.remove() })
       remoteViewerRef.value?.appendChild(msgremotecontrol)
@@ -1270,7 +1300,7 @@ defineExpose({
   }
 
   .remote-viewer #overlay {
-      margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px;
+      margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px; margin-left: 10px; margin-right: 10px;
   }
 
   .remote-viewer #sizeinfo {
@@ -1345,7 +1375,7 @@ defineExpose({
   .remote-viewer .copybutton, .remote-viewer .downloadbutton {
       position: absolute;
       z-index: 10;
-      width: calc(100% - 17px);
+      width: calc(100% - 10px);
       margin-top: 5px;
   }
 
@@ -1458,6 +1488,8 @@ defineExpose({
       border-width: 0 3px 3px 0;
       transform: rotate(45deg);
   }
+
+  
 
   @keyframes scaleIn {
       from {

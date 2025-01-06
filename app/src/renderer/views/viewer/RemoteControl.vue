@@ -237,8 +237,6 @@ function stop() {
   position: absolute;
   top: 0px;
   left: 0px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
 }
 
 .remote-viewer {

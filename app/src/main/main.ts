@@ -84,7 +84,7 @@ interface StoreSchema {
 
   let currentViewCode: string | undefined
 
-  let streamer: Streamer
+  let streamer: Streamer | undefined
   const customDialog = useCustomDialog()
 
   const Store = (await import('electron-store')).default
@@ -424,9 +424,11 @@ interface StoreSchema {
     //if (currentViewCode)
     //  stopSharing()
     
-    //streamer?.stopSharing()
+    streamer?.stopSharing()
 
-    streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
+    //if (streamer === undefined) {
+      streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
+    //}
     streamer.startSharing(sourceId, data.roomId)
   }
 
@@ -606,7 +608,7 @@ interface StoreSchema {
   })
 
   ipcMain.handle('pause-sharing', async (_event) => {
-    streamer.pauseStreaming()
+    streamer?.pauseStreaming()
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
@@ -616,27 +618,27 @@ interface StoreSchema {
       detail: "Sharing resumed, other users can now see your shared screen or application",
       timeout: 3000
     })
-    streamer.resumeStreamingIfPaused()
+    streamer?.resumeStreamingIfPaused()
   })
 
   ipcMain.handle('enable-mouse', async (_event) => {
     console.log('Enabling mouse control')
-    streamer.remotePresenter.enableMouse()
+    streamer?.enableMouse()
   })
 
   ipcMain.handle('disable-mouse', async (_event) => {
     console.log('Disabling mouse control')
-    streamer.remotePresenter.disableMouse()
+    streamer?.disableMouse()
   })
 
   ipcMain.handle('enable-remote-control', async (_event) => {
     console.log('Enabling remote control')
-    streamer.remotePresenter.enableRemoteControl()
+    streamer?.enableRemoteControl()
   })
 
   ipcMain.handle('disable-remote-control', async (_event) => {
     console.log('Disabling remote control')
-    streamer.remotePresenter.disableRemoteControl()
+    streamer?.disableRemoteControl()
   })
 
   ipcMain.handle('quit', async (_event) => {

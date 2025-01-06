@@ -818,7 +818,7 @@ export class WindowManager {
 
     if (sizechanged) {
       if (isWin32) {
-        /*const hwnd = parseInt(this.windowhwnd);
+        const hwnd = parseInt(this.windowhwnd);
         user32.ShowWindow(hwnd, 9)
         user32.SetWindowPos([
           hwnd, 
@@ -828,7 +828,7 @@ export class WindowManager {
           activeWindowWidth, 
           activeWindowHeight, 
           0x4000 | 0x0020 | 0x0020 | 0x0040
-        ])*/
+        ])
 
         formatchanged = true
       }
@@ -953,9 +953,19 @@ export class WindowManager {
   }
 
   hideRecordOverlay() {
-    if (this.overlayrecord != null) {
-      this.overlayrecord.close()
-      this.overlayrecord = null
+    if (this.overlayrecord && !this.overlayrecord.isDestroyed()) {
+      try {
+        this.overlayrecord.hide() // First hide the window
+        setTimeout(() => { // Add delay before closing
+          if (this.overlayrecord && !this.overlayrecord.isDestroyed()) {
+            this.overlayrecord.close()
+            this.overlayrecord = null
+          }
+        }, 100)
+      } catch (error) {
+        console.warn('Error closing record overlay:', error)
+        this.overlayrecord = null // Reset reference if error occurs
+      }
     }
   }
 

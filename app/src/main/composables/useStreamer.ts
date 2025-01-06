@@ -10,7 +10,7 @@ const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
 // Intervals
-const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 100
+const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 1000
 
 export type Streamer = ReturnType<typeof useStreamer>
 
@@ -79,6 +79,26 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     else {
       dialog.showErrorBox('Fenster nicht gefunden', `${hwnd} existiert nicht`)
     }
+  }
+
+  function enableRemoteControl() {
+    remotePresenter.enableRemoteControl()
+    remotePresenter.remoteControlInputEnabled = true
+  }
+
+  function disableRemoteControl() {
+    remotePresenter.disableRemoteControl()
+    remotePresenter.remoteControlInputEnabled = false
+  }
+
+  function enableMouse() {
+    remotePresenter.enableMouse()
+    remotePresenter.mouseEnabled = true
+  }
+
+  function disableMouse() {
+    remotePresenter.disableMouse()
+    remotePresenter.mouseEnabled = false
   }
 
   function stopSharing() {
@@ -182,6 +202,9 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
         mouseenabled: remotePresenter.mouseEnabled,
         dimensions: windowManager.getWindowOuterDimensions(),
       }
+
+      console.log('sendReset', message)
+
       sendRemote('reset', message)
     }, 2000)
   }
@@ -197,6 +220,10 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     stopSharing,
     pauseStreaming,
     resumeStreamingIfPaused,
+    enableRemoteControl,
+    disableRemoteControl,
+    enableMouse,
+    disableMouse,
     onRemote,
   }
 }
