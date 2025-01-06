@@ -179,7 +179,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
     const obj = {
       room: roomid,
-      scalefactor: windowManager.getScaleFactor(),
+      scalefactor: windowManager.getScaleFactor() || 1,
       iscreen: windowManager.isScreen(),
       remotecontrol: remotePresenter.remoteControlInputEnabled,
       mouseenabled: remotePresenter.mouseEnabled,

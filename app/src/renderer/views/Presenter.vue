@@ -248,10 +248,10 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
           mandatory: {
             chromeMediaSource: 'desktop',
             chromeMediaSourceId: source.id,
-            minWidth: 1280,
+            /*minWidth: 1280,
             maxWidth: 1920,
             minHeight: 720,
-            maxHeight: 1080
+            maxHeight: 1080*/
           }
         }
       })

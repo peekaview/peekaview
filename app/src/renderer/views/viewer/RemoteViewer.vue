@@ -757,6 +757,7 @@ onMounted(() => {
       calcScale()
     } else {
       synchronized = true
+      calcScale()
     }
 
     if (synchronized && remoteViewerRef.value?.contains(mouseSyncEl)) {
@@ -1306,7 +1307,7 @@ defineExpose({
   }
 
   .remote-viewer #sizeinfo {
-      padding: 0px; margin: 0px; border: 1px solid black; position: absolute; z-index:2
+      padding: 0px; margin: 0px; position: absolute; z-index:2
   }
 
   .remote-viewer #container, .remote-viewer .container {
