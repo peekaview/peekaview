@@ -6,36 +6,15 @@ on:
     branches:
       - develop
     paths:
-      - "app_disabled/**"
-
+      - "app/**"
 
 jobs:
-#  build_on_linux:
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - uses: actions/setup-node@master
-#      with:
-#        node-version: 14
-#    - name: install dependencies
-#      run: npm install
-#    - name: build
-#      run: npm run make
-
-#  build_on_mac:
-#    runs-on: macos-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - uses: actions/setup-node@master
-#      with:
-#        node-version: 14
-#    - name: install dependencies
-#      run: npm install
-#    - name: build
-#      run: npm run make
-
-  build_on_win:
-    runs-on: windows-latest
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
     permissions:
       contents: write
     steps:
@@ -49,14 +28,23 @@ jobs:
           with:
             node-version: 20
 
+        # Nur für Linux: Wine installieren
+        - name: Install Wine (Linux only)
+          if: runner.os == 'Linux'
+          run: |
+            sudo dpkg --add-architecture i386
+            sudo apt-get update
+            sudo apt-get install -y wine64 wine32
+
         - name: Create Env
           working-directory: ./app
+          shell: bash
           run: |
             echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
             echo "VITE_API_URL=https://api.peekaview.de/" >> .env
             echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
 
-        - name: Cache node_modules in app folder
+        - name: Cache node_modules
           uses: actions/cache@v3
           with:
             path: ./app/node_modules
@@ -71,28 +59,26 @@ jobs:
         - name: Set build version
           id: set_version
           working-directory: ./app
+          shell: bash
           run: |
-            $VERSION = (node -p "require('./package.json').version")
-            $COMMIT_SHA = (git rev-parse --short HEAD)
-            echo "version=$VERSION-$COMMIT_SHA" >> $env:GITHUB_OUTPUT
+            VERSION=$(node -p "require('./package.json').version")
+            COMMIT_SHA=$(git rev-parse --short HEAD)
+            echo "version=$VERSION-$COMMIT_SHA" >> $GITHUB_OUTPUT
 
         - name: Build Electron App
           working-directory: ./app
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             BUILD_VERSION: ${{ steps.set_version.outputs.version }}
-          run: npm run electron-build-win
-
-        - name: List dist directory
-          working-directory: ./app
           run: |
-            Write-Host "Contents of dist directory:"
-            Get-ChildItem -Path dist -Recurse
-        - name: List out directory
-          working-directory: ./app
-          run: |
-            Write-Host "Contents of out directory:"
-            Get-ChildItem -Path out -Recurse
+            if [ "$RUNNER_OS" == "Windows" ]; then
+              npm run electron-build-win
+            elif [ "$RUNNER_OS" == "macOS" ]; then
+              npm run electron-build-mac
+            else
+              npm run electron-build-linux
+            fi
+          shell: bash
 
         - name: Create Pre-release
           uses: softprops/action-gh-release@v1
@@ -105,9 +91,13 @@ jobs:
                 Pre-release build from develop branch
                 Version: ${{ steps.set_version.outputs.version }}
                 Built from commit: ${{ github.sha }}
-                Build date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
+                Build date: ${{ github.event.repository.updated_at }}
             prerelease: true
             draft: true
             files: |
-                app/dist/win32-x64/*.exe
+                app/dist/**/*.exe
+                app/dist/**/*.dmg
+                app/dist/**/*.AppImage
+                app/dist/**/*.deb
+                app/dist/**/*.rpm
             target_commitish: ${{ github.sha }}
