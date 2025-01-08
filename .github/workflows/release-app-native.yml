@@ -10,7 +10,34 @@ on:
 
 
 jobs:
+  create_release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+    - uses: actions/checkout@v4    
+      with:
+        ref: ${{ github.ref }}  
+        
+    - name: Get Version
+      id: get_version
+      working-directory: ./app
+      run: |
+            VERSION=$(awk -F'"' '/"version"/ {print $4}' package.json)
+            echo "Extracted version: $VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_ENV
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ env.VERSION }}" \
+          --title "PeekaView v${{ env.VERSION }}" \
+          --draft
   build_on_linux:
+    needs: create_release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -53,6 +80,7 @@ jobs:
           run: pnpm run build:linux
 
   build_on_mac:
+    needs: create_release
     runs-on: macos-latest
     permissions:
       contents: write
@@ -95,6 +123,7 @@ jobs:
           run: pnpm run build:mac
 
   build_on_win:
+    needs: create_release
     runs-on: windows-latest
     permissions:
       contents: write
