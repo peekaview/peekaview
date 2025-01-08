@@ -28,13 +28,12 @@ jobs:
             VERSION=$(awk -F'"' '/"version"/ {print $4}' package.json)
             echo "Extracted version: $VERSION"
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_ENV
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "v${{ env.VERSION }}" \
-          --title "PeekaView v${{ env.VERSION }}" \
+        gh release create "v${{ steps.get_version.outputs.version }}" \
+          --title "PeekaView v${{ steps.get_version.outputs.version }}" \
           --draft
   build_on_linux:
     needs: create_release
