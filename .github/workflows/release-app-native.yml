@@ -122,13 +122,10 @@ jobs:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
             CSC_LINK: ${{ secrets.CSC_LINK }}
-            APPLEID: ${{ secrets.APPLEID }}
-            APPLEIDPASS: ${{ secrets.APPLEIDPASS }}
             TEAMID: ${{ secrets.TEAMID }}
             APPLE_ID: ${{ secrets.APPLEID }}
             APPLE_ID_PASSWORD: ${{ secrets.APPLEIDPASS }}
             APPLE_TEAM_ID: ${{ secrets.TEAMID }}
-            APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLEIDPASS }}
             NODEBUG: electron-builder
           run: pnpm run build:mac
 
