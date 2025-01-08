@@ -1,0 +1,103 @@
+services:
+  ingress:
+    image: peekaview/ingress:${DOCKER_TAG}
+    restart: unless-stopped
+    environment:
+      - API_DOMAIN=${API_DOMAIN}
+      - LIVEKIT_DOMAIN=${LIVEKIT_DOMAIN}
+      - TURN_DOMAIN=${TURN_DOMAIN}
+      - APP_DOMAIN=${APP_DOMAIN}
+      - CONTROL_DOMAIN=${CONTROL_DOMAIN}
+    network_mode: "host"
+    volumes:
+      - ingress_data:/data
+  
+  # livekit:
+  #   image: peekaview/livekit:${DOCKER_TAG}
+  #   restart: unless-stopped
+  #   environment:
+  #     - LIVEKIT_URL=${LIVEKIT_URL}
+  #     - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+  #     - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+  #     - LIVEKIT_TURN_DOMAIN=${TURN_DOMAIN}
+  #   network_mode: "host"
+  #   volumes:
+  #     - ./livekit/livekit.template.yaml:/etc/livekit.template.yaml
+
+  api:
+    image: peekaview/api:${DOCKER_TAG}
+    restart: unless-stopped
+    environment:
+#      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+#      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+#      - JWT_SECRET=${JWT_SECRET}
+      - TURN_SHARED_SECRET=${TURN_SHARED_SECRET}
+      - VIDEO_SERVERS=${VIDEO_SERVERS}
+      - CONTROL_SERVERS=${CONTROL_SERVERS}
+      - APP_DOMAIN=${APP_DOMAIN}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - FROM_NAME=${FROM_NAME}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    volumes:
+      - api_storage:/storage
+    ports:
+      - "8080:80"
+    networks:
+      - internal
+
+  controlserver:
+    image: peekaview/controlserver:${DOCKER_TAG}
+    restart: unless-stopped
+    environment:
+      - CONTROL_DOMAIN=${CONTROL_DOMAIN}
+    ports:
+      - "8081:3000"
+    networks:
+      - internal
+    extra_hosts:
+      - "${CONTROL_DOMAIN}:127.0.0.1"
+
+  app:
+    image: peekaview/app:${DOCKER_TAG}
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    networks:
+      - internal
+
+  turnserver:
+    image: coturn/coturn
+    restart: unless-stopped
+    environment:
+      - DETECT_EXTERNAL_IP=yes
+    command: [
+      "--min-port=49160",
+      "--max-port=49200",
+      "--log-file=stdout",
+      "--fingerprint",
+      "--allow-loopback-peers",
+      "--no-multicast-peers",
+      "--cli-password=${TURN_CLI_PASSWORD}",
+      "--use-auth-secret",
+      "--static-auth-secret=${TURN_SHARED_SECRET}",
+      "--realm=${TURN_DOMAIN}"
+    ]
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "49160-49200:49160-49200/udp"
+
+volumes:
+  ingress_data:
+  api_storage:
+    # Optional: specify additional volume options here
+
+networks:
+  internal:
+    driver: bridge
+    name: peekaview

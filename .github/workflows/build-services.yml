@@ -1,0 +1,57 @@
+name: Build and Push to DockerHub
+
+on:
+    push:
+        branches:
+            - main
+            - develop
+        paths:
+            - 'api/**'
+            - 'app/**'
+            - 'controlserver/**'
+            - 'ingress/**'
+            - 'livekit/**'
+    pull_request:
+        branches:
+            - 'master'
+jobs:
+    docker:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                service: [api, controlserver, ingress, livekit]
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: dorny/paths-filter@v3
+              id: changes
+              with:
+                  base: ${{ github.ref_name }}
+                  filters: |
+                      service:
+                        - '${{ matrix.service }}/**'
+            
+            - name: Docker meta
+              id: meta
+              if: steps.changes.outputs.service == 'true'
+              uses: docker/metadata-action@v5
+              with:
+                  images: peekaview/${{ matrix.service }}
+            
+            - name: Login to DockerHub
+              if: steps.changes.outputs.service == 'true' && github.event_name != 'pull_request'
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+            
+            - name: Build and push
+              if: steps.changes.outputs.service == 'true'
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./${{ matrix.service }}
+                  push: ${{ github.event_name != 'pull_request' }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}

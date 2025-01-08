@@ -1,0 +1,65 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Build directories
+.webpack/
+dist/
+build/
+out/
+*.log
+
+# Cache
+.cache/
+.npm/
+.yarn/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Redis
+redis/data/
+*.rdb
+
+# Certificates and Keys
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Logs
+logs/
+*.log 
+
+todo.txt
+mkcert
+private

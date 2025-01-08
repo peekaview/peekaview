@@ -1,0 +1,23 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "files": [
+    "src/vite-env.d.ts"
+  ],
+  "include": [
+    "electron.vite.config.*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/composables/**/*",
+    "./package.json"
+  ],
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "composite": true,
+    "types": [
+      "electron-vite/node", 
+      "electron-store"
+    ],
+    "outDir": "dist",
+    "removeComments": true
+  }
+}

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+
+  <style>
+    @font-face {
+        font-family: 'Abel';
+        font-style: normal;
+        font-weight: 400;
+        src: local('Abel Regular'), local('Abel-Regular'), url('fonts/abel-v10-latin-regular.woff2') format('woff2');
+      }
+  </style>
+
+  <link rel="stylesheet" href="css/alerts.css" />
+  <link rel="stylesheet" href="css/spectre.min.css" />
+
+
+    <style>
+
+html, body {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+    body {
+      font-family: Abel;
+    }
+
+    .content {
+      margin-top: 10px;
+      display: inline-block;
+      margin: 0px;
+      margin-right: 20px;
+    }
+
+    .modal-container {
+      -webkit-user-select: none;
+    }
+
+    .modal-container {
+      background: #1a1a1a;
+      color: #EEE
+    }
+
+    .modalin {
+      animation-name: scale-in;
+      animation-duration: 0.3s;
+    }
+
+    .modalout {
+      animation-name: scale-out;
+      animation-duration: 0.2s;
+      transform: translateY(-100%);
+    }
+
+    @keyframes scale-in {
+      0% {
+        transform: translateY(-100%);
+
+      }
+
+      100% {
+        transform: translateY(0%);
+      }
+    }
+
+    @keyframes scale-out {
+      0% {
+        transform: translateY(0%);
+      }
+
+      100% {
+        transform: translateY(-100%);
+      }
+    }
+
+    .btn.btn-secondary {
+        background: #2a2a2a;
+        border-color: #404040;
+        color: #aaa;
+    }
+    .btn.btn-secondary:hover {
+        background: #404040;
+        border-color: #505050;
+        color: #ddd;
+    }
+    /*
+      a.btn, button.btn {
+          -webkit-app-region: no-drag !important;
+      }*/
+  </style>
+
+  <title>peekaview - Dialog</title>
+</head>
+
+<body style="background: transparent;">
+  <div id="modal-id" class="modal active modalin">
+    <div class="modal-container settings_container">
+      <div class="modal-body">
+        <a href="#close" class="btn btn-secondary btn-clear float-right" aria-label="Close" id="close"></a>
+        <div class="content">
+          <div class="f-modal-alert" style="margin-top: -50px; margin-bottom: -40px; transform: scale(0.4); margin-right: 10px; margin-left: -10px">
+            <div class="f-modal-icon f-modal-error animate" style="display: none;">
+              <span class="f-modal-x-mark">
+                <span class="f-modal-line f-modal-left animateXLeft"></span>
+                <span class="f-modal-line f-modal-right animateXRight"></span>
+              </span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+            <div class="f-modal-icon f-modal-warning scaleWarning" style="display: none;">
+              <span class="f-modal-body pulseWarningIns"></span>
+              <span class="f-modal-dot pulseWarningIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-info scaleWarning" style="display: none;">
+              <span class="f-modal-body pulseInfoIns"></span>
+              <span class="f-modal-dot pulseInfoIns"></span>
+            </div>
+            <div class="f-modal-icon f-modal-success animate" style="display: none;">
+              <span class="f-modal-line f-modal-tip animateSuccessTip"></span>
+              <span class="f-modal-line f-modal-long animateSuccessLong"></span>
+              <div class="f-modal-placeholder"></div>
+              <div class="f-modal-fix"></div>
+            </div>
+          </div>
+
+          <p id="detail"></p>
+          <div id="modalbuttons">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+<script>
+  var params = [];
+  let i = 0;
+  if (window.process) {
+    window.process.argv.forEach(function (param) {
+      if (i > 0 && param.substring(0, 1) != '-' && param.substring(0, 1) != '/') {
+        params.push(param);
+      }
+      i++;
+    });
+    //params.shift();
+    console.log(params);
+    console.log(window.process.argv);
+    //alert(params[0]);
+}
+
+
+
+</script>
+
+</html>

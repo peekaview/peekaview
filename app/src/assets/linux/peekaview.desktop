@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=PeekaView
+Exec=/usr/bin/peekaview %u
+Icon=peekaview
+Type=Application
+Categories=Utility;
+MimeType=x-scheme-handler/peekaview;
+Terminal=false

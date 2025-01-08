@@ -1,0 +1,102 @@
+logging:
+  logs:
+    default:
+      level: INFO
+
+storage:
+  module: file_system
+  root: /data
+
+apps:
+  tls:
+    ### BEGIN LOCAL CERTIFICATES ###
+    certificates:
+      load_files:
+        - certificate: /etc/caddy/certificates/custom/peekaview.crt
+          key: /etc/caddy/certificates/custom/peekaview.key
+    automation:
+      policies:
+        - on_demand: true
+    ### END LOCAL CERTIFICATES ###
+    ### BEGIN AUTOMATIC CERTIFICATES ###
+    certificates:
+      automate:
+        - "REPLACE_LIVEKIT_DOMAIN"
+        - "REPLACE_TURN_DOMAIN"
+        - "REPLACE_API_DOMAIN"
+        - "REPLACE_APP_DOMAIN"
+        - "REPLACE_CONTROL_DOMAIN"
+    ### END AUTOMATIC CERTIFICATES ###
+
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          ### BEGIN TURN ###
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_TURN_DOMAIN"
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:5349"]
+          ### END TURN ###
+
+          ### BEGIN LIVEKIT ###
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_LIVEKIT_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:7880"]
+          ### END LIVEKIT ###
+
+          ### BEGIN API ###
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_API_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:8080"]
+          ### END API ###
+
+          ### BEGIN APP ###
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_APP_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:8082"]
+          ### END APP ###
+
+          ### BEGIN CONTROL ###
+          - match:
+              - tls:
+                  sni:
+                    - "REPLACE_CONTROL_DOMAIN"
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1", "h2"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["127.0.0.1:8081"]
+          ### END CONTROL ###

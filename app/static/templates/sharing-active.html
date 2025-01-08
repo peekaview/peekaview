@@ -1,0 +1,21 @@
+{{message}}
+<div style="margin: 10px 0; width: 80vw;padding: 8px; background: transparent;">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <input type="text" readonly value="{{url}}" 
+      style="flex: 1; padding: 4px; background: #333; color: #fff; border: 1px solid #bcc3ce; border-radius: 2px; height: 28px; line-height: 20px;">
+    <button onclick="(async () => {
+        await navigator.clipboard.writeText('{{url}}');
+        this.innerHTML = '<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><polyline points=&quot;20 6 9 17 4 12&quot;></polyline></svg>';
+        setTimeout(() => {
+          this.innerHTML = '<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;><rect x=&quot;9&quot; y=&quot;9&quot; width=&quot;13&quot; height=&quot;13&quot; rx=&quot;2&quot; ry=&quot;2&quot;></rect><path d=&quot;M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1&quot;></path></svg>';
+        }, 1000);
+      })()" 
+      class="btn btn-sm btn-secondary" 
+      style="line-height: 20px; margin: 0; padding: 5px; min-width: 32px; transition: all 0.2s ease;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
+  </div>
+</div>
