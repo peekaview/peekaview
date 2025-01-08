@@ -152,7 +152,6 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
         
         peers[socketId].on('data', (json) => {
           const data = JSON.parse(json) as PeerData
-          console.log('peer on data', data)
           switch (data.type) {
             case 'remote':
               options?.onRemote?.(data.event, data.data)

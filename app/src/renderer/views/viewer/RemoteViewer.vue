@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef, watch } from "vue"
+import { onBeforeUnmount, onMounted, reactive, ref, useTemplateRef, watch } from "vue"
 import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
 
+import SignalContainer from "./SignalContainer.vue"
+import Clipboard from './Clipboard.vue'
+
+import { hexToRgb } from "../../util.js"
+
 import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
-import { b64DecodeUnicode, hexToRgb } from "../../util.js";
-import { ScaleInfo, VideoTransform } from "../../types.js";
+import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
 
 type Pan = {
   x: number
@@ -29,6 +33,14 @@ type Stroke = {
   opacity: number
 }
 
+type Cursor = {
+  name?: string
+  color: string
+  left: string
+  top: string
+  lastAction: number
+}
+
 const props = withDefaults(defineProps<{
   room: string
   user: string
@@ -44,10 +56,6 @@ const emit = defineEmits<{
   (e: 'rescale', scaleinfo: ScaleInfo): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
-
-document.addEventListener('contextmenu', event => {
-  event.preventDefault()
-})
 
 // gedrückte Keys
 let controlpressed = false
@@ -78,14 +86,13 @@ let screensharing = true
 let lastmessage: RemoteResetData | undefined
 
 // Maus-Overlays
-const signals: Record<string, HTMLDivElement> = {}
-const overlayCursor: Record<string, HTMLElement | undefined> = {}
-const overlayCursorLastAction: Record<string, number> = {}
+const signals = reactive<Record<string, Signal>>({})
+const overlayCursors = reactive<Record<string, Cursor>>({})
 let cursorcheckinterval: number
 
 // Remote-Funktionen
-let mouseenabled = true
-let remotecontrol = false
+const mouseEnabled = ref(true)
+const remoteControlActive = ref(false)
 let mousedown = false
 let dragdetected = false
 
@@ -99,40 +106,6 @@ let obj: MouseMessage = {
   color: props.color
 }
 
-// fileTransfer aktiv?
-let fileTransfer = false
-
-// Messages
-const mouseSyncEl = document.createElement('div')
-mouseSyncEl.id = 'mousesync'
-mouseSyncEl.classList.add('message')
-mouseSyncEl.style.cssText = 'opacity: 0.8 z-index: 1001 pointer-events: none'
-mouseSyncEl.innerHTML = '<b>aktive Remotesitzung - Verbindung wird hergestellt</b><img style="float: left margin-right: 50px" src="../img/loading_dark.gif"><br><br>' + (!isTouchEnabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '')
-
-const msgmousehelp = document.createElement('div')
-msgmousehelp.id = 'mousehelp'
-msgmousehelp.classList.add('message')
-msgmousehelp.style.cssText = 'opacity: 0.8 z-index: 1001 pointer-events: none'
-msgmousehelp.innerHTML = '<b>Hilfe für die Maussteuerung</b><br><br>' + (!isTouchEnabled() ? 'STRG + MAUSRAD für Zoom<br>mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben<br>STRG gedrückt halten um zu zeichnen<br>STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern' : '')
-
-const msgfiledrop = document.createElement('div')
-msgfiledrop.id = 'filedrop'
-msgfiledrop.classList.add('message')
-msgfiledrop.style.cssText = 'padding-left: 100px position: absolute z-index: 1002 color: white background: #000 opacity: 0.8 padding:20px min-width: 500px width: 100vw pointer-events: none'
-msgfiledrop.innerHTML = '<b>Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)</b><br><br>Die Datei wird direkt an die Teilnehmer gesendet.<br>Wenn Sie eine Datei dauerhaft speichern wollen, verwenden Sie den Datei-Bereich oben.'
-
-const msgfileupload = document.createElement('div')
-msgfileupload.id = 'transfer'
-msgfileupload.classList.add('message')
-msgfileupload.style.cssText = 'padding-left: 100px position: absolute z-index: 1003 color: white background: #000 opacity: 0.8 padding:20px min-width: 500px width: 100vw pointer-events: none'
-msgfileupload.innerHTML = '<b>Datei wird hochgeladen...</b><br><br>Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.<img style="float: left margin-right: 50px" src="../img/loading_dark.gif">'
-
-const msgremotecontrol = document.createElement('div')
-msgremotecontrol.id = 'remotecontrol'
-msgremotecontrol.classList.add('message')
-msgremotecontrol.style.cssText = 'padding-left: 100px position: absolute z-index: 1004 color: white background: #000 opacity: 0.8 padding:20px min-width: 500px width: 100vw pointer-events: none'
-msgremotecontrol.innerHTML = '<b>Maus/Tastatursteuerung wurde aktiviert</b>'
-
 // Drawing state
 const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
 const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
@@ -143,21 +116,6 @@ let paintcheckinterval: number  // Repaint-Intervall
 // Add this near other state declarations (around line 40-50)
 const tmpPointHistory: Record<string, Stroke[]> = {}
 
-// Disable Browser-Zoom
-//(() => {
-document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && (e.which === 61 || e.which === 107 || e.which === 173 || e.which === 109 || e.which === 187 || e.which === 189)) {
-    e.preventDefault()
-  }
-}, false)
-
-const handleWheel = (e: WheelEvent) => {
-  if (e.ctrlKey || e.metaKey)
-    e.preventDefault()
-}
-document.addEventListener("wheel", handleWheel, { passive: false })
-//})()
-
 const overlayStyle = ref<Record<string, string>>({
   border: '0',
   width: '0px',
@@ -166,23 +124,26 @@ const overlayStyle = ref<Record<string, string>>({
   top: '0px',
 })
 
+const sizeInfoStyle = ref<Record<string, string>>({})
+const showMouseSync = ref(true)
+const showMouseHelp = ref(false)
+const showFileDrop = ref(false)
+const showFileUpload = ref(false)
+const remoteControlMessage = ref<string>()
+const draggingOver = ref(false)
+const clipboardFile = ref<RemotePasteFileData>()
+
 const remoteViewerRef = useTemplateRef('remoteViewer')
 const overlayRef = useTemplateRef('overlay')
-const containerRef = useTemplateRef('container')
 
-// Add this with other state declarations near the top of the script
 let oldbackground: string | undefined
 
 onMounted(() => {
-
-  const sizeInfoEl = document.createElement('div')
-  sizeInfoEl.id = 'sizeinfo'
-  sizeInfoEl.style.cssText = ''
-
-  console.log("connect to controlserver:", props.hostname)
-
-  remoteViewerRef.value?.appendChild(mouseSyncEl)  // display syncmessage
-  remoteViewerRef.value?.appendChild(sizeInfoEl)    // show rectangular with sizeinfo
+  document.body.addEventListener('contextmenu', onContextMenu)
+  document.body.addEventListener('keydown', preventBrowserZoom, false)
+  document.body.addEventListener("wheel", onWheel, { passive: false })
+  window.addEventListener('drop', onDrop)
+  window.addEventListener('dragover', onDragOver)
 
   // allow panning and zooming for #overlay element
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
@@ -260,11 +221,12 @@ onMounted(() => {
     if (!transform)
       return
 
-      const sizeInfoEl = document.querySelector("#sizeinfo") as HTMLDivElement
-      sizeInfoEl.style.width = transform.fullwidth + "px"
-      sizeInfoEl.style.height = transform.fullheight + "px"
-      sizeInfoEl.style.left = (transform.x - 2) + "px"
-      sizeInfoEl.style.top = (transform.y - 2) + "px"
+      sizeInfoStyle.value = {
+        width: transform.fullwidth + "px",
+        height: transform.fullheight + "px",
+        left: (transform.x - 2) + "px",
+        top: (transform.y - 2) + "px"
+      }
 
       // Canvas anpassen
       Object.keys(drawCanvas).forEach(key => {
@@ -289,17 +251,15 @@ onMounted(() => {
     if (!synchronized || screensharing)
       return
 
-    if (overlayCursor[data.id] == undefined) {
-      const cursor = document.createElement('div')
-      cursor.classList.add('cursor')
-      if (props.id != data.id)
-        cursor.innerHTML = '<img src="img/cursor.png" />'
-      else
-        cursor.innerHTML = '<div class="cursor-name" style="border: 1px solid #' + data.color + ';color: #' + data.color + ';">' + data.name + '</div>'
-      overlayCursor[data.id] = cursor
-      overlayRef.value!.appendChild(overlayCursor[data.id]!)
-
-      // Mauszeiger nach 10 Sekunden Inaktivität ausblenden
+    if (!overlayCursors[data.id]) {
+      overlayCursors[data.id] = {
+        name: data.name,
+        color: data.color,
+        left: '0',
+        top: '0',
+        lastAction: 0
+      }
+      
       if (cursorcheckinterval === undefined) {
         cursorcheckinterval = window.setInterval(() => {
           clearMouseCursors()
@@ -307,215 +267,15 @@ onMounted(() => {
       }
     }
 
-    // Positionierung
-    overlayCursorLastAction[data.id] = Date.now()
-    overlayCursor[data.id]!.style.left = Math.round(data.x * (scale * remotescale)) + "px"
-    overlayCursor[data.id]!.style.top = Math.round(data.y * (scale * remotescale)) + "px"
+    overlayCursors[data.id].left = Math.round(data.x * (scale * remotescale)) + "px"
+    overlayCursors[data.id].top = Math.round(data.y * (scale * remotescale)) + "px"
+    overlayCursors[data.id].lastAction = Date.now()
   }
 
   function clearMouseCursors() {
-    // this.overlayCursorLastAction[id]
-    Object.entries(overlayCursor).forEach(([key, value]) => {
-      if (overlayCursorLastAction[key] != undefined && overlayCursorLastAction[key] < (Date.now() - 10000)) {
-        console.log("remove cursor " + key)
-        if (value != null) {
-          value.remove()
-          delete overlayCursor[key]
-          delete overlayCursorLastAction[key]
-        }
-      }
-    })
-  }
-
-  // virtuelles Clipboard, Filesharing via Websockets
-  // Todo, in eigene JS auslagern, da mehr oder weniger baugleich mit Filesharing in meetzi-App
-  function pasteFile(data: RemotePasteFileData) {
-    const clipboardContainerEl = document.querySelector('#clipboardcontainer')
-    if (clipboardContainerEl !== null)
-      clipboardContainerEl.remove()
-
-    const clipboarddiv = document.createElement('div')
-    clipboarddiv.style.cssText = 'position: absolute right:0px bottom:0px'
-    clipboarddiv.id = 'clipboardcontainer'
-    clipboarddiv.innerHTML = `
-      <div class="button" onClick="document.querySelector('#clipboardcontainer').remove()" style="margin-bottom: 5px">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </div>
-      <div class="button copybutton" id="copybutton">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-      </div>
-      <div class="button downloadbutton" id="downloadbutton">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="7 10 12 15 17 10"></polyline>
-          <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-      </div>
-      <div id="clipboardarea"></div>`
-    remoteViewerRef.value?.append(clipboarddiv)
-
-    const clipboardAreaEl = document.getElementById('clipboardarea') as HTMLDivElement
-    const downloadButtonEl = document.querySelector("#downloadbutton") as HTMLButtonElement
-    const copyButtonEl = document.querySelector("#copybutton") as HTMLButtonElement
-    
-    const datestring = (new Date().toLocaleString().replaceAll('/', '-').replaceAll(', ', '_').replaceAll(':', '-'))
-
-    document.querySelectorAll('#transfer').forEach((message) => { message.remove() })
-    if (data.filecontent.startsWith('data:application/octet-stream')) {
-      try {
-        b64DecodeUnicode(data.filecontent.replace('data:application/octet-streambase64,', ''))
-      } catch (e) {
-        data.filecontent = data.filecontent.replace('data:application/octet-stream', 'data:application/bin')
-      }
-    }
-
-    if (data.filecontent.startsWith('data:image/')) {
-      let filetype = data.filecontent.split('data:')[1].split('base64,')[0]
-      let extension = filetype.split('/')[1]
-
-      // Wenns ein Bild ist, aber mime-Extension Sonderzeichen enthält, dann ists irgendein komisches Format und wir nehmen png als Default
-      if (extension.includes('.') || extension.includes('-')) {
-        extension = 'png'
-      }
-      // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
-      if (data.filename !== undefined) {
-        extension = data.filename.split('.').pop() ?? extension
-      }
-
-      const div = document.createElement('div')
-      div.innerHTML = '<center><img id="extensionimage" src="' + data.filecontent + '" style="max-height:120px; max-width:140px; opacity: 0.8"></center>'
-      clipboardAreaEl.append(div)
-
-      // Klick aufs Bild = Download
-      const extensionImageEl = document.querySelector("#extensionimage") as HTMLImageElement
-      extensionImageEl.onclick = () => downloadButtonEl.click()
-
-      downloadButtonEl.onclick = () => {
-        const downloadLink = document.createElement('a')
-        remoteViewerRef.value?.appendChild(downloadLink)
-        downloadLink.href = data.filecontent
-        downloadLink.target = '_self'
-        downloadLink.download = data.filename ?? 'download_' + datestring + '.' + extension
-        downloadLink.click()
-      }
-
-      copyButtonEl.style.display = 'inline'
-      copyButtonEl.onclick = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = extensionImageEl.naturalWidth
-        canvas.height = extensionImageEl.naturalHeight
-        const context = canvas.getContext('2d')!
-        context.drawImage(extensionImageEl, 0, 0)
-        canvas.toBlob(async (blob) => {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              [blob!.type]: blob!
-            })
-          ])
-          console.log('Copied')
-        })
-      }
-
-
-      clipboardAreaEl.append(div)
-    }
-    else if (data.filecontent.startsWith('data:application/octet-stream') || data.filecontent.startsWith('data:text/') || data.filecontent.startsWith('data:application/json')) {
-      let filetype = data.filecontent.split('data:')[1].split('base64,')[0]
-      //let b64data = data.filecontent.split('base64,')[1]
-      let extension = filetype.split('/')[1]
-
-      const div = document.createElement('div')
-      let decoded = ''
-      if (data.filecontent.startsWith('data:application/octet-stream')) {
-        decoded = b64DecodeUnicode(data.filecontent.replace('data:application/octet-streambase64,', ''))
-      } else {
-        decoded = atob(data.filecontent.split('base64,')[1])
-      }
-      if (decoded.includes('<?php')) {
-        extension = 'php'
-      }
-      if (extension.includes('.') || extension.includes('-')) {
-        extension = 'txt'
-      }
-
-      if (data.filename != undefined) {
-        extension = data.filename.split('.').pop() ?? extension
-      }
-
-      div.style.cssText = 'background-image: url(icons/' + extension + '.svg) background-repeat: no-repeat background-position-x: right'
-
-      const textareaEl = document.createElement('textarea')
-      textareaEl.id = 'filecontent'
-      textareaEl.value = decoded
-
-      div.append(textareaEl)
-
-
-
-      clipboardAreaEl.append(div)
-
-      downloadButtonEl.onclick = () => {
-        const downloadLink = document.createElement('a')
-        remoteViewerRef.value?.appendChild(downloadLink)
-        downloadLink.href = data.filecontent
-        downloadLink.target = '_self'
-        if (data.filename != undefined) {
-          downloadLink.download = data.filename
-        } else {
-          downloadLink.download = 'download_' + datestring + '.' + extension
-        }
-        downloadLink.click()
-      }
-
-      copyButtonEl.style.display = 'inline'
-      copyButtonEl.onclick = () => {
-        //document.querySelector("textarea").select()
-        navigator.clipboard.writeText(textareaEl.value)
-
-        //document.execCommand('copy')
-      }
-
-    }
-    else if (data.filecontent.startsWith('data:application/')) {
-      let filetype = data.filecontent.split('data:')[1].split('base64,')[0]
-      let extension = filetype.split('/')[1]
-
-      extension = extension.replace('x-msdownload', 'exe')
-      extension = extension.replace('x-zip-compressed', 'zip')
-
-      if (extension.includes('.') || extension.includes('-')) {
-        extension = 'bin'
-      }
-
-      if (data.filename != undefined) {
-        extension = data.filename.split('.').pop() ?? extension
-      }
-
-      const div = document.createElement('div')
-      div.innerHTML = '<center><img id="extensionimage" src="icons/' + extension + '.svg" style="max-height:150px"></center>'
-      clipboardAreaEl.append(div)
-
-      const extensionImageEl = document.querySelector("#extensionimage") as HTMLImageElement
-      extensionImageEl.onclick = () => downloadButtonEl.click()
-
-      downloadButtonEl.onclick = () => {
-        const downloadLink = document.createElement('a')
-        remoteViewerRef.value?.appendChild(downloadLink)
-        downloadLink.href = data.filecontent
-        downloadLink.target = '_self'
-        if (data.filename != undefined) {
-          downloadLink.download = data.filename
-        } else {
-          downloadLink.download = 'download_' + datestring + '.' + extension
-        }
-        downloadLink.click()
-      }
+    for (const id in overlayCursors) {
+      if (overlayCursors[id].lastAction < (Date.now() - 10000))
+        delete overlayCursors[id]
     }
   }
 
@@ -573,10 +333,8 @@ onMounted(() => {
 
   function repaintStrokes() {
     Object.keys(pointHistory).forEach(key => {
-      //console.log("stroke for "+key)
       // add a canvas for the user strokes
       if (drawCanvas[key] == undefined) {
-        //console.log("canvas for "+key)
         drawCanvas[key] = document.createElement('canvas')
         drawCanvas[key].id = 'canvas_' + key
         drawCanvas[key].style.cssText = 'position: absolute'
@@ -586,7 +344,6 @@ onMounted(() => {
       const drawCanvascontext = drawCanvas[key].getContext("2d")!
       drawCanvascontext.clearRect(0, 0, drawCanvas[key].width, drawCanvas[key].height)
       pointHistory[key].forEach((item) => {
-        //console.log(item)
         if (item.from != undefined) {
           drawCanvascontext.beginPath()
           drawCanvascontext.moveTo(Math.round(item.from[0] * (scale * remotescale)), Math.round(item.from[1] * (scale * remotescale)))
@@ -602,48 +359,22 @@ onMounted(() => {
   }
 
   // Signal einblenden bei Mausklick für 2000ms
-  function mouseSignal(obj: MouseMessage) {
-    if (!remotecontrol && !screensharing) {
-      if (signals[obj.id] != undefined) {
-        signals[obj.id].remove()
+  function mouseSignal(data: MouseMessage) {
+    if (!remoteControlActive.value && !screensharing) {
+      signals[data.id] = {
+        color: data.color,
+        left: Math.round(data.x * (scale * remotescale) - 150) + "px",
+        top: Math.round(data.y * (scale * remotescale) - 150) + "px"
       }
 
-      signals[obj.id] = containerRef.value!.cloneNode(true) as HTMLDivElement
-      signals[obj.id].id = 'signal_' + obj.id
-      overlayRef.value!.appendChild(signals[obj.id])
-
-      signals[obj.id].style.left = Math.round(obj.x * (scale * remotescale) - 150) + "px"
-      signals[obj.id].style.top = Math.round(obj.y * (scale * remotescale) - 150) + "px"
-
-      signals[obj.id].style.display = "flex"
-      signals[obj.id].style.pointerEvents = "none"
-
-      try {
-        document.querySelectorAll('#signal_' + obj.id + ' .cursorsignal').forEach((item) => {
-          (item as HTMLDivElement).style.backgroundColor = '#' + obj.color
-        })
-      } catch (e) { }
-
       setTimeout(() => {
-        if (signals[obj.id] != undefined) {
-          signals[obj.id].remove()
-        }
+        if (signals[data.id])
+          delete signals[data.id]
       }, 2000)
     }
   }
 
-  window.onresize = () => calcScale()
-
-  function calcScale() {
-    overlayStyle.value.border = '1px solid blue'
-    const scale1 = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
-    const scale2 = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
-
-    scale = scale1 < scale2 ? scale1 : scale2
-    if (scale > 1) {
-      scale = 1
-    }
-  }
+  window.addEventListener('resize', calcScale)
 
   onReceive("getclipboard", (data) => {
     console.log("getclipboard", data)
@@ -652,7 +383,7 @@ onMounted(() => {
   })
 
   onReceive("mouse-leftclick", (data) => {
-    if (!remotecontrol) {
+    if (!remoteControlActive.value) {
       mouseSignal(data)
     }
     drawing[data.id] = false;
@@ -666,7 +397,7 @@ onMounted(() => {
   })
 
   onReceive("mouse-move", (data) => {
-    if (!remotecontrol && drawing[data.id] != undefined && drawing[data.id]) {
+    if (!remoteControlActive.value && drawing[data.id] != undefined && drawing[data.id]) {
       continueStroke(data.id, data.color, [data.x, data.y])
     }
 
@@ -687,7 +418,7 @@ onMounted(() => {
   onReceive("mouse-down", (data) => {
     console.log("mouse-down", data)
 
-    if (!remotecontrol && !fileTransfer && (drawing[data.id] == undefined || !drawing[data.id])) {
+    if (!remoteControlActive.value && !draggingOver.value && (drawing[data.id] == undefined || !drawing[data.id])) {
       console.log("startStroke", data)
       startStroke(data.id, [data.x, data.y])
     }
@@ -715,7 +446,7 @@ onMounted(() => {
 
   onReceive("pastefile", (data) => {
     console.log("pastefile", data)
-    pasteFile(data)
+    clipboardFile.value = data
   })
 
   onReceive('reset', (data) => {
@@ -727,7 +458,6 @@ onMounted(() => {
       overlayStyle.value.cursor = 'default'
       screensharing = false
     }
-
     
     if (!oldbackground) {
       oldbackground = document.getElementById('app')!.style.background
@@ -760,35 +490,30 @@ onMounted(() => {
       calcScale()
     }
 
-    if (synchronized && remoteViewerRef.value?.contains(mouseSyncEl)) {
-      mouseSyncEl.remove()
-    }
+    if (synchronized)
+      showMouseSync.value = false
 
     // Maus-Zeigermodus aktiviert/deaktiviert
-    console.log(synchronized, remotecontrol, data.remotecontrol, mouseenabled, data.mouseenabled, mouseSyncEl)
-    if ((!lastmessage || mouseenabled != data.mouseenabled) && !remoteViewerRef.value?.contains(mouseSyncEl)) {
-      msgremotecontrol.innerHTML = data.mouseenabled ? '<b>Remote-Mauszeiger ist nun aktiviert</b>' : '<b>Remote-Mauszeiger wurde deaktiviert</b>'
-      const messageEls = document.querySelectorAll('.message')
-      messageEls.forEach((message) => { message.remove() })
-      remoteViewerRef.value?.appendChild(msgremotecontrol)
+    if ((!lastmessage || mouseEnabled.value != data.mouseenabled) && !showMouseSync.value) {
+      mouseEnabled.value = data.mouseenabled
+      hideMessages()
+      remoteControlMessage.value = mouseEnabled.value ? 'Remote-Mauszeiger ist nun aktiviert' : 'Remote-Mauszeiger wurde deaktiviert'
       setTimeout(() => {
-        messageEls.forEach((message) => { message.remove() })
+        hideMessages()
       }, 3000)
-      mouseenabled = data.mouseenabled
-      if (!mouseenabled) {
+      if (!mouseEnabled.value) {
         clearMouseCursors()
       }
     }
 
     // Maus/Tastatursteuerung aktiviert/deaktiviert
-    if ((!lastmessage || remotecontrol != data.remotecontrol) && !remoteViewerRef.value?.contains(mouseSyncEl)) {
-      msgremotecontrol.innerHTML = data.remotecontrol ? '<b>Fernzugriff ist jetzt aktiviert</b>' : '<b>Fernzugriff wurde deaktiviert</b>'
-      document.querySelectorAll('.message').forEach((message) => { message.remove() })
-      remoteViewerRef.value?.appendChild(msgremotecontrol)
+    if ((!lastmessage || remoteControlActive.value != data.remotecontrol) && !showMouseSync.value) {
+      remoteControlActive.value = data.remotecontrol
+      hideMessages()
+      remoteControlMessage.value = remoteControlActive.value ? 'Fernzugriff ist jetzt aktiviert' : 'Fernzugriff wurde deaktiviert'
       setTimeout(() => {
-        document.querySelectorAll('.message').forEach((message) => { message.remove() })
+        hideMessages()
       }, 3000)
-      remotecontrol = data.remotecontrol
     }
     lastmessage = data
   })
@@ -813,15 +538,12 @@ onMounted(() => {
   })
 
   overlayRef.value!.addEventListener('mousemove', (e) => {
-    if (!mouseenabled) return false
-    if (!synchronized) return false
+    if (!mouseEnabled.value || !synchronized) return false
     remoteClipboard = true
 
     const rect = overlayRef.value!.getBoundingClientRect()
     x = e.pageX - rect.left
     y = e.pageY - rect.top
-
-    
 
     obj = {
       x: Math.round(x / ((scale || 1) * (remotescale || 1) * (zoom?.scale || 1))),
@@ -862,7 +584,7 @@ onMounted(() => {
   let lastObj: MouseMessage
 
   overlayRef.value!.addEventListener('mousedown', (e) => {
-    if (!mouseenabled) return
+    if (!mouseEnabled.value) return
     //if ((ignoremouse < Date.now() - 100)) {
       if (e.which == 3) {
         sendMouseClick()
@@ -876,7 +598,7 @@ onMounted(() => {
   })
 
   overlayRef.value!.addEventListener('mouseup', () => {
-    if (!mouseenabled) return
+    if (!mouseEnabled.value) return
     sendMouseUp()
   })
 
@@ -959,235 +681,16 @@ onMounted(() => {
     lastMouseDown = 0
   }
 
-  window.addEventListener('keydown', (e) => {
-    console.log(e.keyCode)
-
-    skip = false
-    let keyToSend = e.key
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
-      spacepressed = true
-    }
-    if (e.key == 'Shift') {
-      shiftpressed = true
-    }
-    if (e.key == 'Control' || e.key == 'Meta') {
-      controlpressed = true
-    }
-    if (e.key == 'Alt' || e.key == 'AltGraph') {
-      altpressed = true
-    }
-    if (e.key == 'Alt' || e.key == 'AltGraph' || e.key == 'Shift' || e.key == 'CapsLock') {
-      skip = true
-    }
-    if (controlpressed && (e.key == 'Control' || e.key == 'Meta' || e.key == 'v' || e.key == 'c' || e.key == 'x')) {
-      skip = true
-    }
-    if (controlpressed && e.key != 'v' && e.key != 'c' && e.key != 'x' && (e.key.length === 1 && e.key.toLowerCase().match(/[a-z]/i) || e.key == 'Enter')) {
-      keyToSend = '_____strg+' + e.key.toLowerCase()
-    }
-
-    // Special keys ~,+,^,`,´ and how to detect them
-    if (altpressed && e.keyCode == 78) {
-      skip = false
-      keyToSend = '~'
-    }
-    if (e.keyCode === 187) {  // Both ´ and + share keyCode 187
-      if (e.code === 'Equal') {  // Physical key is always 'Equal'
-        if (e.key === 'Dead') {
-          // This is ´ (acute accent)
-          skip = false
-          if (shiftpressed) {
-            keyToSend = '`'
-          } else {
-            keyToSend = '´'
-          }
-        } else if (e.key === '+') {
-          // This is the + key
-          skip = false
-          keyToSend = '+'
-        }
-      }
-    }
-    if (e.keyCode == 192) {
-      skip = false
-      if (shiftpressed) {
-        keyToSend = '°'
-      }
-      else {
-        keyToSend = '^'
-      }
-    }
-    
-    if (!skip) {
-      console.log(keyToSend)
-
-      send('type', { key: keyToSend }, { receiveSelf: true })
-      e.preventDefault()
-    }
-  })
-
-  window.addEventListener('keyup', (e) => {
-    if (e.key == 'Control' || e.key == 'Meta') {
-      setTimeout(() => {
-        controlpressed = false
-      }, 100)
-    }
-    if (e.key == 'Shift') {
-      shiftpressed = false
-    }
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
-      setTimeout(() => {
-        spacepressed = false
-      }, 100)
-    }
-    if (e.key == 'Alt' || e.key == 'AltGraph') {
-      setTimeout(() => {
-        altpressed = false
-      }, 100)
-    }
-
-    e.preventDefault()
-    return false
-  })
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
 
   overlayRef.value!.addEventListener('contextmenu', () => {
     return false
   })
 
-  document.body.ondrop = (ev) => {
-    console.log('File(s) dropped')
-    fileTransfer = false
-
-    // Prevent default behavior (Prevent file from being opened)
-    ev.preventDefault()
-
-    document.querySelectorAll('.message').forEach((message) => { message.remove() })
-    remoteViewerRef.value?.appendChild(msgfileupload)
-
-    const items = ev.dataTransfer?.items
-    if (items) {
-      // Use DataTransferItemList interface to access the file(s)
-      Array.from(items).forEach(item => {
-        // If dropped items aren't files, reject them
-        if (item.kind === 'file') {
-          const blob = item.getAsFile()!
-          const reader = new FileReader()
-          reader.onload = (event) => {
-            send('pastefile', {
-              filecontent: event.target!.result as string,
-              filename: blob.name,
-              room: props.room,
-              name: props.user,
-              color: props.color
-            }, { receiveSelf: true })
-          } // data url!
-          reader.onerror = (e) => {
-            console.error("Error reading file", e);
-          }
-          reader.readAsDataURL(blob)
-
-          //const file = item.getAsFile()
-          //console.log(`… file[${i}].name = ${file.name}`)
-        }
-      })
-    }/* else {
-      // Use DataTransfer interface to access the file(s)
-      [...ev.dataTransfer.files].forEach((file, i) => {
-      console.log(`… file[${i}].name = ${file.name}`)
-      })
-    }*/
-  }
-
-  document.body.ondragover = (ev) => {
-    if (document.querySelector('#filedrop') == null) {
-      console.log('File(s) in drop zone')
-      fileTransfer = true
-
-
-      document.querySelectorAll('.message').forEach((message) => { message.remove() })
-      remoteViewerRef.value?.appendChild(msgfiledrop)
-
-      setTimeout(() => {
-        document.querySelectorAll('#filedrop').forEach((message) => { message.remove() })
-      }, 5000)
-    }
-
-    // Prevent default behavior (Prevent file from being opened)
-    ev.preventDefault()
-  }
-
-  window.addEventListener('paste', (e) => {
-    if (!e.clipboardData)
-      return
-
-    const items = e.clipboardData.items
-    for (let index in items) {
-      const item = items[index]
-
-      console.log(item)
-
-      if (item.kind === 'string' && item.type.match('^text/plain')) {
-        //alert('paste text')
-        item.getAsString((clipText) => {
-          send('paste', {
-            text: clipText.replace(/\r/g, ""),
-            room: props.room,
-            name: props.user,
-            color: props.color,
-            time: Date.now()
-          }, { receiveSelf: true })
-        })
-      } else if (item.kind === 'string' && item.type.match('^text/html')) {
-        // Drag data item is HTML
-        item.getAsString((clipText) => {
-          send('paste', {
-            text: clipText.replace(/\r/g, ""),
-            room: props.room,
-            name: props.user,
-            color: props.color,
-            time: Date.now()
-          }, { receiveSelf: true })
-        })
-        //alert('paste html')
-      } else if (item.kind === 'file') {
-        const blob = item.getAsFile()!
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          send('pastefile', {
-            filecontent: event.target!.result as string,
-            room: props.room,
-            name: props.user,
-            color: props.color
-          }, { receiveSelf: true })
-
-          const obj2: Record<string, Blob> = {}
-          obj2[item.type] = blob
-
-          navigator.clipboard.write([
-            new ClipboardItem(obj2),
-          ])
-
-          //downloadBase64File(event.target.result,'config.php')
-        } // data url!
-        reader.readAsDataURL(blob)
-      }
-
-    }
-  })
-
-  window.addEventListener('copy', () => {
-    if (remoteClipboard)
-      send('copy', {
-        room: props.room,
-      }, { receiveSelf: true })
-  })
-
-  window.addEventListener('cut', () => {
-    if (remoteClipboard)
-      send('cut', {
-        room: props.room,
-      }, { receiveSelf: true })
-  })
+  window.addEventListener('paste', onPaste)
+  window.addEventListener('copy', onCopy)
+  window.addEventListener('cut', onCut)
 
   // Add this near the other event listeners
   overlayRef.value!.addEventListener('mousemove', (e) => {
@@ -1197,26 +700,290 @@ onMounted(() => {
     // Define a threshold for the "top" area (e.g., top 50 pixels)
     const topThreshold = 3
     
-    if (mouseY <= topThreshold) {
-      // Show help message when mouse is near top
-      if (!remoteViewerRef.value?.contains(msgmousehelp)) {
-        remoteViewerRef.value?.appendChild(msgmousehelp)
-      }
-    } else {
-      // Hide help message when mouse moves away
-      if (remoteViewerRef.value?.contains(msgmousehelp)) {
-        msgmousehelp.remove()
-      }
-    }
+    showMouseHelp.value = mouseY <= topThreshold
   })
 
   // Also hide the help message when mouse leaves the overlay
   overlayRef.value!.addEventListener('mouseleave', () => {
-    if (remoteViewerRef.value?.contains(msgmousehelp)) {
-      msgmousehelp.remove()
-    }
+    showMouseHelp.value = false
   })
 })
+
+onBeforeUnmount(() => {
+  document.body.removeEventListener('contextmenu', onContextMenu)
+  document.body.removeEventListener('keydown', preventBrowserZoom)
+  document.body.removeEventListener('wheel', onWheel)
+  window.removeEventListener('drop', onDrop)
+  window.removeEventListener('dragover', onDragOver)
+
+  window.removeEventListener('resize', calcScale)
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+  window.removeEventListener('paste', onPaste)
+  window.removeEventListener('copy', onCopy)
+  window.removeEventListener('cut', onCut)
+})
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault()
+}
+
+// Disable Browser-Zoom
+function preventBrowserZoom(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && (e.which === 61 || e.which === 107 || e.which === 173 || e.which === 109 || e.which === 187 || e.which === 189)) {
+    e.preventDefault()
+  }
+}
+
+function onWheel(e: WheelEvent) {
+  if (e.ctrlKey || e.metaKey)
+    e.preventDefault()
+}
+
+function onKeyUp(e: KeyboardEvent) {
+  if (e.key == 'Control' || e.key == 'Meta') {
+    setTimeout(() => {
+      controlpressed = false
+    }, 100)
+  }
+  if (e.key == 'Shift') {
+    shiftpressed = false
+  }
+  if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    setTimeout(() => {
+      spacepressed = false
+    }, 100)
+  }
+  if (e.key == 'Alt' || e.key == 'AltGraph') {
+    setTimeout(() => {
+      altpressed = false
+    }, 100)
+  }
+
+  e.preventDefault()
+  return false
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  console.log(e.keyCode)
+
+  skip = false
+  let keyToSend = e.key
+  if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    spacepressed = true
+  }
+  if (e.key == 'Shift') {
+    shiftpressed = true
+  }
+  if (e.key == 'Control' || e.key == 'Meta') {
+    controlpressed = true
+  }
+  if (e.key == 'Alt' || e.key == 'AltGraph') {
+    altpressed = true
+  }
+  if (e.key == 'Alt' || e.key == 'AltGraph' || e.key == 'Shift' || e.key == 'CapsLock') {
+    skip = true
+  }
+  if (controlpressed && (e.key == 'Control' || e.key == 'Meta' || e.key == 'v' || e.key == 'c' || e.key == 'x')) {
+    skip = true
+  }
+  if (controlpressed && e.key != 'v' && e.key != 'c' && e.key != 'x' && (e.key.length === 1 && e.key.toLowerCase().match(/[a-z]/i) || e.key == 'Enter')) {
+    keyToSend = '_____strg+' + e.key.toLowerCase()
+  }
+
+  // Special keys ~,+,^,`,´ and how to detect them
+  if (altpressed && e.keyCode == 78) {
+    skip = false
+    keyToSend = '~'
+  }
+  if (e.keyCode === 187) {  // Both ´ and + share keyCode 187
+    if (e.code === 'Equal') {  // Physical key is always 'Equal'
+      if (e.key === 'Dead') {
+        // This is ´ (acute accent)
+        skip = false
+        if (shiftpressed) {
+          keyToSend = '`'
+        } else {
+          keyToSend = '´'
+        }
+      } else if (e.key === '+') {
+        // This is the + key
+        skip = false
+        keyToSend = '+'
+      }
+    }
+  }
+  if (e.keyCode == 192) {
+    skip = false
+    if (shiftpressed) {
+      keyToSend = '°'
+    }
+    else {
+      keyToSend = '^'
+    }
+  }
+  
+  if (!skip) {
+    console.log(keyToSend)
+
+    send('type', { key: keyToSend }, { receiveSelf: true })
+    e.preventDefault()
+  }
+}
+
+function onDrop(e: DragEvent) {
+  // Prevent default behavior (Prevent file from being opened)
+  e.preventDefault()
+
+  console.log('File(s) dropped')
+  draggingOver.value = false
+
+  hideMessages()
+  showFileUpload.value = true
+
+  const items = e.dataTransfer?.items
+  if (items) {
+    // Use DataTransferItemList interface to access the file(s)
+    Array.from(items).forEach(item => {
+      // If dropped items aren't files, reject them
+      if (item.kind === 'file') {
+        const blob = item.getAsFile()!
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          send('pastefile', {
+            filecontent: event.target!.result as string,
+            filename: blob.name,
+            room: props.room,
+            name: props.user,
+            color: props.color
+          }, { receiveSelf: true })
+        } // data url!
+        reader.onerror = (e) => {
+          console.error("Error reading file", e);
+        }
+        reader.readAsDataURL(blob)
+
+        //const file = item.getAsFile()
+        //console.log(`… file[${i}].name = ${file.name}`)
+      }
+    })
+  }/* else {
+    // Use DataTransfer interface to access the file(s)
+    [...ev.dataTransfer.files].forEach((file, i) => {
+    console.log(`… file[${i}].name = ${file.name}`)
+    })
+  }*/
+}
+
+function onDragOver(e: DragEvent) {
+  // Prevent default behavior (Prevent file from being opened)
+  e.preventDefault()
+
+  if (showFileDrop.value)
+    return
+  
+  console.log('File(s) in drop zone')
+  draggingOver.value = true
+
+  hideMessages()
+  showFileDrop.value = true
+
+  setTimeout(() => {
+    showFileDrop.value = false
+  }, 5000)
+}
+
+function onCopy() {
+  if (remoteClipboard)
+    send('copy', {
+      room: props.room,
+    }, { receiveSelf: true })
+}
+
+function onCut() {
+  if (remoteClipboard)
+    send('cut', {
+      room: props.room,
+    }, { receiveSelf: true })
+}
+
+function onPaste(e: ClipboardEvent) {
+  if (!e.clipboardData)
+    return
+
+  const items = e.clipboardData.items
+  for (let index in items) {
+    const item = items[index]
+
+    console.log(item)
+
+    if (item.kind === 'string' && item.type.match('^text/plain')) {
+      //alert('paste text')
+      item.getAsString((clipText) => {
+        send('paste', {
+          text: clipText.replace(/\r/g, ""),
+          room: props.room,
+          name: props.user,
+          color: props.color,
+          time: Date.now()
+        }, { receiveSelf: true })
+      })
+    } else if (item.kind === 'string' && item.type.match('^text/html')) {
+      // Drag data item is HTML
+      item.getAsString((clipText) => {
+        send('paste', {
+          text: clipText.replace(/\r/g, ""),
+          room: props.room,
+          name: props.user,
+          color: props.color,
+          time: Date.now()
+        }, { receiveSelf: true })
+      })
+      //alert('paste html')
+    } else if (item.kind === 'file') {
+      const blob = item.getAsFile()!
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        send('pastefile', {
+          filecontent: event.target!.result as string,
+          room: props.room,
+          name: props.user,
+          color: props.color
+        }, { receiveSelf: true })
+
+        const data: Record<string, Blob> = {}
+        data[item.type] = blob
+
+        navigator.clipboard.write([
+          new ClipboardItem(data),
+        ])
+
+        //downloadBase64File(event.target.result,'config.php')
+      } // data url!
+      reader.readAsDataURL(blob)
+    }
+
+  }
+}
+
+function calcScale() {
+  overlayStyle.value.border = '1px solid blue'
+  const scale1 = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
+  const scale2 = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
+
+  scale = scale1 < scale2 ? scale1 : scale2
+  if (scale > 1) {
+    scale = 1
+  }
+}
+
+function hideMessages() {
+  showMouseHelp.value = false
+  showMouseSync.value = false
+  showFileDrop.value = false
+  showFileUpload.value = false
+  remoteControlMessage.value = undefined
+}
 
 function isTouchEnabled() {
   if (window.matchMedia("(pointer: coarse)").matches) {
@@ -1261,12 +1028,51 @@ defineExpose({
 
 <template>
   <div class="remote-viewer" ref="remoteViewer">
-    <div id="overlay" ref="overlay" :style="overlayStyle"></div>
-    <div id="container" class="container" ref="container">
-      <div class="cursorsignal" style="animation-delay: -1s"></div>
-      <div class="cursorsignal" style="animation-delay: -0.5s"></div>
-      <div class="cursorsignal" style="animation-delay: 0s"></div>
+    <div id="overlay" ref="overlay" :style="overlayStyle">
+      <div v-for="(cursor, cursorId) in overlayCursors" :key="id" class="cursor">
+        <img v-if="cursorId !== id" src="../../assets/img/cursor.png" />
+        <div v-else-if="cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
+      </div>
+      <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
     </div>
+    <div class="size-info" :style="sizeInfoStyle"></div>
+    <div v-if="showMouseHelp || showMouseSync" class="message" style="z-index: 1001">
+      <template v-if="showMouseSync">
+        <b>aktive Remotesitzung - Verbindung wird hergestellt</b>
+        <img style="float: left; margin-right: 50px" src="../../assets/img/loading_dark.gif">
+      </template>
+      <b v-else>Hilfe für die Maussteuerung</b>
+      <br>
+      <br>
+      <template v-if="!isTouchEnabled()">
+        STRG + MAUSRAD für Zoom
+        <br>
+        mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben
+        <br>
+        STRG gedrückt halten um zu zeichnen
+        <br>
+        STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern
+      </template>
+    </div>
+    <div v-if="showFileDrop" class="message modal-message" style="z-index: 1002">
+      <b>Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)</b>
+      <br>
+      <br>
+      Die Datei wird direkt an die Teilnehmer gesendet.
+      <br>
+      Wenn Sie eine Datei dauerhaft speichern wollen, verwenden Sie den Datei-Bereich oben.
+    </div>
+    <div v-if="showFileUpload" class="message modal-message" style="z-index: 1003">
+      <b>Datei wird hochgeladen...</b>
+      <br>
+      <br>
+      Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.
+      <img style="float: left; margin-right: 50px" src="../img/loading_dark.gif">
+    </div>
+    <div v-if="remoteControlMessage" class="message modal-message" style="z-index: 1004">
+      <b>{{ remoteControlMessage }}</b>
+    </div>
+    <Clipboard :file-data="clipboardFile"/>
   </div>
 </template>
 
@@ -1306,20 +1112,8 @@ defineExpose({
       margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px;
   }
 
-  .remote-viewer #sizeinfo {
+  .remote-viewer .size-info {
       padding: 0px; margin: 0px; position: absolute; z-index:2
-  }
-
-  .remote-viewer #container, .remote-viewer .container {
-      width: 300px;
-      height: 300px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      display: none;
-      position: absolute;
-      z-index: 200;
   }
 
   .remote-viewer .cursorsignal {
@@ -1373,43 +1167,6 @@ defineExpose({
       user-select: none;
       -webkit-user-select: none;
       -webkit-app-region: drag;
-  }
-
-  .remote-viewer .copybutton, .remote-viewer .downloadbutton {
-      position: absolute;
-      z-index: 10;
-      width: calc(100% - 10px);
-      margin-top: 5px;
-  }
-
-  .remote-viewer .copybutton {
-      display: none;
-      bottom: 40px;
-  }
-
-  .remote-viewer .downloadbutton {
-      display: inline;
-      bottom: 10px;
-  }
-
-  /* Container styles */
-  .remote-viewer .container {
-      user-select: none;
-      -webkit-user-select: none;
-      clear: both;
-      padding-top: 5px;
-  }
-
-  .remote-viewer #clipboardcontainer {
-      position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 160px;
-      height: 200px;
-      padding: 5px;
-      border-radius: 5px;
-      background: #1a1a1a;
-      z-index: 300;
   }
 
   /* Textarea styles */
@@ -1492,7 +1249,20 @@ defineExpose({
       transform: rotate(45deg);
   }
 
-  
+  .remote-viewer .message {
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  .remote-viewer .modal-message {
+    padding-left: 100px;
+    position: absolute;
+    color: white;
+    background: #000;
+    padding: 20px;
+    min-width: 500px;
+    width: 100vw;
+  }
 
   @keyframes scaleIn {
       from {
