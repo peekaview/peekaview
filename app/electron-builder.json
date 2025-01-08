@@ -76,7 +76,6 @@
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
-    "provisioningProfile": "build-resources/embedded.provisionprofile",
     "signIgnore": [
       "node_modules/koffi/build/koffi/win32_x64/koffi.node",
       "node_modules/koffi/build/koffi/win32_ia32/koffi.node",
