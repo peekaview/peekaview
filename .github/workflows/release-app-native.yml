@@ -105,7 +105,7 @@ jobs:
 
         - name: Install Dependencies
           working-directory: ./app
-          run: pnpm install && pnpm install --global clean-modules && clean-modules         
+          run: pnpm install && pnpm install --global clean-modules && clean-modules clean        
 
         - name: Setup Environment
           working-directory: ./app

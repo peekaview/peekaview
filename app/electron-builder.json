@@ -83,8 +83,8 @@
       "node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node",
       "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
     ],
+    "forceCodeSigning": true,
     "additionalArguments": [
-      "--deep",
       "--force",
       "--options=runtime",
       "--timestamp"
