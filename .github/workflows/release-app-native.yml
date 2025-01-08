@@ -129,6 +129,7 @@ jobs:
             APPLE_ID_PASSWORD: ${{ secrets.APPLEIDPASS }}
             APPLE_TEAM_ID: ${{ secrets.TEAMID }}
             APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLEIDPASS }}
+            DEBUG: electron-builder
           run: pnpm run build:mac
 
   build_on_win:

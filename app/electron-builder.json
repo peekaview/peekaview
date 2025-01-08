@@ -76,7 +76,6 @@
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
-    "additionalProperties": true,
     "additionalArguments": [
       "--deep"
     ],
