@@ -66,8 +66,7 @@
   },
   "mac": {
     "target": [
-      "dmg",
-      "zip"
+      "dmg"
     ],
     "category": "public.app-category.utilities",
     "icon": "build-resources/icon.icns",
@@ -76,41 +75,7 @@
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
-    "signIgnore": [
-      "node_modules/koffi/build/koffi/win32_x64/koffi.node",
-      "node_modules/koffi/build/koffi/win32_ia32/koffi.node",
-      "node_modules/koffi/build/koffi/win32_arm64/koffi.node",
-      "node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node",
-      "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
-    ],
-    "forceCodeSigning": true,
-    "additionalArguments": [
-      "--deep",
-      "--force",
-      "--options=runtime",
-      "--timestamp"
-    ],
-    "binaries": [
-      "Contents/MacOS/peekaview",
-      "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/node-mac-permissions/build/Release/permissions.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_x64/koffi.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_arm64/koffi.node",
-      "Contents/Frameworks/peekaview Helper (GPU).app/Contents/MacOS/peekaview Helper (GPU)",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libEGL.dylib",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libvk_swiftshader.dylib",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libGLESv2.dylib",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libffmpeg.dylib",
-      "Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
-      "Contents/Frameworks/ReactiveObjC.framework/Versions/A/ReactiveObjC",
-      "Contents/Frameworks/Squirrel.framework/Versions/A/Squirrel",
-      "Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt",
-      "Contents/Frameworks/peekaview Helper (Plugin).app/Contents/MacOS/peekaview Helper (Plugin)",
-      "Contents/Frameworks/Mantle.framework/Versions/A/Mantle",
-      "Contents/Frameworks/peekaview Helper.app/Contents/MacOS/peekaview Helper",
-      "Contents/Frameworks/peekaview Helper (Renderer).app/Contents/MacOS/peekaview Helper (Renderer)"
-    ]
+    "notarize": true
   },
   "dmg": {
     "background": "build-resources/dmg-background.png",
