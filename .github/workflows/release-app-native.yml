@@ -125,6 +125,9 @@ jobs:
             APPLEID: ${{ secrets.APPLEID }}
             APPLEIDPASS: ${{ secrets.APPLEIDPASS }}
             TEAMID: ${{ secrets.TEAMID }}
+            APPLE_ID: ${{ secrets.APPLEID }}
+            APPLE_ID_PASSWORD: ${{ secrets.APPLEIDPASS }}
+            APPLE_TEAM_ID: ${{ secrets.TEAMID }}
           run: pnpm run build:mac
 
   build_on_win:
