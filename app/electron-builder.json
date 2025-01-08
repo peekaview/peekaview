@@ -1,6 +1,7 @@
 {
   "appId": "com.limtec.peekaview",
   "productName": "peekaview",
+  "afterSign": "scripts/notarize.js",
   "directories": {
     "buildResources": "build-resources",
     "output": "dist"
@@ -28,12 +29,16 @@
     {
       "from": "locales",
       "to": "./locales",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     {
       "from": "static",
       "to": "./static",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     }
   ],
   "asar": {
@@ -43,7 +48,10 @@
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64", "ia32"]
+        "arch": [
+          "x64",
+          "ia32"
+        ]
       }
     ],
     "icon": "build-resources/icon.ico",
@@ -58,10 +66,17 @@
     "shortcutName": "peekaview"
   },
   "mac": {
-    "target": ["dmg", "zip"],
+    "target": [
+      "dmg",
+      "zip"
+    ],
     "category": "public.app-category.utilities",
     "icon": "build-resources/icon.icns",
-    "artifactName": "${productName}-${version}-mac.${ext}"
+    "artifactName": "${productName}-${version}-mac.${ext}",
+    "entitlements": "build-resources/entitlements.mac.plist",
+    "entitlementsInherit": "build-resources/entitlements.mac.plist",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false
   },
   "dmg": {
     "background": "build-resources/dmg-background.png",
@@ -94,6 +109,10 @@
     "grade": "stable",
     "confinement": "strict",
     "summary": "A Desktop sharing application",
-    "plugs": ["home", "network", "x11"]
+    "plugs": [
+      "home",
+      "network",
+      "x11"
+    ]
   }
 }

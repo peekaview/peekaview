@@ -76,6 +76,10 @@ jobs:
           working-directory: ./app
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+            CSC_LINK: ${{ secrets.CSC_LINK }}
+            APPLEID: ${{ secrets.APPLEID }}
+            APPLEIDPASS: ${{ secrets.APPLEIDPASS }}
           run: pnpm run build:linux
 
   build_on_mac:
