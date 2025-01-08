@@ -85,6 +85,7 @@
     ],
     "forceCodeSigning": true,
     "additionalArguments": [
+      "--deep",
       "--force",
       "--options=runtime",
       "--timestamp"
