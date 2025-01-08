@@ -118,12 +118,12 @@ jobs:
           run: |
             Write-Host "Contents of out directory:"
             Get-ChildItem -Path out -Recurse
-            
+
         - name: Upload Release Assets
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ./app
           run: |
-              Get-ChildItem -Path "out" -Recurse -Filter "*.exe" | ForEach-Object {
+              Get-ChildItem -Path "dist" -Recurse | Where-Object { $_.Name -notlike "*.blockmap" } | ForEach-Object {
                 gh release upload "v${{ needs.create_release.outputs.version }}" $_.FullName
               }
