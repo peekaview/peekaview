@@ -35,34 +35,7 @@ jobs:
 #    - name: build
 #      run: npm run make
 
-  create_release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-    - uses: actions/checkout@v4    
-      with:
-        ref: ${{ github.ref }}  
-        
-    - name: Get Version
-      id: get_version
-      working-directory: ./app
-      run: |
-            VERSION=$(awk -F'"' '/"version"/ {print $4}' package.json)
-            echo "Extracted version: $VERSION"
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "version=$VERSION" >> $GITHUB_ENV
-    - name: Create Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh release create "v${{ env.VERSION }}" \
-          --title "PeekaView v${{ env.VERSION }}" \
-          --draft
   build_on_win:
-    needs: create_release
     runs-on: windows-latest
     permissions:
       contents: write
@@ -110,20 +83,4 @@ jobs:
           working-directory: ./app
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            BUILD_VERSION: ${{ needs.create_release.outputs.version }}
           run: pnpm run build:win
-
-        - name: List out directory
-          working-directory: ./app
-          run: |
-            Write-Host "Contents of out directory:"
-            Get-ChildItem -Path out -Recurse
-
-        - name: Upload Release Assets
-          env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: ./app
-          run: |
-              Get-ChildItem -Path "dist" -Recurse | Where-Object { $_.Name -notlike "*.blockmap" } | ForEach-Object {
-                gh release upload "v${{ needs.create_release.outputs.version }}" $_.FullName
-              }
