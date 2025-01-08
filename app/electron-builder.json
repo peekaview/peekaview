@@ -83,7 +83,6 @@
       "node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node",
       "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
     ],
-    "strictVerify": true,
     "forceCodeSigning": true,
     "additionalArguments": [
       "--deep",
