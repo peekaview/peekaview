@@ -84,6 +84,7 @@
       "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
     ],
     "additionalArguments": [
+      "--deep",
       "--force",
       "--options=runtime",
       "--timestamp"
