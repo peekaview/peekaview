@@ -4,36 +4,95 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - develop
+      - main
     paths:
-      - "app_disabled/**"
+      - "app/**"
 
 
 jobs:
-  
-#  build_on_linux:
-#    runs-on: ubuntu-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - uses: actions/setup-node@master
-#      with:
-#        node-version: 14
-#    - name: install dependencies
-#      run: npm install
-#    - name: build
-#      run: npm run make
+  build_on_linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+        - name: Check out Git repository
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ github.ref }}
 
-#  build_on_mac:
-#    runs-on: macos-latest
-#    steps:
-#    - uses: actions/checkout@v2
-#    - uses: actions/setup-node@master
-#      with:
-#        node-version: 14
-#    - name: install dependencies
-#      run: npm install
-#    - name: build
-#      run: npm run make
+        - uses: pnpm/action-setup@v4
+          name: Install pnpm
+          with:
+            version: 9
+            run_install: false
+    
+        - name: Install Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
+            cache: 'pnpm'
+            cache-dependency-path: 'app/'
+
+        - name: Install Dependencies
+          working-directory: ./app
+          run: pnpm install            
+
+        - name: Setup Environment
+          working-directory: ./app
+          run: |
+            echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
+            echo "VITE_API_URL=https://api.peekaview.de/" >> .env
+            echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
+            echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
+            echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
+
+        - name: Build Electron App
+          working-directory: ./app
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: pnpm run build:linux
+
+  build_on_mac:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+        - name: Check out Git repository
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ github.ref }}
+
+        - uses: pnpm/action-setup@v4
+          name: Install pnpm
+          with:
+            version: 9
+            run_install: false
+    
+        - name: Install Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
+            cache: 'pnpm'
+            cache-dependency-path: 'app/'
+
+        - name: Install Dependencies
+          working-directory: ./app
+          run: pnpm install            
+
+        - name: Setup Environment
+          working-directory: ./app
+          run: |
+            echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
+            echo "VITE_API_URL=https://api.peekaview.de/" >> .env
+            echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
+            echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
+            echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
+
+        - name: Build Electron App
+          working-directory: ./app
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: pnpm run build:mac
 
   build_on_win:
     runs-on: windows-latest
@@ -70,14 +129,6 @@ jobs:
              echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
              echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
              echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
-
-        - name: Cache node_modules in app folder
-          uses: actions/cache@v3
-          with:
-            path: ./app/node_modules
-            key: ${{ runner.os }}-app-node-modules-${{ hashFiles('app/package-lock.json') }}
-            restore-keys: |
-               ${{ runner.os }}-app-node-modules-
 
         - name: Build Electron App
           working-directory: ./app
