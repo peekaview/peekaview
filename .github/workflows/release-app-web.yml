@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare Pages
+name: Release App Web to Cloudflare Pages
 
 on:
   push:
@@ -29,16 +29,22 @@ jobs:
           else
             echo "branch=dev" >> $GITHUB_OUTPUT
           fi
-
-      - name: Setup Node.js
+   
+      - name: setup node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-    
+              node-version: 20
+              cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+              version: 9
+              run_install: false              
+
       - name: Setup Environment
         working-directory: ./app
         run: |
-          npm install -g pnpm
           echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
           echo "VITE_API_URL=https://api.peekaview.de/" >> .env
           echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env

@@ -1,4 +1,4 @@
-name: Build and Release Electron App
+name: Release Electron App to Github Releases
 
 on:
   workflow_dispatch:
@@ -10,6 +10,7 @@ on:
 
 
 jobs:
+  
 #  build_on_linux:
 #    runs-on: ubuntu-latest
 #    steps:
@@ -34,7 +35,32 @@ jobs:
 #    - name: build
 #      run: npm run make
 
+  create_release:
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4    
+      with:
+        ref: ${{ github.ref }}  
+        
+    - name: Get Version
+      id: get_version
+      working-directory: ./app
+      run: |
+            VERSION=$(awk -F'"' '/"version"/ {print $4}' package.json)
+            echo "Extracted version: $VERSION"
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ env.VERSION }}" \
+          --title "PeekaView v${{ env.VERSION }}" \
+          --draft
   build_on_win:
+    needs: create_release
     runs-on: windows-latest
     permissions:
       contents: write
@@ -44,17 +70,26 @@ jobs:
           with:
             ref: ${{ github.ref }}
 
-        - name: Install Node.js
+        - name: setup node
           uses: actions/setup-node@v4
           with:
-            node-version: 20
+             node-version: 20
+             cache: 'pnpm'
+    
+        - uses: pnpm/action-setup@v4
+          name: Install pnpm
+          with:
+             version: 9
+             run_install: false       
 
-        - name: Create Env
+        - name: Setup Environment
           working-directory: ./app
           run: |
-            echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
-            echo "VITE_API_URL=https://api.peekaview.de/" >> .env
-            echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de" >> .env
+             echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
+             echo "VITE_API_URL=https://api.peekaview.de/" >> .env
+             echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
+             echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
+             echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
 
         - name: Cache node_modules in app folder
           uses: actions/cache@v3
@@ -68,46 +103,15 @@ jobs:
           working-directory: ./app
           run: npm install
 
-        - name: Set build version
-          id: set_version
-          working-directory: ./app
-          run: |
-            $VERSION = (node -p "require('./package.json').version")
-            $COMMIT_SHA = (git rev-parse --short HEAD)
-            echo "version=$VERSION-$COMMIT_SHA" >> $env:GITHUB_OUTPUT
-
         - name: Build Electron App
           working-directory: ./app
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            BUILD_VERSION: ${{ steps.set_version.outputs.version }}
-          run: npm run electron-build-win
+            BUILD_VERSION: ${{ env.VERSION }}
+          run: echo "Version i use:" && echo ${{ env.VERSION }} && pnpm run electron-build-win
 
-        - name: List dist directory
-          working-directory: ./app
-          run: |
-            Write-Host "Contents of dist directory:"
-            Get-ChildItem -Path dist -Recurse
         - name: List out directory
           working-directory: ./app
           run: |
             Write-Host "Contents of out directory:"
             Get-ChildItem -Path out -Recurse
-
-        - name: Create Pre-release
-          uses: softprops/action-gh-release@v1
-          env:
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          with:
-            tag_name: pre-release
-            name: Pre-release ${{ steps.set_version.outputs.version }}
-            body: |
-                Pre-release build from develop branch
-                Version: ${{ steps.set_version.outputs.version }}
-                Built from commit: ${{ github.sha }}
-                Build date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))
-            prerelease: true
-            draft: true
-            files: |
-                app/dist/win32-x64/*.exe
-            target_commitish: ${{ github.sha }}
