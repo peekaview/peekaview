@@ -7,6 +7,9 @@ import Clipboard from './Clipboard.vue'
 
 import { hexToRgb } from "../../util.js"
 
+import CursorPng from '../../../assets/img/cursor.png'
+import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
+
 import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
 import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
 
@@ -1030,7 +1033,7 @@ defineExpose({
   <div class="remote-viewer" ref="remoteViewer">
     <div id="overlay" ref="overlay" :style="overlayStyle">
       <div v-for="(cursor, cursorId) in overlayCursors" :key="id" class="cursor">
-        <img v-if="cursorId !== id" src="../../assets/img/cursor.png" />
+        <img v-if="cursorId !== id" :src="CursorPng" />
         <div v-else-if="cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
       </div>
       <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
@@ -1039,7 +1042,7 @@ defineExpose({
     <div v-if="showMouseHelp || showMouseSync" class="message" style="z-index: 1001">
       <template v-if="showMouseSync">
         <b>aktive Remotesitzung - Verbindung wird hergestellt</b>
-        <img style="float: left; margin-right: 50px" src="../../assets/img/loading_dark.gif">
+        <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
       <b v-else>Hilfe für die Maussteuerung</b>
       <br>
@@ -1067,7 +1070,7 @@ defineExpose({
       <br>
       <br>
       Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.
-      <img style="float: left; margin-right: 50px" src="../img/loading_dark.gif">
+      <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
     </div>
     <div v-if="remoteControlMessage" class="message modal-message" style="z-index: 1004">
       <b>{{ remoteControlMessage }}</b>

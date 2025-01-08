@@ -5,6 +5,7 @@
     "src/vue-shims.d.ts"
   ],
   "include": [
+    "src/assets/**/*",
     "src/renderer/env.d.ts",
     "src/renderer/**/*",
     "src/renderer/**/*.vue",
