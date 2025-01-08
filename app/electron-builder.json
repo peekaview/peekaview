@@ -76,14 +76,25 @@
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
+    "provisioningProfile": "build-resources/embedded.provisionprofile",
+    "signIgnore": [
+      "node_modules/koffi/build/koffi/win32_x64/koffi.node",
+      "node_modules/koffi/build/koffi/win32_ia32/koffi.node",
+      "node_modules/koffi/build/koffi/win32_arm64/koffi.node",
+      "node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node",
+      "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
+    ],
+    "strictVerify": true,
+    "forceCodeSigning": true,
     "additionalArguments": [
-      "--deep"
+      "--deep",
+      "--force",
+      "--options=runtime",
+      "--timestamp"
     ],
     "binaries": [
       "Contents/MacOS/peekaview",
       "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/node-mac-permissions/build/Release/permissions.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/node-mac-permissions/build/Release/permissions.node",
-      "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node",
       "Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node",
       "Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_x64/koffi.node",
       "Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_arm64/koffi.node",
