@@ -32,7 +32,6 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
-    "@electron/notarize": "^2.5.0",
     "@nut-tree-fork/nut-js": "4.2.2",
     "@panzoom/panzoom": "^4.5.1",
     "bootstrap": "^5.3.3",

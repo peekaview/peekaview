@@ -75,6 +75,7 @@
     "entitlements": "build-resources/entitlements.mac.plist",
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
+    "strictVerify": true,
     "gatekeeperAssess": false
   },
   "dmg": {
