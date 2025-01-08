@@ -76,8 +76,32 @@
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
+    "additionalProperties": true,
     "additionalArguments": [
       "--deep"
+    ],
+    "binaries": [
+      "peekaview.app/Contents/MacOS/peekaview",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/node-mac-permissions/build/Release/permissions.node",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/node-mac-permissions/build/Release/permissions.node",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_x64/koffi.node",
+      "peekaview.app/Contents/Resources/app.asar.unpacked/node_modules/koffi/build/koffi/darwin_arm64/koffi.node",
+      "peekaview.app/Contents/Frameworks/peekaview Helper (GPU).app/Contents/MacOS/peekaview Helper (GPU)",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libEGL.dylib",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libvk_swiftshader.dylib",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libGLESv2.dylib",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libffmpeg.dylib",
+      "peekaview.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler",
+      "peekaview.app/Contents/Frameworks/ReactiveObjC.framework/Versions/A/ReactiveObjC",
+      "peekaview.app/Contents/Frameworks/Squirrel.framework/Versions/A/Squirrel",
+      "peekaview.app/Contents/Frameworks/Squirrel.framework/Versions/A/Resources/ShipIt",
+      "peekaview.app/Contents/Frameworks/peekaview Helper (Plugin).app/Contents/MacOS/peekaview Helper (Plugin)",
+      "peekaview.app/Contents/Frameworks/Mantle.framework/Versions/A/Mantle",
+      "peekaview.app/Contents/Frameworks/peekaview Helper.app/Contents/MacOS/peekaview Helper",
+      "peekaview.app/Contents/Frameworks/peekaview Helper (Renderer).app/Contents/MacOS/peekaview Helper (Renderer)"
     ]
   },
   "dmg": {
