@@ -75,9 +75,6 @@
     "entitlements": "build-resources/entitlements.mac.plist",
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
-    "notarization": {
-      "timeout": 300000
-    },
     "gatekeeperAssess": false,
     "signIgnore": [
       "node_modules/koffi/build/koffi/win32_x64/koffi.node",
@@ -86,9 +83,7 @@
       "node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node",
       "node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node"
     ],
-    "forceCodeSigning": true,
     "additionalArguments": [
-      "--deep",
       "--force",
       "--options=runtime",
       "--timestamp"
