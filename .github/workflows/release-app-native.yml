@@ -36,6 +36,7 @@ jobs:
           --title "PeekaView v${{ steps.get_version.outputs.version }}" \
           --draft
   build_on_linux:
+    if: ${{ false }}  # disable for now
     needs: create_release
     runs-on: ubuntu-latest
     permissions:
@@ -126,6 +127,7 @@ jobs:
           run: pnpm run build:mac
 
   build_on_win:
+    if: ${{ false }}  # disable for now
     needs: create_release
     runs-on: windows-latest
     permissions:
