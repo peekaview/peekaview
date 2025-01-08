@@ -1,6 +1,7 @@
 {
   "appId": "com.limtec.peekaview",
   "productName": "peekaview",
+  "afterSign": "scripts/notarize.js",
   "directories": {
     "buildResources": "build-resources",
     "output": "dist"
