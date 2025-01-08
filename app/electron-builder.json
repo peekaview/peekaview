@@ -75,11 +75,10 @@
     "entitlements": "build-resources/entitlements.mac.plist",
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
     "hardenedRuntime": true,
-    "strictVerify": true,
-    "signIgnore": [
-      "node_modules/sharp/**/*"
-    ],
-    "gatekeeperAssess": false
+    "gatekeeperAssess": false,
+    "additionalArguments": [
+      "--deep"
+    ]
   },
   "dmg": {
     "background": "build-resources/dmg-background.png",
