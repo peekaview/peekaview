@@ -1,0 +1,117 @@
+name: Release Electron App to Github Releases
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - develop
+    paths:
+      - "app_disabled/**"
+
+
+jobs:
+  
+#  build_on_linux:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v2
+#    - uses: actions/setup-node@master
+#      with:
+#        node-version: 14
+#    - name: install dependencies
+#      run: npm install
+#    - name: build
+#      run: npm run make
+
+#  build_on_mac:
+#    runs-on: macos-latest
+#    steps:
+#    - uses: actions/checkout@v2
+#    - uses: actions/setup-node@master
+#      with:
+#        node-version: 14
+#    - name: install dependencies
+#      run: npm install
+#    - name: build
+#      run: npm run make
+
+  create_release:
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4    
+      with:
+        ref: ${{ github.ref }}  
+        
+    - name: Get Version
+      id: get_version
+      working-directory: ./app
+      run: |
+            VERSION=$(awk -F'"' '/"version"/ {print $4}' package.json)
+            echo "Extracted version: $VERSION"
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "v${{ env.VERSION }}" \
+          --title "PeekaView v${{ env.VERSION }}" \
+          --draft
+  build_on_win:
+    needs: create_release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+        - name: Check out Git repository
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ github.ref }}
+
+        - name: setup node
+          uses: actions/setup-node@v4
+          with:
+             node-version: 20
+             cache: 'pnpm'
+    
+        - uses: pnpm/action-setup@v4
+          name: Install pnpm
+          with:
+             version: 9
+             run_install: false       
+
+        - name: Setup Environment
+          working-directory: ./app
+          run: |
+             echo "VITE_APP_URL=https://develop.peekaview.de/" >> .env
+             echo "VITE_API_URL=https://api.peekaview.de/" >> .env
+             echo "VITE_CONNECT_SRC=https://*.peekaview.de wss://*.peekaview.de wss://c1.peekaview.de turns:t1.peekaview.de:443 turn:t1.peekaview.de:3478" >> .env
+             echo "VITE_RTC_CONTROL_SERVER=wss://c1.peekaview.de/" >> .env
+             echo "VITE_RTC_ICE_SERVER={ \"urls\": [\"turns:t1.peekaview.de:443\", \"turn:t1.peekaview.de:3478\"] }" >> .env
+
+        - name: Cache node_modules in app folder
+          uses: actions/cache@v3
+          with:
+            path: ./app/node_modules
+            key: ${{ runner.os }}-app-node-modules-${{ hashFiles('app/package-lock.json') }}
+            restore-keys: |
+               ${{ runner.os }}-app-node-modules-
+
+        - name: Install Dependencies
+          working-directory: ./app
+          run: npm install
+
+        - name: Build Electron App
+          working-directory: ./app
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            BUILD_VERSION: ${{ env.VERSION }}
+          run: echo "Version i use:" && echo ${{ env.VERSION }} && pnpm run electron-build-win
+
+        - name: List out directory
+          working-directory: ./app
+          run: |
+            Write-Host "Contents of out directory:"
+            Get-ChildItem -Path out -Recurse
