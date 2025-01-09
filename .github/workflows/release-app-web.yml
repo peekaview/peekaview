@@ -1,16 +1,13 @@
 name: Release App Web to Cloudflare Pages
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - develop
     paths:
       - 'app/**'
-
- 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch: {}
 
 jobs:
   deploy:
@@ -29,18 +26,17 @@ jobs:
           else
             echo "branch=dev" >> $GITHUB_OUTPUT
           fi
-   
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+            version: 9
+            run_install: false     
+          
       - name: setup node
         uses: actions/setup-node@v4
         with:
               node-version: 20
               cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-              version: 9
-              run_install: false              
 
       - name: Setup Environment
         working-directory: ./app
