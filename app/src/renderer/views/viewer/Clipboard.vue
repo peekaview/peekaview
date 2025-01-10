@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch } from 'vue'
-import { RemotePasteFileData } from '../../../interface'
 import { b64DecodeUnicode } from "../../util.js"
 
 type ClipboardFile = {
@@ -11,9 +10,12 @@ type ClipboardFile = {
 }
 
 const props = withDefaults(defineProps<{
-  fileData: RemotePasteFileData | undefined
+  data: {
+    content: string
+    name: string | undefined
+  } | undefined
 }>(), {
-  fileData: undefined
+  data: undefined,
 })
 
 const imageRef = useTemplateRef('image')
@@ -27,24 +29,25 @@ const clipboardFile = ref<ClipboardFile | undefined>()
 
 // virtuelles Clipboard, Filesharing via Websockets
 // Todo, in eigene JS auslagern, da mehr oder weniger baugleich mit Filesharing in meetzi-App
-watch(() => props.fileData, (data) => {
+watch(() => props.data, (data) => {
   if (!data) {
     clipboardFile.value = undefined
     return
   }
 
-  if (data.filecontent.startsWith('data:application/octet-stream')) {
+  let content = data.content
+  let name = data.name
+  if (content.startsWith('data:application/octet-stream')) {
     try {
-      b64DecodeUnicode(data.filecontent.replace('data:application/octet-streambase64,', ''))
+      b64DecodeUnicode(content.replace('data:application/octet-streambase64,', ''))
     } catch (e) {
-      data.filecontent = data.filecontent.replace('data:application/octet-stream', 'data:application/bin')
+      content = content.replace('data:application/octet-stream', 'data:application/bin')
     }
   }
 
-  let type: 'text' | 'image' | 'binary'
-  let content = data.filecontent
-  const mime = data.filecontent.split('data:')[1].split('base64,')[0]
+  const mime = content.split('data:')[1].split('base64,')[0]
   let extension = mime.split('/')[1]
+  let type: 'text' | 'image' | 'binary'
 
   if (content.startsWith('data:application/octet-stream') || content.startsWith('data:text/') || content.startsWith('data:application/json')) {
     type = 'text'
@@ -60,8 +63,8 @@ watch(() => props.fileData, (data) => {
       extension = 'txt'
     }
 
-    if (data.filename != undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name != undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
   else if (content.startsWith('data:image/')) {
@@ -72,8 +75,8 @@ watch(() => props.fileData, (data) => {
     }
 
     // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
-    if (data.filename !== undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name !== undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
   else {
@@ -85,16 +88,16 @@ watch(() => props.fileData, (data) => {
       extension = 'bin'
     }
 
-    if (data.filename != undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name != undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
 
   clipboardFile.value = {
-    type: type,
-    name: data.filename,
-    content: content,
-    extension: extension
+    type,
+    name,
+    content,
+    extension
   }
 }, { immediate: true })
 

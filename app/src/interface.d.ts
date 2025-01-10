@@ -72,7 +72,7 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "pastefile" | "cut" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "enable" ? { }
@@ -92,7 +92,8 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "copy" ? {}
   : T extends "cut" ? {}
   : T extends "paste" ? RemotePasteData
-  : T extends "pastefile" ? RemotePasteFileData
+  : T extends "file" ? RemoteFileData
+  : T extends "file-chunk" ? RemoteFileChunkData
   : T extends "reset" ? RemoteResetData
   : T extends "mouse-control" ? { enabled: boolean }
   : T extends "remote-control" ? { enabled: boolean }
@@ -100,25 +101,28 @@ export type RemoteData<T extends RemoteEvent> =
 
   export type RemoteMouseData = {
     id: string
-    color: string
+    color: string // TODO: register name and color by id for each client instead of sending it every time
+    name: string
     x: number
     y: number
+    delta?: number
   }
 
   export type RemotePasteData = {
     text: string
-    room: string
-    name: string
-    color: string
     time: number
   }
 
-  export type RemotePasteFileData = {
-    filename?: string
-    filecontent: string
-    room: string
+  export type RemoteFileData = {
+    id: string
     name: string
-    color: string
+    length: number
+  }
+
+  export type RemoteFileChunkData = {
+    id: string
+    index: number
+    content: string
   }
 
   export type RemoteResetData = {
