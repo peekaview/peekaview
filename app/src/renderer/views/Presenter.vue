@@ -111,12 +111,11 @@ watch(sessionState, (state) => {
 watch(latestRequest, async (request) => {
   if (!request)
     return
-
   const result = await prompt({
     text: t('share.requestAccess.message', { name: request.name }),
     confirmButtonText: t('share.requestAccess.accept'),
     cancelButtonText: t('share.requestAccess.deny'),
-    soundfile: 'ringtone.wav',
+    sound: 'ringtone',
   })
       
   if (result === '0')

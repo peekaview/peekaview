@@ -81,24 +81,12 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     }
   }
 
-  function enableRemoteControl() {
-    remotePresenter.enableRemoteControl()
-    remotePresenter.remoteControlInputEnabled = true
+  function toggleRemoteControl(toggle?: boolean) {
+    remotePresenter.toggleRemoteControl(toggle)
   }
 
-  function disableRemoteControl() {
-    remotePresenter.disableRemoteControl()
-    remotePresenter.remoteControlInputEnabled = false
-  }
-
-  function enableMouse() {
-    remotePresenter.enableMouse()
-    remotePresenter.mouseEnabled = true
-  }
-
-  function disableMouse() {
-    remotePresenter.disableMouse()
-    remotePresenter.mouseEnabled = false
+  function toggleMouse(toggle?: boolean) {
+    remotePresenter.toggleMouse(toggle)
   }
 
   function stopSharing() {
@@ -220,10 +208,8 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     stopSharing,
     pauseStreaming,
     resumeStreamingIfPaused,
-    enableRemoteControl,
-    disableRemoteControl,
-    enableMouse,
-    disableMouse,
+    toggleRemoteControl,
+    toggleMouse,
     onRemote,
   }
 }

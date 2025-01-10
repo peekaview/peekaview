@@ -29,12 +29,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
   let overlayDrawer: BrowserWindow | undefined
   let clipboardWindow: BrowserWindow | undefined
-  let hwnd = 0
   let localClipboardTime = 0
-  let mouseEnabled = true
   let lastKey: string
   let remoteControlActive = false
   let remoteControlInputEnabled = false
+  let mouseEnabled = true
+  let lastMouseEnabled: boolean | undefined = undefined
   let windowBorders = {
     left: 0,
     top: 0,
@@ -54,8 +54,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     remoteControlActive = false
   }
 
-  function activate(newHwnd) {
-    hwnd = newHwnd
+  function activate(hwnd: string) {
     windowManager = new WindowManager()
     windowManager.selectWindow(hwnd)
 
@@ -70,39 +69,41 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     remoteControlActive = true
   }
 
-  function toggleRemoteControl() {
-    remoteControlInputEnabled = !remoteControlInputEnabled
+  function toggleRemoteControl(toggle?: boolean) {
+    if (remoteControlInputEnabled === toggle)
+      return
+
+    if (toggle === undefined)
+      toggle = !remoteControlInputEnabled
+
+    console.log('Toggling remote control', toggle)
+    remoteControlInputEnabled = toggle
+    if (toggle) {
+      const enabled = mouseEnabled
+      toggleMouse(true)
+      lastMouseEnabled = enabled
+    }
+    else if (lastMouseEnabled !== undefined)
+      toggleMouse(lastMouseEnabled)
+
+    sendRemote('remote-control', { enabled: remoteControlInputEnabled })
   }
 
-  function toggleMouse() {
-    mouseEnabled = !mouseEnabled
+  function toggleMouse(toggle?: boolean) {
+    if (mouseEnabled === toggle)
+      return
+
+    lastMouseEnabled = undefined
+
+    if (toggle === undefined)
+      toggle = !mouseEnabled
+
+    console.log('Toggling mouse control', toggle)
+    mouseEnabled = toggle
     if (!mouseEnabled)
       hideOverlays()
-  }
 
-  function enableMouse() {
-    console.log('Enabling mouse control')
-    mouseEnabled = true
-    sendRemote('mouse-control', { enabled: true })
-  }
-
-  function disableMouse() {
-    console.log('Disabling mouse control')
-    mouseEnabled = false
-    hideOverlays()
-    sendRemote('mouse-control', { enabled: false })
-  }
-
-  function enableRemoteControl() {
-    console.log('Enabling remote control')
-    remoteControlInputEnabled = true
-    sendRemote('remote-control', { enabled: true })
-  }
-
-  function disableRemoteControl() {
-    console.log('Disabling remote control')
-    remoteControlInputEnabled = false
-    sendRemote('remote-control', { enabled: false })
+    sendRemote('mouse-control', { enabled: mouseEnabled })
   }
 
   function showoverlayCursorSignal(id: string, name: string, color: string) {
@@ -829,12 +830,8 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     activate,
     deactivate,
-    enableMouse,
-    disableMouse,
-    toggleMouse,
-    enableRemoteControl,
-    disableRemoteControl,
     toggleRemoteControl,
+    toggleMouse,
     hideRemoteControl,
     onRemote,
   }

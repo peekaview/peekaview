@@ -57,6 +57,8 @@ export default defineConfig({
           app: resolve('src/preload/app.ts'),
           login: resolve('src/preload/login.ts'),
           sources: resolve('src/preload/sources.ts'),
+          dialog: resolve('src/preload/dialog.ts'),
+          toolbar: resolve('src/preload/toolbar.ts'),
         },
         output: {
           preserveModules: false
@@ -72,6 +74,8 @@ export default defineConfig({
           app: resolve('src/renderer/index.html'),
           login: resolve('src/renderer/login/index.html'),
           sources: resolve('src/renderer/sources/index.html'),
+          dialog: resolve('src/renderer/dialog/index.html'),
+          toolbar: resolve('src/renderer/toolbar/index.html'),
         },
         output: {
           preserveModules: false

@@ -1,21 +1,7 @@
+import path from 'path'
 import { ipcMain, screen, BrowserWindow } from 'electron'
-import { resolvePath } from '../util'
-
-export interface DialogOptions {
-  id?: number
-  title?: string
-  message?: string
-  detail?: string
-  type?: 'error' | 'warning' | 'info' | 'success' | 'download' | 'call' | 'question'
-  windowtype?: 'tray' | 'dialog'
-  soundfile?: string | null
-  noLink?: boolean
-  buttons?: string[]
-  defaultId?: number
-  cancelId?: number
-  timeout?: number
-  data?: any
-}
+import { resolvePath, windowLoad } from '../util'
+import { DialogOptions } from '../../interface'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -24,8 +10,7 @@ const isMac = process.platform === 'darwin'
 export function useCustomDialog() {
   const dialoglist: BrowserWindow[] = []
   const traylist: BrowserWindow[] = []
-  const sharelist: BrowserWindow[] = []
-  let soundfile: string | null
+  let sound: string | null
 
   function getDialogResult() {
     const promise = new Promise((resolve) => {
@@ -43,13 +28,6 @@ export function useCustomDialog() {
     })
   }
 
-  function closeShareDialogs() {
-    sharelist.forEach((popupwin) => {
-      try { popupwin.close() }
-      catch (error) { }
-    })
-  }
-
   function closeDialogs() {
     dialoglist.forEach((popupwin) => {
       try { popupwin.close() }
@@ -57,12 +35,8 @@ export function useCustomDialog() {
     })
   }
 
-  function playSoundOnOpen(file: string) {
-    soundfile = file
-  }
-
-  function openShareDialog(hostname: string, options: DialogOptions) {
-    openDialog(hostname, options, 'share')
+  function playSoundOnOpen(s: string) {
+    sound = s
   }
 
   function openTrayDialog(hostname: string, options: DialogOptions) {
@@ -70,42 +44,40 @@ export function useCustomDialog() {
     openDialog(hostname, options, 'tray')
   }
 
-  function openDialog(hostname: string, options: DialogOptions, type: 'share' | 'tray' | 'dialog' = 'dialog') {
+  function openDialog(hostname: string, options: DialogOptions, type: 'tray' | 'dialog' = 'dialog') {
     let windowParams: {
       width: number
       height: number
       x: number
       y: number
-      template: string
+      entryKey: string
     }
 
-    if (type === 'share')
+    if (type === 'tray') {
+      const width = 600
+      const height = 240
+
       windowParams = {
-        width: 440,
-        height: 50,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 220),
-        y: 0,
-        template: 'dialogshare.html',
-      }
-    else if (type === 'tray')
-      windowParams = {
-        width: 600,
-        height: 240,
-        //x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250)
-        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux || isWin32 ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 300 : screen.getPrimaryDisplay().workAreaSize.width - 600),
+        width,
+        height,
+        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux || isWin32 ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width),
         y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux || isWin32 ? 70 : screen.getPrimaryDisplay().workAreaSize.height - 200),
-        template: 'dialogtray.html',
+        entryKey: 'dialog',
       }
-    else if (type === 'dialog')
+    } else if (type === 'dialog') {
+      const width = 500
+      const height = 600
+
       windowParams = {
-        width: 500,
-        height: 600,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width / 2 - 250),
-        y: screen.getPrimaryDisplay().bounds.y + (screen.getPrimaryDisplay().workAreaSize.height / 2 - 300),
-        template: 'dialog.html',
+        width,
+        height,
+        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - width) / 2,
+        y: screen.getPrimaryDisplay().bounds.y + (screen.getPrimaryDisplay().workAreaSize.height - height) / 2,
+        entryKey: 'dialog',
       }
-    else
+    } else {
       return
+    }
 
     const defaultOptions: DialogOptions = {
       title: 'Info',
@@ -114,13 +86,14 @@ export function useCustomDialog() {
       noLink: true,
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
+      windowType: type,
       message: '',
       timeout: (type === 'tray' ? 8000 : 0),
       detail: '',
-      soundfile,
+      sound,
     }
 
-    soundfile = null
+    sound = null
 
     const dialogWindow = new BrowserWindow({
       width: windowParams.width,
@@ -132,7 +105,6 @@ export function useCustomDialog() {
       focusable: true,
       alwaysOnTop: true,
       transparent: true,
-      //skipTaskbar: true,
       skipTaskbar: (type !== 'dialog'),
       show: false,
       title: `peekaview - ${options.title}`,
@@ -141,24 +113,24 @@ export function useCustomDialog() {
       y: windowParams.y,
       icon: resolvePath('static/img/peekaviewlogo.png'),
       webPreferences: {
-        preload: resolvePath('static/js/dialog.js'),
+        preload: path.join(__dirname, '../preload/dialog.js'),
         additionalArguments: [hostname],
         nodeIntegration: true,
-        contextIsolation: false,
+        contextIsolation: true,
         sandbox: false,
         webSecurity: false,
       },
     })
 
-    
-    dialogWindow.loadFile(resolvePath(`static/${windowParams.template}`))
+    windowLoad(dialogWindow, windowParams.entryKey)
+
     if (type === 'dialog')
       dialogWindow.center()
 
     dialogWindow.show()
     //dialogWindow.webContents.openDevTools()
     dialogWindow.webContents.once('dom-ready', () => {
-      dialogWindow.webContents.send('params', {
+      dialogWindow.webContents.send('dialog', {
         ...defaultOptions,
         ...options,
       })
@@ -168,17 +140,13 @@ export function useCustomDialog() {
       traylist.push(dialogWindow)
     if (type === 'dialog')
       dialoglist.push(dialogWindow)
-    if (type === 'share')
-      sharelist.push(dialogWindow)
   }
 
   return {
     getDialogResult,
-    closeShareDialogs,
     closeTrayDialogs,
     closeDialogs,
     playSoundOnOpen,
-    openShareDialog,
     openTrayDialog,
     openDialog,
   }
