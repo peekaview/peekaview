@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 import { loadEnv } from 'vite'
+import svgLoader from 'vite-svg-loader'
 
 import packageJson from './package.json'
 
@@ -93,7 +94,7 @@ export default defineConfig({
         "simple-peer": "simple-peer/simplepeer.min.js",
       }
     },
-    plugins: [vue()],
+    plugins: [vue(), svgLoader()],
     publicDir: resolve('static'),
     server: {
       fs: {

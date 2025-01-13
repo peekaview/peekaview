@@ -88,22 +88,24 @@ watch(sessionState, (state) => {
 
   requestInterval.value = window.setInterval(async () => {
     console.log('Checking for requests')
-    try {
-      if (latestRequest.value)
-        return
+    if (latestRequest.value)
+      return
 
-      const requests = await callApi<Request[]>({
-        action: 'doesAnyoneWantToSeeMyScreen',
-        email: props.email,
-        token: props.token,
-      })
+    const requestData = {
+      action: 'doesAnyoneWantToSeeMyScreen' as const,
+      email: props.email,
+      token: props.token,
+    }
+    
+    try {
+      const requests = await callApi<Request[]>(requestData)
       
       if (requests.length > 0) {
         latestRequest.value = requests[0];
       }
     } catch (error) {
       console.error('Error checking requests:', error);
-      handleError(error as Error)
+      handleError(error as Error, requestData)
     }
   }, 2000)
 })
@@ -139,16 +141,18 @@ function togglePingInterval() {
     
 async function updateOnlineStatus() {
   console.log('Updating online status')
+  const requestData = {
+    action: 'doesAnyoneWantToSeeMyScreen' as const,
+    email: props.email,
+    token: props.token,
+  }
+
   try {
-    await callApi({
-      action: 'doesAnyoneWantToSeeMyScreen',
-      email: props.email,
-      token: props.token,
-    })
+    await callApi(requestData)
     lastPingTime.value = Date.now();
   } catch (error) {
     console.error('Error updating online status:', error)
-    handleError(error as Error)
+    handleError(error as Error, requestData)
   }
 }
 
@@ -156,18 +160,20 @@ async function acceptRequest() {
   if (!latestRequest.value)
     return
 
+  const requestData = {
+    action: 'youAreAllowedToSeeMyScreen' as const,
+    email: props.email,
+    token: props.token,
+    request_id: latestRequest.value.request_id,
+  }
+
   try {
-    await callApi({
-      action: 'youAreAllowedToSeeMyScreen',
-      email: props.email,
-      token: props.token,
-      request_id: latestRequest.value.request_id,
-    })
+    await callApi(requestData)
 
     latestRequest.value = undefined
   } catch (error) {
     console.error('Error accepting request:', error)
-    handleError(error as Error)
+    handleError(error as Error, requestData)
   }
 }
 
@@ -175,18 +181,19 @@ async function denyRequest() {
   if (!latestRequest.value)
     return
 
+  const requestData = {
+    action: 'youAreNotAllowedToSeeMyScreen' as const,
+    email: props.email,
+    token: props.token,
+    request_id: latestRequest.value.request_id,
+  }
   try {
-    await callApi({
-      action: 'youAreNotAllowedToSeeMyScreen',
-      email: props.email,
-      token: props.token,
-      request_id: latestRequest.value.request_id,
-    })
+    await callApi(requestData)
 
     latestRequest.value = undefined
   } catch (error) {
     console.error('Error denying request:', error)
-    handleError(error as Error)
+    handleError(error as Error, requestData)
   }
 }
     
@@ -194,12 +201,14 @@ async function startSession() {
   if (screenPresent.value)
     return
 
+  const requestData = {
+    action: 'createScreenShareRoom' as const,
+    email: props.email,
+    token: props.token,
+  }
+
   try {
-    const data = await callApi<AcceptedRequestData>({
-      action: 'createScreenShareRoom',
-      email: props.email,
-      token: props.token,
-    })
+    const data = await callApi<AcceptedRequestData>(requestData)
 
     screenShareData.value = {
       userName: props.email,
@@ -217,7 +226,7 @@ async function startSession() {
     shareLocalScreen()
   } catch (error) {
     console.error('Error creating room:', error);
-    handleError(error as Error)
+    handleError(error as Error, requestData)
   }
 }
 
@@ -275,8 +284,8 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
   }
 }
     
-function handleError(error: Error) {
-  window.electronAPI?.log("presenter error", error)
+function handleError(error: Error, requestData: any) {
+  window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
   if (error instanceof UnauthorizedError) {
     if (window.electronAPI)
       window.electronAPI.logout(true)

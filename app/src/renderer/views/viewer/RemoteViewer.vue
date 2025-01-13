@@ -4,11 +4,13 @@ import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
 
 import SignalContainer from "./SignalContainer.vue"
 import Clipboard from './Clipboard.vue'
+import Toolbar from "../../components/Toolbar.vue"
 
 import { hexToRgb } from "../../util.js"
 
-import CursorPng from '../../../assets/img/cursor.png'
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
+import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
+import LogoutSvg from '../../../assets/icons/logout.svg'
 
 import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
 import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
@@ -56,6 +58,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
+  (e: 'stop'): void
   (e: 'rescale', scaleinfo: ScaleInfo): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
@@ -134,7 +137,10 @@ const showFileDrop = ref(false)
 const showFileUpload = ref(false)
 const remoteControlMessage = ref<string>()
 const draggingOver = ref(false)
+const showClipboard = ref(true)
 const clipboardFile = ref<RemotePasteFileData>()
+
+watch(clipboardFile, () => showClipboard.value = true)
 
 const remoteViewerRef = useTemplateRef('remoteViewer')
 const overlayRef = useTemplateRef('overlay')
@@ -148,7 +154,7 @@ onMounted(() => {
   window.addEventListener('drop', onDrop)
   window.addEventListener('dragover', onDragOver)
 
-  // allow panning and zooming for #overlay element
+  // allow panning and zooming for overlay element
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
   if (!isTouchEnabled())
     options.handleStartEvent = event => {
@@ -694,22 +700,6 @@ onMounted(() => {
   window.addEventListener('paste', onPaste)
   window.addEventListener('copy', onCopy)
   window.addEventListener('cut', onCut)
-
-  // Add this near the other event listeners
-  overlayRef.value!.addEventListener('mousemove', (e) => {
-    // Get the vertical position of the mouse relative to the overlay
-    const mouseY = e.clientY
-    
-    // Define a threshold for the "top" area (e.g., top 50 pixels)
-    const topThreshold = 3
-    
-    showMouseHelp.value = mouseY <= topThreshold
-  })
-
-  // Also hide the help message when mouse leaves the overlay
-  overlayRef.value!.addEventListener('mouseleave', () => {
-    showMouseHelp.value = false
-  })
 })
 
 onBeforeUnmount(() => {
@@ -1031,10 +1021,9 @@ defineExpose({
 
 <template>
   <div class="remote-viewer" ref="remoteViewer">
-    <div id="overlay" ref="overlay" :style="overlayStyle">
-      <div v-for="(cursor, cursorId) in overlayCursors" :key="id" class="cursor">
-        <img v-if="cursorId !== id" :src="CursorPng" />
-        <div v-else-if="cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
+    <div class="overlay" ref="overlay" :style="overlayStyle">
+      <div v-for="(cursor, cursorId) in overlayCursors" :key="cursorId" class="cursor">
+        <div v-if="cursorId !== id && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
       </div>
       <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
     </div>
@@ -1075,7 +1064,19 @@ defineExpose({
     <div v-if="remoteControlMessage" class="message modal-message" style="z-index: 1004">
       <b>{{ remoteControlMessage }}</b>
     </div>
-    <Clipboard :file-data="clipboardFile"/>
+    <Toolbar collapsible>
+      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" style="width: 30px" @click="showClipboard = !showClipboard">
+        <ClipboardTextOutlineSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" title="Help" style="width: 30px" @click="showMouseHelp = !showMouseHelp">
+        ?
+      </div>
+      <div style="flex-grow: 1"></div>
+      <div class="btn btn-sm btn-secondary" title="Leave" style="width: 30px" @click="$emit('stop')">
+        <LogoutSvg />
+      </div>
+    </Toolbar>
+    <Clipboard v-if="showClipboard" :file-data="clipboardFile"/>
   </div>
 </template>
 
@@ -1111,12 +1112,29 @@ defineExpose({
     padding: 4px;
   }
 
-  .remote-viewer #overlay {
-      margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px;
+  .remote-viewer .overlay {
+    margin: 0px;
+    padding: 0px;
+    z-index:99;
+    position:absolute;
+    top: 0px;
+    left: 0px;
+    width: 400px;
+    height: 400px;
+  }
+
+  .remote-viewer .toolbar {
+    z-index: 2000;
+    position: absolute;
+    top: 0px;
+    left: 50%;
   }
 
   .remote-viewer .size-info {
-      padding: 0px; margin: 0px; position: absolute; z-index:2
+    padding: 0px;
+    margin: 0px;
+    position: absolute;
+    z-index: 2
   }
 
   .remote-viewer .cursorsignal {
@@ -1196,7 +1214,7 @@ defineExpose({
   }
 
   /* Checkbox styles */
-  .remote-viewer .checkboxcontainer {
+  .remote-viewer .checkbox-container {
       display: block;
       position: relative;
       padding-left: 5px;
@@ -1207,7 +1225,7 @@ defineExpose({
       user-select: none;
   }
 
-  .remote-viewer .checkboxcontainer input {
+  .remote-viewer .checkbox-container input {
       position: absolute;
       opacity: 0;
       cursor: pointer;
@@ -1224,11 +1242,11 @@ defineExpose({
       background-color: #eee;
   }
 
-  .remote-viewer .checkboxcontainer:hover input ~ .checkmark {
+  .remote-viewer .checkbox-container:hover input ~ .checkmark {
       background-color: #ccc;
   }
 
-  .remote-viewer .checkboxcontainer input:checked ~ .checkmark {
+  .remote-viewer .checkbox-container input:checked ~ .checkmark {
       background-color: #2196F3;
   }
 
@@ -1238,11 +1256,11 @@ defineExpose({
       display: none;
   }
 
-  .remote-viewer .checkboxcontainer input:checked ~ .checkmark:after {
+  .remote-viewer .checkbox-container input:checked ~ .checkmark:after {
       display: block;
   }
 
-  .remote-viewer .checkboxcontainer .checkmark:after {
+  .remote-viewer .checkbox-container .checkmark:after {
       left: 3px;
       top: 0;
       width: 5px;

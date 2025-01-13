@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 import i18n from './i18n'
 
 import 'bootstrap/dist/css/bootstrap.css'
+import '../assets/css/loading.css'
 // IMPORTANT: load bootstrap styles before Vue components for correct styling order
 import App from './App.vue'
 

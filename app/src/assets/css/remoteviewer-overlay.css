@@ -87,7 +87,7 @@ textarea::-webkit-scrollbar {
 }
 
 /* Checkbox styles */
-.checkboxcontainer {
+.checkbox-container {
     display: block;
     position: relative;
     padding-left: 5px;
@@ -98,7 +98,7 @@ textarea::-webkit-scrollbar {
     user-select: none;
 }
 
-.checkboxcontainer input {
+.checkbox-container input {
     position: absolute;
     opacity: 0;
     cursor: pointer;
@@ -115,11 +115,11 @@ textarea::-webkit-scrollbar {
     background-color: #eee;
 }
 
-.checkboxcontainer:hover input ~ .checkmark {
+.checkbox-container:hover input ~ .checkmark {
     background-color: #ccc;
 }
 
-.checkboxcontainer input:checked ~ .checkmark {
+.checkbox-container input:checked ~ .checkmark {
     background-color: #2196F3;
 }
 
@@ -129,11 +129,11 @@ textarea::-webkit-scrollbar {
     display: none;
 }
 
-.checkboxcontainer input:checked ~ .checkmark:after {
+.checkbox-container input:checked ~ .checkmark:after {
     display: block;
 }
 
-.checkboxcontainer .checkmark:after {
+.checkbox-container .checkmark:after {
     left: 3px;
     top: 0;
     width: 5px;

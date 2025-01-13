@@ -4,7 +4,6 @@ import i18n from '../i18n'
 
 import '../../assets/css/spectre.min.css'
 import '../../assets/css/loading.css'
-import '../../assets/css/overlay.css'
 
 import Toolbar from './Toolbar.vue'
 

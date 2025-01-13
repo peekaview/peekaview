@@ -202,6 +202,7 @@ function stop() {
         :style="viewerStyle"
         @rescale="rescale"
         @send="screenView?.sendRemote($event.event, $event.data)"
+        @stop="stop"
       />
       <slot />
     </div>

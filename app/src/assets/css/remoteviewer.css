@@ -4,14 +4,6 @@ body {
     font-family: Abel;
 }
 
-#overlay {
-    margin: 0px; padding: 0px; z-index:99; position:absolute; top: 0px; left: 0px; width: 400px; height: 400px;
-}
-
-#sizeinfo {
-    padding: 0px; margin: 0px; border: 1px solid black; position: absolute; z-index:2
-}
-
 #container, .container {
     width: 300px;
     height: 300px;

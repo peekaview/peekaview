@@ -377,10 +377,9 @@ interface StoreSchema {
     if (toolbarWindow)
       return
 
-    const width = 440
+    const width = 480
     const height = 50
 
-    console.log("toolbar X", screen.getPrimaryDisplay().bounds.x, screen.getPrimaryDisplay().workAreaSize.width, (screen.getPrimaryDisplay().workAreaSize.width - width) / 2)
     toolbarWindow = new BrowserWindow({
       width,
       minWidth: width,
@@ -409,6 +408,7 @@ interface StoreSchema {
 
     windowLoad(toolbarWindow, 'toolbar')
     toolbarWindow.show()
+    //toolbarWindow.webContents.openDevTools()
   }
 
   function handleProtocol(url: string) {
