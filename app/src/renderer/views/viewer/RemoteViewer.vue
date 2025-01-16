@@ -6,15 +6,16 @@ import SignalContainer from "./SignalContainer.vue"
 import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
-import { hexToRgb } from "../../util.js"
+import { hexToRgb, uuidv4 } from "../../util.js"
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
 import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
 
-import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
+import type { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, File } from '../../../interface.d.ts'
 import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
+import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
 
 type Pan = {
   x: number
@@ -105,10 +106,9 @@ let mousedown = false
 let dragdetected = false
 
 // Websocket-Message Object
-let obj: MouseMessage = {
+let currentMouseData: RemoteMouseData = {
   x: 0,
   y: 0,
-  room: props.room,
   id: props.id,
   name: props.user,
   color: props.color
@@ -138,8 +138,9 @@ const activeMessage = ref<string | undefined>()
 const remoteControlMessage = ref<string>()
 const draggingOver = ref(false)
 const showClipboard = ref(true)
-const clipboardFile = ref<RemotePasteFileData>()
+const clipboardFile = ref<File>()
 
+const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
 const remoteViewerRef = useTemplateRef('remoteViewer')
@@ -453,9 +454,13 @@ onMounted(() => {
     delete latestPoint[data.id]
   })
 
-  onReceive("pastefile", (data) => {
-    console.log("pastefile", data)
-    clipboardFile.value = data
+  onReceive("file", (data) => {
+    console.log("file", data)
+    fileChunkRegistry.register(data)
+  })
+
+  onReceive("file-chunk", (data) => {
+    fileChunkRegistry.receiveChunk(data)
   })
 
   onReceive('reset', (data) => {
@@ -525,7 +530,7 @@ onMounted(() => {
 
   function handleMouseUp() {
     if (lastMouseDown > 0) {
-      send("mouse-up", obj, { receiveSelf: true, volatile: true })
+      send("mouse-up", currentMouseData, { receiveSelf: true, volatile: true })
       clearTimeout(eventToSend)
       eventToSend = undefined
       lastMouseDown = 0
@@ -544,10 +549,9 @@ onMounted(() => {
     x = e.pageX - rect.left
     y = e.pageY - rect.top
 
-    obj = {
+    currentMouseData = {
       x: Math.round(x / (totalScale.value * (zoom?.scale ?? 1))),
       y: Math.round(y / (totalScale.value * (zoom?.scale ?? 1))),
-      room: props.room,
       id: props.id,
       name: props.user,
       color: props.color
@@ -557,7 +561,7 @@ onMounted(() => {
       (lastMove < Date.now() - 100) || 
       (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
       lastMove = Date.now()
-      send(controlpressed ? "paint-mouse-move" : "mouse-move", obj, { receiveSelf: true, volatile: true })
+      send(controlpressed ? "paint-mouse-move" : "mouse-move", currentMouseData, { receiveSelf: true, volatile: true })
     }
 
     lastPosX = x
@@ -573,14 +577,14 @@ onMounted(() => {
 
     if (lastWheel < (Date.now() - 200)) {
       console.log(e)
-      obj.delta = e.deltaY
+      currentMouseData.delta = e.deltaY
       lastWheel = Date.now()
-      send("mouse-wheel", obj, { receiveSelf: true })
+      send("mouse-wheel", currentMouseData, { receiveSelf: true })
     }
   })
 
   //let ignoremouse = 0
-  let lastObj: MouseMessage
+  let lastMouseData: RemoteMouseData
 
   overlayRef.value!.addEventListener('mousedown', (e) => {
     if (!mouseEnabled.value) return
@@ -593,7 +597,7 @@ onMounted(() => {
     /*} else {
       ignoremouse = Date.now()
     }*/
-    lastObj = obj
+    lastMouseData = currentMouseData
   })
 
   overlayRef.value!.addEventListener('mouseup', () => {
@@ -612,7 +616,7 @@ onMounted(() => {
     lastMouseDown = 0
     //lastclick = 0
     console.log("mouse-rightclick")
-    send("mouse-click", obj, { receiveSelf: true, volatile: true })
+    send("mouse-click", currentMouseData, { receiveSelf: true, volatile: true })
   }
 
   function sendMouseDown(e: MouseEvent) {
@@ -641,7 +645,7 @@ onMounted(() => {
         mousedown = true
         
         console.log("mouse-down (immediate due to movement)")
-        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, { receiveSelf: true, volatile: true })
+        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
         
         // Remove this handler since we've triggered the event
         moveHandler && document.removeEventListener('mousemove', moveHandler)
@@ -654,7 +658,7 @@ onMounted(() => {
     eventToSend = window.setTimeout(() => {
       mousedown = true
       console.log("mouse-down")
-      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastObj, { receiveSelf: true, volatile: true })
+      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
     }, 120)
   }
 
@@ -670,10 +674,10 @@ onMounted(() => {
 
     if (mousedown || dragdetected) {
       console.log("mouse-up")
-      send(controlpressed ? "paint-mouse-up" : "mouse-up", obj, { receiveSelf: true, volatile: true })
+      send(controlpressed ? "paint-mouse-up" : "mouse-up", currentMouseData, { receiveSelf: true, volatile: true })
     } else {
       console.log("mouse-leftclick")
-      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastObj, { receiveSelf: true, volatile: true })
+      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastMouseData, { receiveSelf: true, volatile: true })
     }
 
     mousedown = false
@@ -828,26 +832,8 @@ function onDrop(e: DragEvent) {
     // Use DataTransferItemList interface to access the file(s)
     Array.from(items).forEach(item => {
       // If dropped items aren't files, reject them
-      if (item.kind === 'file') {
-        const blob = item.getAsFile()!
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          send('pastefile', {
-            filecontent: event.target!.result as string,
-            filename: blob.name,
-            room: props.room,
-            name: props.user,
-            color: props.color
-          }, { receiveSelf: true })
-        } // data url!
-        reader.onerror = (e) => {
-          console.error("Error reading file", e);
-        }
-        reader.readAsDataURL(blob)
-
-        //const file = item.getAsFile()
-        //console.log(`… file[${i}].name = ${file.name}`)
-      }
+      if (item.kind === 'file')
+        sendFile(item)
     })
   }/* else {
     // Use DataTransfer interface to access the file(s)
@@ -888,7 +874,7 @@ function onCut() {
     }, { receiveSelf: true })
 }
 
-function onPaste(e: ClipboardEvent) {
+async function onPaste(e: ClipboardEvent) {
   if (!e.clipboardData)
     return
 
@@ -903,9 +889,6 @@ function onPaste(e: ClipboardEvent) {
       item.getAsString((clipText) => {
         send('paste', {
           text: clipText.replace(/\r/g, ""),
-          room: props.room,
-          name: props.user,
-          color: props.color,
           time: Date.now()
         }, { receiveSelf: true })
       })
@@ -914,34 +897,18 @@ function onPaste(e: ClipboardEvent) {
       item.getAsString((clipText) => {
         send('paste', {
           text: clipText.replace(/\r/g, ""),
-          room: props.room,
-          name: props.user,
-          color: props.color,
           time: Date.now()
         }, { receiveSelf: true })
       })
       //alert('paste html')
     } else if (item.kind === 'file') {
-      const blob = item.getAsFile()!
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        send('pastefile', {
-          filecontent: event.target!.result as string,
-          room: props.room,
-          name: props.user,
-          color: props.color
-        }, { receiveSelf: true })
+      const blob = await sendFile(item)
 
-        const data: Record<string, Blob> = {}
-        data[item.type] = blob
-
-        navigator.clipboard.write([
-          new ClipboardItem(data),
-        ])
-
-        //downloadBase64File(event.target.result,'config.php')
-      } // data url!
-      reader.readAsDataURL(blob)
+      navigator.clipboard.write([
+        new ClipboardItem({
+          [item.type]: blob
+        }),
+      ])
     }
 
   }
@@ -981,6 +948,38 @@ function isTouchEnabled() {
 type SendOptions = {
   volatile?: boolean
   receiveSelf?: boolean
+}
+
+function sendFile(item: DataTransferItem, name?: string) {
+  return new Promise<globalThis.File>((resolve, reject) => {
+    const blob = item.getAsFile()!
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const chunks = chunkFile(event.target!.result as string)
+
+      const id = uuidv4()
+      send('file', {
+        id,
+        name: name ?? blob.name,
+        length: chunks.length
+      }, { receiveSelf: true })
+
+      for (let i = 0; i < chunks.length; i++) {
+        send('file-chunk', {
+          id,
+          index: i,
+          content: chunks[i],
+        }, { receiveSelf: true })
+      }
+
+      resolve(blob)
+    }
+    reader.onerror = (e) => {
+      console.error("Error reading file", e);
+      reject(e)
+    }
+    reader.readAsDataURL(blob)
+  })
 }
 
 function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
@@ -1068,7 +1067,7 @@ defineExpose({
       </div>
     </Toolbar>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :file-data="clipboardFile"/>
+      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
   </div>
 </template>

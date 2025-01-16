@@ -3,16 +3,16 @@ import { ref, nextTick, onMounted, useTemplateRef } from 'vue'
 
 import Clipboard from '../components/Clipboard.vue'
 
-import { RemotePasteFileData } from '../../interface'
+import { File } from '../../interface'
 
-const fileData = ref<RemotePasteFileData | undefined>()
+const file = ref<File | undefined>()
 
 const clipboardRef = useTemplateRef('clipboard')
 
 onMounted(() => {
   window.electronAPI?.clipboardReady()
   window.electronAPI?.dataToClipboard((data) => {
-    fileData.value = JSON.parse(data)
+    file.value = JSON.parse(data)
   })
 })
 
@@ -36,7 +36,7 @@ function close() {
 </script>
 
 <template>
-  <Clipboard ref="clipboard" :file-data="fileData" draggable @close="close" @on-collapse="onCollapse"/>
+  <Clipboard ref="clipboard" :data="file" draggable @close="close" @on-collapse="onCollapse"/>
 </template>
 
 <style>

@@ -34,7 +34,7 @@ function showSharingActive() {
   window.electronAPI!.showSharingActive()
 }
 
-function onCollapse(collapsed: boolean) {
+function onCollapse() {
   nextTick(() => {
     const rect = toolbarRef.value?.$el.getBoundingClientRect()
     if (!rect)
