@@ -1,41 +1,49 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, useTemplateRef, watch } from 'vue'
 
 import ArrowCollapseHorizontalSvg from '../../assets/icons/arrow-collapse-horizontal.svg'
 import ArrowExpandHorizontalSvg from '../../assets/icons/arrow-expand-horizontal.svg'
+import DragSvg from '../../assets/icons/drag.svg'
 
 const props = withDefaults(defineProps<{
   draggable?: boolean
   collapsible?: boolean
+  pollSize?: boolean
 }>(), {
   draggable: false,
-  collapsible: false
+  collapsible: false,
+  pollSize: false
 })
 
+const toolbarRef = useTemplateRef('toolbar')
 const collapsed = ref(false)
 
 watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
+
+setInterval(() => {
+  if (!props.pollSize)
+    return
+
+  const rect = toolbarRef.value?.getBoundingClientRect()
+  if (!rect)
+    return
+  
+  window.electronAPI?.setToolbarSize(rect.width, rect.height)
+}, 500)
 </script>
 
 <template>
-  <div class="toolbar">
-    <div v-if="draggable" style="height: 15px; width: 100%; position: absolute; top: 0; left: 0; -webkit-app-region: drag;"></div>
-
-    <template v-if="!collapsed">
-      <slot />
-      <div style="flex-grow: 1"></div>
-    </template>
-
+  <div class="toolbar" ref="toolbar">
+    <div v-if="draggable" class="draggable">
+      <DragSvg />
+    </div>
     <div v-if="collapsible" class="btn btn-sm btn-secondary" title="Collapse / Expand" style="width: 30px" @click="collapsed = !collapsed">
       <ArrowExpandHorizontalSvg v-if="collapsed" />
       <ArrowCollapseHorizontalSvg v-else />
     </div>
-    <div v-if="draggable" style="line-height: 20px; float:right; padding-bottom: 6px; padding-top: 6px; width: 16px; -webkit-user-select: none; -webkit-app-region: drag; display: flex; justify-content: center; align-items: center;">
-      <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path fill="none" stroke="#ccc" stroke-width="2"
-          d="M15,5 L17,5 L17,3 L15,3 L15,5 Z M7,5 L9,5 L9,3 L7,3 L7,5 Z M15,13 L17,13 L17,11 L15,11 L15,13 Z M7,13 L9,13 L9,11 L7,11 L7,13 Z M15,21 L17,21 L17,19 L15,19 L15,21 Z M7,21 L9,21 L9,19 L7,19 L7,21 Z" />
-      </svg>
-    </div>
+    <template v-if="!collapsed">
+      <slot />
+    </template>
   </div>
 </template>
 
@@ -44,12 +52,14 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     display: flex;
     flex-wrap: nowrap;
     gap: 0.5em;
+    height: 2.25rem;
     -webkit-user-select: none;
     background: #1a1a1a;
     color: #EEE;
     padding: 4px;
     min-width: 0;
   }
+
   .toolbar svg {
     fill: #666;
   }
@@ -57,7 +67,6 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     /* Base button styles */
   .toolbar .button, .toolbar .btn.btn-secondary {
       cursor: pointer;
-      line-height: 10px;
       text-align: center;
       padding: 5px;
       border: 1px solid #404040;
@@ -71,67 +80,6 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
       background: #404040 !important;
       border-color: #505050;
       color: #ddd;
-  }
-
-  /* Specialized buttons */
-  .toolbar .dragbutton {
-      float: right;
-      padding: 3px 0;
-      margin-right: 15px;
-      width: 20px;
-      -webkit-user-select: none;
-      -webkit-app-region: drag;
-  }
-
-  .toolbar .copybutton, .toolbar .downloadbutton {
-      position: absolute;
-      z-index: 10;
-      width: calc(100% - 10px);
-      margin-top: 5px;
-  }
-
-  .toolbar .copybutton {
-      display: none;
-      bottom: 40px;
-  }
-
-  .toolbar .downloadbutton {
-      display: inline;
-      bottom: 10px;
-  }
-
-  /* Container styles */
-  .toolbar .container {
-      -webkit-user-select: none;
-      clear: both;
-      padding-top: 5px;
-  }
-
-  .modal-container {
-      background: #1a1a1a;
-  }
-
-  /* Textarea styles */
-  .toolbar textarea {
-      width: 100%;
-      height: 100%;
-      max-height: 120px;
-      max-width: 170px;
-      font-size: 10px;
-      font-family: sans-serif;
-      background: black;
-      color: white;
-      border: none;
-      outline: none;
-      resize: none;
-      overflow: auto;
-      -webkit-box-shadow: none;
-      -moz-box-shadow: none;
-      box-shadow: none;
-  }
-
-  .toolbar textarea::-webkit-scrollbar {
-      display: none;
   }
 
   /* Checkbox styles */
@@ -206,5 +154,15 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
 
   .toolbar .checkbox-label {
     padding-left: 0.75em;
+    white-space: nowrap;
+  }
+
+  .toolbar .draggable {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 1.5em;
+    -webkit-user-select: none;
+    -webkit-app-region: drag;
   }
 </style>

@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref, useTemplateRef, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, reactive, ref, useTemplateRef, watch } from "vue"
 import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
 
 import SignalContainer from "./SignalContainer.vue"
-import Clipboard from './Clipboard.vue'
+import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
 import { hexToRgb } from "../../util.js"
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
+import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
 
 import type { RemoteData, RemoteEvent, RemotePasteFileData, RemoteResetData } from '../../../interface.d.ts'
@@ -73,8 +74,9 @@ let remoteClipboard = false
 let skip = false
 
 // Skalierungsinfos
-let scale = 1      // Skalierung im Browser im Verhältnis zur Videogröße
-let remotescale = 1  // Skalierung Remotedesktop im Verhältnis zur Videogröße
+const videoScale = ref(1)   // Skalierung im Browser im Verhältnis zur Videogröße
+const remoteScale = ref(1)  // Skalierung Remotedesktop im Verhältnis zur Videogröße
+const totalScale = computed(() => videoScale.value * remoteScale.value)
 const windowdimensions = { width: 0, height: 0 }     // initial
 
 // Panzoom - Scale und Panning im Browser
@@ -89,7 +91,7 @@ let lastMove = 0
 
 // Screensharing oder Windowsharing aktiv?
 let screensharing = true
-let lastmessage: RemoteResetData | undefined
+let lastResetData: RemoteResetData | undefined
 
 // Maus-Overlays
 const signals = reactive<Record<string, Signal>>({})
@@ -130,11 +132,9 @@ const overlayStyle = ref<Record<string, string>>({
   top: '0px',
 })
 
+const sharerToolbarBoundsStyle = ref<Record<string, string> | undefined>()
 const sizeInfoStyle = ref<Record<string, string>>({})
-const showMouseSync = ref(true)
-const showMouseHelp = ref(false)
-const showFileDrop = ref(false)
-const showFileUpload = ref(false)
+const activeMessage = ref<string | undefined>()
 const remoteControlMessage = ref<string>()
 const draggingOver = ref(false)
 const showClipboard = ref(true)
@@ -276,8 +276,8 @@ onMounted(() => {
       }
     }
 
-    overlayCursors[data.id].left = Math.round(data.x * (scale * remotescale)) + "px"
-    overlayCursors[data.id].top = Math.round(data.y * (scale * remotescale)) + "px"
+    overlayCursors[data.id].left = Math.round(data.x * totalScale.value) + "px"
+    overlayCursors[data.id].top = Math.round(data.y * totalScale.value) + "px"
     overlayCursors[data.id].lastAction = Date.now()
   }
 
@@ -355,12 +355,12 @@ onMounted(() => {
       pointHistory[key].forEach((item) => {
         if (item.from != undefined) {
           drawCanvascontext.beginPath()
-          drawCanvascontext.moveTo(Math.round(item.from[0] * (scale * remotescale)), Math.round(item.from[1] * (scale * remotescale)))
+          drawCanvascontext.moveTo(Math.round(item.from[0] * totalScale.value), Math.round(item.from[1] * totalScale.value))
           drawCanvascontext.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
           drawCanvascontext.lineWidth = 5
           drawCanvascontext.lineCap = "round"
           drawCanvascontext.lineJoin = "round"
-          drawCanvascontext.lineTo(Math.round(item.to[0] * (scale * remotescale)), Math.round(item.to[1] * (scale * remotescale)))
+          drawCanvascontext.lineTo(Math.round(item.to[0] * totalScale.value), Math.round(item.to[1] * totalScale.value))
           drawCanvascontext.stroke()
         }
       })
@@ -372,8 +372,8 @@ onMounted(() => {
     if (!remoteControlActive.value && !screensharing) {
       signals[data.id] = {
         color: data.color,
-        left: Math.round(data.x * (scale * remotescale) - 150) + "px",
-        top: Math.round(data.y * (scale * remotescale) - 150) + "px"
+        left: Math.round(data.x * totalScale.value - 150) + "px",
+        top: Math.round(data.y * totalScale.value - 150) + "px"
       }
 
       setTimeout(() => {
@@ -460,55 +460,44 @@ onMounted(() => {
 
   onReceive('reset', (data) => {
     // Bei Screensharing sieht man den Remotemauszeige, daher den eigenen durch ein feines Crosshair ersetzen
-    if (data.iscreen) {
-      overlayStyle.value.cursor = 'url(img/minicrosshair.png) 5 5, auto'
-      screensharing = true
-    } else {
-      overlayStyle.value.cursor = 'default'
-      screensharing = false
-    }
+    screensharing = data.isScreen
+    overlayStyle.value.cursor = screensharing ? 'url(img/minicrosshair.png) 5 5, auto' : 'default'
     
     if (!oldbackground) {
       oldbackground = document.getElementById('app')!.style.background
       document.getElementById('app')!.style.background = 'repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px'
     }
 
-    /*if (((message.dimensions.right - message.dimensions.left) - 0) * message.scalefactor > props.videoTransform.width) {
-      remotescale = (props.videoTransform.width / ((message.dimensions.right - message.dimensions.left) - 0))
-    } else {*/
-    //remotescale = message.scalefactor
-    const remotescaleheight = (props.videoTransform.height / ((data.dimensions.bottom - data.dimensions.top) - 0))
-    const remotescalewidth = (props.videoTransform.width / ((data.dimensions.right - data.dimensions.left) - 0))
-    if (remotescaleheight < remotescalewidth) {
-      remotescale = remotescaleheight
-    } else {
-      remotescale = remotescalewidth
-    }
-    //}
+    const remoteScaleHeight = props.videoTransform.height / (data.dimensions.bottom - data.dimensions.top)
+    const remoteScaleWidth = props.videoTransform.width / (data.dimensions.right - data.dimensions.left)
+    remoteScale.value = remoteScaleHeight < remoteScaleWidth ? remoteScaleHeight : remoteScaleWidth
 
     // Speichern der Fensterabmessungen
     windowdimensions.width = data.dimensions.right - data.dimensions.left
     windowdimensions.height = data.dimensions.bottom - data.dimensions.top
 
     // Skalierungsinfos und Mauszeigerposition mit Remote-App synchronisiert
-    if (!lastmessage || lastmessage.dimensions.left != data.dimensions.left || lastmessage.dimensions.right != data.dimensions.right || lastmessage.dimensions.top != data.dimensions.top || lastmessage.dimensions.bottom != data.dimensions.bottom) {
-      synchronized = false
-      calcScale()
-    } else {
-      synchronized = true
-      calcScale()
-    }
+    synchronized = !!lastResetData && lastResetData.dimensions.left == data.dimensions.left && lastResetData.dimensions.right == data.dimensions.right && lastResetData.dimensions.top == data.dimensions.top && lastResetData.dimensions.bottom == data.dimensions.bottom
+    calcScale()
+
+    sharerToolbarBoundsStyle.value = (screensharing && data.toolbarBounds) ? {
+      left: totalScale.value * (data.toolbarBounds.x - data.dimensions.left) + "px",
+      top: totalScale.value * (data.toolbarBounds.y - data.dimensions.top) + "px",
+      width: totalScale.value * data.toolbarBounds.width + "px",
+      height: totalScale.value * data.toolbarBounds.height + "px"
+    } : undefined
 
     if (synchronized)
-      showMouseSync.value = false
+      hideMessage('mouseSync')
 
     // Maus-Zeigermodus aktiviert/deaktiviert
-    if ((!lastmessage || mouseEnabled.value != data.mouseenabled) && !showMouseSync.value) {
+    if ((!lastResetData || mouseEnabled.value != data.mouseenabled) && activeMessage.value !== 'mouseSync') {
       mouseEnabled.value = data.mouseenabled
-      hideMessages()
+      activeMessage.value = 'remoteControl'
       remoteControlMessage.value = mouseEnabled.value ? 'Remote-Mauszeiger ist nun aktiviert' : 'Remote-Mauszeiger wurde deaktiviert'
       setTimeout(() => {
-        hideMessages()
+        hideMessage('remoteControl')
+        remoteControlMessage.value = undefined
       }, 3000)
       if (!mouseEnabled.value) {
         clearMouseCursors()
@@ -516,15 +505,16 @@ onMounted(() => {
     }
 
     // Maus/Tastatursteuerung aktiviert/deaktiviert
-    if ((!lastmessage || remoteControlActive.value != data.remotecontrol) && !showMouseSync.value) {
+    if ((!lastResetData || remoteControlActive.value != data.remotecontrol) && activeMessage.value !== 'remoteControl') {
       remoteControlActive.value = data.remotecontrol
-      hideMessages()
+      activeMessage.value = 'remoteControl'
       remoteControlMessage.value = remoteControlActive.value ? 'Fernzugriff ist jetzt aktiviert' : 'Fernzugriff wurde deaktiviert'
       setTimeout(() => {
-        hideMessages()
+        hideMessage('remoteControl')
+        remoteControlMessage.value = undefined
       }, 3000)
     }
-    lastmessage = data
+    lastResetData = data
   })
 
   let lastPosX = 0
@@ -555,8 +545,8 @@ onMounted(() => {
     y = e.pageY - rect.top
 
     obj = {
-      x: Math.round(x / ((scale || 1) * (remotescale || 1) * (zoom?.scale || 1))),
-      y: Math.round(y / ((scale || 1) * (remotescale || 1) * (zoom?.scale || 1))),
+      x: Math.round(x / (totalScale.value * (zoom?.scale ?? 1))),
+      y: Math.round(y / (totalScale.value * (zoom?.scale ?? 1))),
       room: props.room,
       id: props.id,
       name: props.user,
@@ -831,8 +821,7 @@ function onDrop(e: DragEvent) {
   console.log('File(s) dropped')
   draggingOver.value = false
 
-  hideMessages()
-  showFileUpload.value = true
+  activeMessage.value = 'fileUpload'
 
   const items = e.dataTransfer?.items
   if (items) {
@@ -872,17 +861,16 @@ function onDragOver(e: DragEvent) {
   // Prevent default behavior (Prevent file from being opened)
   e.preventDefault()
 
-  if (showFileDrop.value)
+  if (activeMessage.value === 'fileDrop')
     return
   
   console.log('File(s) in drop zone')
   draggingOver.value = true
 
-  hideMessages()
-  showFileDrop.value = true
+  activeMessage.value = 'fileDrop'
 
   setTimeout(() => {
-    showFileDrop.value = false
+    hideMessage('fileDrop')
   }, 5000)
 }
 
@@ -961,21 +949,22 @@ function onPaste(e: ClipboardEvent) {
 
 function calcScale() {
   overlayStyle.value.border = '1px solid blue'
-  const scale1 = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
-  const scale2 = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
+  const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
+  const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
 
-  scale = scale1 < scale2 ? scale1 : scale2
-  if (scale > 1) {
-    scale = 1
+  videoScale.value = scaleX < scaleY ? scaleX : scaleY
+  if (videoScale.value > 1) {
+    videoScale.value = 1
   }
 }
 
-function hideMessages() {
-  showMouseHelp.value = false
-  showMouseSync.value = false
-  showFileDrop.value = false
-  showFileUpload.value = false
-  remoteControlMessage.value = undefined
+function toggleMessage(message: string) {
+  activeMessage.value = activeMessage.value === message ? undefined : message
+}
+
+function hideMessage(message: string) {
+  if (activeMessage.value === message)
+    activeMessage.value = undefined
 }
 
 function isTouchEnabled() {
@@ -1026,57 +1015,61 @@ defineExpose({
         <div v-if="cursorId !== id && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
       </div>
       <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
+      <div v-if="sharerToolbarBoundsStyle" class="sharer-toolbar-bounds" :style="sharerToolbarBoundsStyle"></div>
     </div>
     <div class="size-info" :style="sizeInfoStyle"></div>
-    <div v-if="showMouseHelp || showMouseSync" class="message" style="z-index: 1001">
-      <template v-if="showMouseSync">
-        <b>aktive Remotesitzung - Verbindung wird hergestellt</b>
+    <div v-if="activeMessage" class="message">
+      <template v-if="activeMessage === 'mouseSync' || activeMessage === 'mouseHelp'">
+        <template v-if="activeMessage === 'mouseSync'">
+          <b>aktive Remotesitzung - Verbindung wird hergestellt</b>
+          <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
+        </template>
+        <b v-else>Hilfe für die Maussteuerung</b>
+        <br>
+        <br>
+        <template v-if="!isTouchEnabled()">
+          STRG + MAUSRAD für Zoom
+          <br>
+          mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben
+          <br>
+          STRG gedrückt halten um zu zeichnen
+          <br>
+          STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern
+        </template>
+      </template>
+      <template v-else-if="activeMessage === 'fileDrop'">
+        <b>Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)</b>
+        <br>
+        <br>
+        Die Datei wird direkt an die Teilnehmer gesendet.
+        <br>
+        Wenn Sie eine Datei dauerhaft speichern wollen, verwenden Sie den Datei-Bereich oben.
+      </template>
+      <template v-if="activeMessage === 'fileUpload'">
+        <b>Datei wird hochgeladen...</b>
+        <br>
+        <br>
+        Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.
         <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
-      <b v-else>Hilfe für die Maussteuerung</b>
-      <br>
-      <br>
-      <template v-if="!isTouchEnabled()">
-        STRG + MAUSRAD für Zoom
-        <br>
-        mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben
-        <br>
-        STRG gedrückt halten um zu zeichnen
-        <br>
-        STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern
+      <template v-if="activeMessage === 'remoteControl' && remoteControlMessage">
+        <b>{{ remoteControlMessage }}</b>
       </template>
     </div>
-    <div v-if="showFileDrop" class="message modal-message" style="z-index: 1002">
-      <b>Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)</b>
-      <br>
-      <br>
-      Die Datei wird direkt an die Teilnehmer gesendet.
-      <br>
-      Wenn Sie eine Datei dauerhaft speichern wollen, verwenden Sie den Datei-Bereich oben.
-    </div>
-    <div v-if="showFileUpload" class="message modal-message" style="z-index: 1003">
-      <b>Datei wird hochgeladen...</b>
-      <br>
-      <br>
-      Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.
-      <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
-    </div>
-    <div v-if="remoteControlMessage" class="message modal-message" style="z-index: 1004">
-      <b>{{ remoteControlMessage }}</b>
-    </div>
-    <Toolbar collapsible>
+    <Toolbar class="main-toolbar" collapsible>
       <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" style="width: 30px" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Help" style="width: 30px" @click="showMouseHelp = !showMouseHelp">
-        ?
+      <div class="btn btn-sm btn-secondary" title="Help" style="width: 30px" @click="toggleMessage('mouseHelp')">
+        <HelpSvg />
       </div>
-      <div style="flex-grow: 1"></div>
       <div class="btn btn-sm btn-secondary" title="Leave" style="width: 30px" @click="$emit('stop')">
         <LogoutSvg />
       </div>
     </Toolbar>
-    <Clipboard v-if="showClipboard" :file-data="clipboardFile"/>
+    <div class="clipboard-container">
+      <Clipboard v-if="showClipboard" :file-data="clipboardFile"/>
+    </div>
   </div>
 </template>
 
@@ -1116,14 +1109,23 @@ defineExpose({
     margin: 0px;
     padding: 0px;
     z-index:99;
-    position:absolute;
+    position: absolute;
     top: 0px;
     left: 0px;
     width: 400px;
     height: 400px;
   }
 
-  .remote-viewer .toolbar {
+  .remote-viewer .clipboard-container {
+    position: absolute;
+    bottom: 0px;
+    left: 0px;
+    width: 160px;
+    height: 200px;
+    z-index: 300;
+  }
+
+  .remote-viewer .main-toolbar {
     z-index: 2000;
     position: absolute;
     top: 0px;
@@ -1138,26 +1140,41 @@ defineExpose({
   }
 
   .remote-viewer .cursorsignal {
-      border-radius: 50%;
-      width: 50px;
-      background-color: red;
-      height: 50px;
-      position: absolute;
-      opacity: 0;
-      animation: scaleIn 1s infinite cubic-bezier(.36, .11, .89, .32);
+    border-radius: 50%;
+    width: 50px;
+    background-color: red;
+    height: 50px;
+    position: absolute;
+    opacity: 0;
+    animation: scaleIn 1s infinite cubic-bezier(.36, .11, .89, .32);
+  }
+
+  .remote-viewer .sharer-toolbar-bounds {
+    position: absolute;
+    z-index: 100;
+    background: repeating-linear-gradient(-45deg, #222, #333 15px, #aa0 15px, #cc0 20px);
   }
 
   .remote-viewer .item {
-      z-index: 100;
-      padding: 5px;
+    z-index: 100;
+    padding: 5px;
   }
 
   .remote-viewer .item img {
-      width: 150px;
+    width: 150px;
   }
 
   .remote-viewer .message {
-      padding-left: 100px; position: absolute; z-index: 100; color: white; background: #000; padding:20px; min-width: 500px; width: 100vw
+    padding-left: 100px;
+    position: absolute;
+    z-index: 100;
+    color: white;
+    background: #000;
+    padding: 20px;
+    min-width: 500px;
+    width: 100vw;
+    opacity: 0.8;
+    pointer-events: none;
   }
 
   /* Common button styles */
@@ -1174,126 +1191,111 @@ defineExpose({
   }
 
   .remote-viewer .button:hover, .remote-viewer .recordoverlayclosebutton:hover {
-      background: #404040 !important;
-      border-color: #505050;
-      color: #ddd;
+    background: #404040 !important;
+    border-color: #505050;
+    color: #ddd;
   }
 
   /* Specialized buttons */
   .remote-viewer .dragbutton {
-      float: right;
-      padding: 3px 0;
-      margin-right: 15px;
-      width: 20px;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-app-region: drag;
+    float: right;
+    padding: 3px 0;
+    margin-right: 15px;
+    width: 20px;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-app-region: drag;
   }
 
   /* Textarea styles */
   .remote-viewer textarea {
-      width: 100%;
-      height: 100%;
-      max-height: 120px;
-      max-width: 170px;
-      font-size: 10px;
-      font-family: sans-serif;
-      background: black;
-      color: white;
-      border: none;
-      outline: none;
-      resize: none;
-      overflow: auto;
-      -webkit-box-shadow: none;
-      -moz-box-shadow: none;
-      box-shadow: none;
+    width: 100%;
+    height: 100%;
+    max-height: 120px;
+    max-width: 170px;
+    font-size: 10px;
+    font-family: sans-serif;
+    background: black;
+    color: white;
+    border: none;
+    outline: none;
+    resize: none;
+    overflow: auto;
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
   }
 
   .remote-viewer textarea::-webkit-scrollbar {
-      display: none;
+    display: none;
   }
 
   /* Checkbox styles */
   .remote-viewer .checkbox-container {
-      display: block;
-      position: relative;
-      padding-left: 5px;
-      cursor: pointer;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
+    display: block;
+    position: relative;
+    padding-left: 5px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
   }
 
   .remote-viewer .checkbox-container input {
-      position: absolute;
-      opacity: 0;
-      cursor: pointer;
-      height: 0;
-      width: 0;
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
   }
 
   .remote-viewer .checkmark {
-      position: absolute;
-      top: 2px;
-      left: 0;
-      height: 15px;
-      width: 15px;
-      background-color: #eee;
+    position: absolute;
+    top: 2px;
+    left: 0;
+    height: 15px;
+    width: 15px;
+    background-color: #eee;
   }
 
   .remote-viewer .checkbox-container:hover input ~ .checkmark {
-      background-color: #ccc;
+    background-color: #ccc;
   }
 
   .remote-viewer .checkbox-container input:checked ~ .checkmark {
-      background-color: #2196F3;
+    background-color: #2196F3;
   }
 
   .remote-viewer .checkmark:after {
-      content: "";
-      position: absolute;
-      display: none;
+    content: "";
+    position: absolute;
+    display: none;
   }
 
   .remote-viewer .checkbox-container input:checked ~ .checkmark:after {
-      display: block;
+    display: block;
   }
 
   .remote-viewer .checkbox-container .checkmark:after {
-      left: 3px;
-      top: 0;
-      width: 5px;
-      height: 10px;
-      border: solid white;
-      border-width: 0 3px 3px 0;
-      transform: rotate(45deg);
-  }
-
-  .remote-viewer .message {
-    opacity: 0.8;
-    pointer-events: none;
-  }
-
-  .remote-viewer .modal-message {
-    padding-left: 100px;
-    position: absolute;
-    color: white;
-    background: #000;
-    padding: 20px;
-    min-width: 500px;
-    width: 100vw;
+    left: 3px;
+    top: 0;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
   }
 
   @keyframes scaleIn {
-      from {
-          transform: scale(.5, .5);
-          opacity: .2;
-      }
+    from {
+      transform: scale(.5, .5);
+      opacity: .2;
+    }
 
-      to {
-          transform: scale(2.5, 2.5);
-          opacity: 0;
-      }
+    to {
+      transform: scale(2.5, 2.5);
+      opacity: 0;
+    }
   }
 </style>

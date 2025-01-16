@@ -286,7 +286,7 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
     
 function handleError(error: Error, requestData: any) {
   window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
-  if (error instanceof UnauthorizedError) {
+  if (!import.meta.env.DEV && error instanceof UnauthorizedError) {
     if (window.electronAPI)
       window.electronAPI.logout(true)
     else
@@ -366,7 +366,7 @@ function stopSharing() {
     <div class="section-content">
       <template v-if="token && offerDownload">
         <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
-        
+        filecontent
         <div class="panel share-options-stack">
           <div class="share-option primary">
             <div class="option-content">

@@ -2,6 +2,8 @@
 import { ref, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
+import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
+
 const remoteControlEnabled = ref(true)
 const mouseEnabled = ref(true)
 const isPaused = ref(false)
@@ -23,13 +25,17 @@ function shareDifferentScreen() {
   window.electronAPI!.openScreenSourceSelection()
 }
 
+function toggleClipboard() {
+  window.electronAPI!.toggleClipboard()
+}
+
 function showSharingActive() {
   window.electronAPI!.showSharingActive()
 }
 </script>
 
 <template>
-  <Toolbar collapsible draggable>
+  <Toolbar class="main-toolbar" collapsible draggable poll-size>
     <label class="checkbox-container">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>
@@ -41,6 +47,9 @@ function showSharingActive() {
       <span class="checkmark"></span>
       <span class="checkbox-label">Pointer</span>
     </label>
+    <div class="btn btn-sm btn-secondary" title="Toggle clipboard" style="width: 30px" @click="toggleClipboard">
+      <ClipboardTextOutlineSvg />
+    </div>
     <div class="btn btn-sm btn-secondary" title="Share different screen" style="width: 30px" @click="shareDifferentScreen">
       <svg width="16px" height="16px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path fill="#666" d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v2h12v-2l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/>

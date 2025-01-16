@@ -41,11 +41,16 @@ export interface IElectronAPI {
   handleAppClosing: () => Promise<void>,
   toggleRemoteControl: (toggle?: boolean) => Promise<void>,
   toggleMouse: (toggle?: boolean) => Promise<void>,
+  toggleClipboard: (toggle?: boolean) => Promise<void>,
+  clipboardReady: () => Promise<void>,
+  dataToClipboard: (callback: (data: string) => void) => Electron.IpcRenderer,
+  setToolbarSize: (width: number, height: number) => Promise<void>,
   stopSharing: () => Promise<void>,
   pauseSharing: () => Promise<void>,
   resumeSharing: () => Promise<void>,
   showSharingActive: () => Promise<void>,
   quit: () => Promise<void>,
+  closeClipboard: () => Promise<void>,
   onCleanUpStream: (callback: () => void) => void
 }
 
@@ -147,7 +152,7 @@ export type RemoteData<T extends RemoteEvent> =
   export type RemoteResetData = {
     room: string
     scalefactor: number
-    iscreen: boolean
+    isScreen: boolean
     remotecontrol: boolean
     mouseenabled: boolean
     dimensions: {
@@ -156,4 +161,12 @@ export type RemoteData<T extends RemoteEvent> =
       right: number
       bottom: number
     }
+    toolbarBounds: Rectangle | undefined
+  }
+
+  export type Rectangle = {
+    x: number
+    y: number
+    width: number
+    height: number
   }

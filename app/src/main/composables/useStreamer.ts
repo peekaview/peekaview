@@ -3,7 +3,7 @@ import { dialog } from 'electron'
 import { WindowManager } from '../modules/WindowManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
 
-import type { RemoteData, RemoteEvent, RemoteResetData } from '../../interface.d.ts'
+import type { RemoteData, RemoteEvent } from '../../interface.d.ts'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -81,14 +81,6 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     }
   }
 
-  function toggleRemoteControl(toggle?: boolean) {
-    remotePresenter.toggleRemoteControl(toggle)
-  }
-
-  function toggleMouse(toggle?: boolean) {
-    remotePresenter.toggleMouse(toggle)
-  }
-
   function stopSharing() {
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
@@ -100,7 +92,6 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       checkWindowInterval = undefined
     }
 
-    console.log('stop sharing!!')
     windowManager.hideRecordOverlay()
     remotePresenter.hideRemoteControl()
     remotePresenter.deactivate()
@@ -148,8 +139,6 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     if (hwnd !== undefined && streamingState === 'stopped') {
       console.log("startStreaming")
 
-      
-
       streamingState = 'active'
 
       windowManager.selectWindow(hwnd)
@@ -165,40 +154,24 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     if (roomid === undefined)
       return
 
-    const obj = {
-      room: roomid,
-      scalefactor: windowManager.getScaleFactor() || 1,
-      iscreen: windowManager.isScreen(),
+    const send = () => sendRemote('reset', {
+      room: roomid!,
+      scalefactor: windowManager.getScaleFactor() ?? 1,
+      isScreen: windowManager.isScreen(),
       remotecontrol: remotePresenter.remoteControlInputEnabled,
       mouseenabled: remotePresenter.mouseEnabled,
       dimensions: windowManager.getWindowOuterDimensions(),
-    }
+      toolbarBounds: remotePresenter.getToolbarBounds(),
+    })
 
-    sendRemote('reset', obj)
+    send()
 
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
       resetInterval = undefined
     }
 
-    resetInterval = setInterval(() => {
-      const message: RemoteResetData = {
-        room: roomid!,
-        scalefactor: windowManager.getScaleFactor(),
-        iscreen: windowManager.isScreen(),
-        remotecontrol: remotePresenter.remoteControlInputEnabled,
-        mouseenabled: remotePresenter.mouseEnabled,
-        dimensions: windowManager.getWindowOuterDimensions(),
-      }
-
-      console.log('sendReset', message)
-
-      sendRemote('reset', message)
-    }, 2000)
-  }
-
-  function onRemote<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
-    remotePresenter.onRemote(event, data)
+    resetInterval = setInterval(() => send(), 2000)
   }
 
   return {
@@ -208,8 +181,5 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     stopSharing,
     pauseStreaming,
     resumeStreamingIfPaused,
-    toggleRemoteControl,
-    toggleMouse,
-    onRemote,
   }
 }

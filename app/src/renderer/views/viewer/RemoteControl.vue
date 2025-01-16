@@ -206,12 +206,6 @@ function stop() {
       />
       <slot />
     </div>
-
-    <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="stop">
-        {{ $t('viewer.stop') }}
-      </button>
-    </div>
   </div>
 </template>
 

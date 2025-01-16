@@ -19,7 +19,7 @@ const promiseHandlers: {
   [id: number]: [(value: string) => void, () => void]
 } = {}
 
-window.electronAPI?.onReplyDialog((dialogId, result) => {
+window.electronAPI?.onReplyDialog?.((dialogId, result) => {
   if (promiseHandlers[dialogId]) {
     promiseHandlers[dialogId][0](result)
     delete promiseHandlers[dialogId]

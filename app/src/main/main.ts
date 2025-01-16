@@ -12,7 +12,6 @@ import {
   protocol,
   Tray,
   session,
-  screen,
   shell
 } from 'electron'
 import { is } from '@electron-toolkit/utils'
@@ -25,7 +24,7 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 
 //import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
-import { DialogOptions, RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface.js'
+import { DialogOptions, ScreenSource, StreamerData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -76,7 +75,6 @@ interface StoreSchema {
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
-  let toolbarWindow: BrowserWindow | undefined
   //let windowManager: WindowManager | undefined
 
   let tray: Tray
@@ -373,44 +371,6 @@ interface StoreSchema {
     sourcesWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
 
-  function createToolbarWindow() {
-    if (toolbarWindow)
-      return
-
-    const width = 480
-    const height = 50
-
-    toolbarWindow = new BrowserWindow({
-      width,
-      minWidth: width,
-      height,
-      minHeight: height,
-      minimizable: false,
-      maximizable: false,
-      focusable: true,
-      alwaysOnTop: true,
-      transparent: true,
-      skipTaskbar: true,
-      show: false,
-      frame: false,
-      x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - width) / 2,
-      y: 0,
-      icon: path.join(__dirname, PeekaViewLogo),
-      webPreferences: {
-        preload: path.join(__dirname, '../preload/toolbar.js'),
-        additionalArguments: [import.meta.env.VITE_APP_URL],
-        nodeIntegration: true,
-        contextIsolation: true,
-        sandbox: false,
-        webSecurity: false,
-      },
-    })
-
-    windowLoad(toolbarWindow, 'toolbar')
-    toolbarWindow.show()
-    //toolbarWindow.webContents.openDevTools()
-  }
-
   function handleProtocol(url: string) {
     log.info("Processing protocol URL", url)
     const params = new URL(url).searchParams
@@ -477,8 +437,6 @@ interface StoreSchema {
     currentViewCode = undefined
     appWindow?.webContents.send('clean-up-stream')
     streamer?.stopSharing()
-    toolbarWindow?.close()
-    toolbarWindow = undefined
     customDialog.closeTrayDialogs()
   }
 
@@ -543,10 +501,6 @@ interface StoreSchema {
     appWindow?.webContents.send('reply-dialog', id, result)
   })
 
-  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
-    streamer?.onRemote(event, data)
-  })
-
   ipcMain.handle('open-screen-source-selection', async () => {
     createSourcesWindow()
   })
@@ -585,10 +539,6 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  /*ipcMain.handle('start-remote-control', async (_event, data: StreamerData) => {
-    startRemoteControl(data)
-  })*/
-
   const openShareMessage = async () => {
     log.info('Opening share message, currentViewCode:', currentViewCode)
     if (!currentViewCode) {
@@ -622,7 +572,6 @@ interface StoreSchema {
       startRemoteControl(streamerData)
     
       customDialog.playSoundOnOpen('ping')
-      createToolbarWindow()
       await openShareMessage()
     }
   })
@@ -650,14 +599,6 @@ interface StoreSchema {
       timeout: 3000
     })
     streamer?.resumeStreamingIfPaused()
-  })
-
-  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
-    streamer?.toggleMouse(toggle)
-  })
-  
-  ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
-    streamer?.toggleRemoteControl(toggle)
   })
 
   ipcMain.handle('quit', async (_event) => {
