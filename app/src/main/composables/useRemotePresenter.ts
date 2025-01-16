@@ -12,7 +12,7 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath, windowLoad } from '../util.js'
-import { RemoteData, RemoteEvent, RemotePasteData, RemotePasteFileData } from '../../interface.d'
+import { ElectronWindowDimensions, RemoteData, RemoteEvent, RemotePasteData, RemotePasteFileData } from '../../interface.d'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -68,6 +68,29 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
     toggleRemoteControl(toggle)
+  })
+
+  ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
+    let window: BrowserWindow | undefined
+    switch (windowName) {
+      case 'clipboard':
+        window = clipboardWindow
+        break
+      case 'toolbar':
+        window = toolbarWindow
+        break
+      default:
+        return
+    }
+
+    if (!window)
+      return
+
+    let size = window?.getMinimumSize()
+    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
+
+    size = window?.getSize()
+    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
   })
 
   ipcMain.handle('close-clipboard', async (_event) => {
@@ -297,8 +320,10 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     clipboardWindow = new BrowserWindow({
       width,
       height,
-      // transparent: true,
-      // skipTaskbar: true,
+      minWidth: width,
+      minHeight: 50,
+      transparent: true,
+      skipTaskbar: true,
       focusable: true,
       enableLargerThanScreen: true,
       useContentSize: true,
@@ -306,7 +331,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       alwaysOnTop: true,
       title: '__peekaview - Clipboard',
       titleBarStyle: 'hidden',
-      skipTaskbar: true,
       x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width + 10),
       y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - height + 30),
       webPreferences: {
@@ -320,7 +344,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     clipboardWindow.removeMenu()
     clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
     windowLoad(clipboardWindow, 'clipboard')
-    clipboardWindow.webContents.openDevTools()
+    //lipboardWindow.webContents.openDevTools()
 
     return new Promise<void>((resolve) => {
       ipcMain.handleOnce('clipboard-ready', async (_event) => {
@@ -344,7 +368,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     toolbarWindow = new BrowserWindow({
       width,
-      minWidth: width,
       height,
       minHeight: height,
       minimizable: false,

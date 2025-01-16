@@ -1118,10 +1118,8 @@ defineExpose({
 
   .remote-viewer .clipboard-container {
     position: absolute;
-    bottom: 0px;
-    left: 0px;
-    width: 160px;
-    height: 200px;
+    bottom: 0;
+    right: 0;
     z-index: 300;
   }
 
@@ -1167,6 +1165,7 @@ defineExpose({
   .remote-viewer .message {
     padding-left: 100px;
     position: absolute;
+    bottom: 0px;
     z-index: 100;
     color: white;
     background: #000;

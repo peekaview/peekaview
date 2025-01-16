@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
+import { ElectronWindowDimensions } from '../interface';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
@@ -13,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resumeSharing: () => ipcRenderer.invoke('resume-sharing'),
   openScreenSourceSelection: () => ipcRenderer.invoke('open-screen-source-selection'),
   showSharingActive: () => ipcRenderer.invoke('show-sharing-active'),
+  resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => ipcRenderer.invoke('resize-window', windowName, dimensions),
 })
 
 console.log('Preload script has been loaded');

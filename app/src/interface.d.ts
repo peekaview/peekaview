@@ -49,6 +49,7 @@ export interface IElectronAPI {
   pauseSharing: () => Promise<void>,
   resumeSharing: () => Promise<void>,
   showSharingActive: () => Promise<void>,
+  resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
   quit: () => Promise<void>,
   closeClipboard: () => Promise<void>,
   onCleanUpStream: (callback: () => void) => void
@@ -170,3 +171,7 @@ export type RemoteData<T extends RemoteEvent> =
     width: number
     height: number
   }
+
+  export type Dimensions = { width: number, height: number }
+
+  export type ElectronWindowDimensions = { size: Partial<Dimensions>, minimumSize?: Partial<Dimensions>, maximumSize?: Partial<Dimensions> }
