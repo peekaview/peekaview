@@ -279,6 +279,14 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
     sessionState.value = 'active'
 
     source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: props.email }))
+
+    if (!window.electronAPI) {
+      const data = btoa(JSON.stringify({
+        ...screenShareData.value, 
+        userName: 'preview'
+      }))
+      window.open(`preview/index.html?data=${data}`, '_blank', 'width=320,height=320,right=160,top=0,popup=true')
+    }
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }

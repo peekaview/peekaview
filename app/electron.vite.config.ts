@@ -79,6 +79,7 @@ export default defineConfig({
           sources: resolve('src/renderer/sources/index.html'),
           dialog: resolve('src/renderer/dialog/index.html'),
           toolbar: resolve('src/renderer/toolbar/index.html'),
+          preview: resolve('src/renderer/preview/index.html'),
         },
         output: {
           preserveModules: false

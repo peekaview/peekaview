@@ -21,6 +21,7 @@ interface ScreenPresentOptions {
 interface ScreenViewOptions {
   turnCredentials?: TurnCredentials
   videoElement?: HTMLVideoElement
+  role?: PeerRole
   onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
   onEnding?: () => void
 }
@@ -63,7 +64,7 @@ export type ScreenPeerData = {
   turnCredentials: TurnCredentials
 }
 
-export type PeerRole = 'presenter' | 'viewer'
+export type PeerRole = 'presenter' | 'viewer' | 'preview'
 
 const rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
 
@@ -137,6 +138,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
   const { socket, initPeer } = await useScreenPeer(screenShareData, 'presenter')
   const participants = ref<Record<string, ViewingParticipant>>({})
   const peers: Record<string, SimplePeer.Instance> = {}
+  let previewPeer: SimplePeer.Instance | undefined
   let stream: MediaStream | undefined
 
   socket.on('initReceive', ({ socketId, role }: { socketId: string, role: PeerRole }) => {
@@ -168,6 +170,9 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
         
         peers[socketId].on('close', () => close(socketId))
         break
+      case 'preview':
+        previewPeer = initPeer(socketId, true, stream)
+        break
       default:
         console.error('Invalid role connected:', role, socketId)
         break
@@ -188,6 +193,12 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
       }
       close(socketId)
     }
+
+    if (stream)
+      previewPeer?.removeStream(stream)
+
+    previewPeer?.destroy()
+    previewPeer = undefined
 
     stream = undefined
   }
@@ -234,7 +245,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
 }
 
 export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
-  const { socket, initPeer } = await useScreenPeer(screenShareData, 'viewer')
+  const { socket, initPeer } = await useScreenPeer(screenShareData, options?.role ?? 'viewer')
   const sharingParticipant = ref<SharingParticipant>()
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined
