@@ -12,7 +12,7 @@ export type DialogButton = {
   label: string
 }
 
-const Sounds = {
+const Sounds: Record<string, string> = {
   ping: PingWave,
   ringtone: RingtoneWave
 }
@@ -60,7 +60,7 @@ window.electronAPI!.onDialog((options: DialogOptions) => {
       this.play();
     }, false);
   }
-  if (options.sound !== null) {
+  if (options.sound) {
     var audio = new Audio(Sounds[options.sound]);
     audio.play();
   }

@@ -15,9 +15,14 @@ const props = withDefaults(defineProps<{
   pollSize: false
 })
 
+const emit = defineEmits<{
+  (e: 'onCollapse', collapsed: boolean): void
+}>()
+
 const toolbarRef = useTemplateRef('toolbar')
 const collapsed = ref(false)
 
+watch(collapsed, value => emit('onCollapse', value))
 watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
 
 setInterval(() => {
@@ -33,7 +38,7 @@ setInterval(() => {
 </script>
 
 <template>
-  <div class="toolbar" ref="toolbar">
+  <div ref="toolbar" class="toolbar" :class="{ collapsed: collapsed }">
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>
@@ -53,7 +58,7 @@ setInterval(() => {
     flex-wrap: nowrap;
     gap: 0.5em;
     height: 2.25rem;
-    -webkit-user-select: none;
+    user-select: none;
     background: #1a1a1a;
     color: #EEE;
     padding: 4px;

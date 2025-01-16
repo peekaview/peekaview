@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, nextTick, useTemplateRef, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
@@ -7,6 +7,7 @@ import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.s
 const remoteControlEnabled = ref(true)
 const mouseEnabled = ref(true)
 const isPaused = ref(false)
+const toolbarRef = useTemplateRef('toolbar')
 
 watch(remoteControlEnabled, (flag) => window.electronAPI!.toggleRemoteControl(flag))
 watch(mouseEnabled, (flag) => window.electronAPI!.toggleMouse(flag))
@@ -32,10 +33,27 @@ function toggleClipboard() {
 function showSharingActive() {
   window.electronAPI!.showSharingActive()
 }
+
+function onCollapse() {
+  nextTick(() => {
+    const rect = toolbarRef.value?.$el.getBoundingClientRect()
+    if (!rect)
+      return
+
+    window.electronAPI!.resizeWindow('toolbar', {
+      size: {
+        width: Math.round(rect.width),
+      },
+      minimumSize: {
+        width: Math.round(rect.width),
+      },
+    })
+  })
+}
 </script>
 
 <template>
-  <Toolbar class="main-toolbar" collapsible draggable poll-size>
+  <Toolbar ref="toolbar" class="main-toolbar" collapsible draggable poll-size @on-collapse="onCollapse">
     <label class="checkbox-container">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>

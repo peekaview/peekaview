@@ -1,62 +1,73 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
-import { RemotePasteFileData } from '../../interface.js'
+import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
+import { File } from '../../interface.js'
 import { b64DecodeUnicode } from "../util.js"
 
+import ArrowCollapseVerticalSvg from '../../assets/icons/arrow-collapse-vertical.svg'
+import ArrowExpandVerticalSvg from '../../assets/icons/arrow-expand-vertical.svg'
 import CloseSvg from '../../assets/icons/close.svg'
 import CopySvg from '../../assets/icons/content-copy.svg'
-import DragSvg from '../../assets/icons/drag.svg'
 import DownloadSvg from '../../assets/icons/download.svg'
 import Toolbar from './Toolbar.vue'
 
-type ClipboardFile = {
+type ClipboardFile = File & {
   type: 'text' | 'image' | 'binary'
-  name?: string
   extension: string
-  content: string
 }
 
 const props = withDefaults(defineProps<{
-  fileData: RemotePasteFileData | undefined
+  data: File | undefined
   draggable?: boolean
 }>(), {
-  fileData: undefined,
-  draggable: false
+  data: undefined,
+  draggable: false,
 })
 
 const emit = defineEmits<{
+  (e: 'onCollapse', collapsed: boolean): void
   (e: 'close'): void
 }>()
 
 const imageRef = useTemplateRef('image')
 const downloadRef = useTemplateRef('download')
-const downloadData = ref<{
-  name: string
-  content: string
-} | undefined>()
+const downloadData = ref<File | undefined>()
 
 const clipboardFile = ref<ClipboardFile | undefined>()
+const fileSvg = computed(() => {
+  if (!clipboardFile.value)
+    return
+
+  if (clipboardFile.value.type !== 'binary')
+    return clipboardFile.value.content
+
+  return `${window.electronAPI ? '../': ''}icons/${clipboardFile.value.extension}.svg`
+})
+
+const collapsed = ref(false)
+
+watch(collapsed, value => emit('onCollapse', value))
 
 // virtuelles Clipboard, Filesharing via Websockets
 // Todo, in eigene JS auslagern, da mehr oder weniger baugleich mit Filesharing in meetzi-App
-watch(() => props.fileData, (data) => {
+watch(() => props.data, (data) => {
   if (!data) {
     clipboardFile.value = undefined
     return
   }
 
-  if (data.filecontent.startsWith('data:application/octet-stream')) {
+  let content = data.content
+  let name = data.name
+  if (content.startsWith('data:application/octet-stream')) {
     try {
-      b64DecodeUnicode(data.filecontent.replace('data:application/octet-streambase64,', ''))
+      b64DecodeUnicode(content.replace('data:application/octet-streambase64,', ''))
     } catch (e) {
-      data.filecontent = data.filecontent.replace('data:application/octet-stream', 'data:application/bin')
+      content = content.replace('data:application/octet-stream', 'data:application/bin')
     }
   }
 
-  let type: 'text' | 'image' | 'binary'
-  let content = data.filecontent
-  const mime = data.filecontent.split('data:')[1].split('base64,')[0]
+  const mime = content.split('data:')[1].split('base64,')[0]
   let extension = mime.split('/')[1]
+  let type: 'text' | 'image' | 'binary'
 
   if (content.startsWith('data:application/octet-stream') || content.startsWith('data:text/') || content.startsWith('data:application/json')) {
     type = 'text'
@@ -72,8 +83,8 @@ watch(() => props.fileData, (data) => {
       extension = 'txt'
     }
 
-    if (data.filename != undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name != undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
   else if (content.startsWith('data:image/')) {
@@ -84,8 +95,8 @@ watch(() => props.fileData, (data) => {
     }
 
     // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
-    if (data.filename !== undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name !== undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
   else {
@@ -97,20 +108,20 @@ watch(() => props.fileData, (data) => {
       extension = 'bin'
     }
 
-    if (data.filename != undefined) {
-      extension = data.filename.split('.').pop() ?? extension
+    if (name != undefined) {
+      extension = name.split('.').pop() ?? extension
     }
   }
 
   clipboardFile.value = {
-    type: type,
-    name: data.filename,
-    content: content,
-    extension: extension
+    type,
+    name,
+    content,
+    extension
   }
 }, { immediate: true })
 
-function download() {
+function downloadFile() {
   console.log('download', clipboardFile.value)
   if (!clipboardFile.value)
     return
@@ -121,9 +132,11 @@ function download() {
     name: clipboardFile.value.name ?? 'download_' + datestring + '.' + clipboardFile.value.extension
   }
   console.log(downloadData.value)
-  downloadRef.value?.click()
   nextTick(() => {
-    downloadData.value = undefined
+    downloadRef.value?.click()
+    nextTick(() => {
+      downloadData.value = undefined
+    })
   })
 }
 
@@ -159,40 +172,46 @@ function close() {
 </script>
 
 <template>
-  <div v-if="clipboardFile" class="clipboard">
+  <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar :draggable="draggable">
+      <div class="btn btn-sm btn-secondary" title="Collapse / Expand" style="width: 30px" @click="collapsed = !collapsed">
+        <ArrowExpandVerticalSvg v-if="collapsed" />
+        <ArrowCollapseVerticalSvg v-else />
+      </div>
       <div class="btn btn-sm btn-secondary" title="Close" @click="close">
         <CloseSvg />
       </div>
     </Toolbar>
-    <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
-      <textarea>{{ clipboardFile.content }}</textarea>
-    </div>
-    <div v-else>
-      <img
-        ref="image"
-        :class="clipboardFile.type === 'binary' ? 'binary' : 'image'"
-        :src="clipboardFile.type === 'binary' ? `icons/${clipboardFile.extension}.svg` : clipboardFile.content"
-        @click="download"
-      />
-    </div>
-    <Toolbar>
-      <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" title="Copy to clipboard" @click="copy">
-        <CopySvg />
+    <template v-if="!collapsed">
+      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
+        <textarea>{{ clipboardFile.content }}</textarea>
       </div>
-      <div class="btn btn-sm btn-secondary" title="Download" @click="download">
-        <DownloadSvg />
+      <div v-else class="clipboard-content">
+        <img
+          ref="image"
+          :class="clipboardFile.type === 'binary' ? 'binary' : 'image'"
+          :src="fileSvg"
+          @click="downloadFile"
+        />
       </div>
-      <a
-        ref="download"
-        v-if="downloadData"
-        :href="downloadData.content"
-        :download="downloadData.name"
-        target="_self"
-      >
-        {{ downloadData.name }}
-      </a>
-    </Toolbar>
+      <Toolbar>
+        <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" title="Copy to clipboard" @click="copy">
+          <CopySvg />
+        </div>
+        <div class="btn btn-sm btn-secondary" title="Download" @click="downloadFile">
+          <DownloadSvg />
+        </div>
+        <a
+          ref="download"
+          v-if="downloadData"
+          :href="downloadData.content"
+          :download="downloadData.name"
+          target="_self"
+        >
+          {{ downloadData.name }}
+        </a>
+      </Toolbar>
+    </template>
   </div>
 </template>
 
@@ -200,11 +219,16 @@ function close() {
 .clipboard {
   display: flex;
   flex-direction: column;
+  min-width: 10rem;
   width: 100%;
   height: 100%;
   padding: 5px;
   border-radius: 5px;
   background: #1a1a1a;
+}
+
+.clipboard.collapsed {
+  height: auto;
 }
 
 .clipboard .toolbar .btn {
@@ -213,6 +237,9 @@ function close() {
   
 .clipboard .clipboard-content {
   flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-repeat: 'no-repeat';
   background-position-x: 'right';
 }

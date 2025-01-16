@@ -12,7 +12,8 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath, windowLoad } from '../util.js'
-import { RemoteData, RemoteEvent, RemotePasteData, RemotePasteFileData } from '../../interface.d'
+import { ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData } from '../../interface.d'
+import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -32,7 +33,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let toolbarWindow: BrowserWindow | undefined
   let toolbarSize: { width: number, height: number } | {} = {}
   let localClipboardTime = 0
-  let lastClipboardData: RemotePasteFileData | undefined
+  let lastClipboardData: File | undefined
   let lastKey: string
   let remoteControlActive = false
   let remoteControlInputEnabled = false
@@ -49,6 +50,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
 
+  const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
 
   ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
     onRemote(event, data)
@@ -68,6 +70,29 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
     toggleRemoteControl(toggle)
+  })
+
+  ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
+    let window: BrowserWindow | undefined
+    switch (windowName) {
+      case 'clipboard':
+        window = clipboardWindow
+        break
+      case 'toolbar':
+        window = toolbarWindow
+        break
+      default:
+        return
+    }
+
+    if (!window)
+      return
+
+    let size = window?.getMinimumSize()
+    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
+
+    size = window?.getSize()
+    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
   })
 
   ipcMain.handle('close-clipboard', async (_event) => {
@@ -181,7 +206,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     }, 1000)
   }
 
-  function showDrawCanvas(action: string, data: any) {
+  function showDrawCanvas(action: string, data: RemoteMouseData) {
     if (!data.id || !remoteControlActive)
       return
 
@@ -277,13 +302,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     mousePressed[id] = false
   }
 
-  async function dataToClipboard(data: RemotePasteFileData) {
+  async function dataToClipboard(data: File) {
     if (!clipboardWindow)
       await createClipboardWindow()
 
     lastClipboardData = data
 
-    console.log('show clipboard')
     clipboardWindow!.webContents.send('data-to-clipboard', JSON.stringify(data))
   }
 
@@ -297,8 +321,10 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     clipboardWindow = new BrowserWindow({
       width,
       height,
-      // transparent: true,
-      // skipTaskbar: true,
+      minWidth: width,
+      minHeight: 50,
+      transparent: true,
+      skipTaskbar: true,
       focusable: true,
       enableLargerThanScreen: true,
       useContentSize: true,
@@ -306,7 +332,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       alwaysOnTop: true,
       title: '__peekaview - Clipboard',
       titleBarStyle: 'hidden',
-      skipTaskbar: true,
       x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width + 10),
       y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - height + 30),
       webPreferences: {
@@ -320,7 +345,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     clipboardWindow.removeMenu()
     clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
     windowLoad(clipboardWindow, 'clipboard')
-    clipboardWindow.webContents.openDevTools()
+    //clipboardWindow.webContents.openDevTools()
 
     return new Promise<void>((resolve) => {
       ipcMain.handleOnce('clipboard-ready', async (_event) => {
@@ -344,7 +369,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     toolbarWindow = new BrowserWindow({
       width,
-      minWidth: width,
       height,
       minHeight: height,
       minimizable: false,
@@ -413,7 +437,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       return new Point(overlayCursor[obj.id].getPosition()[0] + 210, overlayCursor[obj.id].getPosition()[1] + 10)
   }
 
-  function mouseMove(data: any) {
+  function mouseMove(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -433,22 +457,22 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       mouse.setPosition(mousePosition(data))
   }
 
-  function mouseSignal(data: any) {
+  function mouseSignal(data: RemoteMouseData) {
     if (!data.id)
       return
 
     showOverlayCursorSignal(data.id, data.name, data.color)
   }
 
-  function mouseWheel(data: any) {
+  function mouseWheel(data: RemoteMouseData) {
     console.log(`scroll ${data.delta}`)
-    if (data.delta < 0)
+    if (data.delta! < 0)
       keyboard.type(Key.PageUp)
     else
       keyboard.type(Key.PageDown)
   }
 
-  function mouseLeftClick(data: any) {
+  function mouseLeftClick(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -466,7 +490,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[data.id] = false;}, 50)
   }
 
-  function mouseDblClick(data: any) {
+  function mouseDblClick(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -480,7 +504,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     setTimeout(() => { mouse.setPosition(lastMousePos) }, 250)
   }
 
-  function mouseClick(data: any) {
+  function mouseClick(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -493,7 +517,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     setTimeout(() => { mouse.setPosition(lastMousePos) }, 200)
   }
 
-  function mouseDown(data: any) {
+  function mouseDown(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -509,7 +533,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     mousePressed[data.id] = true
   }
 
-  function mouseUp(data: any) {
+  function mouseUp(data: RemoteMouseData) {
     if (!data.id)
       return
 
@@ -562,12 +586,20 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       dataToClipboard(lastClipboardData)
   }
 
+  function receiveFile(data: RemoteFileData) {
+    fileChunkRegistry.register(data)
+  }
+
+  function receiveFileChunk(data: RemoteFileChunkData) {
+    fileChunkRegistry.receiveChunk(data)
+  }
+
   function textToClipboard(data: RemotePasteData) {
     if (data.text)
       return
 
     if (!remoteControlActive || !remoteControlInputEnabled) {
-      dataToClipboard({ filecontent: `data:text/plain;base64,${btoa(data.text)}`, room: data.room, name: data.name, color: data.color })
+      dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
     else {
       console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
@@ -833,9 +865,13 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         //if (remoteControlInputEnabled)
           textToClipboard(data as RemotePasteData)
         break
-      case 'pastefile':
+      case 'file':
         if (mouseEnabled)
-          dataToClipboard(data as RemotePasteFileData)
+          receiveFile(data as RemoteFileData)
+        break
+      case 'file-chunk':
+        if (mouseEnabled)
+          receiveFileChunk(data as RemoteFileChunkData)
         break
       case 'cut':
         if (remoteControlInputEnabled)
@@ -843,62 +879,62 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         break
       case 'mouse-move':
         if (mouseEnabled) {
-          mouseMove(data)
-          showDrawCanvas('mouse-move', data)
+          mouseMove(data as RemoteMouseData)
+          showDrawCanvas('mouse-move', data as RemoteMouseData)
         }
         break
       case 'paint-mouse-move':
         if (mouseEnabled) {
-          mouseMove(data)
-          showDrawCanvas('mouse-move', data)
+          mouseMove(data as RemoteMouseData)
+          showDrawCanvas('mouse-move', data as RemoteMouseData)
         }
         break
       case 'mouse-click':
         if (remoteControlInputEnabled)
-          mouseClick(data)
+          mouseClick(data as RemoteMouseData)
         break
       case 'mouse-dblclick':
         if (remoteControlInputEnabled)
-          mouseDblClick(data)
+          mouseDblClick(data as RemoteMouseData)
         break
       case 'mouse-leftclick':
         if (remoteControlInputEnabled) {
           if (!isMac)
-            mouseSignal(data)
+            mouseSignal(data as RemoteMouseData)
   
-          mouseLeftClick(data)
+          mouseLeftClick(data as RemoteMouseData)
         }
         else if (mouseEnabled) {
-          mouseSignal(data)
+          mouseSignal(data as RemoteMouseData)
         }
         break
       case 'paint-mouse-leftclick':
         if (mouseEnabled)
-          mouseSignal(data)
+          mouseSignal(data as RemoteMouseData)
         break
       case 'mouse-down':
         if (remoteControlInputEnabled)
-          mouseDown(data)
+          mouseDown(data as RemoteMouseData)
         else if (mouseEnabled)
-          showDrawCanvas('mouse-down', data)
+          showDrawCanvas('mouse-down', data as RemoteMouseData)
         break;
       case 'paint-mouse-down':
         if (mouseEnabled)
-          showDrawCanvas('mouse-down', data)
+          showDrawCanvas('mouse-down', data as RemoteMouseData)
         break;
       case 'mouse-wheel':
         if (remoteControlInputEnabled)
-          mouseWheel(data)
+          mouseWheel(data as RemoteMouseData)
         break;
       case 'mouse-up':
         if (remoteControlInputEnabled)
-          mouseUp(data)
+          mouseUp(data as RemoteMouseData)
         else if (mouseEnabled)
-          showDrawCanvas('mouse-up', data)
+          showDrawCanvas('mouse-up', data as RemoteMouseData)
         break;
       case 'paint-mouse-up':
         if (mouseEnabled)
-          showDrawCanvas('mouse-up', data)
+          showDrawCanvas('mouse-up', data as RemoteMouseData)
         break;
       case 'type':
         if (remoteControlInputEnabled)
