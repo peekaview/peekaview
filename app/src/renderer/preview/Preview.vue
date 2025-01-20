@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef } from 'vue'
+import { ref, useTemplateRef } from 'vue'
 
 import Toolbar from '../components/Toolbar.vue'
 import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare';
@@ -7,7 +7,7 @@ import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSi
 const videoRef = useTemplateRef('video')
 const screenView = ref<ScreenView>()
 
-onMounted(async () => {
+async function startPreview() {
   const params = new URLSearchParams(window.location.search)
   const data = params.get('data')
   if (!data)
@@ -15,17 +15,26 @@ onMounted(async () => {
   
   screenView.value = await useScreenView(JSON.parse(atob(data)) as ScreenShareData, {
     role: 'preview',
-    videoElement: videoRef.value ?? undefined
+    videoElement: videoRef.value ?? undefined,
+    onRemote: (event, data) => {
+      console.log('remote', event, data)
+    }
   })
-})
+}
 </script>
 
 <template>
   <div>
     <Toolbar collapsible>
-      <div class="btn">
-      </div>
+      <button v-if="!screenView" class="btn btn-primary" @click="startPreview">Start Preview</button>
     </Toolbar>
     <video ref="video" />
   </div>
 </template>
+
+<style>
+video {
+  max-width: 100%;
+  max-height: 100%;
+}
+</style>

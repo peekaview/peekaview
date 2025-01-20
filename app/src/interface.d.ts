@@ -50,6 +50,9 @@ export interface IElectronAPI {
   resumeSharing: () => Promise<void>,
   showSharingActive: () => Promise<void>,
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
+  onMouseDown: (callback: (data: RemoteMouseData) => void) => void,
+  onMouseMove: (callback: (data: RemoteMouseData) => void) => void,
+  onMouseUp: (callback: (data: RemoteMouseData) => void) => void,
   quit: () => Promise<void>,
   closeClipboard: () => Promise<void>,
   onCleanUpStream: (callback: () => void) => void
@@ -101,7 +104,7 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "paint-mouse-leftclick" | "mouse-move" | "paint-mouse-move" | "mouse-down" | "paint-mouse-down" | "mouse-up" | "paint-mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "enable" ? { }
@@ -109,13 +112,9 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
   : T extends "mouse-leftclick" ? RemoteMouseData
-  : T extends "paint-mouse-leftclick" ? RemoteMouseData
   : T extends "mouse-move" ? RemoteMouseData
-  : T extends "paint-mouse-move" ? RemoteMouseData
   : T extends "mouse-down" ? RemoteMouseData
-  : T extends "paint-mouse-down" ? RemoteMouseData
   : T extends "mouse-up" ? RemoteMouseData
-  : T extends "paint-mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
   : T extends "type" ? { key: string }
   : T extends "copy" ? {}
@@ -135,6 +134,7 @@ export type RemoteData<T extends RemoteEvent> =
     x: number
     y: number
     delta?: number
+    draw?: boolean
   }
 
   export type RemotePasteData = {

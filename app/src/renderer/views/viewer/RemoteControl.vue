@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import RemoteViewer from './RemoteViewer.vue'
 
 import type { RemoteControlData, ScaleInfo, VideoTransform } from '../../types'
-import { notify, stringToColor } from '../../util'
+import { notify } from '../../util'
+import { stringToColor } from '../../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 
 const props = withDefaults(defineProps<{

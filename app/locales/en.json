@@ -91,7 +91,8 @@
       "stop": "Stop",
       "pause": "Pause",
       "resume": "Resume",
-      "shareDifferentScreen": "Share Different Screen"
+      "shareDifferentScreen": "Share Different Screen",
+      "openPreview": "Open Preview"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",

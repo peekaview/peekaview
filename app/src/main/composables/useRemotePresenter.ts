@@ -28,7 +28,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   const lastTargetPoints: Record<string, Point> = {}
   const mousePressed: Record<string, boolean> = {}
 
-  let overlayDrawer: BrowserWindow | undefined
+  let drawOverlayWindow: BrowserWindow | undefined
   let clipboardWindow: BrowserWindow | undefined
   let toolbarWindow: BrowserWindow | undefined
   let toolbarSize: { width: number, height: number } | {} = {}
@@ -206,46 +206,52 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     }, 1000)
   }
 
-  function showDrawCanvas(action: string, data: RemoteMouseData) {
-    if (!data.id || !remoteControlActive)
+  function createDrawOverlayWindow() {
+    if (drawOverlayWindow)
       return
 
-    if (!overlayDrawer) {
-      const activeWindowDimensions = windowManager.getWindowOuterDimensions()
-      overlayDrawer = new BrowserWindow({
-        x: activeWindowDimensions.left,
-        y: activeWindowDimensions.top,
-        width: activeWindowDimensions.right - activeWindowDimensions.left,
-        height: activeWindowDimensions.bottom - activeWindowDimensions.top,
-        transparent: true,
-        skipTaskbar: true,
-        focusable: false,
-        enableLargerThanScreen: true,
-        // useContentSize: true,
-        frame: false,
-        alwaysOnTop: true,
-        title: '__peekaview - Drawer ',
-        // titleBarStyle: 'hidden',
-        webPreferences: {
-          webSecurity: false,
-          nodeIntegration: true,
-          contextIsolation: false,
-          preload: resolvePath('static/js/drawer.js'),
-        },
-      })
+    const activeWindowDimensions = windowManager.getWindowOuterDimensions()
+    drawOverlayWindow = new BrowserWindow({
+      x: activeWindowDimensions.left,
+      y: activeWindowDimensions.top,
+      width: activeWindowDimensions.right - activeWindowDimensions.left,
+      height: activeWindowDimensions.bottom - activeWindowDimensions.top,
+      transparent: true,
+      skipTaskbar: true,
+      focusable: false,
+      enableLargerThanScreen: true,
+      // useContentSize: true,
+      frame: false,
+      alwaysOnTop: true,
+      // titleBarStyle: 'hidden',
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/drawOverlay.js'),
+        webSecurity: false,
+        nodeIntegration: true,
+        contextIsolation: true,
+      },
+    })
 
-      // overlayDrawer.openDevTools();
-      overlayDrawer.removeMenu()
-      overlayDrawer.setIgnoreMouseEvents(true)
-      
-      overlayDrawer.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      overlayDrawer.setAlwaysOnTop(true, 'screen-saver', 1);
-      overlayDrawer.loadFile(resolvePath('static/drawer.html'))
-    }
-    overlayDrawer.webContents.send(action, JSON.stringify(data))
+    //drawOverlayWindow.webContents.openDevTools()
+    drawOverlayWindow.removeMenu()
+    drawOverlayWindow.setIgnoreMouseEvents(true)
+    
+    drawOverlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    drawOverlayWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+    windowLoad(drawOverlayWindow, 'drawOverlay')
   }
 
-  function showoverlayCursorWindow(id: string, name: string, color: string) {
+  function showDrawOverlayWindow(action: string, data: RemoteMouseData) {
+    if (!drawOverlayWindow)
+      createDrawOverlayWindow()
+
+    if (!data.id || !remoteControlActive)
+      return
+  
+    drawOverlayWindow!.webContents.send(action, data)
+  }
+
+  function showOverlayCursorWindow(id: string, name: string, color: string) {
     if (overlayCursor[id])
       return
 
@@ -419,9 +425,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       }
     }
 
-    if (overlayDrawer) {
-      overlayDrawer.close()
-      overlayDrawer = undefined
+    if (drawOverlayWindow) {
+      drawOverlayWindow.close()
+      drawOverlayWindow = undefined
     }
   }
 
@@ -444,7 +450,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (!overlayCursor[data.id] && remoteControlActive) {
       console.log(data)
       console.log(`show cursor ${data.id}`)
-      showoverlayCursorWindow(data.id, data.name, data.color)
+      showOverlayCursorWindow(data.id, data.name, data.color)
     }
 
     overlayCursorLastAction[data.id] = Date.now()
@@ -856,6 +862,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
   function onRemote<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
     keyboard.config.autoDelayMs = 5
+    let mouseData
     switch (event) {
       case 'copy':
         if (remoteControlInputEnabled)
@@ -880,13 +887,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       case 'mouse-move':
         if (mouseEnabled) {
           mouseMove(data as RemoteMouseData)
-          showDrawCanvas('mouse-move', data as RemoteMouseData)
-        }
-        break
-      case 'paint-mouse-move':
-        if (mouseEnabled) {
-          mouseMove(data as RemoteMouseData)
-          showDrawCanvas('mouse-move', data as RemoteMouseData)
+          showDrawOverlayWindow('on-mouse-move', data as RemoteMouseData)
         }
         break
       case 'mouse-click':
@@ -898,43 +899,34 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
           mouseDblClick(data as RemoteMouseData)
         break
       case 'mouse-leftclick':
-        if (remoteControlInputEnabled) {
+        mouseData = data as RemoteMouseData
+        if (remoteControlInputEnabled && !mouseData.draw) {
           if (!isMac)
-            mouseSignal(data as RemoteMouseData)
+            mouseSignal(mouseData)
   
-          mouseLeftClick(data as RemoteMouseData)
+          mouseLeftClick(mouseData)
         }
         else if (mouseEnabled) {
-          mouseSignal(data as RemoteMouseData)
+          mouseSignal(mouseData)
         }
         break
-      case 'paint-mouse-leftclick':
-        if (mouseEnabled)
-          mouseSignal(data as RemoteMouseData)
-        break
       case 'mouse-down':
-        if (remoteControlInputEnabled)
-          mouseDown(data as RemoteMouseData)
+        mouseData = data as RemoteMouseData
+        if (remoteControlInputEnabled && !mouseData.draw)
+          mouseDown(mouseData)
         else if (mouseEnabled)
-          showDrawCanvas('mouse-down', data as RemoteMouseData)
-        break;
-      case 'paint-mouse-down':
-        if (mouseEnabled)
-          showDrawCanvas('mouse-down', data as RemoteMouseData)
+          showDrawOverlayWindow('on-mouse-down', mouseData)
         break;
       case 'mouse-wheel':
         if (remoteControlInputEnabled)
           mouseWheel(data as RemoteMouseData)
         break;
       case 'mouse-up':
-        if (remoteControlInputEnabled)
+        mouseData = data as RemoteMouseData
+        if (remoteControlInputEnabled && !mouseData.draw)
           mouseUp(data as RemoteMouseData)
         else if (mouseEnabled)
-          showDrawCanvas('mouse-up', data as RemoteMouseData)
-        break;
-      case 'paint-mouse-up':
-        if (mouseEnabled)
-          showDrawCanvas('mouse-up', data as RemoteMouseData)
+          showDrawOverlayWindow('on-mouse-up', mouseData)
         break;
       case 'type':
         if (remoteControlInputEnabled)

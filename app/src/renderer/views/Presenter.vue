@@ -21,8 +21,10 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
+const inElectron = !!window.electronAPI
+
 const appUrl = ref(import.meta.env.VITE_APP_URL)
-const offerDownload = ref(!window.electronAPI)
+const offerDownload = ref(!inElectron)
 const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
@@ -149,7 +151,7 @@ async function updateOnlineStatus() {
 
   try {
     await callApi(requestData)
-    lastPingTime.value = Date.now();
+    lastPingTime.value = Date.now()
   } catch (error) {
     console.error('Error updating online status:', error)
     handleError(error as Error, requestData)
@@ -220,7 +222,7 @@ async function startSession() {
     }
 
     screenPresent.value = await useScreenPresent(screenShareData.value, {
-      remoteEnabled: !!window.electronAPI,
+      remoteEnabled: inElectron,
       onRemote: (event, data) => window.electronAPI?.sendRemote(event, data)
     })
     shareLocalScreen()
@@ -235,11 +237,11 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
     return
 
   try {
-    if (window.electronAPI) {
+    if (inElectron) {
       console.debug('Electron environment detected')
       if (!source) {
         console.debug('No source provided, opening screen source selection')
-        await window.electronAPI.openScreenSourceSelection()
+        await window.electronAPI!.openScreenSourceSelection()
         return
       }
 
@@ -280,23 +282,28 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
 
     source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: props.email }))
 
-    if (!window.electronAPI) {
-      const data = btoa(JSON.stringify({
-        ...screenShareData.value, 
-        userName: 'preview'
-      }))
-      window.open(`preview/index.html?data=${data}`, '_blank', 'width=320,height=320,right=160,top=0,popup=true')
-    }
+    openPreview()
   } catch (error) {
     console.error('Error sharing local screen:', error)
   }
+}
+
+function openPreview() {
+  if (inElectron)
+    return
+
+  const data = btoa(JSON.stringify({
+    ...screenShareData.value, 
+    userName: 'preview'
+  }))
+  window.open(`preview/index.html?data=${data}`, '_blank', 'width=320,height=320,right=160,top=0,popup=true')
 }
     
 function handleError(error: Error, requestData: any) {
   window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
   if (!import.meta.env.DEV && error instanceof UnauthorizedError) {
-    if (window.electronAPI)
-      window.electronAPI.logout(true)
+    if (inElectron)
+      window.electronAPI!.logout(true)
     else
       window.location.href = `/?login=${btoa(`target=web&discardSession=true`)}`
     return
@@ -358,14 +365,14 @@ function stopSharing() {
   if (screenPresent.value)
     screenPresent.value.leave()
 
-  alert('stopSharing')
-
   clearInterval(requestInterval.value)
   clearInterval(pingInterval.value)
   document.removeEventListener('visibilitychange', togglePingInterval)
   
   sessionState.value = 'stopped'
   window.electronAPI?.stopSharing()
+
+  offerDownload.value = !inElectron
 }
 </script>
 
@@ -374,7 +381,6 @@ function stopSharing() {
     <div class="section-content">
       <template v-if="token && offerDownload">
         <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
-        filecontent
         <div class="panel share-options-stack">
           <div class="share-option primary">
             <div class="option-content">
@@ -443,6 +449,11 @@ function stopSharing() {
             </button>
             <button v-else type="button" class="btn btn-secondary" @click="pauseSharing">
               {{ $t('share.activeSession.pause') }}
+            </button>
+          </div>
+          <div v-if="!inElectron" class="btn-row">
+            <button class="btn btn-secondary" @click="openPreview">
+              {{ $t('share.activeSession.openPreview') }}
             </button>
           </div>
         </div>

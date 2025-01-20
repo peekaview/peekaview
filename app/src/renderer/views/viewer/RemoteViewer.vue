@@ -6,7 +6,9 @@ import SignalContainer from "./SignalContainer.vue"
 import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
-import { hexToRgb, uuidv4 } from "../../util.js"
+import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
+import { useDrawOverlay } from "../../../composables/useDrawOverlay"
+import { uuidv4 } from "../../../util.js"
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
@@ -15,7 +17,6 @@ import LogoutSvg from '../../../assets/icons/logout.svg'
 
 import type { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, File } from '../../../interface.d.ts'
 import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
-import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
 
 type Pan = {
   x: number
@@ -30,14 +31,6 @@ type MouseMessage = {
   name?: string
   color: string
   delta?: number
-}
-
-type Stroke = {
-  from: [number, number]
-  to: [number, number]
-  color: string
-  timestamp: number
-  opacity: number
 }
 
 type Cursor = {
@@ -91,7 +84,7 @@ let y = 0
 let lastMove = 0
 
 // Screensharing oder Windowsharing aktiv?
-let screensharing = true
+let isSharingScreen = true
 let lastResetData: RemoteResetData | undefined
 
 // Maus-Overlays
@@ -111,18 +104,16 @@ let currentMouseData: RemoteMouseData = {
   y: 0,
   id: props.id,
   name: props.user,
-  color: props.color
+  color: props.color,
+  draw: false
 }
 
 // Drawing state
-const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
-const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
-const pointHistory: Record<string, Stroke[]> = {}    // Punktarrays der Benutzer
-const latestPoint: Record<string, [number, number]> = {}     // jeweils letzter Punkt
-let paintcheckinterval: number  // Repaint-Intervall
-
-// Add this near other state declarations (around line 40-50)
-const tmpPointHistory: Record<string, Stroke[]> = {}
+const canvasRef = useTemplateRef('canvas')
+const drawOverlay = useDrawOverlay(canvasRef, {
+  scale: totalScale,
+  dimensions: computed(() => props.videoTransform ? [props.videoTransform!.fullwidth, props.videoTransform!.fullheight] : undefined)
+})
 
 const overlayStyle = ref<Record<string, string>>({
   border: '0',
@@ -130,6 +121,7 @@ const overlayStyle = ref<Record<string, string>>({
   height: '0px',
   left: '0px',
   top: '0px',
+  cursor: 'default',
 })
 
 const sharerToolbarBoundsStyle = ref<Record<string, string> | undefined>()
@@ -145,8 +137,6 @@ watch(clipboardFile, () => showClipboard.value = true)
 
 const remoteViewerRef = useTemplateRef('remoteViewer')
 const overlayRef = useTemplateRef('overlay')
-
-let oldbackground: string | undefined
 
 onMounted(() => {
   document.body.addEventListener('contextmenu', onContextMenu)
@@ -172,11 +162,7 @@ onMounted(() => {
   // Mousewheel-Zoom
   remoteViewerRef.value?.addEventListener('wheel', (event: WheelEvent) => {
     if (!event.ctrlKey) return
-    if (event.deltaY < 0) {
-      panzoom.zoom(panzoom.getScale() + 0.1, { animate: true })
-    } else {
-      panzoom.zoom(panzoom.getScale() - 0.1, { animate: true })
-    }
+    panzoom.zoom(panzoom.getScale() + (event.deltaY < 0 ? 0.1 : -0.1), { animate: true })
   })
 
   // Änderungen zoom/panning in Variable zwischenspeichern
@@ -238,17 +224,6 @@ onMounted(() => {
         top: (transform.y - 2) + "px"
       }
 
-      // Canvas anpassen
-      Object.keys(drawCanvas).forEach(key => {
-        drawCanvas[key].style.width = transform.fullwidth + "px"
-        drawCanvas[key].style.height = transform.fullheight + "px"
-        const drawCanvascontext = drawCanvas[key].getContext("2d")!
-        if (transform.fullwidth != drawCanvascontext.canvas.width) {
-          drawCanvascontext.canvas.width = transform.fullwidth
-          drawCanvascontext.canvas.height = transform.fullheight
-        }
-      })
-
       overlayStyle.value!.width = (transform.width) + "px"
       overlayStyle.value!.height = (transform.height) + "px"
       overlayStyle.value!.left = Math.round((transform.x - 2) - (transform.fullwidth / transform.width * lastPan.x) + ((transform.fullwidth - transform.width) / 2)) + "px"
@@ -258,7 +233,7 @@ onMounted(() => {
   // virtueller Mauszeiger
   function mouseMove(data: MouseMessage) {
     // Mauszeiger erstellen (nur bei Windowsharing, beim Screensharing bleibt stattdessen der Remotemauszeiger sichtbar)
-    if (!synchronized || screensharing)
+    if (!synchronized || isSharingScreen)
       return
 
     if (!overlayCursors[data.id]) {
@@ -289,88 +264,9 @@ onMounted(() => {
     }
   }
 
-  function startStroke(id: string, point: [number, number]) {
-    // Initialize point history if needed
-    if (pointHistory[id] == undefined) {
-      pointHistory[id] = []
-    }
-    
-    drawing[id] = true
-    latestPoint[id] = point
-
-    if (paintcheckinterval === undefined) {
-      paintcheckinterval = window.setInterval(() => {
-        Object.keys(pointHistory).forEach(key => {
-          tmpPointHistory[key] = []
-          pointHistory[key].forEach((item) => {
-            if (item.timestamp >= (Date.now() - 8000)) {
-              tmpPointHistory[key].push(item)
-            }
-            if (item.timestamp < (Date.now() - 8000) && item.timestamp > (Date.now() - 20000)) {
-              item.opacity = item.opacity - 0.03
-              tmpPointHistory[key].push(item)
-            }
-          })
-          pointHistory[key] = tmpPointHistory[key]
-        })
-        repaintStrokes()
-      }, 50)
-    }
-  }
-
-  function continueStroke(id: string, color: string, newPoint: [number, number]) {
-    if (!drawing[id] || !latestPoint[id]) {
-      return
-    }
-
-    if (pointHistory[id] == undefined) {
-      pointHistory[id] = []
-    }
-
-    // Only add point if it's different from the last point
-    if (latestPoint[id][0] !== newPoint[0] || latestPoint[id][1] !== newPoint[1]) {
-      pointHistory[id].push({
-        color,
-        from: latestPoint[id],
-        to: newPoint,
-        timestamp: Date.now(),
-        opacity: 1.0
-      })
-      latestPoint[id] = newPoint
-      repaintStrokes()
-    }
-  }
-
-  function repaintStrokes() {
-    Object.keys(pointHistory).forEach(key => {
-      // add a canvas for the user strokes
-      if (drawCanvas[key] == undefined) {
-        drawCanvas[key] = document.createElement('canvas')
-        drawCanvas[key].id = 'canvas_' + key
-        drawCanvas[key].style.cssText = 'position: absolute'
-        overlayRef.value!.appendChild(drawCanvas[key])
-      }
-
-      const drawCanvascontext = drawCanvas[key].getContext("2d")!
-      drawCanvascontext.clearRect(0, 0, drawCanvas[key].width, drawCanvas[key].height)
-      pointHistory[key].forEach((item) => {
-        if (item.from != undefined) {
-          drawCanvascontext.beginPath()
-          drawCanvascontext.moveTo(Math.round(item.from[0] * totalScale.value), Math.round(item.from[1] * totalScale.value))
-          drawCanvascontext.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
-          drawCanvascontext.lineWidth = 5
-          drawCanvascontext.lineCap = "round"
-          drawCanvascontext.lineJoin = "round"
-          drawCanvascontext.lineTo(Math.round(item.to[0] * totalScale.value), Math.round(item.to[1] * totalScale.value))
-          drawCanvascontext.stroke()
-        }
-      })
-    })
-  }
-
   // Signal einblenden bei Mausklick für 2000ms
   function mouseSignal(data: MouseMessage) {
-    if (!remoteControlActive.value && !screensharing) {
+    if (!remoteControlActive.value && !isSharingScreen) {
       signals[data.id] = {
         color: data.color,
         left: Math.round(data.x * totalScale.value - 150) + "px",
@@ -393,65 +289,26 @@ onMounted(() => {
   })
 
   onReceive("mouse-leftclick", (data) => {
-    if (!remoteControlActive.value) {
+    if (!remoteControlActive.value && !data.draw)
       mouseSignal(data)
-    }
-    drawing[data.id] = false;
-  })
-
-  onReceive("paint-mouse-leftclick", (data) => {
-    /*if (drawing[data.id] != undefined && drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }*/
-    drawing[data.id] = false;
+      
+    drawOverlay.endStroke(data.id)
   })
 
   onReceive("mouse-move", (data) => {
-    if (!remoteControlActive.value && drawing[data.id] != undefined && drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }
+    if (!remoteControlActive.value || data.draw)
+      drawOverlay.continueStroke(data.id, data.color, [data.x, data.y])
 
     mouseMove(data)
   })
-
-  onReceive("paint-mouse-move", (data) => {
-    if (drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }
-    mouseMove(data)
-  })
-
-  /*onReceive("rectangle", (data) => {
-    //createRectangle(data)
-  })*/
 
   onReceive("mouse-down", (data) => {
-    console.log("mouse-down", data)
-
-    if (!remoteControlActive.value && !draggingOver.value && (drawing[data.id] == undefined || !drawing[data.id])) {
-      console.log("startStroke", data)
-      startStroke(data.id, [data.x, data.y])
-    }
-    //createRectangle(data)
-  })
-
-  onReceive("paint-mouse-down", (data) => {
-    if (drawing[data.id] == undefined || !drawing[data.id]) {
-      startStroke(data.id, [data.x, data.y])
-    }
+    if ((!remoteControlActive.value && !draggingOver.value) || data.draw)
+      drawOverlay.startStroke(data.id, [data.x, data.y])
   })
 
   onReceive("mouse-up", (data) => {
-    //mousepressed[data.id] = false
-    console.log("mouse-up", data)
-
-    drawing[data.id] = false
-    //finishRectangle(data)
-  })
-
-  onReceive("paint-mouse-up", (data) => {
-    drawing[data.id] = false
-    delete latestPoint[data.id]
+    drawOverlay.endStroke(data.id)
   })
 
   onReceive("file", (data) => {
@@ -465,13 +322,8 @@ onMounted(() => {
 
   onReceive('reset', (data) => {
     // Bei Screensharing sieht man den Remotemauszeige, daher den eigenen durch ein feines Crosshair ersetzen
-    screensharing = data.isScreen
-    overlayStyle.value.cursor = screensharing ? 'url(img/minicrosshair.png) 5 5, auto' : 'default'
-    
-    if (!oldbackground) {
-      oldbackground = document.getElementById('app')!.style.background
-      document.getElementById('app')!.style.background = 'repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px'
-    }
+    isSharingScreen = data.isScreen
+    overlayStyle.value.cursor = isSharingScreen ? 'url(img/minicrosshair.png) 5 5, auto' : 'default'
 
     const remoteScaleHeight = props.videoTransform.height / (data.dimensions.bottom - data.dimensions.top)
     const remoteScaleWidth = props.videoTransform.width / (data.dimensions.right - data.dimensions.left)
@@ -485,7 +337,7 @@ onMounted(() => {
     synchronized = !!lastResetData && lastResetData.dimensions.left == data.dimensions.left && lastResetData.dimensions.right == data.dimensions.right && lastResetData.dimensions.top == data.dimensions.top && lastResetData.dimensions.bottom == data.dimensions.bottom
     calcScale()
 
-    sharerToolbarBoundsStyle.value = (screensharing && data.toolbarBounds) ? {
+    sharerToolbarBoundsStyle.value = (isSharingScreen && data.toolbarBounds) ? {
       left: totalScale.value * (data.toolbarBounds.x - data.dimensions.left) + "px",
       top: totalScale.value * (data.toolbarBounds.y - data.dimensions.top) + "px",
       width: totalScale.value * data.toolbarBounds.width + "px",
@@ -554,14 +406,15 @@ onMounted(() => {
       y: Math.round(y / (totalScale.value * (zoom?.scale ?? 1))),
       id: props.id,
       name: props.user,
-      color: props.color
+      color: props.color,
+      draw: controlpressed,
     }
 
     if ((lastMouseDown > 0 && lastMove < Date.now() - 10) || 
       (lastMove < Date.now() - 100) || 
       (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
       lastMove = Date.now()
-      send(controlpressed ? "paint-mouse-move" : "mouse-move", currentMouseData, { receiveSelf: true, volatile: true })
+      send("mouse-move", currentMouseData, { receiveSelf: true, volatile: true })
     }
 
     lastPosX = x
@@ -645,7 +498,7 @@ onMounted(() => {
         mousedown = true
         
         console.log("mouse-down (immediate due to movement)")
-        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
+        send("mouse-down", { ...lastMouseData, draw: controlpressed }, { receiveSelf: true, volatile: true })
         
         // Remove this handler since we've triggered the event
         moveHandler && document.removeEventListener('mousemove', moveHandler)
@@ -658,7 +511,7 @@ onMounted(() => {
     eventToSend = window.setTimeout(() => {
       mousedown = true
       console.log("mouse-down")
-      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
+      send("mouse-down", { ...lastMouseData, draw: controlpressed }, { receiveSelf: true, volatile: true })
     }, 120)
   }
 
@@ -674,10 +527,10 @@ onMounted(() => {
 
     if (mousedown || dragdetected) {
       console.log("mouse-up")
-      send(controlpressed ? "paint-mouse-up" : "mouse-up", currentMouseData, { receiveSelf: true, volatile: true })
+      send("mouse-up", { ...currentMouseData, draw: controlpressed }, { receiveSelf: true, volatile: true })
     } else {
       console.log("mouse-leftclick")
-      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastMouseData, { receiveSelf: true, volatile: true })
+      send("mouse-leftclick", { ...lastMouseData, draw: controlpressed }, { receiveSelf: true, volatile: true })
     }
 
     mousedown = false
@@ -1015,6 +868,7 @@ defineExpose({
       </div>
       <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
       <div v-if="sharerToolbarBoundsStyle" class="sharer-toolbar-bounds" :style="sharerToolbarBoundsStyle"></div>
+      <canvas ref="canvas" />
     </div>
     <div class="size-info" :style="sizeInfoStyle"></div>
     <div v-if="activeMessage" class="message">
@@ -1109,10 +963,15 @@ defineExpose({
     padding: 0px;
     z-index:99;
     position: absolute;
-    top: 0px;
-    left: 0px;
-    width: 400px;
-    height: 400px;
+  }
+
+  .remote-viewer .overlay canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    width: 100%;
+    height: 100%;
   }
 
   .remote-viewer .clipboard-container {
