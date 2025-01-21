@@ -1,4 +1,4 @@
-import { TurnCredentials } from "src/interface"
+import { TurnCredentials, UserData } from "src/interface"
 
 export type AcceptedRequestData = {
   videoServer: string
@@ -9,9 +9,7 @@ export type AcceptedRequestData = {
 
 export type RemoteControlData = {
   roomid: string
-  username: string
-  userid: string
-  color: string
+  user: UserData
   hostname: string
 }
 

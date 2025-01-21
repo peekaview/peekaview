@@ -24,7 +24,7 @@ import { useStreamer, type Streamer } from './composables/useStreamer'
 
 //import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
-import { DialogOptions, ScreenSource, StreamerData } from '../interface.js'
+import { DialogOptions, ScreenSource, StreamerData, UserData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -599,6 +599,10 @@ interface StoreSchema {
       timeout: 3000
     })
     streamer?.resumeStreamingIfPaused()
+  })
+
+  ipcMain.handle('update-users', async (_event, users: string) => {
+    streamer?.remotePresenter?.updateUsers(JSON.parse(users) as UserData[])
   })
 
   ipcMain.handle('quit', async (_event) => {

@@ -53,6 +53,8 @@ export interface IElectronAPI {
   onMouseDown: (callback: (data: RemoteMouseData) => void) => void,
   onMouseMove: (callback: (data: RemoteMouseData) => void) => void,
   onMouseUp: (callback: (data: RemoteMouseData) => void) => void,
+  onUpdateUsers: (callback: (users: UserData[]) => void) => void,
+  updateUsers: (users: string) => Promise<void>,
   quit: () => Promise<void>,
   closeClipboard: () => Promise<void>,
   onCleanUpStream: (callback: () => void) => void
@@ -82,9 +84,15 @@ export interface DialogOptions {
   data?: any
 }
 
+export type UserData = {
+  id: string
+  name: string
+  color: string
+}
+
 export type PeerData = {
   type: 'identity'
-  name: string
+  user: UserData
 } | {
   type: 'remote'
   event: RemoteEvent
@@ -104,10 +112,10 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "enable" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
-  T extends "enable" ? { }
+  T extends "browser" ? { }
   : T extends "getclipboard" ? { text: string }
   : T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
@@ -128,9 +136,7 @@ export type RemoteData<T extends RemoteEvent> =
   : never
 
   export type RemoteMouseData = {
-    id: string
-    color: string // TODO: register name and color by id for each client instead of sending it every time
-    name: string
+    userId: string
     x: number
     y: number
     delta?: number

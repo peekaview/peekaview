@@ -1,4 +1,5 @@
 import {
+  computed,
   Reactive,
   reactive,
   Ref,
@@ -10,11 +11,11 @@ import {
 import SimplePeer from 'simple-peer'
 import { io, type Socket } from "socket.io-client"
 
-import { PeerData, RemoteData, RemoteEvent, TurnCredentials } from "src/interface"
+import { PeerData, RemoteData, RemoteEvent, TurnCredentials, UserData } from "src/interface"
 
 interface ScreenPresentOptions {
   turnCredentials?: TurnCredentials
-  remoteEnabled?: boolean
+  inBrowser?: boolean
   onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
 }
 
@@ -27,25 +28,17 @@ interface ScreenViewOptions {
 }
 
 export type ScreenPresent = Reactive<{
-  participants: Ref<Record<string, ViewingParticipant>>
+  participants: Ref<Record<string, UserData>>
   addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>, socketId?: string, exclude?: boolean) => void
   leave: () => void
 }>
 
 export type ScreenView = Reactive<{
-  sharingParticipant: Ref<SharingParticipant | undefined>
+  sharingParticipant: Ref<UserData | undefined>
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
   leave: () => void
 }>
-
-export type ViewingParticipant = {
-  name: string | undefined
-}
-
-export type SharingParticipant = {
-  name: string | undefined
-}
 
 interface ScreenPeer {
   socket: Socket
@@ -53,7 +46,8 @@ interface ScreenPeer {
 }
 
 export type ScreenShareData = ScreenPeerData & {
-  userName: string
+  user: UserData
+  roomId: string
   roomName: string
   serverUrl: string
   controlServer: string
@@ -136,7 +130,8 @@ export async function useScreenPeer({ roomId, turnCredentials }: ScreenPeerData,
 
 export async function useScreenPresent(screenShareData: ScreenShareData, options?: ScreenPresentOptions): Promise<ScreenPresent> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, 'presenter')
-  const participants = ref<Record<string, ViewingParticipant>>({})
+  const _participants = ref<Record<string, UserData>>({})
+  const participants = computed(() => _participants.value) // make this one readonly
   const peers: Record<string, SimplePeer.Instance> = {}
   let previewPeer: SimplePeer.Instance | undefined
   let stream: MediaStream | undefined
@@ -147,9 +142,9 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
         peers[socketId] = initPeer(socketId, true, stream)
     
         peers[socketId].on('connect', () => {
-          peers[socketId].send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
-          if (options?.remoteEnabled)
-            sendRemote("enable", {}, socketId)
+          peers[socketId].send(JSON.stringify({ type: 'identity', user: screenShareData.user }))
+          if (options?.inBrowser)
+            sendRemote("browser", {}, socketId)
         })
         
         peers[socketId].on('data', (json) => {
@@ -160,7 +155,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
               sendRemote(data.event, data.data, socketId, true)
               break
             case 'identity':
-              participants.value[socketId] = { name: data.name }
+              _participants.value[socketId] = data.user
               break
             case 'leave':
               close(socketId)
@@ -206,7 +201,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
   const close = (socketId: string) => {
     peers[socketId]?.destroy()
     delete peers[socketId]
-    delete participants.value[socketId]
+    delete _participants.value[socketId]
   }
 
   const addStream = async (s: MediaStream, _shareAudio = false) => {
@@ -246,7 +241,8 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
 
 export async function useScreenView(screenShareData: ScreenShareData, options?: ScreenViewOptions): Promise<ScreenView> {
   const { socket, initPeer } = await useScreenPeer(screenShareData, options?.role ?? 'viewer')
-  const sharingParticipant = ref<SharingParticipant>()
+  const _sharingParticipant = ref<UserData>()
+  const sharingParticipant = computed(() => _sharingParticipant.value) // make this one readonly
   const stream = shallowRef<MediaStream>()
   let sharingPeer: SimplePeer.Instance | undefined
 
@@ -265,7 +261,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
   const close = () => {
     sharingPeer?.destroy()
     sharingPeer = undefined
-    sharingParticipant.value = undefined
+    _sharingParticipant.value = undefined
     stream.value = undefined
 
     options?.onEnding?.()
@@ -280,7 +276,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
 
       sharingPeer = initPeer(socketId, false)
       sharingPeer.on('connect', () => 
-        sharingPeer!.send(JSON.stringify({ type: 'identity', name: screenShareData.userName }))
+        sharingPeer!.send(JSON.stringify({ type: 'identity', user: screenShareData.user }))
       )
 
       sharingPeer.on('stream', s => {
@@ -293,7 +289,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
             options?.onRemote?.(data.event, data.data)
             break
           case 'identity':
-            sharingParticipant.value = { name: data.name }
+            _sharingParticipant.value = data.user
             break
           case 'close':
             close()

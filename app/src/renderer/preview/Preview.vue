@@ -2,10 +2,14 @@
 import { ref, useTemplateRef } from 'vue'
 
 import Toolbar from '../components/Toolbar.vue'
-import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare';
+import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare'
+import { useDrawOverlay } from '../composables/useDrawOverlay'
 
 const videoRef = useTemplateRef('video')
+const canvasRef = useTemplateRef('canvas')
 const screenView = ref<ScreenView>()
+
+const drawOverlay = useDrawOverlay(canvasRef)
 
 async function startPreview() {
   const params = new URLSearchParams(window.location.search)
@@ -29,6 +33,7 @@ async function startPreview() {
       <button v-if="!screenView" class="btn btn-primary" @click="startPreview">Start Preview</button>
     </Toolbar>
     <video ref="video" />
+    <canvas ref="canvas" />
   </div>
 </template>
 

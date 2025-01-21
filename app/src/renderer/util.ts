@@ -95,3 +95,7 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
 
   return result.isConfirmed ? '0' : '1'
 }
+
+export function isTouchEnabled() {
+  return window.matchMedia("(pointer: coarse)").matches
+}

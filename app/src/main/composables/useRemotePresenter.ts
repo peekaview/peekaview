@@ -12,7 +12,7 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath, windowLoad } from '../util.js'
-import { ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData } from '../../interface.d'
+import { ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
@@ -49,7 +49,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let lastMousePos = new Point(0, 0)
   let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
-
+  let users: UserData[] = []
   const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
 
   ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
@@ -163,11 +163,13 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     sendRemote('mouse-control', { enabled: mouseEnabled })
   }
 
-  function showOverlayCursorSignal(id: string, name: string, color: string) {
+  function showOverlayCursorSignal(id: string) {
     if (!lastTargetPoints[id])
       return
 
     const cpoint = lastTargetPoints[id]
+    const user = users.find(user => user.id === id)
+    const additionalArguments = user ? [id, user.name, user.color] : [id]
     overlayCursorSignal[id] = new BrowserWindow({
       width: 480,
       height: 320,
@@ -180,12 +182,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       useContentSize: true,
       frame: false,
       alwaysOnTop: true,
-      title: `__peekaview - Cursorsignal ${name}`,
       // titleBarStyle: 'hidden',
       webPreferences: {
         nodeIntegration: true,
         preload: resolvePath('static/js/cursoroverlaysignal.js'),
-        additionalArguments: [id, name, color],
+        additionalArguments,
       },
     })
 
@@ -206,7 +207,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     }, 1000)
   }
 
-  function createDrawOverlayWindow() {
+  async function createDrawOverlayWindow() {
     if (drawOverlayWindow)
       return
 
@@ -239,19 +240,26 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     drawOverlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     drawOverlayWindow.setAlwaysOnTop(true, 'screen-saver', 1)
     windowLoad(drawOverlayWindow, 'drawOverlay')
+
+    return new Promise<void>((resolve) => {
+      drawOverlayWindow!.on('ready-to-show', () => {
+        drawOverlayWindow!.webContents.send('on-update-users', users)
+        resolve()
+      })
+    })
   }
 
-  function showDrawOverlayWindow(action: string, data: RemoteMouseData) {
+  async function showDrawOverlayWindow(action: string, data: RemoteMouseData) {
     if (!drawOverlayWindow)
-      createDrawOverlayWindow()
+      await createDrawOverlayWindow()
 
-    if (!data.id || !remoteControlActive)
+    if (!data.userId || !remoteControlActive)
       return
   
     drawOverlayWindow!.webContents.send(action, data)
   }
 
-  function showOverlayCursorWindow(id: string, name: string, color: string) {
+  function showOverlayCursorWindow(id: string) {
     if (overlayCursor[id])
       return
 
@@ -260,6 +268,10 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     windowBorders.top = activeWindowDimensions.top
 
     if (!overlayCursor[id]) {
+      const user = users.find(user => user.id === id)
+      const additionalArguments = user ? [id, user.name, user.color] : [id]
+      console.log(additionalArguments, user, users)
+
       overlayCursor[id] = new BrowserWindow({
         width: 400,
         height: 80,
@@ -270,12 +282,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         useContentSize: true,
         frame: false,
         alwaysOnTop: true,
-        title: `__peekaview - Cursor ${name}`,
         // titleBarStyle: 'hidden',
         webPreferences: {
           nodeIntegration: true,
           preload: resolvePath('static/js/cursoroverlay.js'),
-          additionalArguments: [id, name, color],
+          additionalArguments,
         },
       })
 
@@ -443,31 +454,36 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       return new Point(overlayCursor[obj.id].getPosition()[0] + 210, overlayCursor[obj.id].getPosition()[1] + 10)
   }
 
+  function updateUsers(newUsers: UserData[]) {
+    users = newUsers
+    drawOverlayWindow?.webContents.send('on-update-users', newUsers)
+  }
+
   function mouseMove(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
-    if (!overlayCursor[data.id] && remoteControlActive) {
+    if (!overlayCursor[data.userId] && remoteControlActive) {
       console.log(data)
-      console.log(`show cursor ${data.id}`)
-      showOverlayCursorWindow(data.id, data.name, data.color)
+      console.log(`show cursor ${data.userId}`)
+      showOverlayCursorWindow(data.userId)
     }
 
-    overlayCursorLastAction[data.id] = Date.now()
+    overlayCursorLastAction[data.userId] = Date.now()
 
-    if (overlayCursor[data.id])
-      overlayCursor[data.id].setPosition(data.x + windowBorders.left - 210, data.y + windowBorders.top - 10)
+    if (overlayCursor[data.userId])
+      overlayCursor[data.userId].setPosition(data.x + windowBorders.left - 210, data.y + windowBorders.top - 10)
 
-    lastTargetPoints[data.id] = new Point(data.x + windowBorders.left, data.y + windowBorders.top)
-    if (mousePressed[data.id])
+    lastTargetPoints[data.userId] = new Point(data.x + windowBorders.left, data.y + windowBorders.top)
+    if (mousePressed[data.userId])
       mouse.setPosition(mousePosition(data))
   }
 
   function mouseSignal(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
-    showOverlayCursorSignal(data.id, data.name, data.color)
+    showOverlayCursorSignal(data.userId)
   }
 
   function mouseWheel(data: RemoteMouseData) {
@@ -479,30 +495,30 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function mouseLeftClick(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
-    if (overlayCursorSignal[data.id]) {
-      overlayCursorSignal[data.id].close()
-      delete overlayCursorSignal[data.id]
+    if (overlayCursorSignal[data.userId]) {
+      overlayCursorSignal[data.userId].close()
+      delete overlayCursorSignal[data.userId]
     }
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[data.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.userId]}`)
 
     mouseMove(data)
     mouse.setPosition(mousePosition(data))
-    setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[data.id] = false;}, 50)
+    setTimeout(() => { console.log('leftClick'); mouse.leftClick() ; mousePressed[data.userId] = false;}, 50)
   }
 
   function mouseDblClick(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[data.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.userId]}`)
     mouseMove(data)
     mouse.setPosition(mousePosition(data))
     setTimeout(() => { console.log('dblclick1'); mouse.leftClick() }, 50)
@@ -511,12 +527,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function mouseClick(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
     windowManager.focus()
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
-    console.log(`setposition: ${lastTargetPoints[data.id]}`)
+    console.log(`setposition: ${lastTargetPoints[data.userId]}`)
     mouseMove(data)
     mouse.setPosition(mousePosition(data))
     setTimeout(() => { console.log('rightClick'); mouse.rightClick() }, 50)
@@ -524,31 +540,31 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function mouseDown(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
     lastMousePos = windowManager.convertDipPosition(screen.getCursorScreenPoint())
     mouseMove(data)
     mouse.setPosition(mousePosition(data))
 
-    if (!mousePressed[data.id]) {
-      console.log(`setposition: ${lastTargetPoints[data.id]}`)
+    if (!mousePressed[data.userId]) {
+      console.log(`setposition: ${lastTargetPoints[data.userId]}`)
       mouse.setPosition(convertObjToAbsolutePosition(data))
       setTimeout(() => { console.log('mouseDown'); mouse.pressButton(Button.LEFT) }, 50)
     }
-    mousePressed[data.id] = true
+    mousePressed[data.userId] = true
   }
 
   function mouseUp(data: RemoteMouseData) {
-    if (!data.id)
+    if (!data.userId)
       return
 
-    if (mousePressed[data.id]) {
-      console.log(`setposition: ${lastTargetPoints[data.id]}`)
+    if (mousePressed[data.userId]) {
+      console.log(`setposition: ${lastTargetPoints[data.userId]}`)
       mouseMove(data)
       mouse.setPosition(mousePosition(data))
       setTimeout(() => { console.log('mouseUp'); mouse.releaseButton(Button.LEFT) }, 50)
-      mousePressed[data.id] = false
+      mousePressed[data.userId] = false
 
       setTimeout(() => { mouse.setPosition(lastMousePos) }, 200)
     }
@@ -969,6 +985,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     toggleMouse,
     getToolbarBounds,
     hideRemoteControl,
+    updateUsers,
     onRemote,
   }
 }

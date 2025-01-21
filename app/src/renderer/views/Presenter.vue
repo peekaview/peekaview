@@ -8,6 +8,7 @@ import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { notify, prompt } from '../util'
 import { ScreenSource } from '../../interface'
+import { stringToColor, uuidv4 } from '../../util'
 
 interface Request {
   request_id: string
@@ -29,6 +30,7 @@ const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
 const screenPresent = ref<ScreenPresent>()
+const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}))
 const latestRequest = ref<Request>()
 
 const requestInterval = ref<number>()
@@ -66,6 +68,10 @@ window.electronAPI?.onRemote((event, data) => {
   if (screenPresent.value) {
     screenPresent.value.sendRemote(event, data)
   }
+})
+
+watch(viewers, (viewers) => {
+  window.electronAPI?.updateUsers(JSON.stringify(viewers))
 })
 
 watch(offerDownload, async (flag) => {
@@ -136,7 +142,7 @@ function togglePingInterval() {
 
   window.electronAPI?.log('startPingInterval')
   pingInterval.value = window.setInterval(() => {
-    updateOnlineStatus();
+    updateOnlineStatus()
   }, 10000) // Ping every 10 seconds
   updateOnlineStatus() // Initial ping
 }
@@ -213,7 +219,11 @@ async function startSession() {
     const data = await callApi<AcceptedRequestData>(requestData)
 
     screenShareData.value = {
-      userName: props.email,
+      user: {
+        id: uuidv4(),
+        name: props.email,
+        color: stringToColor(props.email),
+      },
       roomName: data.roomId,
       roomId: data.roomId,
       turnCredentials: data.turnCredentials,
@@ -222,8 +232,13 @@ async function startSession() {
     }
 
     screenPresent.value = await useScreenPresent(screenShareData.value, {
-      remoteEnabled: inElectron,
-      onRemote: (event, data) => window.electronAPI?.sendRemote(event, data)
+      inBrowser: !inElectron,
+      onRemote: (event, data) => {
+        if (inElectron)
+          window.electronAPI?.sendRemote(event, data)
+        else
+          screenPresent.value?.sendRemote(event, data)
+      }
     })
     shareLocalScreen()
   } catch (error) {
