@@ -17,12 +17,10 @@ const mappedUsers = computed(() => {
 const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers })
 
 window.electronAPI!.onUpdateUsers((data) => {
-  window.electronAPI?.log("onUpdateUsers", data)
   users.value = data
 })
 
 window.electronAPI!.onMouseDown((data) => {
-  window.electronAPI?.log("onMouseDown", data)
   drawOverlay.startStroke(data.userId, [data.x, data.y])
 })
 

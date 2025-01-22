@@ -1,6 +1,6 @@
-import { computed, reactive, ref } from "vue"
+import { computed, reactive, Ref, ref } from "vue"
 
-export function useKeyListeners(send: (key: string) => void) {
+export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<boolean>) {
   const _control = ref(false)
   const _alt = ref(false)
   const _shift = ref(false)
@@ -15,6 +15,9 @@ export function useKeyListeners(send: (key: string) => void) {
   const skip = computed(() => _skip.value)
 
   function onKeyUp(e: KeyboardEvent) {
+    if (!inputEnabled.value)
+      return
+
     if (e.key == 'Control' || e.key == 'Meta') {
       setTimeout(() => {
         _control.value = false
@@ -39,6 +42,9 @@ export function useKeyListeners(send: (key: string) => void) {
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    if (!inputEnabled.value)
+      return
+
     console.log(e.keyCode)
 
     _skip.value = false
@@ -106,10 +112,4 @@ export function useKeyListeners(send: (key: string) => void) {
   }
 
   return { pressed: reactive({ control, alt, shift, space, skip }), onKeyDown, onKeyUp }
-}
-
-export function useMouseListeners() {
-
-  
-  return { onMouseDown, onMouseUp }
 }

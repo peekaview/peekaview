@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "../composables/useSimplePeerScreenShare"
@@ -30,7 +30,7 @@ const downloadLink = ref('downloads/PeekaView.exe')
 
 const screenShareData = ref<ScreenShareData>()
 const screenPresent = ref<ScreenPresent>()
-const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}))
+const viewers = computed(() => screenPresent.value?.users ?? [])
 const latestRequest = ref<Request>()
 
 const requestInterval = ref<number>()
@@ -41,7 +41,37 @@ const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
 
-let stream: MediaStream | undefined
+const stream = shallowRef<MediaStream | undefined>()
+
+let resetInterval: number | undefined
+watch(stream, (stream) => {
+  if (!stream || inElectron) {
+    clearInterval(resetInterval)
+    return
+  }
+  
+  resetInterval = window.setInterval(() => {
+    screenPresent.value?.sendRemote('reset', {
+      room: screenShareData.value!.roomId,
+      scalefactor: 1,
+      isScreen: false,
+      remotecontrol: false,
+      mouseenabled: true,
+      dimensions: {
+        left: 0,
+        top: 0,
+        right: stream.getVideoTracks()[0].getSettings().width ?? 0,
+        bottom: stream.getVideoTracks()[0].getSettings().height ?? 0,
+      },
+      toolbarBounds: {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+      },
+    })
+  }, 2000)
+})
 
 onMounted(() => {
   document.addEventListener('visibilitychange', togglePingInterval)
@@ -236,8 +266,6 @@ async function startSession() {
       onRemote: (event, data) => {
         if (inElectron)
           window.electronAPI?.sendRemote(event, data)
-        else
-          screenPresent.value?.sendRemote(event, data)
       }
     })
     shareLocalScreen()
@@ -260,7 +288,7 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
         return
       }
 
-      stream = await navigator.mediaDevices.getUserMedia({
+      stream.value = await navigator.mediaDevices.getUserMedia({
         ...(shareAudio ? {
           audio: {
             mandatory: {
@@ -282,17 +310,17 @@ async function shareLocalScreen(source?: ScreenSource, shareAudio = false) {
       })
     } else {
       console.debug('Browser environment detected')
-      stream = await navigator.mediaDevices.getDisplayMedia({
+      stream.value = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: shareAudio
       })
     }
 
-    if (!stream)
+    if (!stream.value)
       return
 
-    console.debug('Screen stream obtained:', stream)
-    await screenPresent.value.addStream(stream, shareAudio)
+    console.debug('Screen stream obtained:', stream.value)
+    await screenPresent.value.addStream(stream.value, shareAudio)
     sessionState.value = 'active'
 
     source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: props.email }))
@@ -355,22 +383,22 @@ function shareViaApp() {
 
 function pauseSharing() {
   window.electronAPI?.pauseSharing()
-  if (stream)
-    stream.getTracks()[0].enabled = false
+  if (stream.value)
+    stream.value.getTracks()[0].enabled = false
   sessionState.value = 'paused'
 }
 
 function resumeSharing() {
   window.electronAPI?.resumeSharing()
-  if (stream)
-    stream.getTracks()[0].enabled = true
+  if (stream.value)
+    stream.value.getTracks()[0].enabled = true
   sessionState.value = 'active'
 }
 
 function cleanUpStream() {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop())
-    stream = undefined
+  if (stream.value) {
+    stream.value.getTracks().forEach(track => track.stop())
+    stream.value = undefined
   }
 }
 

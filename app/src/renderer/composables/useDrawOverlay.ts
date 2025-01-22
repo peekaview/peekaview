@@ -48,7 +48,6 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
   }, 50)
 
   function refitDimensions() {
-    console.log("refitDimensions", dimensions.value, canvasRef.value)
     if (!dimensions.value || !canvasRef.value)
       return
 

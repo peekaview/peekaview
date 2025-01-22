@@ -98,7 +98,7 @@ export type PeerData = {
   event: RemoteEvent
   data: RemoteData<RemoteEvent>
 } | {
-  type: 'leave' | 'close' | 'reset'
+  type: 'leave'
 }
 
 export type TurnCredentials = {
@@ -112,11 +112,11 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "browser" | "getclipboard" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "text" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
-  : T extends "getclipboard" ? { text: string }
+  : T extends "text" ? { text: string }
   : T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
   : T extends "mouse-leftclick" ? RemoteMouseData
@@ -166,13 +166,15 @@ export type RemoteData<T extends RemoteEvent> =
     isScreen: boolean
     remotecontrol: boolean
     mouseenabled: boolean
-    dimensions: {
-      left: number
-      top: number
-      right: number
-      bottom: number
-    }
+    dimensions: Dimensions
     toolbarBounds: Rectangle | undefined
+  }
+
+  export type Dimensions = {
+    left: number
+    top: number
+    right: number
+    bottom: number
   }
 
   export type Rectangle = {
@@ -187,6 +189,6 @@ export type RemoteData<T extends RemoteEvent> =
     name?: string
   }
 
-  export type Dimensions = { width: number, height: number }
+  export type Size = { width: number, height: number }
 
-  export type ElectronWindowDimensions = { size: Partial<Dimensions>, minimumSize?: Partial<Dimensions>, maximumSize?: Partial<Dimensions> }
+  export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }

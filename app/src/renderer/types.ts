@@ -32,6 +32,6 @@ export type VideoTransform = {
 
 export type Signal = {
   color: string
-  left: string
-  top: string
+  left: number
+  top: number
 }

@@ -270,7 +270,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (!overlayCursor[id]) {
       const user = users.find(user => user.id === id)
       const additionalArguments = user ? [id, user.name, user.color] : [id]
-      console.log(additionalArguments, user, users)
 
       overlayCursor[id] = new BrowserWindow({
         width: 400,
@@ -592,7 +591,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       room: data.room,
       text: remoteclipboard,
     }
-    sendRemote('getclipboard', sendobj)
+    sendRemote('text', sendobj)
 
     // @ts-ignore: nut-js does not support clipboard.copy
     await clipboard.copy(tmpclipboard)

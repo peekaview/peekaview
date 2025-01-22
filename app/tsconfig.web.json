@@ -11,6 +11,7 @@
     "src/renderer/**/*.vue",
     "src/preload/*.d.ts",
     "src/interface.d.ts",
+    "src/util.ts",
     "src/composables/**/*"
   ],
   "compilerOptions": {

@@ -23,10 +23,10 @@ const { t } = useI18n()
 
 const inBrowser = ref(false)
 const screenView = ref<ScreenView>()
-const viewers = computed(() => [])
+const users = computed(() => screenView.value?.users ?? [])
 const remoteViewerRef = useTemplateRef('remoteViewer')
-const trackRef = useTemplateRef('track')
-const trackStyle = ref<Record<string, string>>({
+const videoRef = useTemplateRef('video')
+const videoStyle = ref<Record<string, string>>({
   transform: 'scale(1) translate(0px,0px)',
 })
 const containerRef = useTemplateRef('container')
@@ -54,7 +54,7 @@ watch(() => props.data, async (screenShareData) => {
 
   emit('toggle-full-video', true)
   screenView.value = await useScreenView(screenShareData, {
-    videoElement: trackRef.value ?? undefined,
+    videoElement: videoRef.value ?? undefined,
     onRemote: (event, data) => {
       if (event === 'browser')
         inBrowser.value = true
@@ -70,7 +70,6 @@ watch(() => props.data, async (screenShareData) => {
       }
 
       remoteViewerRef.value?.receive(event, parsedData)
-      console.log("remote control", event, parsedData)
     },
     onEnding: () => {
       notify({
@@ -146,11 +145,11 @@ function rescale(scaleinfo: ScaleInfo) {
   }
 
   containerStyle.value.overflow = 'visible'
-  trackStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
+  videoStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
 
   nextTick(() => {  
     const containerRect = containerRef.value!.getBoundingClientRect()
-    const videoRect = trackRef.value!.getBoundingClientRect()
+    const videoRect = videoRef.value!.getBoundingClientRect()
     videoTransform.value = {
       x: Math.round(videoRect.left),
       y: Math.round(videoRect.top),
@@ -186,15 +185,14 @@ function stop() {
 <template>
   <div class="remote-control">
     <div ref="container" class="remote-container" :style="containerStyle">
-      <video ref="track" playsinline autoplay :style="trackStyle" />
+      <video ref="video" playsinline autoplay :style="videoStyle" />
       <RemoteViewer
         ref="remoteViewer"
         v-if="data"
         :in-browser="inBrowser"
         :room="data.roomId"
         :user-id="data.user.id"
-        :users="[...viewers, data.user]"
-        :hostname="data.controlServer"
+        :users="[...users, data.user]"
         :video-transform="videoTransform"
         :style="viewerStyle"
         @rescale="rescale"
