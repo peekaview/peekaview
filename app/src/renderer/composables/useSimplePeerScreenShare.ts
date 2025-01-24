@@ -61,6 +61,7 @@ interface ScreenBase {
 
 interface ScreenParticipant {
   peer: SimplePeer.Instance
+  remoteToken?: string
   user: UserData
 }
 

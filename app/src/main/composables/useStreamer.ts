@@ -155,11 +155,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       return
 
     const send = () => sendRemote('reset', {
-      room: roomid!,
-      scalefactor: windowManager.getScaleFactor() ?? 1,
       isScreen: windowManager.isScreen(),
-      remotecontrol: remotePresenter.remoteControlInputEnabled,
-      mouseenabled: remotePresenter.mouseEnabled,
       dimensions: windowManager.getWindowOuterDimensions(),
       toolbarBounds: remotePresenter.getToolbarBounds(),
     })

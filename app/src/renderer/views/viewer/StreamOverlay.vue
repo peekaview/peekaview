@@ -59,8 +59,16 @@ const mappedUsers = computed(() => {
 })
 
 // Skalierungsinfos
+const windowDimensions = reactive({ width: 0, height: 0 })
 const videoScale = ref(1)
-const remoteScale = ref(1)
+const remoteScale = computed(() => {
+  if (!windowDimensions.height || !windowDimensions.width)
+    return 1
+
+  const height = props.videoTransform.height / windowDimensions.height
+  const width = props.videoTransform.width / windowDimensions.width
+  return height < width ? height : width
+})
 const totalScale = computed(() => videoScale.value * remoteScale.value)
 
 const sharerToolbarBoundsStyle = ref<Record<string, string> | undefined>()
@@ -93,7 +101,6 @@ const signals = reactive<Record<string, Signal>>({})
 const overlayCursors = reactive<Record<string, Cursor>>({})
 window.setInterval(() => clearMouseCursors(), 1000)
 
-const windowDimensions = reactive({ width: 0, height: 0 })
 const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(overlayRef, toRef(pressed.space), toRef(props.inputEnabled))
 
 const scaleInfo = computed(() => ({
@@ -127,7 +134,7 @@ const overlayStyle = computed(() => {
 
 function receiveMouseLeftClick(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
-  if (props.remoteControlActive && data.draw && isSharingScreen.value)
+  if (props.remoteControlActive && data.draw)
     return
 
   const user = mappedUsers.value[data.userId]
@@ -143,7 +150,7 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
   setTimeout(() => {
     if (signals[user.id])
       delete signals[user.id]
-  }, 2000)
+  }, 200000)
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
@@ -360,10 +367,6 @@ function calcScale() {
 let lastDimensions: Dimensions
 function reset(data: RemoteResetData) {
   isSharingScreen.value = data.isScreen
-
-  const remoteScaleHeight = props.videoTransform.height / (data.dimensions.bottom - data.dimensions.top)
-  const remoteScaleWidth = props.videoTransform.width / (data.dimensions.right - data.dimensions.left)
-  remoteScale.value = remoteScaleHeight < remoteScaleWidth ? remoteScaleHeight : remoteScaleWidth
 
   // Speichern der Fensterabmessungen
   windowDimensions.width = data.dimensions.right - data.dimensions.left

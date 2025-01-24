@@ -36,13 +36,14 @@ function showSharingActive() {
 
 <template>
   <PresenterToolbar
-   @toggle-remote-control="toggleRemoteControl"
-   @toggle-mouse="toggleMouse"
-   @pause-sharing="pauseSharing"
-   @resume-sharing="resumeSharing"
-   @stop-sharing="stopSharing"
-   @share-different-screen="shareDifferentScreen"
-   @toggle-clipboard="toggleClipboard"
-   @show-sharing-active="showSharingActive"
+    draggable
+    @toggle-remote-control="toggleRemoteControl"
+    @toggle-mouse="toggleMouse"
+    @pause-sharing="pauseSharing"
+    @resume-sharing="resumeSharing"
+    @stop-sharing="stopSharing"
+    @share-different-screen="shareDifferentScreen"
+    @toggle-clipboard="toggleClipboard"
+    @show-sharing-active="showSharingActive"
   />
 </template>

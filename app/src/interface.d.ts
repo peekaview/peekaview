@@ -112,7 +112,7 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "browser" | "text" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "text" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
@@ -124,12 +124,14 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-down" ? RemoteMouseData
   : T extends "mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
+  : T extends "toggle-freeze" ? { enabled: boolean }
   : T extends "type" ? { key: string }
   : T extends "copy" ? {}
   : T extends "cut" ? {}
   : T extends "paste" ? RemotePasteData
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
+  : T extends "control" ? RemoteControlData
   : T extends "reset" ? RemoteResetData
   : T extends "mouse-control" ? { enabled: boolean }
   : T extends "remote-control" ? { enabled: boolean }
@@ -161,11 +163,7 @@ export type RemoteData<T extends RemoteEvent> =
   }
 
   export type RemoteResetData = {
-    room: string
-    scalefactor: number
     isScreen: boolean
-    remotecontrol: boolean
-    mouseenabled: boolean
     dimensions: Dimensions
     toolbarBounds: Rectangle | undefined
   }

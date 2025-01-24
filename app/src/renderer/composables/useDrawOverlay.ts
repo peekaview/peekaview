@@ -31,16 +31,20 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
   watch(() => [canvasRef.value, canvasContext.value, dimensions.value], () => refitDimensions(), { immediate: true })
 
   let fadeInterval = setInterval(() => {
+    const now = Date.now()
+    const fadeThreshold = now - 8000
+    const fadeTimeout = now - 20000
+
     for (const key in pointHistory) {
       const strokes: Stroke[] = []
       for (const item of pointHistory[key]) {
-        if (item.timestamp >= (Date.now() - 8000)) {
-          strokes.push(item)
-        }
-        if (item.timestamp < (Date.now() - 8000) && item.timestamp > (Date.now() - 20000)) {
-          item.opacity = item.opacity - 0.03
-          strokes.push(item)
-        }
+        if (item.timestamp < fadeTimeout)
+          continue
+        
+        if (item.timestamp < fadeThreshold)
+          item.opacity -= 0.03
+
+        strokes.push(item)
       }
       pointHistory[key] = strokes
     }

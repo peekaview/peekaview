@@ -40,6 +40,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'stop'): void
   (e: 'rescale', scaleinfo: ScaleInfo): void
+  (e: 'freeze'): void
+  (e: 'unfreeze'): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
 
@@ -104,8 +106,20 @@ onReceive("mouse-down", (data) => {
   overlayRef.value?.receiveMouseDown(data)
 })
 
+let throttling = false
 onReceive("mouse-up", (data) => {
   overlayRef.value?.receiveMouseUp(data)
+
+  if (throttling)
+    return
+
+  throttling = true
+  window.setTimeout(() => throttling = false, 5000)
+
+  emit('freeze')
+  window.setTimeout(() => {
+    emit('unfreeze')
+  }, 3500)
 })
 
 onReceive("text", (data) => {
@@ -123,10 +137,15 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-onReceive('reset', (data) => {
-  mouseEnabled.value = data.mouseenabled
-  remoteControlActive.value = data.remotecontrol
+onReceive('mouse-control', (data) => {
+  mouseEnabled.value = data.enabled
+})
 
+onReceive('remote-control', (data) => {
+  remoteControlActive.value = data.enabled
+})
+
+onReceive('reset', (data) => {
   overlayRef.value?.reset(data)
 })
 
@@ -554,17 +573,5 @@ defineExpose({
     border: solid white;
     border-width: 0 3px 3px 0;
     transform: rotate(45deg);
-  }
-
-  @keyframes scaleIn {
-    from {
-      transform: scale(.5, .5);
-      opacity: .2;
-    }
-
-    to {
-      transform: scale(2.5, 2.5);
-      opacity: 0;
-    }
   }
 </style>

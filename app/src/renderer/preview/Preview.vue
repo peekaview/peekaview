@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
-import Toolbar from '../components/Toolbar.vue'
 import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare'
 import { ScaleInfo, VideoTransform } from '../types'
 import { RemoteEvent, RemoteData } from '../../interface'
+import PresenterToolbar from '../components/PresenterToolbar.vue'
 
 const screenShareData = ref<ScreenShareData>()
 const videoRef = useTemplateRef('video')
@@ -13,6 +13,19 @@ const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
 const screenView = ref<ScreenView>()
 const users = computed(() => screenView.value?.users ?? [])
+
+const remoteControlActive = ref(true)
+const mouseEnabled = ref(true)
+
+watch(remoteControlActive, (enabled) => {
+  screenView.value?.sendRemote('remote-control', { enabled })
+})
+
+watch(mouseEnabled, (enabled) => {
+  screenView.value?.sendRemote('mouse-control', { enabled })
+})
+
+onMounted(() => startPreview())
 
 async function startPreview() {
   const params = new URLSearchParams(window.location.search)
@@ -108,8 +121,28 @@ onReceive("mouse-down", (data) => {
   overlayRef.value?.receiveMouseDown(data)
 })
 
+let throttling = false
+const shutterActive = ref(false)
 onReceive("mouse-up", (data) => {
   overlayRef.value?.receiveMouseUp(data)
+
+  if (throttling)
+    return
+
+  throttling = true
+  window.setTimeout(() => throttling = false, 5000)
+
+  shutterActive.value = true
+  window.setTimeout(() => {
+    freeze()
+    shutterActive.value = false
+    window.resizeTo(window.screen.width, window.screen.height)
+    window.focus()
+    window.setTimeout(() => {
+      window.resizeTo(400, 300)
+      unfreeze()
+    }, 3000)
+  }, 150)
 })
 
 onReceive('reset', (data) => {
@@ -129,13 +162,23 @@ function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
 function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
   receiveEvents[event] = handler as ReceiveEventHandlers[T]
 }
+
+function freeze() {
+  videoRef.value?.pause()
+}
+
+function unfreeze() {
+  videoRef.value?.play()
+}
 </script>
 
 <template>
   <div>
-    <Toolbar v-if="!screenView">
-      <button class="btn btn-primary" @click="startPreview">Start Preview</button>
-    </Toolbar>
+    <PresenterToolbar
+      @toggle-remote-control="remoteControlActive = $event"
+      @toggle-mouse="mouseEnabled = $event"
+      @toggle-clipboard=""
+    />
     <div ref="container" class="preview-container">
       <video ref="video" muted />
       <StreamOverlay
@@ -145,10 +188,12 @@ function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T
         :users="users"
         :user-id="screenShareData.user.id"
         :video-transform="videoTransform"
-        mouse-enabled
+        :mouse-enabled="mouseEnabled"
+        :remote-control-active="remoteControlActive"
         @rescale="rescale"
         @send="send($event.event, $event.data, $event.options)"
       />
+      <div v-if="shutterActive" class="shutter" />
     </div>
   </div>
 </template>
@@ -157,5 +202,21 @@ function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T
 video {
   max-width: 100%;
   max-height: 100%;
+}
+
+.preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.shutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  z-index: 1000;
 }
 </style>

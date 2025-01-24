@@ -41,7 +41,9 @@ const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
 
 const viewCode = computed(() => btoa(`viewEmail=${ props.email }`))
 
-const stream = shallowRef<MediaStream | undefined>()
+const stream = shallowRef<MediaStream | undefined>() 
+
+let previewWindow: Window | null = null
 
 let resetInterval: number | undefined
 watch(stream, (stream) => {
@@ -52,11 +54,7 @@ watch(stream, (stream) => {
   
   resetInterval = window.setInterval(() => {
     screenPresent.value?.sendRemote('reset', {
-      room: screenShareData.value!.roomId,
-      scalefactor: 1,
-      isScreen: false,
-      remotecontrol: false,
-      mouseenabled: true,
+      isScreen: false, // TODO
       dimensions: {
         left: 0,
         top: 0,
@@ -339,7 +337,7 @@ function openPreview() {
     ...screenShareData.value, 
     userName: 'preview'
   }))
-  window.open(`preview/index.html?data=${data}`, '_blank', 'width=320,height=320,right=160,top=0,popup=true')
+  previewWindow = window.open(`preview/index.html?data=${data}`, '_blank', 'width=400,height=300,right=160,top=0,popup=true')
 }
     
 function handleError(error: Error, requestData: any) {
@@ -414,6 +412,9 @@ function stopSharing() {
   
   sessionState.value = 'stopped'
   window.electronAPI?.stopSharing()
+
+  previewWindow?.close()
+  previewWindow = null
 
   offerDownload.value = !inElectron
 }

@@ -198,6 +198,8 @@ function stop() {
         @rescale="rescale"
         @send="screenView?.sendRemote($event.event, $event.data)"
         @stop="stop"
+        @freeze="videoRef?.pause()"
+        @unfreeze="videoRef?.play()"
       />
       <slot />
     </div>
