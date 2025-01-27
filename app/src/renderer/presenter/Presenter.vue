@@ -2,25 +2,25 @@
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
-import { ScreenShareData, ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare'
+import { ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare'
 import { ScaleInfo, VideoTransform } from '../types'
 import { RemoteEvent, RemoteData } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
+import { usePresenter, type Presenter } from '../views/presenter/usePresenter'
+import { notify } from '../util'
 
-const screenShareData = ref<ScreenShareData>()
+const windowDefaultSize = [400, 400] as const
+const windowSelectSize = [720, 600] as const
+
+const appUrl = ref(import.meta.env.VITE_APP_URL)
+const presenter = ref<Presenter>()
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
 const screenView = ref<ScreenView>()
 const users = computed(() => screenView.value?.users ?? [])
 
-const remoteControlActive = ref(true)
 const mouseEnabled = ref(true)
-
-watch(remoteControlActive, (enabled) => {
-  screenView.value?.sendRemote('remote-control', { enabled })
-})
-
 watch(mouseEnabled, (enabled) => {
   screenView.value?.sendRemote('mouse-control', { enabled })
 })
@@ -33,8 +33,14 @@ async function startPreview() {
   if (!data)
     throw new Error('')
   
-  screenShareData.value = JSON.parse(atob(data)) as ScreenShareData
-  screenView.value = await useScreenView(screenShareData.value, {
+  const { email, token } = JSON.parse(atob(data))
+  presenter.value = usePresenter(email, token, {
+    onStop: () => window.close(),
+    onBeforeScreenSelect: () => window.resizeTo(...windowSelectSize),
+    onAfterScreenSelect: () => window.resizeTo(...windowDefaultSize),
+  })
+  await presenter.value.startSession()
+  screenView.value = await useScreenView(presenter.value.screenShareData!, {
     videoElement: videoRef.value ?? undefined,
     onRemote: (event, data) => {
       let parsedData = data
@@ -111,6 +117,7 @@ const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
 onReceive("mouse-leftclick", (data) => {
   overlayRef.value?.receiveMouseLeftClick(data)
+  freezeAndFocus()
 })
 
 onReceive("mouse-move", (data) => {
@@ -125,24 +132,7 @@ let throttling = false
 const shutterActive = ref(false)
 onReceive("mouse-up", (data) => {
   overlayRef.value?.receiveMouseUp(data)
-
-  if (throttling)
-    return
-
-  throttling = true
-  window.setTimeout(() => throttling = false, 5000)
-
-  shutterActive.value = true
-  window.setTimeout(() => {
-    freeze()
-    shutterActive.value = false
-    window.resizeTo(window.screen.width, window.screen.height)
-    window.focus()
-    window.setTimeout(() => {
-      window.resizeTo(400, 300)
-      unfreeze()
-    }, 3000)
-  }, 150)
+  freezeAndFocus()
 })
 
 onReceive('reset', (data) => {
@@ -163,33 +153,57 @@ function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T
   receiveEvents[event] = handler as ReceiveEventHandlers[T]
 }
 
-function freeze() {
-  videoRef.value?.pause()
+function freezeAndFocus() {
+  if (throttling)
+    return
+
+  throttling = true
+  window.setTimeout(() => throttling = false, 5000)
+
+  shutterActive.value = true
+  window.setTimeout(() => { // wait until shutter is streamed
+    videoRef.value?.pause()
+    shutterActive.value = false
+    window.resizeTo(window.screen.width, window.screen.height)
+    window.focus()
+    window.setTimeout(() => {
+      window.resizeTo(...windowDefaultSize)
+      videoRef.value?.play()
+    }, 3000)
+  }, 150)
 }
 
-function unfreeze() {
-  videoRef.value?.play()
+function showInviteLink() {
+  notify({
+    type: 'info',
+    title: 'Invite link',
+    html: `<code>${appUrl.value}?view=${presenter.value?.viewCode}</code>`,
+  })
 }
 </script>
 
 <template>
   <div>
     <PresenterToolbar
-      @toggle-remote-control="remoteControlActive = $event"
+      v-if="presenter"
       @toggle-mouse="mouseEnabled = $event"
       @toggle-clipboard=""
+      @stop-sharing="presenter.stopSharing()"
+      @pause-sharing="presenter.pauseSharing()"
+      @resume-sharing="presenter.resumeSharing()"
+      @share-different-screen="presenter.shareLocalScreen()"
+      @show-invite-link="showInviteLink"
     />
     <div ref="container" class="preview-container">
       <video ref="video" muted />
       <StreamOverlay
-        v-if="screenShareData && screenView"
+        v-if="presenter?.screenShareData && screenView"
         ref="overlay"
         :input-enabled="false"
         :users="users"
-        :user-id="screenShareData.user.id"
+        :user-id="presenter.screenShareData.user.id"
         :video-transform="videoTransform"
         :mouse-enabled="mouseEnabled"
-        :remote-control-active="remoteControlActive"
         @rescale="rescale"
         @send="send($event.event, $event.data, $event.options)"
       />
@@ -202,6 +216,7 @@ function unfreeze() {
 video {
   max-width: 100%;
   max-height: 100%;
+  filter: grayscale(100%);
 }
 
 .preview-container {

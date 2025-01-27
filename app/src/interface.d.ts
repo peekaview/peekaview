@@ -4,6 +4,9 @@ import { type DialogOptions } from './main/composables/useCustomDialog'
 declare global {
   interface Window {
     electronAPI?: IElectronAPI
+    presenterControl?: {
+      stopSharing: () => void
+    }
   }
 
   interface MediaTrackConstraints {
@@ -131,7 +134,6 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "paste" ? RemotePasteData
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
-  : T extends "control" ? RemoteControlData
   : T extends "reset" ? RemoteResetData
   : T extends "mouse-control" ? { enabled: boolean }
   : T extends "remote-control" ? { enabled: boolean }
@@ -165,7 +167,7 @@ export type RemoteData<T extends RemoteEvent> =
   export type RemoteResetData = {
     isScreen: boolean
     dimensions: Dimensions
-    toolbarBounds: Rectangle | undefined
+    coverBounds: Rectangle[]
   }
 
   export type Dimensions = {

@@ -29,7 +29,7 @@ function toggleClipboard() {
   window.electronAPI!.toggleClipboard()
 }
 
-function showSharingActive() {
+function showInviteLink() {
   window.electronAPI!.showSharingActive()
 }
 </script>
@@ -44,6 +44,12 @@ function showSharingActive() {
     @stop-sharing="stopSharing"
     @share-different-screen="shareDifferentScreen"
     @toggle-clipboard="toggleClipboard"
-    @show-sharing-active="showSharingActive"
+    @show-invite-link="showInviteLink"
   />
 </template>
+
+<style>
+  #toolbar {
+    display: inline-block;
+  }
+</style>

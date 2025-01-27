@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
-import Present from './views/Presenter.vue'
+import Presenter from './views/presenter/Presenter.vue'
 
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
@@ -12,47 +12,14 @@ import Imprint from './components/Imprint.vue'
 import { prompt } from './util'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
-
-enum Action {
-  Login = 'login',
-  Share = 'share',
-  View = 'view'
-}
+import { useParamsData, Action } from './composables/useParamsData'
 
 const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
+const { action, token, email, name, target, viewEmail } = useParamsData()
 
-const action = ref<Action>(Action.View)
-const token = ref<string | undefined>(localStorage.getItem('token') ?? undefined)
-const email = ref<string | undefined>(localStorage.getItem('email') ?? undefined)
-const name = ref<string | undefined>(localStorage.getItem('name') ?? undefined)
-const target = ref<string | undefined>()
-const viewEmail = ref<string | undefined>()
 const viewActive = ref(false)
-
-onMounted(() => {
-  const params = new URLSearchParams(window.location.search)
-  handleParams(params)
-  console.log('params', params.toString(), params.has('share'))
-
-  for (const a of Object.values(Action)) {
-    if (!params.has(a))
-      continue
-
-    action.value = a
-    const value = params.get(a)
-    if (value)
-      handleParams(new URLSearchParams(atob(value)))
-
-    break
-  }
-})
-
-watch(action, (action) => {
-  if (action === Action.Share && (!email.value || !token.value))
-    window.location.search = 'login'
-})
 
 watch(viewActive, (viewActive) => {
   if (viewActive)
@@ -60,25 +27,6 @@ watch(viewActive, (viewActive) => {
   else
     document.body.classList.remove('view-active')
 })
-
-function handleParams(params: URLSearchParams) {
-  token.value = params.get('token') ?? token.value
-  email.value = params.get('email')?.toLowerCase() ?? email.value
-  name.value = params.get('name') ?? name.value
-  target.value = params.get('target') ?? target.value
-  viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value
-
-  if (params.get('discardSession') === 'true') {
-    email.value = undefined
-    token.value = undefined
-    localStorage.removeItem('email')
-    localStorage.removeItem('token')
-  }
-  
-  email.value && localStorage.setItem('email', email.value)
-  token.value && localStorage.setItem('token', token.value)
-  name.value && localStorage.setItem('name', name.value)
-}
 
 async function handleLogout() {
   const result = await prompt({
@@ -121,7 +69,7 @@ async function handleLogout() {
       v-if="action === Action.Login"
       :target="target"
     />
-    <Present
+    <Presenter
       v-else-if="action === Action.Share && email && token"
       :email="email"
       :token="token"

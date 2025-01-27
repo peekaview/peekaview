@@ -21,7 +21,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const inBrowser = ref(false)
+const inApp = ref(!!window.electronAPI)
 const screenView = ref<ScreenView>()
 const users = computed(() => screenView.value?.users ?? [])
 const remoteViewerRef = useTemplateRef('remoteViewer')
@@ -57,7 +57,7 @@ watch(() => props.data, async (screenShareData) => {
     videoElement: videoRef.value ?? undefined,
     onRemote: (event, data) => {
       if (event === 'browser')
-        inBrowser.value = true
+        inApp.value = false
 
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -189,7 +189,7 @@ function stop() {
       <RemoteViewer
         ref="remoteViewer"
         v-if="data"
-        :in-browser="inBrowser"
+        :in-app="inApp"
         :room="data.roomId"
         :user-id="data.user.id"
         :users="[...users, data.user]"

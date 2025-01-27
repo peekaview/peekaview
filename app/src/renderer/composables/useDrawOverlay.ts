@@ -108,7 +108,7 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
         canvasContext.value.beginPath()
         canvasContext.value.moveTo(Math.round(item.from[0] * scale.value), Math.round(item.from[1] * scale.value))
         canvasContext.value.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
-        canvasContext.value.lineWidth = 5
+        canvasContext.value.lineWidth = 5 * scale.value
         canvasContext.value.lineCap = "round"
         canvasContext.value.lineJoin = "round"
         canvasContext.value.lineTo(Math.round(item.to[0] * scale.value), Math.round(item.to[1] * scale.value))

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { Signal } from "../../types"
 
-defineProps<{
+withDefaults(defineProps<{
   signal: Signal
-}>()
+  scale?: number
+}>(), {
+  scale: 1
+})
 </script>
 
 <template>
-  <div class="signal-container" :style="{ left: (signal.left - 150) + 'px', top: (signal.top - 150) + 'px', 'background-color': signal.color }">
+  <div class="signal-container" :style="{ left: (signal.left * scale - 150) + 'px', top: (signal.top * scale - 150) + 'px', 'background-color': signal.color }">
     <div class="signal" style="animation-delay: -1s"></div>
     <div class="signal" style="animation-delay: -0.5s"></div>
     <div class="signal" style="animation-delay: 0s"></div>

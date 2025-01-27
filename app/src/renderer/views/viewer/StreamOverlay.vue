@@ -59,19 +59,19 @@ const mappedUsers = computed(() => {
 })
 
 // Skalierungsinfos
-const windowDimensions = reactive({ width: 0, height: 0 })
+const streamDimensions = reactive({ width: 0, height: 0 })
 const videoScale = ref(1)
 const remoteScale = computed(() => {
-  if (!windowDimensions.height || !windowDimensions.width)
+  if (!streamDimensions.height || !streamDimensions.width)
     return 1
 
-  const height = props.videoTransform.height / windowDimensions.height
-  const width = props.videoTransform.width / windowDimensions.width
+  const height = props.videoTransform.height / streamDimensions.height
+  const width = props.videoTransform.width / streamDimensions.width
   return height < width ? height : width
 })
 const totalScale = computed(() => videoScale.value * remoteScale.value)
 
-const sharerToolbarBoundsStyle = ref<Record<string, string> | undefined>()
+const coverBounds = ref<Record<string, string>[]>()
 
 const overlayRef = useTemplateRef('overlay')
 const canvasRef = useTemplateRef('canvas')
@@ -107,8 +107,8 @@ const scaleInfo = computed(() => ({
   x: currentPan.x,
   y: currentPan.y,
   scale: currentPanScale.value,
-  width: windowDimensions.width,
-  height: windowDimensions.height
+  width: streamDimensions.width,
+  height: streamDimensions.height
 }))
 
 watch(scaleInfo, () => updateVideoScale(scaleInfo.value))
@@ -116,7 +116,7 @@ watch(scaleInfo, () => updateVideoScale(scaleInfo.value))
 const overlayStyle = computed(() => {
   const style = {
     border: '1px solid blue',
-    // Bei Screensharing sieht man den Remotemauszeiger, daher den eigenen durch ein feines Crosshair ersetzen
+    // Bei Screensharing sieht man den Mauszeiger des Presenters, daher den eigenen durch ein feines Crosshair ersetzen
     cursor: isSharingScreen.value ? 'url(img/minicrosshair.png) 5 5, auto' : 'default',
     width: '0',
     height: '0',
@@ -143,14 +143,14 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
 
   signals[user.id] = {
     color: user.color,
-    left: Math.round(data.x * totalScale.value),
-    top: Math.round(data.y * totalScale.value),
+    left: Math.round(data.x),
+    top: Math.round(data.y),
   }
 
   setTimeout(() => {
     if (signals[user.id])
       delete signals[user.id]
-  }, 200000)
+  }, 2000)
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
@@ -369,15 +369,15 @@ function reset(data: RemoteResetData) {
   isSharingScreen.value = data.isScreen
 
   // Speichern der Fensterabmessungen
-  windowDimensions.width = data.dimensions.right - data.dimensions.left
-  windowDimensions.height = data.dimensions.bottom - data.dimensions.top
+  streamDimensions.width = data.dimensions.right - data.dimensions.left
+  streamDimensions.height = data.dimensions.bottom - data.dimensions.top
 
-  sharerToolbarBoundsStyle.value = (isSharingScreen.value && data.toolbarBounds) ? {
-    left: totalScale.value * (data.toolbarBounds.x - data.dimensions.left) + "px",
-    top: totalScale.value * (data.toolbarBounds.y - data.dimensions.top) + "px",
-    width: totalScale.value * data.toolbarBounds.width + "px",
-    height: totalScale.value * data.toolbarBounds.height + "px"
-  } : undefined
+  coverBounds.value = data.coverBounds.map(bound => ({
+    left: totalScale.value * (bound.x - data.dimensions.left) + "px",
+    top: totalScale.value * (bound.y - data.dimensions.top) + "px",
+    width: totalScale.value * bound.width + "px",
+    height: totalScale.value * bound.height + "px"
+  }))
 
   // Skalierungsinfos und Mauszeigerposition mit Remote-App synchronisiert
   synchronized = !!lastDimensions && lastDimensions.left == data.dimensions.left && lastDimensions.right == data.dimensions.right && lastDimensions.top == data.dimensions.top && lastDimensions.bottom == data.dimensions.bottom
@@ -429,9 +429,11 @@ defineExpose({
       <img :src="CursorPng"/>
       <div v-if="cursorId !== userId && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
     </div>
-    <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" :signal="signal" />
+    <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" :signal="signal" :scale="totalScale" />
     <canvas ref="canvas" />
-    <div v-if="inputEnabled && sharerToolbarBoundsStyle" class="sharer-toolbar-bounds" :style="sharerToolbarBoundsStyle"></div>
+    <template v-if="isSharingScreen">
+      <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
+    </template>
   </div>
 </template>
 
@@ -477,7 +479,7 @@ defineExpose({
   height: 100%;
 }
 
-.stream-overlay .sharer-toolbar-bounds {
+.stream-overlay .cover-bounds {
   position: absolute;
   z-index: 100;
   background: repeating-linear-gradient(-45deg, #222, #333 15px, #aa0 15px, #cc0 20px);

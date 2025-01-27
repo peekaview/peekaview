@@ -28,7 +28,7 @@ type SendOptions = {
 
 const props = withDefaults(defineProps<{
   room: string
-  inBrowser: boolean
+  inApp: boolean
   users: UserData[]
   userId: string
   videoTransform?: VideoTransform
@@ -49,7 +49,6 @@ const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
 
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
-// Remote-Funktionen
 const mouseEnabled = ref(true)
 const remoteControlActive = ref(false)
 const remoteClipboard = ref(false)

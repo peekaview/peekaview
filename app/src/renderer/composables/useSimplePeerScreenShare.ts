@@ -16,7 +16,7 @@ import { PeerData, RemoteData, RemoteEvent, TurnCredentials, UserData } from "sr
 
 interface ScreenPresentOptions {
   turnCredentials?: TurnCredentials
-  inBrowser?: boolean
+  inApp?: boolean
   onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
 }
 
@@ -228,7 +228,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
     stream,
     roleHandlers: {
       viewer: (socketId) => {
-        createParticipant(socketId, true, () => options?.inBrowser && sendRemote("browser", {}, socketId), () => dismiss(socketId))
+        createParticipant(socketId, true, () => !options?.inApp && sendRemote("browser", {}, socketId), () => dismiss(socketId))
       }
     },
   })
