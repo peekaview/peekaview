@@ -70,6 +70,7 @@ const remoteScale = computed(() => {
   return height < width ? height : width
 })
 const totalScale = computed(() => videoScale.value * remoteScale.value)
+watch(totalScale, () => console.log('totalScale', totalScale.value))
 
 const coverBounds = ref<Record<string, string>[]>()
 

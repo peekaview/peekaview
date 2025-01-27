@@ -293,7 +293,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
       options!.videoElement!.play().catch(err => {
         console.error('Error playing video:', err)
       })
-    }, 5000)
+    }, 2500)
   })
 
   const leave = () => {

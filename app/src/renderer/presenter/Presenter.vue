@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
-import { ScreenView, useScreenView } from '../composables/useSimplePeerScreenShare'
 import { ScaleInfo, VideoTransform } from '../types'
 import { RemoteEvent, RemoteData } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
@@ -17,12 +16,10 @@ const presenter = ref<Presenter>()
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
-const screenView = ref<ScreenView>()
-const users = computed(() => screenView.value?.users ?? [])
 
 const mouseEnabled = ref(true)
 watch(mouseEnabled, (enabled) => {
-  screenView.value?.sendRemote('mouse-control', { enabled })
+  presenter.value?.sendRemote?.('mouse-control', { enabled })
 })
 
 onMounted(() => startPreview())
@@ -35,13 +32,16 @@ async function startPreview() {
   
   const { email, token } = JSON.parse(atob(data))
   presenter.value = usePresenter(email, token, {
-    onStop: () => window.close(),
     onBeforeScreenSelect: () => window.resizeTo(...windowSelectSize),
     onAfterScreenSelect: () => window.resizeTo(...windowDefaultSize),
-  })
-  await presenter.value.startSession()
-  screenView.value = await useScreenView(presenter.value.screenShareData!, {
-    videoElement: videoRef.value ?? undefined,
+    onStream: (stream) => {
+      videoRef.value!.srcObject = stream
+      setTimeout(() => {
+        videoRef.value!.play().catch(err => {
+          console.error('Error playing video:', err)
+        })
+      }, 2500)
+    },
     onRemote: (event, data) => {
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -54,8 +54,11 @@ async function startPreview() {
       }
 
       receive(event, parsedData)
-    }
+    },
+    onReset: (data) => overlayRef.value?.reset(data),
+    onStop: () => window.close(),
   })
+  await presenter.value.startSession()
 }
 
 const videoStyle = ref<Record<string, string>>({
@@ -135,12 +138,8 @@ onReceive("mouse-up", (data) => {
   freezeAndFocus()
 })
 
-onReceive('reset', (data) => {
-  overlayRef.value?.reset(data)
-})
-
 function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
-  screenView.value?.sendRemote(event, data)
+  presenter.value?.sendRemote?.(event, data)
   if (options.receiveSelf)
     receive(event, data)
 }
@@ -197,10 +196,10 @@ function showInviteLink() {
     <div ref="container" class="preview-container">
       <video ref="video" muted />
       <StreamOverlay
-        v-if="presenter?.screenShareData && screenView"
+        v-if="presenter?.screenShareData"
         ref="overlay"
         :input-enabled="false"
-        :users="users"
+        :users="presenter.viewers"
         :user-id="presenter.screenShareData.user.id"
         :video-transform="videoTransform"
         :mouse-enabled="mouseEnabled"

@@ -50,7 +50,6 @@ export function usePanzoom(el: Readonly<ShallowRef<HTMLElement | null>>, active 
     if ((currentPan.x <= 0 && currentPan.y <= 0) || currentPanScale.value > 1)
       return
     
-    console.log("reset pan")
     panzoom?.pan(0, 0, {
       animate: true
     })

@@ -6,7 +6,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "../.
 import type { AcceptedRequestData } from '../../types'
 import { callApi, UnauthorizedError } from '../../api'
 import { notify, prompt } from '../../util'
-import { ScreenSource } from '../../../interface'
+import { RemoteData, RemoteEvent, ScreenSource } from '../../../interface'
 import { stringToColor, uuidv4 } from '../../../util'
 
 interface Request {
@@ -17,9 +17,12 @@ interface Request {
 export type Presenter = ReturnType<typeof usePresenter>
 
 type PresenterOptions = {
-  onStop?: () => void
   onBeforeScreenSelect?: () => void
   onAfterScreenSelect?: () => void
+  onStream?: (stream: MediaStream, shareAudio?: boolean) => void
+  onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
+  onReset?: (data: RemoteData<'reset'>) => void
+  onStop?: () => void
 }
 
 export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, options?: PresenterOptions) {
@@ -41,13 +44,12 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
 
   let resetInterval: number | undefined
   watch(stream, (stream) => {
-    if (!stream || inApp) {
-      clearInterval(resetInterval)
+    clearInterval(resetInterval)
+    if (!stream || inApp)
       return
-    }
     
     resetInterval = window.setInterval(() => {
-      screenPresent.value?.sendRemote('reset', {
+      const data = {
         isScreen: true, // TODO
         dimensions: {
           left: 0,
@@ -56,7 +58,9 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
           bottom: stream.getVideoTracks()[0].getSettings().height ?? 0,
         },
         coverBounds: []
-      })
+      }
+      screenPresent.value?.sendRemote('reset', data)
+      options?.onReset?.(data)
     }, 2000)
   })
 
@@ -104,6 +108,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
   watch(latestRequest, async (request) => {
     if (!request)
       return
+    
     const result = await prompt({
       text: t('share.requestAccess.message', { name: request.name }),
       confirmButtonText: t('share.requestAccess.accept'),
@@ -165,6 +170,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
       screenPresent.value = await useScreenPresent(screenShareData.value, {
         inApp,
         onRemote: (event, data) => {
+          options?.onRemote?.(event, data)
           if (inApp)
             window.electronAPI?.sendRemote(event, data)
         }
@@ -220,6 +226,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
 
       console.debug('Screen stream obtained:', stream.value)
       await screenPresent.value.addStream(stream.value, shareAudio)
+      options?.onStream?.(stream.value, shareAudio)
       sessionState.value = 'active'
 
       source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: unref(email) }))
@@ -360,7 +367,10 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
 
   return reactive({
     viewCode,
+    stream,
+    viewers,
     screenShareData: computed(() => screenShareData.value),
+    sendRemote: computed(() => screenPresent.value?.sendRemote),
     startSession,
     pauseSharing,
     resumeSharing,
