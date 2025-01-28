@@ -23,9 +23,11 @@ export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => Promise<void>,
+  onDialog: (callback: (options: DialogOptions) => void) => Electron.IpcRenderer,
   onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => Electron.IpcRenderer,
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => Electron.IpcRenderer,
   onChangeLanguage: (callback: (locale: string) => void) => Electron.IpcRenderer,
+  replyDialog: (dialogId: number, result: string) => Promise<void>,
   logout: (discardSession?: boolean) => Promise<void>,
   loginViaBrowser: (discardSession?: boolean) => Promise<void>,
   loginWithCode: (code: string) => Promise<void>,
@@ -37,10 +39,19 @@ export interface IElectronAPI {
   openScreenSourceSelection: () => Promise<void>,
   sharingActive: (viewCode: string, data: string) => Promise<void>,
   handleAppClosing: () => Promise<void>,
+  toggleRemoteControl: (toggle?: boolean) => Promise<void>,
+  toggleMouse: (toggle?: boolean) => Promise<void>,
+  toggleClipboard: (toggle?: boolean) => Promise<void>,
+  clipboardReady: () => Promise<void>,
+  dataToClipboard: (callback: (data: string) => void) => Electron.IpcRenderer,
+  setToolbarSize: (width: number, height: number) => Promise<void>,
   stopSharing: () => Promise<void>,
   pauseSharing: () => Promise<void>,
   resumeSharing: () => Promise<void>,
+  showSharingActive: () => Promise<void>,
+  resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
   quit: () => Promise<void>,
+  closeClipboard: () => Promise<void>,
   onCleanUpStream: (callback: () => void) => void
 }
 
@@ -48,6 +59,24 @@ export interface ScreenSource {
   id: string
   name: string
   thumbnail: string
+}
+
+export type DialogType = 'error' | 'warning' | 'info' | 'success' | 'download' | 'call' | 'question'
+
+export interface DialogOptions {
+  id?: number
+  title?: string
+  message?: string
+  detail?: string
+  type?: DialogType
+  windowType?: 'tray' | 'dialog'
+  sound?: string | null
+  noLink?: boolean
+  buttons?: string[]
+  defaultId?: number
+  cancelId?: number
+  timeout?: number
+  data?: any
 }
 
 export type PeerData = {
@@ -128,7 +157,7 @@ export type RemoteData<T extends RemoteEvent> =
   export type RemoteResetData = {
     room: string
     scalefactor: number
-    iscreen: boolean
+    isScreen: boolean
     remotecontrol: boolean
     mouseenabled: boolean
     dimensions: {
@@ -137,4 +166,21 @@ export type RemoteData<T extends RemoteEvent> =
       right: number
       bottom: number
     }
+    toolbarBounds: Rectangle | undefined
   }
+
+  export type Rectangle = {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+
+  export type File = {
+    content: string
+    name?: string
+  }
+
+  export type Dimensions = { width: number, height: number }
+
+  export type ElectronWindowDimensions = { size: Partial<Dimensions>, minimumSize?: Partial<Dimensions>, maximumSize?: Partial<Dimensions> }

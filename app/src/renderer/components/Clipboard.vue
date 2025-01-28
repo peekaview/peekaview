@@ -1,31 +1,51 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
-import { b64DecodeUnicode } from "../../util.js"
+import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
+import { File } from '../../interface.js'
+import { b64DecodeUnicode } from "../util.js"
 
-type ClipboardFile = {
+import ArrowCollapseVerticalSvg from '../../assets/icons/arrow-collapse-vertical.svg'
+import ArrowExpandVerticalSvg from '../../assets/icons/arrow-expand-vertical.svg'
+import CloseSvg from '../../assets/icons/close.svg'
+import CopySvg from '../../assets/icons/content-copy.svg'
+import DownloadSvg from '../../assets/icons/download.svg'
+import Toolbar from './Toolbar.vue'
+
+type ClipboardFile = File & {
   type: 'text' | 'image' | 'binary'
-  name?: string
   extension: string
-  content: string
 }
 
 const props = withDefaults(defineProps<{
-  data: {
-    content: string
-    name: string | undefined
-  } | undefined
+  data: File | undefined
+  draggable?: boolean
 }>(), {
   data: undefined,
+  draggable: false,
 })
+
+const emit = defineEmits<{
+  (e: 'onCollapse', collapsed: boolean): void
+  (e: 'close'): void
+}>()
 
 const imageRef = useTemplateRef('image')
 const downloadRef = useTemplateRef('download')
-const downloadData = ref<{
-  name: string
-  content: string
-} | undefined>()
+const downloadData = ref<File | undefined>()
 
 const clipboardFile = ref<ClipboardFile | undefined>()
+const fileSvg = computed(() => {
+  if (!clipboardFile.value)
+    return
+
+  if (clipboardFile.value.type !== 'binary')
+    return clipboardFile.value.content
+
+  return `${window.electronAPI ? '../': ''}icons/${clipboardFile.value.extension}.svg`
+})
+
+const collapsed = ref(false)
+
+watch(collapsed, value => emit('onCollapse', value))
 
 // virtuelles Clipboard, Filesharing via Websockets
 // Todo, in eigene JS auslagern, da mehr oder weniger baugleich mit Filesharing in meetzi-App
@@ -101,7 +121,7 @@ watch(() => props.data, (data) => {
   }
 }, { immediate: true })
 
-function download() {
+function downloadFile() {
   console.log('download', clipboardFile.value)
   if (!clipboardFile.value)
     return
@@ -112,9 +132,11 @@ function download() {
     name: clipboardFile.value.name ?? 'download_' + datestring + '.' + clipboardFile.value.extension
   }
   console.log(downloadData.value)
-  downloadRef.value?.click()
   nextTick(() => {
-    downloadData.value = undefined
+    downloadRef.value?.click()
+    nextTick(() => {
+      downloadData.value = undefined
+    })
   })
 }
 
@@ -142,64 +164,104 @@ function copy() {
       break
   }
 }
+
+function close() {
+  clipboardFile.value = undefined
+  emit('close')
+}
 </script>
 
 <template>
-  <div v-if="clipboardFile" class="clipboard">
-    <div class="button" style="margin-bottom: 5px" @click="clipboardFile = undefined">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </div>
-    <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="button copy-button" @click="copy">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-      </svg>
-    </div>
-    <div class="button download-button">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
-      </svg>
-    </div>
-    <div>
-      <div v-if="clipboardFile.type === 'text'" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)`, 'background-repeat': 'no-repeat', 'background-position-x': 'right' }">
+  <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
+    <Toolbar :draggable="draggable">
+      <div class="btn btn-sm btn-secondary" title="Collapse / Expand" style="width: 30px" @click="collapsed = !collapsed">
+        <ArrowExpandVerticalSvg v-if="collapsed" />
+        <ArrowCollapseVerticalSvg v-else />
+      </div>
+      <div class="btn btn-sm btn-secondary" title="Close" @click="close">
+        <CloseSvg />
+      </div>
+    </Toolbar>
+    <template v-if="!collapsed">
+      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
         <textarea>{{ clipboardFile.content }}</textarea>
       </div>
-      <img
-        v-else
-        ref="image"
-        :class="clipboardFile.type === 'binary' ? 'binary' : 'image'"
-        :src="clipboardFile.type === 'binary' ? `icons/${clipboardFile.extension}.svg` : clipboardFile.content"
-        @click="download"
-      />
-    </div>
-    <a
-      ref="download"
-      v-if="downloadData"
-      :href="downloadData.content"
-      :download="downloadData.name"
-      target="_self"
-    >
-      {{ downloadData.name }}
-    </a>
+      <div v-else class="clipboard-content">
+        <img
+          ref="image"
+          :class="clipboardFile.type === 'binary' ? 'binary' : 'image'"
+          :src="fileSvg"
+          @click="downloadFile"
+        />
+      </div>
+      <Toolbar>
+        <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" title="Copy to clipboard" @click="copy">
+          <CopySvg />
+        </div>
+        <div class="btn btn-sm btn-secondary" title="Download" @click="downloadFile">
+          <DownloadSvg />
+        </div>
+        <a
+          ref="download"
+          v-if="downloadData"
+          :href="downloadData.content"
+          :download="downloadData.name"
+          target="_self"
+        >
+          {{ downloadData.name }}
+        </a>
+      </Toolbar>
+    </template>
   </div>
 </template>
 
 <style>
 .clipboard {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    width: 160px;
-    height: 200px;
-    padding: 5px;
-    border-radius: 5px;
-    background: #1a1a1a;
-    z-index: 300;
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  border-radius: 5px;
+  background: #1a1a1a;
+}
+
+.clipboard.collapsed {
+  height: auto;
+}
+
+.clipboard .toolbar .btn {
+  flex: 1;
+}
+  
+.clipboard .clipboard-content {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-repeat: 'no-repeat';
+  background-position-x: 'right';
+}
+  
+.clipboard textarea {
+  width: 100%;
+  height: 100%;
+  font-size: 10px;
+  font-family: sans-serif;
+  background: black;
+  color: white;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: auto;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+}
+
+.clipboard textarea::-webkit-scrollbar {
+  display: none;
 }
 
 .clipboard img {
@@ -214,22 +276,5 @@ function copy() {
 
 .clipboard img.binary {
   max-height: 150px;
-}
-
-.clipboard .copy-button, .clipboard .download-button {
-    position: absolute;
-    z-index: 10;
-    width: calc(100% - 10px);
-    margin-top: 5px;
-}
-
-.clipboard .copy-button {
-    display: none;
-    bottom: 40px;
-}
-
-.clipboard .download-button {
-    display: inline;
-    bottom: 10px;
 }
 </style>

@@ -202,14 +202,9 @@ function stop() {
         :style="viewerStyle"
         @rescale="rescale"
         @send="screenView?.sendRemote($event.event, $event.data)"
+        @stop="stop"
       />
       <slot />
-    </div>
-
-    <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="stop">
-        {{ $t('viewer.stop') }}
-      </button>
     </div>
   </div>
 </template>

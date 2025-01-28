@@ -1,6 +1,6 @@
-import { RemoteFileData, RemoteFileChunkData } from "../interface"
+import { File, RemoteFileData, RemoteFileChunkData } from "../interface"
 
-export function useFileChunkRegistry(onComplete: (content: string, name: string) => void) {
+export function useFileChunkRegistry(onComplete: (file: File) => void) {
   const receivingFiles: Record<string, { name: string, length: number, chunks: string[] }> = {}
 
   function register(data: RemoteFileData) {
@@ -16,12 +16,14 @@ export function useFileChunkRegistry(onComplete: (content: string, name: string)
     if (receivingFiles[data.id].chunks.length !== receivingFiles[data.id].length)
       return
 
-    const content = receivingFiles[data.id].chunks.join('')
-    const name = receivingFiles[data.id].name
+    const file = {
+      content: receivingFiles[data.id].chunks.join(''),
+      name: receivingFiles[data.id].name
+    }
     delete receivingFiles[data.id]
 
-    console.log("complete file chunk", content, name)
-    onComplete(content, name)
+    console.log("complete file chunk", file)
+    onComplete(file)
   }
 
   return {

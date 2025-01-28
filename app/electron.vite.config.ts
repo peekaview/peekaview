@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 import { loadEnv } from 'vite'
+import svgLoader from 'vite-svg-loader'
 
 import packageJson from './package.json'
 
@@ -55,8 +56,11 @@ export default defineConfig({
       rollupOptions: {
         input: {
           app: resolve('src/preload/app.ts'),
+          clipboard: resolve('src/preload/clipboard.ts'),
           login: resolve('src/preload/login.ts'),
           sources: resolve('src/preload/sources.ts'),
+          dialog: resolve('src/preload/dialog.ts'),
+          toolbar: resolve('src/preload/toolbar.ts'),
         },
         output: {
           preserveModules: false
@@ -70,8 +74,11 @@ export default defineConfig({
       rollupOptions: {
         input: {
           app: resolve('src/renderer/index.html'),
+          clipboard: resolve('src/renderer/clipboard/index.html'),
           login: resolve('src/renderer/login/index.html'),
           sources: resolve('src/renderer/sources/index.html'),
+          dialog: resolve('src/renderer/dialog/index.html'),
+          toolbar: resolve('src/renderer/toolbar/index.html'),
         },
         output: {
           preserveModules: false
@@ -89,7 +96,7 @@ export default defineConfig({
         "simple-peer": "simple-peer/simplepeer.min.js",
       }
     },
-    plugins: [vue()],
+    plugins: [vue(), svgLoader()],
     publicDir: resolve('static'),
     server: {
       fs: {

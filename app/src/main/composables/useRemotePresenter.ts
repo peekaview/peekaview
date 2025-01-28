@@ -6,13 +6,13 @@ import {
   Key,
   Button,
 } from '@nut-tree-fork/nut-js'
-import { BrowserWindow, screen } from 'electron'
+import path from 'path'
+import { ipcMain, BrowserWindow, screen } from 'electron'
 // import { fileTypeFromBlob } from 'file-type';
 
-// import { Streamer } from "./Streamer.js";
 import { WindowManager } from '../modules/WindowManager.js'
-import { resolvePath } from '../util.js'
-import { RemoteData, RemoteEvent, RemoteFileChunkData, RemoteFileData, RemoteMouseData } from '../../interface.d'
+import { resolvePath, windowLoad } from '../util.js'
+import { ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
@@ -30,12 +30,15 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
   let overlayDrawer: BrowserWindow | undefined
   let clipboardWindow: BrowserWindow | undefined
-  let hwnd = 0
+  let toolbarWindow: BrowserWindow | undefined
+  let toolbarSize: { width: number, height: number } | {} = {}
   let localClipboardTime = 0
-  let mouseEnabled = true
+  let lastClipboardData: File | undefined
   let lastKey: string
   let remoteControlActive = false
   let remoteControlInputEnabled = false
+  let mouseEnabled = true
+  let lastMouseEnabled: boolean | undefined = undefined
   let windowBorders = {
     left: 0,
     top: 0,
@@ -47,8 +50,53 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
 
-  const fileChunkRegistry = useFileChunkRegistry((content, name) => {
-    fileToClipboard(content, name)
+  const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
+
+  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
+    onRemote(event, data)
+  })
+
+  ipcMain.handle('set-toolbar-size', async (_event, width: number, height: number) => {
+    toolbarSize = { width, height }
+  })
+
+  ipcMain.handle('toggle-clipboard', async (_event, toggle?: boolean) => {
+    toggleClipboardWindow(toggle)
+  })
+
+  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
+    toggleMouse(toggle)
+  })
+  
+  ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
+    toggleRemoteControl(toggle)
+  })
+
+  ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
+    let window: BrowserWindow | undefined
+    switch (windowName) {
+      case 'clipboard':
+        window = clipboardWindow
+        break
+      case 'toolbar':
+        window = toolbarWindow
+        break
+      default:
+        return
+    }
+
+    if (!window)
+      return
+
+    let size = window?.getMinimumSize()
+    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
+
+    size = window?.getSize()
+    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
+  })
+
+  ipcMain.handle('close-clipboard', async (_event) => {
+    clipboardWindow?.close()
   })
 
   function deactivate() {
@@ -57,10 +105,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       cursorCheckInterval = undefined
     }
     remoteControlActive = false
+
+    toolbarWindow?.close()
+    clipboardWindow?.close()
   }
 
-  function activate(newHwnd) {
-    hwnd = newHwnd
+  function activate(hwnd: string) {
     windowManager = new WindowManager()
     windowManager.selectWindow(hwnd)
 
@@ -73,44 +123,47 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     }, 1000)
 
     remoteControlActive = true
+    createToolbarWindow()
   }
 
-  function toggleRemoteControl() {
-    remoteControlInputEnabled = !remoteControlInputEnabled
+  function toggleRemoteControl(toggle?: boolean) {
+    if (remoteControlInputEnabled === toggle)
+      return
+
+    if (toggle === undefined)
+      toggle = !remoteControlInputEnabled
+
+    console.log('Toggling remote control', toggle)
+    remoteControlInputEnabled = toggle
+    if (toggle) {
+      const enabled = mouseEnabled
+      toggleMouse(true)
+      lastMouseEnabled = enabled
+    }
+    else if (lastMouseEnabled !== undefined)
+      toggleMouse(lastMouseEnabled)
+
+    sendRemote('remote-control', { enabled: remoteControlInputEnabled })
   }
 
-  function toggleMouse() {
-    mouseEnabled = !mouseEnabled
+  function toggleMouse(toggle?: boolean) {
+    if (mouseEnabled === toggle)
+      return
+
+    lastMouseEnabled = undefined
+
+    if (toggle === undefined)
+      toggle = !mouseEnabled
+
+    console.log('Toggling mouse control', toggle)
+    mouseEnabled = toggle
     if (!mouseEnabled)
       hideOverlays()
+
+    sendRemote('mouse-control', { enabled: mouseEnabled })
   }
 
-  function enableMouse() {
-    console.log('Enabling mouse control')
-    mouseEnabled = true
-    sendRemote('mouse-control', { enabled: true })
-  }
-
-  function disableMouse() {
-    console.log('Disabling mouse control')
-    mouseEnabled = false
-    hideOverlays()
-    sendRemote('mouse-control', { enabled: false })
-  }
-
-  function enableRemoteControl() {
-    console.log('Enabling remote control')
-    remoteControlInputEnabled = true
-    sendRemote('remote-control', { enabled: true })
-  }
-
-  function disableRemoteControl() {
-    console.log('Disabling remote control')
-    remoteControlInputEnabled = false
-    sendRemote('remote-control', { enabled: false })
-  }
-
-  function showoverlayCursorSignal(id: string, name: string, color: string) {
+  function showOverlayCursorSignal(id: string, name: string, color: string) {
     if (!lastTargetPoints[id])
       return
 
@@ -249,6 +302,115 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     mousePressed[id] = false
   }
 
+  async function dataToClipboard(data: File) {
+    if (!clipboardWindow)
+      await createClipboardWindow()
+
+    lastClipboardData = data
+
+    clipboardWindow!.webContents.send('data-to-clipboard', JSON.stringify(data))
+  }
+
+  function createClipboardWindow() {
+    if (clipboardWindow)
+      return
+
+    const width = 240
+    const height = 320
+
+    clipboardWindow = new BrowserWindow({
+      width,
+      height,
+      minWidth: width,
+      minHeight: 50,
+      transparent: true,
+      skipTaskbar: true,
+      focusable: true,
+      enableLargerThanScreen: true,
+      useContentSize: true,
+      frame: false,
+      alwaysOnTop: true,
+      title: '__peekaview - Clipboard',
+      titleBarStyle: 'hidden',
+      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width + 10),
+      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - height + 30),
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/clipboard.js'),
+        webSecurity: false,
+        nodeIntegration: true,
+        contextIsolation: true,
+      },
+    })
+
+    clipboardWindow.removeMenu()
+    clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
+    windowLoad(clipboardWindow, 'clipboard')
+    //clipboardWindow.webContents.openDevTools()
+
+    return new Promise<void>((resolve) => {
+      ipcMain.handleOnce('clipboard-ready', async (_event) => {
+        resolve()
+      })
+
+      clipboardWindow!.on('closed', () => {
+        clipboardWindow = undefined
+      })
+
+      clipboardWindow!.show()
+    })
+  }
+
+  function createToolbarWindow() {
+    if (toolbarWindow)
+      return
+
+    const width = 480
+    const height = 50
+
+    toolbarWindow = new BrowserWindow({
+      width,
+      height,
+      minHeight: height,
+      minimizable: false,
+      maximizable: false,
+      focusable: true,
+      alwaysOnTop: true,
+      transparent: true,
+      skipTaskbar: true,
+      show: false,
+      frame: false,
+      x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - width) / 2,
+      y: 0,
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/toolbar.js'),
+        additionalArguments: [import.meta.env.VITE_APP_URL],
+        nodeIntegration: true,
+        contextIsolation: true,
+        sandbox: false,
+        webSecurity: false,
+      },
+    })
+
+    toolbarWindow.setAlwaysOnTop(true, 'screen-saver')
+    windowLoad(toolbarWindow, 'toolbar')
+    toolbarWindow.show()
+    //toolbarWindow.webContents.openDevTools()
+
+    toolbarWindow.on('closed', () => {
+      toolbarWindow = undefined
+    })
+  }
+
+  function getToolbarBounds() {
+    if (!toolbarWindow)
+      return undefined
+
+    return {
+      ...toolbarWindow.getBounds(),
+      ...toolbarSize,
+    }
+  }
+
   function hideOverlays() {
     for (const id in overlayCursor) {
       if (overlayCursor[id]) {
@@ -299,7 +461,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (!data.id)
       return
 
-    showoverlayCursorSignal(data.id, data.name, data.color)
+    showOverlayCursorSignal(data.id, data.name, data.color)
   }
 
   function mouseWheel(data: RemoteMouseData) {
@@ -414,6 +576,16 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     await clipboard.copy(tmpclipboard)
   }
 
+  function toggleClipboardWindow(toggle?: boolean) {
+    if (toggle === undefined)
+      toggle = !clipboardWindow
+
+    if (!toggle)
+      clipboardWindow?.close()
+    else if (lastClipboardData !== undefined)
+      dataToClipboard(lastClipboardData)
+  }
+
   function receiveFile(data: RemoteFileData) {
     fileChunkRegistry.register(data)
   }
@@ -422,57 +594,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     fileChunkRegistry.receiveChunk(data)
   }
 
-  function fileToClipboard(filecontent: string, filename?: string) {
-    if (clipboardWindow) {
-      clipboardWindow.close()
-      clipboardWindow = undefined
-    }
-
-    clipboardWindow = new BrowserWindow({
-      width: 170,
-      height: 200,
-      // transparent: true,
-      // skipTaskbar: true,
-      focusable: true,
-      enableLargerThanScreen: true,
-      useContentSize: true,
-      frame: false,
-      resizable: false,
-      alwaysOnTop: true,
-      title: '__peekaview - Clipboard',
-      titleBarStyle: 'hidden',
-      skipTaskbar: true,
-      //x: screen.getPrimaryDisplay().workAreaSize.width - 170,
-      //y: screen.getPrimaryDisplay().workAreaSize.height - 250,
-      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ?  screen.getPrimaryDisplay().workAreaSize.width / 2 - 85 : screen.getPrimaryDisplay().workAreaSize.width - 180),
-      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - 210),
-      webPreferences: {
-        webSecurity: false,
-        nodeIntegration: true,
-        contextIsolation: false,
-        preload: resolvePath('static/js/clipboard.js'),
-      },
-    })
-
-    clipboardWindow.removeMenu()
-    clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
-    clipboardWindow.loadFile(resolvePath('static/clipboard.html'))
-    //clipboardWindow.webContents.openDevTools();
-    clipboardWindow.webContents.send('pasteFromFile', JSON.stringify({ filecontent, filename }))
-    clipboardWindow.show()
-
-    clipboardWindow.on('closed', () => {
-      clipboardWindow = undefined
-    })
-  }
-
-  function pasteFromClipboard(data: any) {
-    console.log("pasteFromClipboard", data)
-    if (data.filecontent)
+  function textToClipboard(data: RemotePasteData) {
+    if (data.text)
       return
 
     if (!remoteControlActive || !remoteControlInputEnabled) {
-      fileToClipboard(`data:text/plain;base64,${btoa(data.text)}`)
+      dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
     else {
       console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
@@ -736,7 +863,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         break
       case 'paste':
         //if (remoteControlInputEnabled)
-          pasteFromClipboard(data)
+          textToClipboard(data as RemotePasteData)
         break
       case 'file':
         if (mouseEnabled)
@@ -845,12 +972,10 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     activate,
     deactivate,
-    enableMouse,
-    disableMouse,
-    toggleMouse,
-    enableRemoteControl,
-    disableRemoteControl,
+    toggleClipboardWindow,
     toggleRemoteControl,
+    toggleMouse,
+    getToolbarBounds,
     hideRemoteControl,
     onRemote,
   }

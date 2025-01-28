@@ -19,13 +19,13 @@ import log from 'electron-log/main'
 import { exec } from 'child_process'
 import fs from 'fs'
 
-import { useCustomDialog, type DialogOptions } from './composables/useCustomDialog'
+import { useCustomDialog } from './composables/useCustomDialog'
 import { useStreamer, type Streamer } from './composables/useStreamer'
 
 //import { WindowManager } from './modules/WindowManager'
 //import { Conference } from './modules/Conference.js'
-import { RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface.js'
-import { resolvePath } from './util'
+import { DialogOptions, ScreenSource, StreamerData } from '../interface.js'
+import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
@@ -437,7 +437,6 @@ interface StoreSchema {
     currentViewCode = undefined
     appWindow?.webContents.send('clean-up-stream')
     streamer?.stopSharing()
-    customDialog.closeShareDialogs()
     customDialog.closeTrayDialogs()
   }
 
@@ -449,13 +448,6 @@ interface StoreSchema {
     windowLoad(appWindow, undefined, params)
     if (show !== undefined)
       show ? appWindow.show() : appWindow.hide()
-  }
-
-  function windowLoad(window: BrowserWindow, entryKey?: string | undefined, params?: Record<string, string>) {
-    if (is.dev && process.env.ELECTRON_RENDERER_URL)
-      window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/${entryKey ? entryKey + '/': ''}index.html${params ? '?' + (new URLSearchParams(params).toString()) : ''}`)
-    else
-      window.loadFile(path.join(__dirname, `../renderer/${entryKey ? entryKey + '/': ''}index.html`), { query: params })
   }
 
   function getAppUrl() {
@@ -509,10 +501,6 @@ interface StoreSchema {
     appWindow?.webContents.send('reply-dialog', id, result)
   })
 
-  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
-    streamer?.onRemote(event, data)
-  })
-
   ipcMain.handle('open-screen-source-selection', async () => {
     createSourcesWindow()
   })
@@ -551,12 +539,6 @@ interface StoreSchema {
     sourcesWindow?.close()
   })
 
-  /*ipcMain.handle('start-remote-control', async (_event, data: StreamerData) => {
-    startRemoteControl(data)
-  })*/
-
-  
-
   const openShareMessage = async () => {
     log.info('Opening share message, currentViewCode:', currentViewCode)
     if (!currentViewCode) {
@@ -589,9 +571,7 @@ interface StoreSchema {
       currentViewCode = viewCode
       startRemoteControl(streamerData)
     
-    
-      customDialog.playSoundOnOpen('ping.wav')
-      customDialog.openShareDialog(import.meta.env.VITE_APP_URL, {})
+      customDialog.playSoundOnOpen('ping')
       await openShareMessage()
     }
   })
@@ -612,33 +592,13 @@ interface StoreSchema {
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
-    customDialog.playSoundOnOpen('ping.wav')
+    customDialog.playSoundOnOpen('ping')
     customDialog.openDialog('dialog', {
       title: 'Sharing resumed',
       detail: "Sharing resumed, other users can now see your shared screen or application",
       timeout: 3000
     })
     streamer?.resumeStreamingIfPaused()
-  })
-
-  ipcMain.handle('enable-mouse', async (_event) => {
-    console.log('Enabling mouse control')
-    streamer?.enableMouse()
-  })
-
-  ipcMain.handle('disable-mouse', async (_event) => {
-    console.log('Disabling mouse control')
-    streamer?.disableMouse()
-  })
-
-  ipcMain.handle('enable-remote-control', async (_event) => {
-    console.log('Enabling remote control')
-    streamer?.enableRemoteControl()
-  })
-
-  ipcMain.handle('disable-remote-control', async (_event) => {
-    console.log('Disabling remote control')
-    streamer?.disableRemoteControl()
   })
 
   ipcMain.handle('quit', async (_event) => {

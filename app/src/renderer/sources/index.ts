@@ -1,5 +1,3 @@
-import 'bootstrap/dist/css/bootstrap.css'
-
 import { createApp } from 'vue'
 
 import i18n from '../i18n'

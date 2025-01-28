@@ -7,7 +7,7 @@ interface DialogOptions {
   html?: string
   confirmButtonText?: string
   cancelButtonText?: string
-  soundfile?: string | null
+  sound?: string | null
 }
 
 interface NotifyOptions extends DialogOptions {
@@ -19,7 +19,7 @@ const promiseHandlers: {
   [id: number]: [(value: string) => void, () => void]
 } = {}
 
-window.electronAPI?.onReplyDialog((dialogId, result) => {
+window.electronAPI?.onReplyDialog?.((dialogId, result) => {
   if (promiseHandlers[dialogId]) {
     promiseHandlers[dialogId][0](result)
     delete promiseHandlers[dialogId]
@@ -60,7 +60,7 @@ export async function notify({ type, title, text, html, confirmButtonText, cance
   }
 }
 
-export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, soundfile = null }: DialogOptions) {
+export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, sound = null }: DialogOptions) {
   if (window.electronAPI) {
     const id = increment++
 
@@ -69,7 +69,7 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
       id,
       type,
       title,
-      soundfile,
+      sound,
       message: text ?? html,
       buttons: [
         confirmButtonText ?? 'Yes', // result === '0'
