@@ -186,29 +186,24 @@ function onWheel(e: WheelEvent) {
     e.preventDefault()
 }
 
-function onDrop(e: DragEvent) {
+async function onDrop(e: DragEvent) {
   // Prevent default behavior (Prevent file from being opened)
   e.preventDefault()
 
   console.log('File(s) dropped')
   draggingOver.value = false
 
-  activeMessage.value = 'fileUpload'
-
   const items = e.dataTransfer?.items
-  if (items) {
-    // Use DataTransferItemList interface to access the file(s)
-    Array.from(items).forEach(item => {
-      // If dropped items aren't files, reject them
-      if (item.kind === 'file')
-        sendFile(item)
-    })
-  }/* else {
-    // Use DataTransfer interface to access the file(s)
-    [...ev.dataTransfer.files].forEach((file, i) => {
-    console.log(`… file[${i}].name = ${file.name}`)
-    })
-  }*/
+  if (!items)
+    return
+
+  activeMessage.value = 'fileUpload'
+  for (let item of Array.from(items)) {
+    if (item.kind === 'file')
+      await sendFile(item)
+  }
+
+  hideMessage('fileUpload')
 }
 
 function onDragOver(e: DragEvent) {

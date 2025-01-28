@@ -43,19 +43,30 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
   const stream = shallowRef<MediaStream | undefined>() 
 
   let resetInterval: number | undefined
+  let lastResetWidth: number | undefined
+  let lastResetHeight: number | undefined
   watch(stream, (stream) => {
     clearInterval(resetInterval)
     if (!stream || inApp)
       return
     
     resetInterval = window.setInterval(() => {
+      const width = stream.getVideoTracks()[0].getSettings().width ?? 0
+      const height = stream.getVideoTracks()[0].getSettings().height ?? 0
+
+      /*if (lastResetWidth === width && lastResetHeight === height)
+        return*/ // TODO: do send in case a new viewer joins somehow
+
+      lastResetWidth = width
+      lastResetHeight = height
+
       const data = {
         isScreen: true, // TODO
         dimensions: {
           left: 0,
           top: 0,
-          right: stream.getVideoTracks()[0].getSettings().width ?? 0,
-          bottom: stream.getVideoTracks()[0].getSettings().height ?? 0,
+          right: width,
+          bottom: height,
         },
         coverBounds: []
       }

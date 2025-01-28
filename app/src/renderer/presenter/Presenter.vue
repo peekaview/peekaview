@@ -1,26 +1,37 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
+import Clipboard from '../components/Clipboard.vue'
 import { ScaleInfo, VideoTransform } from '../types'
-import { RemoteEvent, RemoteData } from '../../interface'
+import { File, RemoteEvent, RemoteData } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, type Presenter } from '../views/presenter/usePresenter'
-import { notify } from '../util'
+import { prompt } from '../util'
+import { useFileChunkRegistry } from '../../composables/useFileChunking'
+
+const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
 
-const appUrl = ref(import.meta.env.VITE_APP_URL)
-const presenter = ref<Presenter>()
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
+
+const appUrl = ref(import.meta.env.VITE_APP_URL)
+const presenter = ref<Presenter>()
 
 const mouseEnabled = ref(true)
 watch(mouseEnabled, (enabled) => {
   presenter.value?.sendRemote?.('mouse-control', { enabled })
 })
+
+const showClipboard = ref(true)
+const clipboardFile = ref<File>()
+const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
+watch(clipboardFile, () => showClipboard.value = true)
 
 onMounted(() => startPreview())
 
@@ -58,6 +69,7 @@ async function startPreview() {
     onReset: (data) => overlayRef.value?.reset(data),
     onStop: () => window.close(),
   })
+  
   await presenter.value.startSession()
 }
 
@@ -71,27 +83,27 @@ const containerStyle = ref<Record<string, string>>({
 })
 const videoTransform = ref<VideoTransform>()
 
-function rescale(scaleinfo: ScaleInfo) {
+function rescale(scaleInfo: ScaleInfo) {
   const containerRect = containerRef.value!.getBoundingClientRect()
   const currentHeight = Math.round(containerRect.height)
   const currentWidth = Math.round(containerRect.width)
 
-  let scaledowny = 1
-  let scaledownx = 1
-  if (scaleinfo.height > window.innerHeight)
-    scaledowny = window.innerHeight / scaleinfo.height
-  if (scaleinfo.width > window.innerWidth)
-    scaledownx = window.innerWidth / scaleinfo.width
+  let scaleDownY = 1
+  let scaleDownX = 1
+  if (scaleInfo.height > window.innerHeight)
+    scaleDownY = window.innerHeight / scaleInfo.height
+  if (scaleInfo.width > window.innerWidth)
+    scaleDownX = window.innerWidth / scaleInfo.width
 
-  let scaledown = scaledowny < scaledownx ? scaledowny : scaledownx
+  let scaleDown = scaleDownY < scaleDownX ? scaleDownY : scaleDownX
   
-  if (scaleinfo.height != currentHeight || scaleinfo.width != currentWidth) {
-    containerStyle.value.height = scaleinfo.height * scaledown + 'px'
-    containerStyle.value.width = scaleinfo.width * scaledown + 'px'
+  if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
+    containerStyle.value.height = scaleInfo.height * scaleDown + 'px'
+    containerStyle.value.width = scaleInfo.width * scaleDown + 'px'
   }
 
   containerStyle.value.overflow = 'visible'
-  videoStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
+  videoStyle.value.transform = `scale(${scaleInfo.scale}) translate(${scaleInfo.x}px,${scaleInfo.y}px)`
 
   nextTick(() => {  
     const containerRect = containerRef.value!.getBoundingClientRect()
@@ -129,6 +141,15 @@ onReceive("mouse-move", (data) => {
 
 onReceive("mouse-down", (data) => {
   overlayRef.value?.receiveMouseDown(data)
+})
+
+onReceive("file", (data) => {
+  console.log("file", data)
+  fileChunkRegistry.register(data)
+})
+
+onReceive("file-chunk", (data) => {
+  fileChunkRegistry.receiveChunk(data)
 })
 
 let throttling = false
@@ -172,56 +193,86 @@ function freezeAndFocus() {
   }, 150)
 }
 
-function showInviteLink() {
-  notify({
+async function showInviteLink() {
+  const url = `${appUrl.value}?view=${presenter.value?.viewCode}`
+  const result = await prompt({
     type: 'info',
     title: 'Invite link',
-    html: `<code>${appUrl.value}?view=${presenter.value?.viewCode}</code>`,
+    html: `<code>${url}</code>`,
+    confirmButtonText: t('general.copyToClipboard'),
+    cancelButtonText: t('general.close'),
   })
+
+  if (result === '0')
+    navigator.clipboard.writeText(url)
 }
 </script>
 
 <template>
-  <div>
-    <PresenterToolbar
-      v-if="presenter"
-      @toggle-mouse="mouseEnabled = $event"
-      @toggle-clipboard=""
-      @stop-sharing="presenter.stopSharing()"
-      @pause-sharing="presenter.pauseSharing()"
-      @resume-sharing="presenter.resumeSharing()"
-      @share-different-screen="presenter.shareLocalScreen()"
-      @show-invite-link="showInviteLink"
+  <PresenterToolbar
+    v-if="presenter"
+    @toggle-mouse="mouseEnabled = $event"
+    @toggle-clipboard="showClipboard = !showClipboard"
+    @stop-sharing="presenter.stopSharing()"
+    @pause-sharing="presenter.pauseSharing()"
+    @resume-sharing="presenter.resumeSharing()"
+    @share-different-screen="presenter.shareLocalScreen()"
+    @show-invite-link="showInviteLink"
+  />
+  <div ref="container" class="preview-container">
+    <video ref="video" muted />
+    <div class="veil" />
+    <StreamOverlay
+      v-if="presenter?.screenShareData"
+      ref="overlay"
+      :input-enabled="false"
+      :users="presenter.viewers"
+      :user-id="presenter.screenShareData.user.id"
+      :video-transform="videoTransform"
+      :mouse-enabled="mouseEnabled"
+      @rescale="rescale"
+      @send="send($event.event, $event.data, $event.options)"
     />
-    <div ref="container" class="preview-container">
-      <video ref="video" muted />
-      <StreamOverlay
-        v-if="presenter?.screenShareData"
-        ref="overlay"
-        :input-enabled="false"
-        :users="presenter.viewers"
-        :user-id="presenter.screenShareData.user.id"
-        :video-transform="videoTransform"
-        :mouse-enabled="mouseEnabled"
-        @rescale="rescale"
-        @send="send($event.event, $event.data, $event.options)"
-      />
-      <div v-if="shutterActive" class="shutter" />
+    <div class="clipboard-container">
+      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
+    <div v-if="shutterActive" class="shutter" />
   </div>
 </template>
 
 <style>
+#presenter {
+  width: 100%;
+  height: 100%;
+}
+
 video {
   max-width: 100%;
   max-height: 100%;
-  filter: grayscale(100%);
+  filter: grayscale(50%);
+}
+
+.veil {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #8886;
+  z-index: 1000;
 }
 
 .preview-container {
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+.clipboard-container {
+  position: absolute;
+  z-index: 300;
+  top: 50px;
+  left: 50px;
 }
 
 .shutter {
@@ -231,6 +282,6 @@ video {
   width: 100%;
   height: 100%;
   background-color: black;
-  z-index: 1000;
+  z-index: 1001;
 }
 </style>
