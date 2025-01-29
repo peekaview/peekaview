@@ -6,11 +6,12 @@
     "cancel": "Cancel",
     "close": "Close",
     "areYouSure": "Are you sure?",
-    "copyToClipboard": "Copy to clipboard"
+    "error": "Error"
   },
   "labels": {
     "yourEmail": "Your email address",
     "yourName": "Your Name",
+    "enterYourName": "Enter your name",
     "connectToEmail": "Email address of user to connect with"
   },
   "app": {
@@ -24,14 +25,16 @@
     "login": "Login to app",
     "loggingIn": "Logging in to the app...",
     "code": "Your login code",
-    "useCodeAlternatively": "Auto-Login not working on the desktop app? Then copy this code instead and enter it in the app.",
-    "alreadyRegistered": "This email address is already registered.",
     "justRegistered": "You have successfully registered. Please check your mails for the login link.",
     "successful": "Login Successful",
     "successMessage": "Your login was successful. You can now proceed to the app.",
     "openApp": "Open App",
     "orEnterCode": "Or enter this code in the app to proceed:",
-    "contactSupport": "If you're having trouble, please contact support."
+    "contactSupport": "If you're having trouble, please contact support.",
+    "connectionError": {
+      "title": "Connection Error",
+      "text": "There was a problem connecting to the server. Please try again."
+    }
   },
   "viewer": {
     "requestScreenShare": "Request Screen Share Access",
@@ -55,6 +58,28 @@
       "minutesAgo": "one minute ago | {n} minutes ago",
       "hoursAgo": "one hour ago | {n} hours ago",
       "daysAgo": "one day ago | {n} days ago"
+    },
+    "messages": {
+      "mouseEnabled": "Remote mouse is now enabled",
+      "mouseDisabled": "Remote mouse is now disabled",
+      "remoteControlEnabled": "Remote control is now enabled",
+      "remoteControlDisabled": "Remote control is now disabled",
+      "establishing": "Establishing connection...",
+      "mouseHelp": {
+        "title": "Mouse Help",
+        "zoom": "CTRL + Mouse wheel for zoom",
+        "move": "Middle mouse button or pressed space bar to move",
+        "draw": "Hold CTRL to draw",
+        "copy": "CTRL + C to copy and CTRL + V to paste text, images or files"
+      },
+      "fileDrop": {
+        "title": "File per Drag-and-Drop to all participants... (max 10MB)",
+        "description": "The file is sent directly to all participants."
+      },
+      "fileUpload": {
+        "title": "File is being uploaded...",
+        "description": "It may take a while for all participants to receive the file."
+      }
     },
     "stop": "Stop",
     "sharingEnded": "Screen sharing connection has been closed.",
@@ -110,13 +135,11 @@
       "tryAgain": "Try Again",
       "cancel": "Cancel"
     },
+    "windowNotFound": {
+      "title": "Window not found",
+      "content": "{hwnd} does not exist"
+    },
     "requestError": "There was a problem processing your request. Please try again."
-  },
-  "screenShare": {
-    "title": "Screen Sharing Session",
-    "shareButton": "Share my screen",
-    "localParticipant": "Me",
-    "connectionError": "There was an error connecting to the room: {error}"
   },
   "loginWindow": {
     "login": "Login",
@@ -124,6 +147,7 @@
     "sessionError": "There has been an error with your session. Please try to login again.",
     "waitForLogin": "Wait for login",
     "orEnterCode": "or enter code from browser",
+    "enterCode": "Enter code",
     "loginWithCode": "Login with code"
   },
   "sourcesWindow": {
@@ -139,6 +163,7 @@
     "message": "You can invite someone to view your screen with this link"
   },
   "trayMenu": {
+    "running": "PeekaView is running",
     "shareMyScreen": "Share my screen",
     "requestScreenShare": "Request screen share",
     "help": "Help",
@@ -146,5 +171,20 @@
     "changeLanguage": "Change language",
     "logout": "Logout",
     "quit": "Quit"
+  },
+  "toolbar": {
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "remoteControl": "Remote Control",
+    "pointer": "Pointer",
+    "openClipboard": "Open clipboard",
+    "shareDifferentScreen": "Share different screen",
+    "inviteLink": "Invite link",
+    "showInviteLink": "Show invite link",
+    "pause": "Pause sharing",
+    "resume": "Resume sharing",
+    "stop": "Stop sharing",
+    "copyToClipboard": "Copy to clipboard",
+    "download": "Download"
   }
 } 

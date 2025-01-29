@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { File } from '../../interface.js'
 import { b64DecodeUnicode } from "../../util.js"
 
@@ -27,6 +28,8 @@ const emit = defineEmits<{
   (e: 'onCollapse', collapsed: boolean): void
   (e: 'close'): void
 }>()
+
+const { t } = useI18n()
 
 const imageRef = useTemplateRef('image')
 const downloadRef = useTemplateRef('download')
@@ -174,11 +177,11 @@ function close() {
 <template>
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar :draggable="draggable">
-      <div class="btn btn-sm btn-secondary" title="Collapse / Expand" style="width: 30px" @click="collapsed = !collapsed">
+      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="width: 30px" @click="collapsed = !collapsed">
         <ArrowExpandVerticalSvg v-if="collapsed" />
         <ArrowCollapseVerticalSvg v-else />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Close" @click="close">
+      <div class="btn btn-sm btn-secondary" :title="$t('general.close')" @click="close">
         <CloseSvg />
       </div>
     </Toolbar>
@@ -195,10 +198,10 @@ function close() {
         />
       </div>
       <Toolbar>
-        <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" title="Copy to clipboard" @click="copy">
+        <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" :title="$t('toolbar.copyToClipboard')" @click="copy">
           <CopySvg />
         </div>
-        <div class="btn btn-sm btn-secondary" title="Download" @click="downloadFile">
+        <div class="btn btn-sm btn-secondary" :title="$t('toolbar.download')" @click="downloadFile">
           <DownloadSvg />
         </div>
         <a

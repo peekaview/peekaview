@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
@@ -13,6 +13,7 @@ import { prompt } from './util'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
+import i18n, { type Locale } from './i18n'
 
 const { t } = useI18n()
 
@@ -26,6 +27,14 @@ watch(viewActive, (viewActive) => {
     document.body.classList.add('view-active')
   else
     document.body.classList.remove('view-active')
+})
+
+const locale = computed({
+  get: () => i18n.global.locale.value,
+  set: (value: Locale) => {
+    i18n.global.locale.value = value
+    localStorage.setItem('locale', value)
+  }
 })
 
 async function handleLogout() {
@@ -87,7 +96,16 @@ async function handleLogout() {
 
   <footer v-if="!viewActive" class="main-footer">
     <div class="footer-content">
-      <p>&copy; 2024 PeekaView | <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
+      <p>
+        &copy; 2024-2025 PeekaView | 
+        <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | 
+        <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | 
+        <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a> | 
+        <select v-model="locale">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </p>
     </div>
   </footer>
 </template>

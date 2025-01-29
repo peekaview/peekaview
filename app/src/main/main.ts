@@ -179,7 +179,7 @@ interface StoreSchema {
 
     log.info("App initialization complete")
     const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
-    new Notification({ title: 'PeekaView', body: "PeekaView is running", icon: notificationIcon }).show()
+    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()
   })
 
   const onTrayClick = () => {
@@ -244,7 +244,7 @@ interface StoreSchema {
 
   const showAbout = () => {
     dialog.showMessageBox({
-      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024 - info@limtec.de`,
+      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024-2025 - info@limtec.de`,
       title: i18n.t('trayMenu.about'),
     })
   }

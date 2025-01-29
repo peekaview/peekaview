@@ -12,7 +12,7 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { WindowManager } from '../modules/WindowManager.js'
 import { resolvePath, windowLoad } from '../util.js'
-import { ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
@@ -39,7 +39,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let remoteControlInputEnabled = false
   let mouseEnabled = true
   let lastMouseEnabled: boolean | undefined = undefined
-  let windowBorders = {
+  let windowBorders: Dimensions = {
     left: 0,
     top: 0,
     right: 0,
@@ -47,7 +47,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
   let windowManager
   let lastMousePos = new Point(0, 0)
-  let cursorCheckInterval: NodeJS.Timeout | undefined
   let cursorcheckinterval: NodeJS.Timeout | undefined
   let users: UserData[] = []
   const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
@@ -100,30 +99,21 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   })
 
   function deactivate() {
-    if (cursorCheckInterval) {
-      clearInterval(cursorCheckInterval)
-      cursorCheckInterval = undefined
-    }
     remoteControlActive = false
 
+    drawOverlayWindow?.close()
     toolbarWindow?.close()
     clipboardWindow?.close()
   }
 
-  function activate(hwnd: string) {
-    windowManager = new WindowManager()
-    windowManager.selectWindow(hwnd)
-
-    if (cursorCheckInterval) {
-      clearInterval(cursorCheckInterval)
-      cursorCheckInterval = undefined
-    }
-    cursorCheckInterval = setInterval(() => {
-      windowBorders = windowManager.getWindowOuterDimensions()
-    }, 1000)
-
+  function activate(manager: WindowManager) {
+    windowManager = manager
     remoteControlActive = true
     createToolbarWindow()
+  }
+
+  function updateWindowBorders(newBorders: Dimensions) {
+    windowBorders = newBorders
   }
 
   function toggleRemoteControl(toggle?: boolean) {
@@ -211,12 +201,17 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (drawOverlayWindow)
       return
 
-    const activeWindowDimensions = windowManager.getWindowOuterDimensions()
+    const scalefactor = windowManager.getScaleFactor()
+    const x = Math.round(windowBorders.left / scalefactor)
+    const y = Math.round(windowBorders.top / scalefactor)
+    const width = Math.round((windowBorders.right - windowBorders.left) / scalefactor)
+    const height = Math.round((windowBorders.bottom - windowBorders.top) / scalefactor)
+
     drawOverlayWindow = new BrowserWindow({
-      x: activeWindowDimensions.left,
-      y: activeWindowDimensions.top,
-      width: activeWindowDimensions.right - activeWindowDimensions.left,
-      height: activeWindowDimensions.bottom - activeWindowDimensions.top,
+      x,
+      y,
+      width,
+      height,
       transparent: true,
       skipTaskbar: true,
       focusable: false,
@@ -244,6 +239,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     return new Promise<void>((resolve) => {
       drawOverlayWindow!.on('ready-to-show', () => {
         drawOverlayWindow!.webContents.send('on-update-users', users)
+        drawOverlayWindow!.webContents.send('on-update-scale', 1 / scalefactor)
         resolve()
       })
     })
@@ -262,10 +258,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   function showOverlayCursorWindow(id: string) {
     if (overlayCursor[id])
       return
-
-    const activeWindowDimensions = windowManager.getWindowOuterDimensions()
-    windowBorders.left = activeWindowDimensions.left
-    windowBorders.top = activeWindowDimensions.top
 
     if (!overlayCursor[id]) {
       const user = users.find(user => user.id === id)
@@ -346,7 +338,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       useContentSize: true,
       frame: false,
       alwaysOnTop: true,
-      title: '__peekaview - Clipboard',
       titleBarStyle: 'hidden',
       x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width + 10),
       y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - height + 30),
@@ -470,10 +461,13 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     overlayCursorLastAction[data.userId] = Date.now()
 
+    const scalefactor = windowManager.getScaleFactor()
+    const x = Math.round((data.x + windowBorders.left) / scalefactor)
+    const y = Math.round((data.y + windowBorders.top) / scalefactor)
     if (overlayCursor[data.userId])
-      overlayCursor[data.userId].setPosition(data.x + windowBorders.left - 210, data.y + windowBorders.top - 10)
+      overlayCursor[data.userId].setPosition(x - 210, y - 10)
 
-    lastTargetPoints[data.userId] = new Point(data.x + windowBorders.left, data.y + windowBorders.top)
+    lastTargetPoints[data.userId] = new Point(x, y)
     if (mousePressed[data.userId])
       mouse.setPosition(mousePosition(data))
   }
@@ -985,6 +979,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     getToolbarBounds,
     hideRemoteControl,
     updateUsers,
+    updateWindowBorders,
     onRemote,
   }
 }

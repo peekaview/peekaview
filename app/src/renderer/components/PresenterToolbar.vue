@@ -59,28 +59,28 @@ function onCollapse() {
     <label v-if="inApp" class="checkbox-container">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>
-      <span class="checkbox-label">Remote Control</span>
+      <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
     <label class="checkbox-container">
       <input v-if="remoteControlEnabled" type="checkbox" checked disabled />
       <input v-else type="checkbox" v-model="mouseEnabled" />
       <span class="checkmark"></span>
-      <span class="checkbox-label">Pointer</span>
+      <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
     </label>
-    <div class="btn btn-sm btn-secondary" title="Toggle clipboard" style="width: 30px" @click="$emit('toggle-clipboard')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" style="width: 30px" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" title="Share different screen" style="width: 30px" @click="$emit('share-different-screen')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.shareDifferentScreen')" style="width: 30px" @click="$emit('share-different-screen')">
       <MonitorSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" title="Show invite link" style="width: 30px" @click="$emit('show-invite-link')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.showInviteLink')" style="width: 30px" @click="$emit('show-invite-link')">
       <LinkSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" title="Pause / Resume" style="width: 30px" @click="isPaused = !isPaused">
+    <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${isPaused ? 'resume' : 'pause'}`)" style="width: 30px" @click="isPaused = !isPaused">
       <PlaySvg v-if="isPaused" />
       <PauseSvg v-else />
     </div>
-    <div class="btn btn-sm btn-secondary" title="Stop" style="width: 30px" @click="$emit('stop-sharing')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.stop')" style="width: 30px" @click="$emit('stop-sharing')">
       <CloseSvg />
     </div>
   </Toolbar>

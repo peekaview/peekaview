@@ -234,7 +234,7 @@ function formatLastSeen(timestamp: number | undefined) {
             <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
             <input type="text" class="form-control form-control-lg" name="name"
               v-model="inputName"
-              placeholder="Enter your name" required>
+              :placeholder="$t('labels.enterYourName')" required>
           </div>
           <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
         </div>

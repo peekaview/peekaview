@@ -94,18 +94,18 @@ export class WindowManager {
     this.currentMonitorProcess = null;
   }
 
-  selectAndActivateWindow(hwnd) {
-    this.selectWindow(`${hwnd}`)
+  async selectAndActivateWindow(hwnd) {
+    await this.selectWindow(hwnd)
     this.bringToFront()
   }
 
   async selectWindow(hwnd) {
-    this.windowhwnd = `${hwnd}`
+    this.windowhwnd = hwnd
 
     if (this.isScreen()) {
-      this.getScreen()
+      await this.getScreen()
     } else {
-      this.startWindowMonitoring();
+      this.startWindowMonitoring()
     }
   }
 
@@ -144,7 +144,6 @@ export class WindowManager {
     let windowhwnd = 0
     let num = 0
 
-    console.log("TEST2", isMac)
     // Mac doesn't provide enough information about the windows via desktopCapturer API, so we need our own way to get windows via osascript
     /*if (isMac) {
       const processlist = await this.getMacWindowlist()
@@ -203,18 +202,15 @@ export class WindowManager {
           return windowByTitle
         }
       })
-    }, (error) => { },
-    )
+    }, () => {})
 
-    console.log(`SELECT WINDOW: ${windowByTitle}`)
     if (this.isScreen())
       this.getScreen()
 
     return windowByTitle
   }
 
-  getScreen() {
-    console.log(`WINDOWSHWND2 ${this.windowhwnd}`)
+  async getScreen() {
     const self = this
 
     if (this.isScreen()) {
@@ -224,33 +220,26 @@ export class WindowManager {
           thumbnailSize: { height: 0, width: 0 },
         })
       }
-      const sources = this.windowlistformatted
+      const items = await this.windowlistformatted
 
-      sources.then((items) => {
-        let i = 0
-        items.forEach((item) => {
-          if (item.id.split(':')[1] === self.windowhwnd) {
-            console.log(`${item.name} - ${item.id}`)
-            console.log(`use screen number ${i}`)
-            let j = 0
-            screen.getAllDisplays().forEach((cscreen) => {
-              if (j == i) {
-                console.log(`match screen ${j}`)
-                console.log(cscreen)
-                self.screen = cscreen
-              }
-              j++
-            })
-          }
-          i++
-        })
-      }, (error) => { },
-      )
+      let i = 0
+      for (const item of items) {
+        if (item.id.split(':')[1] === self.windowhwnd) {
+          let j = 0
+          screen.getAllDisplays().forEach((cscreen) => {
+            if (j == i) {
+              self.screen = cscreen
+            }
+            j++
+          })
+        }
+        i++
+      }
     }
   }
 
   getScaleFactor() {
-    if (this.isScreen()) {
+    if (isLinux || this.isScreen()) { // TODO: test if this applies to Mac as well
       return this.screen.scaleFactor;
     }
 
@@ -280,7 +269,6 @@ export class WindowManager {
         return 1;
       }
     }
-
     return 1; // Default fallback for other platforms
   }
 
@@ -319,13 +307,11 @@ export class WindowManager {
   getWindowOuterDimensions() {
     if (this.isScreen()) {
       const cscreen = this.screen;
-      console.log('Screen:')
-      console.log(cscreen)
       return {
         left: cscreen.bounds.x,
         top: cscreen.bounds.y,
-        right: cscreen.bounds.width,
-        bottom: cscreen.bounds.height,
+        right: cscreen.bounds.x + cscreen.bounds.width,
+        bottom: cscreen.bounds.y + cscreen.bounds.height,
       };
     }
 
@@ -772,13 +758,8 @@ export class WindowManager {
   }
 
   checkWindowSizeAndReposition() {
-    let formatchanged = false
-    const sizechanged = false
-
-    if (this.isScreen()) {
-      // console.log(this.windowhwnd);
+    if (this.isScreen())
       return false
-    }
 
     // get window dimension
     let activeWindowOuterDimensions = { right: 0, left: 0, bottom: 0, top: 0 }
@@ -798,6 +779,7 @@ export class WindowManager {
     const activeWindowWidth = activeWindowOuterDimensions.right - activeWindowOuterDimensions.left
     const activeWindowHeight = activeWindowOuterDimensions.bottom - activeWindowOuterDimensions.top
 
+    let formatchanged = false
     if (activeWindowInnerDimensions.left != this.windowleftborder || activeWindowInnerDimensions.top != this.windowtopborder)
       formatchanged = true
 
@@ -808,34 +790,6 @@ export class WindowManager {
     this.windowtopborder = activeWindowInnerDimensions.top
     this.windowwidth = activeWindowWidth
     this.windowheight = activeWindowHeight
-
-    if (sizechanged) {
-      console.log('left: ', activeWindowOuterDimensions.left)
-      console.log('top: ', activeWindowOuterDimensions.top)
-      console.log('width: ', activeWindowWidth)
-      console.log('height: ', activeWindowHeight)
-    }
-
-    if (sizechanged) {
-      if (isWin32) {
-        const hwnd = parseInt(this.windowhwnd);
-        user32.ShowWindow(hwnd, 9)
-        user32.SetWindowPos([
-          hwnd, 
-          0, 
-          activeWindowOuterDimensions.left, 
-          activeWindowOuterDimensions.top, 
-          activeWindowWidth, 
-          activeWindowHeight, 
-          0x4000 | 0x0020 | 0x0020 | 0x0040
-        ])
-
-        formatchanged = true
-      }
-      if (isLinux) {
-        this.executeCmd(`xdotool windowactivate ${this.windowhwnd} && xdotool windowsize ${this.windowhwnd} ${activeWindowWidth} ${activeWindowHeight} && xdotool windowmove ${this.windowhwnd} ${activeWindowOuterDimensions.left} ${activeWindowOuterDimensions.top}`)
-      }
-    }
 
     return formatchanged
   }
@@ -1015,11 +969,9 @@ export class WindowManager {
       const height = windowdimensions.bottom - windowdimensions.top + 4
       const scalefactor = this.getScaleFactor()
 
-      console.log(scalefactor)
-
       this.overlayrecord = new BrowserWindow({
-        x,
-        y,
+        x: Math.round(x / scalefactor),
+        y: Math.round(y / scalefactor),
         width: Math.round(width / scalefactor),
         height: Math.round(height / scalefactor),
         transparent: true,
@@ -1050,6 +1002,8 @@ export class WindowManager {
     } else {
       const windowdimensions = this.getWindowOuterDimensions()
 
+      console.log("showRecordOverlay screen", windowdimensions)
+
       this.overlayrecord = new BrowserWindow({
         x: windowdimensions.left,
         y: windowdimensions.top,
@@ -1067,9 +1021,6 @@ export class WindowManager {
           nodeIntegration: true,
         },
       })
-
-      console.log('Screen:')
-      console.log(windowdimensions)
 
       this.overlayrecord.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       this.overlayrecord.setAlwaysOnTop(true, 'screen-saver', 1);

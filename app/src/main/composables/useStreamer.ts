@@ -2,6 +2,7 @@ import { dialog } from 'electron'
 
 import { WindowManager } from '../modules/WindowManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
+import { i18n } from '../i18n'
 
 import type { RemoteData, RemoteEvent } from '../../interface.d.ts'
 
@@ -44,40 +45,41 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     console.log(`hwndstreamer:${hwnd}`)
 
     const windowList = await windowManager.getWindowList()
-    if (windowList.includes(hwnd) || hwnd == '0') {
-      console.log(`${hwnd} in windowList`)
-
-      windowManager.selectAndActivateWindow(hwnd)
-      startStreaming()
-
-      windowManager.checkWindowSizeAndReposition()
-
-      if (checkWindowInterval == undefined) {
-        checkWindowInterval = setInterval(() => {
-          // pause streaming, if window is minimized
-          if (windowManager.isMinimized()) {
-            console.log('window is minimized')
-            pauseStreaming(true)
-          }
-          else if (windowManager.checkWindowSizeAndReposition()) {
-            console.log('window was resized')
-            pauseStreaming(true)
-            // resume streaming, if window is back to normal state
-          }
-          else if (windowManager.isVisible()) {
-            resumeStreamingIfPaused(true)
-          }
-
-          if (!windowManager.isVisible()) {
-            console.log('window is not visible')
-            //stopSharing()
-            pauseStreaming(true)
-          }
-        }, checkWindowIntervalTime)
-      }
+    if (!windowList.includes(hwnd) && hwnd != '0') {
+      dialog.showErrorBox(i18n.t('windowNotFound.title'), i18n.t('windowNotFound.content', { hwnd }))
+      return
     }
-    else {
-      dialog.showErrorBox('Fenster nicht gefunden', `${hwnd} existiert nicht`)
+    
+    console.log(`${hwnd} in windowList`)
+
+    await startStreaming()
+
+    windowManager.checkWindowSizeAndReposition()
+    checkWindow()
+    if (!checkWindowInterval)
+      checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
+  }
+
+  function checkWindow() {
+    // pause streaming, if window is minimized
+    remotePresenter.updateWindowBorders(windowManager.getWindowOuterDimensions())
+    if (windowManager.isMinimized()) {
+      console.log('window is minimized')
+      pauseStreaming(true)
+    }
+    else if (windowManager.checkWindowSizeAndReposition()) {
+      console.log('window was resized')
+      pauseStreaming(true)
+      // resume streaming, if window is back to normal state
+    }
+    else if (windowManager.isVisible()) {
+      resumeStreamingIfPaused(true)
+    }
+
+    if (!windowManager.isVisible() && streamingState !== 'hidden') {
+      console.log('window is not visible')
+      //stopSharing()
+      pauseStreaming(true)
     }
   }
 
@@ -120,7 +122,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     remotePresenter.hideRemoteControl()
   }
 
-  function resumeStreamingIfPaused(fromHidden = false) {
+  async function resumeStreamingIfPaused(fromHidden = false) {
     if (streamingState !== 'hidden' && (streamingState !== 'paused' || fromHidden))
       return
 
@@ -132,19 +134,19 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     
     streamingState = 'stopped'
     console.log('resume')
-    startStreaming()
+    await startStreaming()
   }
 
-  function startStreaming() {
+  async function startStreaming() {
     if (hwnd !== undefined && streamingState === 'stopped') {
       console.log("startStreaming")
 
       streamingState = 'active'
 
-      windowManager.selectWindow(hwnd)
+      await windowManager.selectAndActivateWindow(hwnd)
       windowManager.showRecordOverlay()
       //windowManager.showDebugOverlay(args)
-      remotePresenter.activate(hwnd)
+      remotePresenter.activate(windowManager)
 
       sendReset()
     }

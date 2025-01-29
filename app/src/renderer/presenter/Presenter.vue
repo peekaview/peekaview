@@ -197,9 +197,9 @@ async function showInviteLink() {
   const url = `${appUrl.value}?view=${presenter.value?.viewCode}`
   const result = await prompt({
     type: 'info',
-    title: 'Invite link',
+    title: t('toolbar.inviteLink'),
     html: `<code>${url}</code>`,
-    confirmButtonText: t('general.copyToClipboard'),
+    confirmButtonText: t('toolbar.copyToClipboard'),
     cancelButtonText: t('general.close'),
   })
 
@@ -270,7 +270,7 @@ video {
 
 .clipboard-container {
   position: absolute;
-  z-index: 300;
+  z-index: 1002;
   top: 50px;
   left: 50px;
 }

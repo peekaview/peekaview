@@ -34,7 +34,7 @@ function loginWithCode() {
         <div v-else class="text-center">
           <h2 class="mb-3">{{ $t('loginWindow.waitForLogin') }}</h2>
           <h3 class="text-secondary mb-3">{{ $t('loginWindow.orEnterCode') }}</h3>
-          <input v-model="code" class="form-control mb-3" type="text" placeholder="Enter Code">
+          <input v-model="code" class="form-control mb-3" type="text" :placeholder="$t('loginWindow.enterCode')">
           <button class="btn btn-primary btn-lg w-100" :disabled="!code" @click="loginWithCode">{{ $t('loginWindow.loginWithCode') }}</button>
         </div>
       </div>

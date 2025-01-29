@@ -16,6 +16,7 @@ import LogoutSvg from '../../../assets/icons/logout.svg'
 
 import type { RemoteData, RemoteEvent, File, UserData } from '../../../interface'
 import type { ScaleInfo, VideoTransform } from "../../types.js"
+import { useI18n } from "vue-i18n"
 
 type ReceiveEventHandlers = {
   [K in RemoteEvent]: (data: RemoteData<K>) => void
@@ -45,6 +46,8 @@ const emit = defineEmits<{
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
 
+const { t } = useI18n()
+
 const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
 
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
@@ -54,26 +57,26 @@ const remoteControlActive = ref(false)
 const remoteClipboard = ref(false)
 
 watch(mouseEnabled, (enabled) => {
-  if (activeMessage.value === 'mouseSync')
+  if (activeMessage.value === 'init')
     return
 
-  activeMessage.value = 'remoteControl'
-  remoteControlMessage.value = enabled ? 'Remote-Mauszeiger ist nun aktiviert' : 'Remote-Mauszeiger wurde deaktiviert'
+  activeMessage.value = 'remote'
+  remoteMessage.value = t(`viewer.messages.mouse${enabled ? 'En' : 'Dis'}abled`)
   setTimeout(() => {
-    hideMessage('remoteControl')
-    remoteControlMessage.value = undefined
+    hideMessage('remote')
+    remoteMessage.value = undefined
   }, 3000)
 })
 
 watch(remoteControlActive, (active) => {
-  if (activeMessage.value === 'remoteControl')
+  if (activeMessage.value === 'remote')
     return
   
-  activeMessage.value = 'remoteControl'
-  remoteControlMessage.value = active ? 'Fernzugriff ist jetzt aktiviert' : 'Fernzugriff wurde deaktiviert'
+  activeMessage.value = 'remote'
+  remoteMessage.value = t(`viewer.messages.remoteControl${active ? 'En' : 'Dis'}abled`)
   setTimeout(() => {
-    hideMessage('remoteControl')
-    remoteControlMessage.value = undefined
+    hideMessage('remote')
+    remoteMessage.value = undefined
   }, 3000)
 })
 
@@ -84,8 +87,8 @@ const sizeInfoStyle = computed(() => props.videoTransform ? {
   top: (props.videoTransform.y - 2) + "px"
 }: {})
 
-const activeMessage = ref<string | undefined>()
-const remoteControlMessage = ref<string>()
+const activeMessage = ref<string | undefined>('init')
+const remoteMessage = ref<string>()
 const draggingOver = ref(false)
 
 const showClipboard = ref(true)
@@ -105,20 +108,8 @@ onReceive("mouse-down", (data) => {
   overlayRef.value?.receiveMouseDown(data)
 })
 
-let throttling = false
 onReceive("mouse-up", (data) => {
   overlayRef.value?.receiveMouseUp(data)
-
-  if (throttling)
-    return
-
-  throttling = true
-  window.setTimeout(() => throttling = false, 5000)
-
-  emit('freeze')
-  window.setTimeout(() => {
-    emit('unfreeze')
-  }, 3500)
 })
 
 onReceive("text", (data) => {
@@ -274,6 +265,20 @@ async function onPaste(e: ClipboardEvent) {
   }
 }
 
+let throttling = false
+function freezeVideo() {
+  if (throttling)
+    return
+
+  throttling = true
+  window.setTimeout(() => throttling = false, 5000)
+
+  emit('freeze')
+  window.setTimeout(() => {
+    emit('unfreeze')
+  }, 3500)
+}
+
 function toggleMessage(message: string) {
   activeMessage.value = activeMessage.value === message ? undefined : message
 }
@@ -346,48 +351,47 @@ defineExpose({
       :remote-control-active="remoteControlActive"
       :dragging-over="draggingOver"
       @rescale="emit('rescale', $event)"
-      @synchronized="hideMessage('mouseSync')"
+      @synchronized="hideMessage('init')"
+      @interacted="freezeVideo"
       @mouse-inside="remoteClipboard = $event"
       @send="send($event.event, $event.data, $event.options)"
     >
     </StreamOverlay>
     <div class="size-info" :style="sizeInfoStyle"></div>
     <div v-if="activeMessage" class="message">
-      <template v-if="activeMessage === 'mouseSync' || activeMessage === 'mouseHelp'">
-        <template v-if="activeMessage === 'mouseSync'">
-          <b>aktive Remotesitzung - Verbindung wird hergestellt</b>
+      <template v-if="activeMessage === 'init' || activeMessage === 'mouseHelp'">
+        <template v-if="activeMessage === 'init'">
+          <b>{{ $t('viewer.messages.establishing') }}</b>
           <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
         </template>
-        <b v-else>Hilfe für die Maussteuerung</b>
+        <b v-else>{{ $t('viewer.messages.mouseHelp.title') }}</b>
         <br>
         <br>
         <template v-if="!isTouchEnabled()">
-          STRG + MAUSRAD für Zoom
+          {{ $t('viewer.messages.mouseHelp.zoom') }}
           <br>
-          mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben
+          {{ $t('viewer.messages.mouseHelp.move') }}
           <br>
-          STRG gedrückt halten um zu zeichnen
+          {{ $t('viewer.messages.mouseHelp.draw') }}
           <br>
-          STRG + C/STRG + V zum Einfügen von Texten/Dateien/Bildern
+          {{ $t('viewer.messages.mouseHelp.copy') }}
         </template>
       </template>
       <template v-else-if="activeMessage === 'fileDrop'">
-        <b>Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)</b>
+        <b>{{ $t('viewer.messages.fileDrop.title') }}</b>
         <br>
         <br>
-        Die Datei wird direkt an die Teilnehmer gesendet.
-        <br>
-        Wenn Sie eine Datei dauerhaft speichern wollen, verwenden Sie den Datei-Bereich oben.
+        {{ $t('viewer.messages.fileDrop.description') }}
       </template>
       <template v-if="activeMessage === 'fileUpload'">
-        <b>Datei wird hochgeladen...</b>
+        <b>{{ $t('viewer.messages.fileUpload.title') }}</b>
         <br>
         <br>
-        Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben.
+        {{ $t('viewer.messages.fileUpload.description') }}
         <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
-      <template v-if="activeMessage === 'remoteControl' && remoteControlMessage">
-        <b>{{ remoteControlMessage }}</b>
+      <template v-if="activeMessage === 'remote' && remoteMessage">
+        <b>{{ remoteMessage }}</b>
       </template>
     </div>
     <Toolbar class="main-toolbar" collapsible>

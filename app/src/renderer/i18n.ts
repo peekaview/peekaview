@@ -8,7 +8,7 @@ export type Locale = "en" | "de"
 const i18n = createI18n({
   legacy: false,
   globalInjection: true, 
-  locale: Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
+  locale: localStorage.getItem('locale') ?? Intl.DateTimeFormat().resolvedOptions().locale.substring(0, 2),
   fallbackLocale: 'en',
   messages: {
     en,
