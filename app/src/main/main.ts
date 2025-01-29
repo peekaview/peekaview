@@ -14,6 +14,7 @@ import {
   session,
   shell
 } from 'electron'
+import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
@@ -58,7 +59,8 @@ interface StoreSchema {
   }
 
   log.info('Starting app update check')
-
+  autoUpdater.checkForUpdatesAndNotify()
+  
   if (!app.isDefaultProtocolClient('peekaview')) {
     const success = app.setAsDefaultProtocolClient('peekaview')
     if (!success) {
