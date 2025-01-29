@@ -4,6 +4,7 @@
     "yes": "Ja",
     "no": "Nein",
     "cancel": "Abbrechen",
+    "close": "Schließen",
     "areYouSure": "Sind Sie sicher?",
     "copyToClipboard": "In Zwischenablage kopieren"
   },
@@ -90,7 +91,8 @@
       "stop": "Beenden",
       "pause": "Pausieren",
       "resume": "Fortfahren",
-      "shareDifferentScreen": "Anderen Bildschirm teilen"
+      "shareDifferentScreen": "Anderen Bildschirm teilen",
+      "openPreview": "Vorschau öffnen"
     },
     "requestAccess": {
       "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",

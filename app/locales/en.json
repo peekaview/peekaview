@@ -4,6 +4,7 @@
     "yes": "Yes",
     "no": "No",
     "cancel": "Cancel",
+    "close": "Close",
     "areYouSure": "Are you sure?",
     "copyToClipboard": "Copy to clipboard"
   },
@@ -91,7 +92,8 @@
       "stop": "Stop",
       "pause": "Pause",
       "resume": "Resume",
-      "shareDifferentScreen": "Share Different Screen"
+      "shareDifferentScreen": "Share Different Screen",
+      "openPreview": "Open Preview"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",

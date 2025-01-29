@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
-import Present from './views/Presenter.vue'
+import Presenter from './views/presenter/Presenter.vue'
 
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
@@ -12,60 +12,21 @@ import Imprint from './components/Imprint.vue'
 import { prompt } from './util'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
-
-enum Action {
-  Login = 'login',
-  Share = 'share',
-  View = 'view'
-}
+import { useParamsData, Action } from './composables/useParamsData'
 
 const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
+const { action, token, email, name, target, viewEmail } = useParamsData()
 
-const action = ref<Action>(Action.View)
-const token = ref<string | undefined>(localStorage.getItem('token') ?? undefined)
-const email = ref<string | undefined>(localStorage.getItem('email') ?? undefined)
-const name = ref<string | undefined>(localStorage.getItem('name') ?? undefined)
-const target = ref<string | undefined>()
-const viewEmail = ref<string | undefined>()
-const hideHeaderAndFooter = ref(false)
+const viewActive = ref(false)
 
-onMounted(() => {
-  const params = new URLSearchParams(window.location.search)
-  handleParams(params)
-
-  for (const a of Object.values(Action)) {
-    if (!params.has(a))
-      continue
-
-    action.value = a
-    const value = params.get(a)
-    if (value)
-      handleParams(new URLSearchParams(atob(value)))
-
-    break
-  }
+watch(viewActive, (viewActive) => {
+  if (viewActive)
+    document.body.classList.add('view-active')
+  else
+    document.body.classList.remove('view-active')
 })
-
-function handleParams(params: URLSearchParams) {
-  token.value = params.get('token') ?? token.value
-  email.value = params.get('email')?.toLowerCase() ?? email.value
-  name.value = params.get('name') ?? name.value
-  target.value = params.get('target') ?? target.value
-  viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value
-
-  if (params.get('discardSession') === 'true') {
-    email.value = undefined
-    token.value = undefined
-    localStorage.removeItem('email')
-    localStorage.removeItem('token')
-  }
-  
-  email.value && localStorage.setItem('email', email.value)
-  token.value && localStorage.setItem('token', token.value)
-  name.value && localStorage.setItem('name', name.value)
-}
 
 async function handleLogout() {
   const result = await prompt({
@@ -82,7 +43,7 @@ async function handleLogout() {
 
 <template>
   <!-- Header -->
-  <header v-if="!hideHeaderAndFooter" class="main-header">
+  <header v-if="!viewActive" class="main-header">
     <div class="header-content">
       <div class="logo-container">
         <a href="/">
@@ -105,11 +66,11 @@ async function handleLogout() {
     <!-- Main Content -->
   <div class="main-container">
     <Login
-      v-if="action === 'login'"
+      v-if="action === Action.Login"
       :target="target"
     />
-    <Present
-      v-else-if="action === 'share' && email && token"
+    <Presenter
+      v-else-if="action === Action.Share && email && token"
       :email="email"
       :token="token"
     />
@@ -117,14 +78,14 @@ async function handleLogout() {
       v-else
       :email="viewEmail"
       :name="name"
-      @toggle-full-video="hideHeaderAndFooter = $event"
+      @toggle-full-video="viewActive = $event"
     />
   </div>
 
   <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
   <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
 
-  <footer v-if="!hideHeaderAndFooter" class="main-footer">
+  <footer v-if="!viewActive" class="main-footer">
     <div class="footer-content">
       <p>&copy; 2024 PeekaView | <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a></p>
     </div>
@@ -133,8 +94,15 @@ async function handleLogout() {
 
 <style>
 body {
-  background: url('../assets/img/background.jpg') no-repeat center center fixed;
   background-size: cover;
+}
+
+body:not(.view-active) {
+  background: url('../assets/img/background.jpg') no-repeat center center fixed;
+}
+
+body.view-active {
+  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
 }
 
 .main-header,

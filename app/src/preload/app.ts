@@ -1,9 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-import { type DialogOptions } from '../main/composables/useCustomDialog'
 import { base } from './base'
 
-import { RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface'
+import { DialogOptions, RemoteData, RemoteEvent, ScreenSource, StreamerData } from '../interface'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
@@ -20,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),
   pauseSharing: () => ipcRenderer.invoke('pause-sharing'),
   resumeSharing: () => ipcRenderer.invoke('resume-sharing'),
+  updateUsers: (users: string) => ipcRenderer.invoke('update-users', users),
   onCleanUpStream: (callback: () => void) => ipcRenderer.on('clean-up-stream', () => callback()),
 });
 
