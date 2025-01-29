@@ -42,7 +42,7 @@ setInterval(() => {
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>
-    <div v-if="collapsible" class="btn btn-sm btn-secondary" title="Collapse / Expand" style="width: 30px" @click="collapsed = !collapsed">
+    <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="width: 30px" @click="collapsed = !collapsed">
       <ArrowExpandHorizontalSvg v-if="collapsed" />
       <ArrowCollapseHorizontalSvg v-else />
     </div>

@@ -5,6 +5,7 @@ import { useDrawOverlay } from '../composables/useDrawOverlay'
 import { UserData } from '../../interface'
 
 const canvasRef = useTemplateRef('canvas')
+const scale = ref(1)
 const users = ref<UserData[]>([])
 const mappedUsers = computed(() => {
   const mappedUsers: Record<string, UserData> = {}
@@ -14,10 +15,14 @@ const mappedUsers = computed(() => {
   return mappedUsers
 })
 
-const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers })
+const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers, scale })
 
 window.electronAPI!.onUpdateUsers((data) => {
   users.value = data
+})
+
+window.electronAPI!.onUpdateScale((data) => {
+  scale.value = data
 })
 
 window.electronAPI!.onMouseDown((data) => {

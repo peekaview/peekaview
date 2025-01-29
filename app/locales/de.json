@@ -6,11 +6,12 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "areYouSure": "Sind Sie sicher?",
-    "copyToClipboard": "In Zwischenablage kopieren"
+    "error": "Fehler"
   },
   "labels": {
     "yourEmail": "Ihre E-Mail-Adresse",
     "yourName": "Ihr Name",
+    "enterYourName": "Geben Sie Ihren Namen ein",
     "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten"
   },
   "app": {
@@ -24,13 +25,16 @@
     "login": "Jetzt in App anmelden",
     "loggingIn": "Logge in der App ein...",
     "code": "Ihr Login-Code",
-    "useCodeAlternatively": "Auto-Login auf der Desktop App funktioniert nicht? Dann kopieren Sie stattdessen diesen Code und geben in der App ein.",
     "justRegistered": "Sie haben sich erfolgreich registriert. Bitte prüfen Sie Ihre Mails für den Anmelde-Link.",
     "successful": "Anmeldung erfolgreich",
     "successMessage": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
     "openApp": "App öffnen",
     "orEnterCode": "Oder geben Sie diesen Code in der App ein, um fortzufahren:",
-    "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support."
+    "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support.",
+    "connectionError": {
+      "title": "Verbindungsfehler",
+      "text": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+    }
   },
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",
@@ -54,6 +58,28 @@
       "minutesAgo": "vor einer Minute | vor {n} Minuten",
       "hoursAgo": "vor einer Stunde | vor {n} Stunden",
       "daysAgo": "vor einem Tag | vor {n} Tagen"
+    },
+    "messages": {
+      "mouseEnabled": "Remote-Mauszeiger ist jetzt aktiviert",
+      "mouseDisabled": "Remote-Mauszeiger wurde deaktiviert",
+      "remoteControlEnabled": "Fernzugriff ist jetzt aktiviert",
+      "remoteControlDisabled": "Fernzugriff wurde deaktiviert",
+      "establishing": "Verbindung wird hergestellt...",
+      "mouseHelp": {
+        "title": "Hilfe für die Maussteuerung",
+        "zoom": "STRG + MAUSRAD für Zoom",
+        "move": "Mittlere MAUSTASTE oder gedrückte Leertaste zum Verschieben",
+        "draw": "STRG gedrückt halten um zu zeichnen",
+        "copy": "STRG + C zum Kopieren und STRG + V zum Einfügen von Text, Bildern oder Dateien"
+      },
+      "fileDrop": {
+        "title": "Datei per Drag-and-Drop an alle Teilnehmer verteilen... (max 10MB)",
+        "description": "Die Datei wird direkt an die Teilnehmer gesendet."
+      },
+      "fileUpload": {
+        "title": "Datei wird hochgeladen...",
+        "description": "Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben."
+      }
     },
     "stop": "Beenden",
     "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
@@ -109,13 +135,11 @@
       "tryAgain": "Erneut versuchen",
       "cancel": "Abbrechen"
     },
+    "windowNotFound": {
+      "title": "Fenster nicht gefunden",
+      "content": "{hwnd} existiert nicht"
+    },
     "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
-  },
-  "screenShare": {
-    "title": "Bildschirmfreigabe-Sitzung",
-    "shareButton": "Meinen Bildschirm teilen",
-    "localParticipant": "Ich",
-    "connectionError": "Beim Verbinden mit dem Raum ist ein Fehler aufgetreten: {error}"
   },
   "loginWindow": {
     "login": "Anmelden",
@@ -123,6 +147,7 @@
     "sessionError": "Es ist ein Fehler bei Ihrer Sitzung aufgetreten. Bitte versuchen Sie erneut, sich anzumelden.",
     "waitForLogin": "Warte auf Anmeldung",
     "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
+    "enterCode": "Code eingeben",
     "loginWithCode": "Mit Code anmelden"
   },
   "sourcesWindow": {
@@ -138,6 +163,7 @@
     "message": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen"
   },
   "trayMenu": {
+    "running": "PeekaView läuft",
     "shareMyScreen": "Meinen Bildschirm teilen",
     "requestScreenShare": "Bildschirmfreigabe anfordern",
     "help": "Hilfe",
@@ -145,5 +171,20 @@
     "changeLanguage": "Sprache ändern",
     "logout": "Ausloggen",
     "quit": "Beenden"
+  },
+  "toolbar": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen",
+    "remoteControl": "Fernsteuerung",
+    "pointer": "Mauszeiger",
+    "openClipboard": "Zwischenablage öffnen",
+    "shareDifferentScreen": "Anderen Bildschirm teilen",
+    "inviteLink": "Einladungslink",
+    "showInviteLink": "Einladungslink anzeigen",
+    "pause": "Bildschirmfreigabe pausieren",
+    "resume": "Bildschirmfreigabe fortfahren",
+    "stop": "Bildschirmfreigabe beenden",
+    "copyToClipboard": "In die Zwischenablage kopieren",
+    "download": "Herunterladen"
   }
-} 
+}

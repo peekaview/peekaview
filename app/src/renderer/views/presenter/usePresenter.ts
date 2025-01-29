@@ -43,8 +43,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
   const stream = shallowRef<MediaStream | undefined>() 
 
   let resetInterval: number | undefined
-  let lastResetWidth: number | undefined
-  let lastResetHeight: number | undefined
+  //let lastResetWidth: number | undefined
+  //let lastResetHeight: number | undefined
   watch(stream, (stream) => {
     clearInterval(resetInterval)
     if (!stream || inApp)
@@ -54,11 +54,13 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
       const width = stream.getVideoTracks()[0].getSettings().width ?? 0
       const height = stream.getVideoTracks()[0].getSettings().height ?? 0
 
+      // TODO: do send in case a new viewer joins somehow
       /*if (lastResetWidth === width && lastResetHeight === height)
-        return*/ // TODO: do send in case a new viewer joins somehow
+        return
 
       lastResetWidth = width
       lastResetHeight = height
+      */ 
 
       const data = {
         isScreen: true, // TODO
@@ -316,7 +318,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, o
   
     notify({
       type: 'error',
-      title: 'Error',
+      title: t('general.error'),
       text: t('share.requestError') + '\n\n' + error.message,
       confirmButtonText: t('general.ok'),
     })

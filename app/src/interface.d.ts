@@ -57,6 +57,7 @@ export interface IElectronAPI {
   onMouseMove: (callback: (data: RemoteMouseData) => void) => void,
   onMouseUp: (callback: (data: RemoteMouseData) => void) => void,
   onUpdateUsers: (callback: (users: UserData[]) => void) => void,
+  onUpdateScale: (callback: (scale: number) => void) => void,
   updateUsers: (users: string) => Promise<void>,
   quit: () => Promise<void>,
   closeClipboard: () => Promise<void>,

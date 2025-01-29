@@ -42,6 +42,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'rescale', scaleinfo: ScaleInfo): void
+  (e: 'interacted'): void
   (e: 'mouse-inside', inside: boolean): void
   (e: 'synchronized'): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, options: SendOptions }): void
@@ -70,7 +71,6 @@ const remoteScale = computed(() => {
   return height < width ? height : width
 })
 const totalScale = computed(() => videoScale.value * remoteScale.value)
-watch(totalScale, () => console.log('totalScale', totalScale.value))
 
 const coverBounds = ref<Record<string, string>[]>()
 
@@ -152,6 +152,8 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
     if (signals[user.id])
       delete signals[user.id]
   }, 2000)
+
+  emit('interacted')
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
@@ -185,6 +187,7 @@ function receiveMouseDown(data: RemoteMouseData) {
 
 function receiveMouseUp(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
+  emit('interacted')
 }
 
 function clearMouseCursors(instant = false) {
@@ -428,7 +431,7 @@ defineExpose({
   >
     <div v-for="(cursor, cursorId) in overlayCursors" :key="cursorId" class="cursor" :style="{ left: cursor.left, top: cursor.top }">
       <img :src="CursorPng"/>
-      <div v-if="cursorId !== userId && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
+      <div v-if="cursorId !== userId && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }">{{ cursor.name }}</div>
     </div>
     <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" :signal="signal" :scale="totalScale" />
     <canvas ref="canvas" />
