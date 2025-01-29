@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import RemoteViewer from './RemoteViewer.vue'
 
-import type { RemoteControlData, ScaleInfo, VideoTransform } from '../../types'
-import { notify, stringToColor } from '../../util'
+import type { ScaleInfo, VideoTransform } from '../../types'
+import { notify } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 
 const props = withDefaults(defineProps<{
@@ -21,11 +21,12 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const inApp = ref(!!window.electronAPI)
 const screenView = ref<ScreenView>()
-const remoteControlData = ref<RemoteControlData>()
+const users = computed(() => screenView.value?.users ?? [])
 const remoteViewerRef = useTemplateRef('remoteViewer')
-const trackRef = useTemplateRef('track')
-const trackStyle = ref<Record<string, string>>({
+const videoRef = useTemplateRef('video')
+const videoStyle = ref<Record<string, string>>({
   transform: 'scale(1) translate(0px,0px)',
 })
 const containerRef = useTemplateRef('container')
@@ -51,20 +52,12 @@ watch(() => props.data, async (screenShareData) => {
     return
   }
 
+  emit('toggle-full-video', true)
   screenView.value = await useScreenView(screenShareData, {
-    videoElement: trackRef.value ?? undefined,
+    videoElement: videoRef.value ?? undefined,
     onRemote: (event, data) => {
-      if (event === 'enable') {
-        remoteControlData.value = {
-          roomid: screenShareData.roomName,
-          username: screenShareData.userName,
-          userid: screenShareData.userName, //TODO: generate userid
-          color: stringToColor(screenShareData.userName ?? 'Anonymous'),
-          hostname: screenShareData.controlServer
-        }
-        emit('toggle-full-video', true)
-        return
-      }
+      if (event === 'browser')
+        inApp.value = false
 
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -77,7 +70,6 @@ watch(() => props.data, async (screenShareData) => {
       }
 
       remoteViewerRef.value?.receive(event, parsedData)
-      console.log("remote control", event, parsedData)
     },
     onEnding: () => {
       notify({
@@ -94,6 +86,7 @@ watch(() => props.data, async (screenShareData) => {
 }, { flush: 'post', immediate: true })
 
 onMounted(() => {
+
   denyLoadingInTopWindow()
   const cleanupZoom = disableBrowserZoom()
   window.addEventListener('resize', repaint)
@@ -152,17 +145,20 @@ function rescale(scaleinfo: ScaleInfo) {
   }
 
   containerStyle.value.overflow = 'visible'
-  trackStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
+  videoStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
 
-  const videoRect = trackRef.value!.getBoundingClientRect()
-  videoTransform.value = {
-    x: Math.round(videoRect.left),
-    y: Math.round(videoRect.top),
-    fullwidth: Math.round(videoRect.right - videoRect.left),
-    fullheight: Math.round(videoRect.bottom - videoRect.top),
-    width: Math.round(containerRect.right - containerRect.left),
-    height: Math.round(containerRect.bottom - containerRect.top)
-  }
+  nextTick(() => {  
+    const containerRect = containerRef.value!.getBoundingClientRect()
+    const videoRect = videoRef.value!.getBoundingClientRect()
+    videoTransform.value = {
+      x: Math.round(videoRect.left),
+      y: Math.round(videoRect.top),
+      fullwidth: Math.round(videoRect.right - videoRect.left),
+      fullheight: Math.round(videoRect.bottom - videoRect.top),
+      width: Math.round(containerRect.right - containerRect.left),
+      height: Math.round(containerRect.bottom - containerRect.top)
+    }
+  })
 }
 
 function repaint() {
@@ -189,20 +185,21 @@ function stop() {
 <template>
   <div class="remote-control">
     <div ref="container" class="remote-container" :style="containerStyle">
-      <video ref="track" playsinline autoplay :style="trackStyle" />
+      <video ref="video" playsinline autoplay :style="videoStyle" />
       <RemoteViewer
         ref="remoteViewer"
-        v-if="remoteControlData"
-        :room="remoteControlData?.roomid"
-        :user="remoteControlData?.username"
-        :id="remoteControlData?.userid"
-        :color="remoteControlData?.color"
-        :hostname="remoteControlData?.hostname"
+        v-if="data"
+        :in-app="inApp"
+        :room="data.roomId"
+        :user-id="data.user.id"
+        :users="[...users, data.user]"
         :video-transform="videoTransform"
         :style="viewerStyle"
         @rescale="rescale"
         @send="screenView?.sendRemote($event.event, $event.data)"
         @stop="stop"
+        @freeze="videoRef?.pause()"
+        @unfreeze="videoRef?.play()"
       />
       <slot />
     </div>

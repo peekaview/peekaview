@@ -6,6 +6,7 @@ import type { AcceptedRequestData } from '../../types'
 import { callApi } from '../../api'
 import { notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
+import { stringToColor, uuidv4 } from '../../../util'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -165,7 +166,11 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   requestStatus.value = undefined
 
   emit('accept', {
-    userName: inputName.value,
+    user: {
+      id: uuidv4(),
+      name: inputName.value,
+      color: stringToColor(inputName.value ?? 'Anonymous'),
+    },
     roomName: data.roomId,
     roomId: data.roomId,
     serverUrl: data.videoServer,

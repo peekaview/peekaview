@@ -22,9 +22,7 @@ import fs from 'fs'
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useStreamer, type Streamer } from './composables/useStreamer'
 
-//import { WindowManager } from './modules/WindowManager'
-//import { Conference } from './modules/Conference.js'
-import { DialogOptions, ScreenSource, StreamerData } from '../interface.js'
+import { DialogOptions, ScreenSource, StreamerData, UserData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -75,7 +73,6 @@ interface StoreSchema {
   let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let sourcesWindow: BrowserWindow | undefined
-  //let windowManager: WindowManager | undefined
 
   let tray: Tray
 
@@ -415,14 +412,6 @@ interface StoreSchema {
     }
     let sourceId = data.source.id
     log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
-
-    /*if (process.platform === 'darwin') {
-      windowManager = new WindowManager()
-      sourceId = await windowManager.getHwndForWindowByTitleAndId(data.source.name, sourceId)
-    }*/
-
-    //if (currentViewCode)
-    //  stopSharing()
     
     streamer?.stopSharing()
 
@@ -599,6 +588,10 @@ interface StoreSchema {
       timeout: 3000
     })
     streamer?.resumeStreamingIfPaused()
+  })
+
+  ipcMain.handle('update-users', async (_event, users: string) => {
+    streamer?.remotePresenter?.updateUsers(JSON.parse(users) as UserData[])
   })
 
   ipcMain.handle('quit', async (_event) => {

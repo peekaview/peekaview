@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),
   pauseSharing: () => ipcRenderer.invoke('pause-sharing'),
   resumeSharing: () => ipcRenderer.invoke('resume-sharing'),
+  updateUsers: (users: string) => ipcRenderer.invoke('update-users', users),
   onCleanUpStream: (callback: () => void) => ipcRenderer.on('clean-up-stream', () => callback()),
 });
 

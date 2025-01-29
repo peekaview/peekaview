@@ -1,696 +1,159 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, useTemplateRef, watch } from "vue"
-import Panzoom, { PanzoomOptions, PanzoomEventDetail } from '@panzoom/panzoom'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue"
 
-import SignalContainer from "./SignalContainer.vue"
+import StreamOverlay from './StreamOverlay.vue'
 import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
-import { hexToRgb, uuidv4 } from "../../util.js"
+import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
+import { uuidv4 } from "../../../util.js"
+import { isTouchEnabled } from "../../util.js"
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
 import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
 
-import type { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, File } from '../../../interface.d.ts'
-import type { ScaleInfo, Signal, VideoTransform } from "../../types.js"
-import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
+import type { RemoteData, RemoteEvent, File, UserData } from '../../../interface'
+import type { ScaleInfo, VideoTransform } from "../../types.js"
 
-type Pan = {
-  x: number
-  y: number
+type ReceiveEventHandlers = {
+  [K in RemoteEvent]: (data: RemoteData<K>) => void
 }
 
-type MouseMessage = {
-  x: number
-  y: number
-  room?: string
-  id: string
-  name?: string
-  color: string
-  delta?: number
-}
-
-type Stroke = {
-  from: [number, number]
-  to: [number, number]
-  color: string
-  timestamp: number
-  opacity: number
-}
-
-type Cursor = {
-  name?: string
-  color: string
-  left: string
-  top: string
-  lastAction: number
+type SendOptions = {
+  volatile?: boolean
+  receiveSelf?: boolean
 }
 
 const props = withDefaults(defineProps<{
   room: string
-  user: string
-  id: string
-  color: string
-  hostname: string
+  inApp: boolean
+  users: UserData[]
+  userId: string
   videoTransform?: VideoTransform
 }>(), {
-  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 })
+  users: () => [],
+  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 }),
 })
 
 const emit = defineEmits<{
   (e: 'stop'): void
   (e: 'rescale', scaleinfo: ScaleInfo): void
+  (e: 'freeze'): void
+  (e: 'unfreeze'): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
 
-// gedrückte Keys
-let controlpressed = false
-let altpressed = false
-let shiftpressed = false
-let spacepressed = false
-let synchronized = false
-let remoteClipboard = false
-let skip = false
+const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
 
-// Skalierungsinfos
-const videoScale = ref(1)   // Skalierung im Browser im Verhältnis zur Videogröße
-const remoteScale = ref(1)  // Skalierung Remotedesktop im Verhältnis zur Videogröße
-const totalScale = computed(() => videoScale.value * remoteScale.value)
-const windowdimensions = { width: 0, height: 0 }     // initial
+const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
-// Panzoom - Scale und Panning im Browser
-let zoom: PanzoomEventDetail | undefined = undefined      // lokales Zoomlevel zwischenspeichern
-let lastPanScale = 1
-let lastPan: Pan = { x: 0, y: 0 }
-
-// Mauszeiger
-let x = 0
-let y = 0
-let lastMove = 0
-
-// Screensharing oder Windowsharing aktiv?
-let screensharing = true
-let lastResetData: RemoteResetData | undefined
-
-// Maus-Overlays
-const signals = reactive<Record<string, Signal>>({})
-const overlayCursors = reactive<Record<string, Cursor>>({})
-let cursorcheckinterval: number
-
-// Remote-Funktionen
 const mouseEnabled = ref(true)
 const remoteControlActive = ref(false)
-let mousedown = false
-let dragdetected = false
+const remoteClipboard = ref(false)
 
-// Websocket-Message Object
-let currentMouseData: RemoteMouseData = {
-  x: 0,
-  y: 0,
-  id: props.id,
-  name: props.user,
-  color: props.color
-}
+watch(mouseEnabled, (enabled) => {
+  if (activeMessage.value === 'mouseSync')
+    return
 
-// Drawing state
-const drawing: Record<string, boolean> = {}       // Benutzer malt gerade? 
-const drawCanvas: Record<string, HTMLCanvasElement> = {}    // Canvas der Benutzer
-const pointHistory: Record<string, Stroke[]> = {}    // Punktarrays der Benutzer
-const latestPoint: Record<string, [number, number]> = {}     // jeweils letzter Punkt
-let paintcheckinterval: number  // Repaint-Intervall
-
-// Add this near other state declarations (around line 40-50)
-const tmpPointHistory: Record<string, Stroke[]> = {}
-
-const overlayStyle = ref<Record<string, string>>({
-  border: '0',
-  width: '0px',
-  height: '0px',
-  left: '0px',
-  top: '0px',
+  activeMessage.value = 'remoteControl'
+  remoteControlMessage.value = enabled ? 'Remote-Mauszeiger ist nun aktiviert' : 'Remote-Mauszeiger wurde deaktiviert'
+  setTimeout(() => {
+    hideMessage('remoteControl')
+    remoteControlMessage.value = undefined
+  }, 3000)
 })
 
-const sharerToolbarBoundsStyle = ref<Record<string, string> | undefined>()
-const sizeInfoStyle = ref<Record<string, string>>({})
+watch(remoteControlActive, (active) => {
+  if (activeMessage.value === 'remoteControl')
+    return
+  
+  activeMessage.value = 'remoteControl'
+  remoteControlMessage.value = active ? 'Fernzugriff ist jetzt aktiviert' : 'Fernzugriff wurde deaktiviert'
+  setTimeout(() => {
+    hideMessage('remoteControl')
+    remoteControlMessage.value = undefined
+  }, 3000)
+})
+
+const sizeInfoStyle = computed(() => props.videoTransform ? {
+  width: props.videoTransform.fullwidth + "px",
+  height: props.videoTransform.fullheight + "px",
+  left: (props.videoTransform.x - 2) + "px",
+  top: (props.videoTransform.y - 2) + "px"
+}: {})
+
 const activeMessage = ref<string | undefined>()
 const remoteControlMessage = ref<string>()
 const draggingOver = ref(false)
+
 const showClipboard = ref(true)
 const clipboardFile = ref<File>()
-
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
-const remoteViewerRef = useTemplateRef('remoteViewer')
-const overlayRef = useTemplateRef('overlay')
+onReceive("mouse-leftclick", (data) => {
+  overlayRef.value?.receiveMouseLeftClick(data)
+})
 
-let oldbackground: string | undefined
+onReceive("mouse-move", (data) => {
+  overlayRef.value?.receiveMouseMove(data)
+})
+
+onReceive("mouse-down", (data) => {
+  overlayRef.value?.receiveMouseDown(data)
+})
+
+let throttling = false
+onReceive("mouse-up", (data) => {
+  overlayRef.value?.receiveMouseUp(data)
+
+  if (throttling)
+    return
+
+  throttling = true
+  window.setTimeout(() => throttling = false, 5000)
+
+  emit('freeze')
+  window.setTimeout(() => {
+    emit('unfreeze')
+  }, 3500)
+})
+
+onReceive("text", (data) => {
+  console.log("text", data)
+
+  navigator.clipboard.writeText(data.text)
+})
+
+onReceive("file", (data) => {
+  console.log("file", data)
+  fileChunkRegistry.register(data)
+})
+
+onReceive("file-chunk", (data) => {
+  fileChunkRegistry.receiveChunk(data)
+})
+
+onReceive('mouse-control', (data) => {
+  mouseEnabled.value = data.enabled
+})
+
+onReceive('remote-control', (data) => {
+  remoteControlActive.value = data.enabled
+})
+
+onReceive('reset', (data) => {
+  overlayRef.value?.reset(data)
+})
 
 onMounted(() => {
   document.body.addEventListener('contextmenu', onContextMenu)
-  document.body.addEventListener('keydown', preventBrowserZoom, false)
-  document.body.addEventListener("wheel", onWheel, { passive: false })
+  document.body.addEventListener('keydown', preventBrowserZoom)
+  document.body.addEventListener("wheel", onWheel)
   window.addEventListener('drop', onDrop)
   window.addEventListener('dragover', onDragOver)
-
-  // allow panning and zooming for overlay element
-  const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
-  if (!isTouchEnabled())
-    options.handleStartEvent = event => {
-      if ((event as MouseEvent).button !== 1 && !spacepressed) {
-        throw "use middle button for panning"
-      } else {
-        event.stopPropagation()
-        event.preventDefault()
-      }
-    }
-
-  const panzoom = Panzoom(overlayRef.value!, options)
-
-  // Mousewheel-Zoom
-  remoteViewerRef.value?.addEventListener('wheel', (event: WheelEvent) => {
-    if (!event.ctrlKey) return
-    if (event.deltaY < 0) {
-      panzoom.zoom(panzoom.getScale() + 0.1, { animate: true })
-    } else {
-      panzoom.zoom(panzoom.getScale() - 0.1, { animate: true })
-    }
-  })
-
-  // Änderungen zoom/panning in Variable zwischenspeichern
-  overlayRef.value!.addEventListener('panzoomchange', (event: any) => {
-    zoom = event.detail
-    console.log(zoom) // => { x: 0, y: 0, scale: 1 }
-  })
-
-  // alle 50ms werden die aktuellen Zoom-Infos an den Videoviewer gesendet
-  setInterval(() => {
-    const pan = panzoom.getPan()
-    const panScale = panzoom.getScale()
-
-    emit('rescale', {
-      x: pan.x,
-      y: pan.y,
-      scale: panScale,
-      width: windowdimensions.width,
-      height: windowdimensions.height
-    })
-
-    if (pan.x != lastPan.x || pan.y != lastPan.y || panScale != lastPanScale) {
-      lastPanScale = panScale
-      lastPan = pan
-
-      let reset = false
-      if ((pan.x > 0 || pan.y > 0) && panScale <= 1) {
-        pan.x = 0
-        pan.y = 0
-        reset = true
-      }
-
-      // Adjust child starting X/Y according the new scale for panning
-      if (reset) {
-        panzoom.pan(pan.x, pan.y, {
-          animate: true
-        })
-        reset = false
-      }
-
-      emit('rescale', {
-        x: pan.x,
-        y: pan.y,
-        scale: panScale,
-        width: windowdimensions.width,
-        height: windowdimensions.height
-      })
-    }
-  }, 50)
-
-  watch(() => props.videoTransform, (transform) => {
-    if (!transform)
-      return
-
-      sizeInfoStyle.value = {
-        width: transform.fullwidth + "px",
-        height: transform.fullheight + "px",
-        left: (transform.x - 2) + "px",
-        top: (transform.y - 2) + "px"
-      }
-
-      // Canvas anpassen
-      Object.keys(drawCanvas).forEach(key => {
-        drawCanvas[key].style.width = transform.fullwidth + "px"
-        drawCanvas[key].style.height = transform.fullheight + "px"
-        const drawCanvascontext = drawCanvas[key].getContext("2d")!
-        if (transform.fullwidth != drawCanvascontext.canvas.width) {
-          drawCanvascontext.canvas.width = transform.fullwidth
-          drawCanvascontext.canvas.height = transform.fullheight
-        }
-      })
-
-      overlayStyle.value!.width = (transform.width) + "px"
-      overlayStyle.value!.height = (transform.height) + "px"
-      overlayStyle.value!.left = Math.round((transform.x - 2) - (transform.fullwidth / transform.width * lastPan.x) + ((transform.fullwidth - transform.width) / 2)) + "px"
-      overlayStyle.value!.top = Math.round((transform.y - 2) - (transform.fullwidth / transform.width * lastPan.y) + ((transform.fullheight - transform.height) / 2)) + "px"
-  })
-
-  // virtueller Mauszeiger
-  function mouseMove(data: MouseMessage) {
-    // Mauszeiger erstellen (nur bei Windowsharing, beim Screensharing bleibt stattdessen der Remotemauszeiger sichtbar)
-    if (!synchronized || screensharing)
-      return
-
-    if (!overlayCursors[data.id]) {
-      overlayCursors[data.id] = {
-        name: data.name,
-        color: data.color,
-        left: '0',
-        top: '0',
-        lastAction: 0
-      }
-      
-      if (cursorcheckinterval === undefined) {
-        cursorcheckinterval = window.setInterval(() => {
-          clearMouseCursors()
-        }, 1000)
-      }
-    }
-
-    overlayCursors[data.id].left = Math.round(data.x * totalScale.value) + "px"
-    overlayCursors[data.id].top = Math.round(data.y * totalScale.value) + "px"
-    overlayCursors[data.id].lastAction = Date.now()
-  }
-
-  function clearMouseCursors() {
-    for (const id in overlayCursors) {
-      if (overlayCursors[id].lastAction < (Date.now() - 10000))
-        delete overlayCursors[id]
-    }
-  }
-
-  function startStroke(id: string, point: [number, number]) {
-    // Initialize point history if needed
-    if (pointHistory[id] == undefined) {
-      pointHistory[id] = []
-    }
-    
-    drawing[id] = true
-    latestPoint[id] = point
-
-    if (paintcheckinterval === undefined) {
-      paintcheckinterval = window.setInterval(() => {
-        Object.keys(pointHistory).forEach(key => {
-          tmpPointHistory[key] = []
-          pointHistory[key].forEach((item) => {
-            if (item.timestamp >= (Date.now() - 8000)) {
-              tmpPointHistory[key].push(item)
-            }
-            if (item.timestamp < (Date.now() - 8000) && item.timestamp > (Date.now() - 20000)) {
-              item.opacity = item.opacity - 0.03
-              tmpPointHistory[key].push(item)
-            }
-          })
-          pointHistory[key] = tmpPointHistory[key]
-        })
-        repaintStrokes()
-      }, 50)
-    }
-  }
-
-  function continueStroke(id: string, color: string, newPoint: [number, number]) {
-    if (!drawing[id] || !latestPoint[id]) {
-      return
-    }
-
-    if (pointHistory[id] == undefined) {
-      pointHistory[id] = []
-    }
-
-    // Only add point if it's different from the last point
-    if (latestPoint[id][0] !== newPoint[0] || latestPoint[id][1] !== newPoint[1]) {
-      pointHistory[id].push({
-        color,
-        from: latestPoint[id],
-        to: newPoint,
-        timestamp: Date.now(),
-        opacity: 1.0
-      })
-      latestPoint[id] = newPoint
-      repaintStrokes()
-    }
-  }
-
-  function repaintStrokes() {
-    Object.keys(pointHistory).forEach(key => {
-      // add a canvas for the user strokes
-      if (drawCanvas[key] == undefined) {
-        drawCanvas[key] = document.createElement('canvas')
-        drawCanvas[key].id = 'canvas_' + key
-        drawCanvas[key].style.cssText = 'position: absolute'
-        overlayRef.value!.appendChild(drawCanvas[key])
-      }
-
-      const drawCanvascontext = drawCanvas[key].getContext("2d")!
-      drawCanvascontext.clearRect(0, 0, drawCanvas[key].width, drawCanvas[key].height)
-      pointHistory[key].forEach((item) => {
-        if (item.from != undefined) {
-          drawCanvascontext.beginPath()
-          drawCanvascontext.moveTo(Math.round(item.from[0] * totalScale.value), Math.round(item.from[1] * totalScale.value))
-          drawCanvascontext.strokeStyle = "rgba(" + hexToRgb(item.color)!.r + ", " + hexToRgb(item.color)!.g + ", " + hexToRgb(item.color)!.b + ", " + item.opacity + ")"
-          drawCanvascontext.lineWidth = 5
-          drawCanvascontext.lineCap = "round"
-          drawCanvascontext.lineJoin = "round"
-          drawCanvascontext.lineTo(Math.round(item.to[0] * totalScale.value), Math.round(item.to[1] * totalScale.value))
-          drawCanvascontext.stroke()
-        }
-      })
-    })
-  }
-
-  // Signal einblenden bei Mausklick für 2000ms
-  function mouseSignal(data: MouseMessage) {
-    if (!remoteControlActive.value && !screensharing) {
-      signals[data.id] = {
-        color: data.color,
-        left: Math.round(data.x * totalScale.value - 150) + "px",
-        top: Math.round(data.y * totalScale.value - 150) + "px"
-      }
-
-      setTimeout(() => {
-        if (signals[data.id])
-          delete signals[data.id]
-      }, 2000)
-    }
-  }
-
-  window.addEventListener('resize', calcScale)
-
-  onReceive("getclipboard", (data) => {
-    console.log("getclipboard", data)
-
-    navigator.clipboard.writeText(data.text)
-  })
-
-  onReceive("mouse-leftclick", (data) => {
-    if (!remoteControlActive.value) {
-      mouseSignal(data)
-    }
-    drawing[data.id] = false;
-  })
-
-  onReceive("paint-mouse-leftclick", (data) => {
-    /*if (drawing[data.id] != undefined && drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }*/
-    drawing[data.id] = false;
-  })
-
-  onReceive("mouse-move", (data) => {
-    if (!remoteControlActive.value && drawing[data.id] != undefined && drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }
-
-    mouseMove(data)
-  })
-
-  onReceive("paint-mouse-move", (data) => {
-    if (drawing[data.id]) {
-      continueStroke(data.id, data.color, [data.x, data.y])
-    }
-    mouseMove(data)
-  })
-
-  /*onReceive("rectangle", (data) => {
-    //createRectangle(data)
-  })*/
-
-  onReceive("mouse-down", (data) => {
-    console.log("mouse-down", data)
-
-    if (!remoteControlActive.value && !draggingOver.value && (drawing[data.id] == undefined || !drawing[data.id])) {
-      console.log("startStroke", data)
-      startStroke(data.id, [data.x, data.y])
-    }
-    //createRectangle(data)
-  })
-
-  onReceive("paint-mouse-down", (data) => {
-    if (drawing[data.id] == undefined || !drawing[data.id]) {
-      startStroke(data.id, [data.x, data.y])
-    }
-  })
-
-  onReceive("mouse-up", (data) => {
-    //mousepressed[data.id] = false
-    console.log("mouse-up", data)
-
-    drawing[data.id] = false
-    //finishRectangle(data)
-  })
-
-  onReceive("paint-mouse-up", (data) => {
-    drawing[data.id] = false
-    delete latestPoint[data.id]
-  })
-
-  onReceive("file", (data) => {
-    console.log("file", data)
-    fileChunkRegistry.register(data)
-  })
-
-  onReceive("file-chunk", (data) => {
-    fileChunkRegistry.receiveChunk(data)
-  })
-
-  onReceive('reset', (data) => {
-    // Bei Screensharing sieht man den Remotemauszeige, daher den eigenen durch ein feines Crosshair ersetzen
-    screensharing = data.isScreen
-    overlayStyle.value.cursor = screensharing ? 'url(img/minicrosshair.png) 5 5, auto' : 'default'
-    
-    if (!oldbackground) {
-      oldbackground = document.getElementById('app')!.style.background
-      document.getElementById('app')!.style.background = 'repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px'
-    }
-
-    const remoteScaleHeight = props.videoTransform.height / (data.dimensions.bottom - data.dimensions.top)
-    const remoteScaleWidth = props.videoTransform.width / (data.dimensions.right - data.dimensions.left)
-    remoteScale.value = remoteScaleHeight < remoteScaleWidth ? remoteScaleHeight : remoteScaleWidth
-
-    // Speichern der Fensterabmessungen
-    windowdimensions.width = data.dimensions.right - data.dimensions.left
-    windowdimensions.height = data.dimensions.bottom - data.dimensions.top
-
-    // Skalierungsinfos und Mauszeigerposition mit Remote-App synchronisiert
-    synchronized = !!lastResetData && lastResetData.dimensions.left == data.dimensions.left && lastResetData.dimensions.right == data.dimensions.right && lastResetData.dimensions.top == data.dimensions.top && lastResetData.dimensions.bottom == data.dimensions.bottom
-    calcScale()
-
-    sharerToolbarBoundsStyle.value = (screensharing && data.toolbarBounds) ? {
-      left: totalScale.value * (data.toolbarBounds.x - data.dimensions.left) + "px",
-      top: totalScale.value * (data.toolbarBounds.y - data.dimensions.top) + "px",
-      width: totalScale.value * data.toolbarBounds.width + "px",
-      height: totalScale.value * data.toolbarBounds.height + "px"
-    } : undefined
-
-    if (synchronized)
-      hideMessage('mouseSync')
-
-    // Maus-Zeigermodus aktiviert/deaktiviert
-    if ((!lastResetData || mouseEnabled.value != data.mouseenabled) && activeMessage.value !== 'mouseSync') {
-      mouseEnabled.value = data.mouseenabled
-      activeMessage.value = 'remoteControl'
-      remoteControlMessage.value = mouseEnabled.value ? 'Remote-Mauszeiger ist nun aktiviert' : 'Remote-Mauszeiger wurde deaktiviert'
-      setTimeout(() => {
-        hideMessage('remoteControl')
-        remoteControlMessage.value = undefined
-      }, 3000)
-      if (!mouseEnabled.value) {
-        clearMouseCursors()
-      }
-    }
-
-    // Maus/Tastatursteuerung aktiviert/deaktiviert
-    if ((!lastResetData || remoteControlActive.value != data.remotecontrol) && activeMessage.value !== 'remoteControl') {
-      remoteControlActive.value = data.remotecontrol
-      activeMessage.value = 'remoteControl'
-      remoteControlMessage.value = remoteControlActive.value ? 'Fernzugriff ist jetzt aktiviert' : 'Fernzugriff wurde deaktiviert'
-      setTimeout(() => {
-        hideMessage('remoteControl')
-        remoteControlMessage.value = undefined
-      }, 3000)
-    }
-    lastResetData = data
-  })
-
-  let lastPosX = 0
-  let lastPosY = 0
-
-  overlayRef.value!.addEventListener('mouseleave', handleMouseUp)
-  window.addEventListener('blur', handleMouseUp)
-
-  function handleMouseUp() {
-    if (lastMouseDown > 0) {
-      send("mouse-up", currentMouseData, { receiveSelf: true, volatile: true })
-      clearTimeout(eventToSend)
-      eventToSend = undefined
-      lastMouseDown = 0
-    }
-  }
-
-  overlayRef.value!.addEventListener('mouseenter', () => { 
-    remoteClipboard = true 
-  })
-
-  overlayRef.value!.addEventListener('mousemove', (e) => {
-    if (!mouseEnabled.value || !synchronized) return false
-    remoteClipboard = true
-
-    const rect = overlayRef.value!.getBoundingClientRect()
-    x = e.pageX - rect.left
-    y = e.pageY - rect.top
-
-    currentMouseData = {
-      x: Math.round(x / (totalScale.value * (zoom?.scale ?? 1))),
-      y: Math.round(y / (totalScale.value * (zoom?.scale ?? 1))),
-      id: props.id,
-      name: props.user,
-      color: props.color
-    }
-
-    if ((lastMouseDown > 0 && lastMove < Date.now() - 10) || 
-      (lastMove < Date.now() - 100) || 
-      (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
-      lastMove = Date.now()
-      send(controlpressed ? "paint-mouse-move" : "mouse-move", currentMouseData, { receiveSelf: true, volatile: true })
-    }
-
-    lastPosX = x
-    lastPosY = y
-
-    e.preventDefault()
-    return false
-  })
-
-  let lastWheel = 0
-  overlayRef.value!.addEventListener('wheel', (e) => {
-    if (e.ctrlKey) return
-
-    if (lastWheel < (Date.now() - 200)) {
-      console.log(e)
-      currentMouseData.delta = e.deltaY
-      lastWheel = Date.now()
-      send("mouse-wheel", currentMouseData, { receiveSelf: true })
-    }
-  })
-
-  //let ignoremouse = 0
-  let lastMouseData: RemoteMouseData
-
-  overlayRef.value!.addEventListener('mousedown', (e) => {
-    if (!mouseEnabled.value) return
-    //if ((ignoremouse < Date.now() - 100)) {
-      if (e.which == 3) {
-        sendMouseClick()
-      } else {
-        sendMouseDown(e)
-      }
-    /*} else {
-      ignoremouse = Date.now()
-    }*/
-    lastMouseData = currentMouseData
-  })
-
-  overlayRef.value!.addEventListener('mouseup', () => {
-    if (!mouseEnabled.value) return
-    sendMouseUp()
-  })
-
-  let eventToSend: number | undefined
-  let lastMouseDown = 0
-  //const lastclick = 0
-  //const mousepressed = {}
-  let moveHandler: ((event: MouseEvent) => void) | undefined
-
-  function sendMouseClick() {
-    mousedown = false
-    lastMouseDown = 0
-    //lastclick = 0
-    console.log("mouse-rightclick")
-    send("mouse-click", currentMouseData, { receiveSelf: true, volatile: true })
-  }
-
-  function sendMouseDown(e: MouseEvent) {
-    if (lastMouseDown !== 0)
-      return
-    
-    dragdetected = false
-    lastMouseDown = Date.now()
-    mousedown = false
-
-    // Store initial cursor position
-    const initialX = e.clientX
-    const initialY = e.clientY
-
-    // Add mousemove handler to check distance
-    moveHandler = (moveEvent) => {
-      const deltaX = moveEvent.clientX - initialX
-      const deltaY = moveEvent.clientY - initialY
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-      
-      if (distance > 5) {
-        // Clear the delayed event since we're sending immediately
-        clearTimeout(eventToSend)
-        eventToSend = undefined
-        dragdetected = true
-        mousedown = true
-        
-        console.log("mouse-down (immediate due to movement)")
-        send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
-        
-        // Remove this handler since we've triggered the event
-        moveHandler && document.removeEventListener('mousemove', moveHandler)
-        moveHandler = undefined
-      }
-    }
-    
-    document.addEventListener('mousemove', moveHandler)
-    
-    eventToSend = window.setTimeout(() => {
-      mousedown = true
-      console.log("mouse-down")
-      send(controlpressed ? "paint-mouse-down" : "mouse-down", lastMouseData, { receiveSelf: true, volatile: true })
-    }, 120)
-  }
-
-  function sendMouseUp() {
-    if (moveHandler !== undefined) {
-      document.removeEventListener('mousemove', moveHandler)
-      moveHandler = undefined
-    }
-    if (eventToSend !== undefined) {
-      clearTimeout(eventToSend)
-      eventToSend = undefined
-    }
-
-    if (mousedown || dragdetected) {
-      console.log("mouse-up")
-      send(controlpressed ? "paint-mouse-up" : "mouse-up", currentMouseData, { receiveSelf: true, volatile: true })
-    } else {
-      console.log("mouse-leftclick")
-      send(controlpressed ? "paint-mouse-leftclick" : "mouse-leftclick", lastMouseData, { receiveSelf: true, volatile: true })
-    }
-
-    mousedown = false
-    lastMouseDown = 0
-  }
-
-  window.addEventListener('keydown', onKeyDown)
-  window.addEventListener('keyup', onKeyUp)
-
-  overlayRef.value!.addEventListener('contextmenu', () => {
-    return false
-  })
-
   window.addEventListener('paste', onPaste)
   window.addEventListener('copy', onCopy)
   window.addEventListener('cut', onCut)
@@ -702,10 +165,6 @@ onBeforeUnmount(() => {
   document.body.removeEventListener('wheel', onWheel)
   window.removeEventListener('drop', onDrop)
   window.removeEventListener('dragover', onDragOver)
-
-  window.removeEventListener('resize', calcScale)
-  window.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('keyup', onKeyUp)
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('copy', onCopy)
   window.removeEventListener('cut', onCut)
@@ -727,120 +186,24 @@ function onWheel(e: WheelEvent) {
     e.preventDefault()
 }
 
-function onKeyUp(e: KeyboardEvent) {
-  if (e.key == 'Control' || e.key == 'Meta') {
-    setTimeout(() => {
-      controlpressed = false
-    }, 100)
-  }
-  if (e.key == 'Shift') {
-    shiftpressed = false
-  }
-  if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
-    setTimeout(() => {
-      spacepressed = false
-    }, 100)
-  }
-  if (e.key == 'Alt' || e.key == 'AltGraph') {
-    setTimeout(() => {
-      altpressed = false
-    }, 100)
-  }
-
-  e.preventDefault()
-  return false
-}
-
-function onKeyDown(e: KeyboardEvent) {
-  console.log(e.keyCode)
-
-  skip = false
-  let keyToSend = e.key
-  if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
-    spacepressed = true
-  }
-  if (e.key == 'Shift') {
-    shiftpressed = true
-  }
-  if (e.key == 'Control' || e.key == 'Meta') {
-    controlpressed = true
-  }
-  if (e.key == 'Alt' || e.key == 'AltGraph') {
-    altpressed = true
-  }
-  if (e.key == 'Alt' || e.key == 'AltGraph' || e.key == 'Shift' || e.key == 'CapsLock') {
-    skip = true
-  }
-  if (controlpressed && (e.key == 'Control' || e.key == 'Meta' || e.key == 'v' || e.key == 'c' || e.key == 'x')) {
-    skip = true
-  }
-  if (controlpressed && e.key != 'v' && e.key != 'c' && e.key != 'x' && (e.key.length === 1 && e.key.toLowerCase().match(/[a-z]/i) || e.key == 'Enter')) {
-    keyToSend = '_____strg+' + e.key.toLowerCase()
-  }
-
-  // Special keys ~,+,^,`,´ and how to detect them
-  if (altpressed && e.keyCode == 78) {
-    skip = false
-    keyToSend = '~'
-  }
-  if (e.keyCode === 187) {  // Both ´ and + share keyCode 187
-    if (e.code === 'Equal') {  // Physical key is always 'Equal'
-      if (e.key === 'Dead') {
-        // This is ´ (acute accent)
-        skip = false
-        if (shiftpressed) {
-          keyToSend = '`'
-        } else {
-          keyToSend = '´'
-        }
-      } else if (e.key === '+') {
-        // This is the + key
-        skip = false
-        keyToSend = '+'
-      }
-    }
-  }
-  if (e.keyCode == 192) {
-    skip = false
-    if (shiftpressed) {
-      keyToSend = '°'
-    }
-    else {
-      keyToSend = '^'
-    }
-  }
-  
-  if (!skip) {
-    console.log(keyToSend)
-
-    send('type', { key: keyToSend }, { receiveSelf: true })
-    e.preventDefault()
-  }
-}
-
-function onDrop(e: DragEvent) {
+async function onDrop(e: DragEvent) {
   // Prevent default behavior (Prevent file from being opened)
   e.preventDefault()
 
   console.log('File(s) dropped')
   draggingOver.value = false
 
-  activeMessage.value = 'fileUpload'
-
   const items = e.dataTransfer?.items
-  if (items) {
-    // Use DataTransferItemList interface to access the file(s)
-    Array.from(items).forEach(item => {
-      // If dropped items aren't files, reject them
-      if (item.kind === 'file')
-        sendFile(item)
-    })
-  }/* else {
-    // Use DataTransfer interface to access the file(s)
-    [...ev.dataTransfer.files].forEach((file, i) => {
-    console.log(`… file[${i}].name = ${file.name}`)
-    })
-  }*/
+  if (!items)
+    return
+
+  activeMessage.value = 'fileUpload'
+  for (let item of Array.from(items)) {
+    if (item.kind === 'file')
+      await sendFile(item)
+  }
+
+  hideMessage('fileUpload')
 }
 
 function onDragOver(e: DragEvent) {
@@ -861,14 +224,14 @@ function onDragOver(e: DragEvent) {
 }
 
 function onCopy() {
-  if (remoteClipboard)
+  if (remoteClipboard.value)
     send('copy', {
       room: props.room,
     }, { receiveSelf: true })
 }
 
 function onCut() {
-  if (remoteClipboard)
+  if (remoteClipboard.value)
     send('cut', {
       room: props.room,
     }, { receiveSelf: true })
@@ -881,8 +244,6 @@ async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData.items
   for (let index in items) {
     const item = items[index]
-
-    console.log(item)
 
     if (item.kind === 'string' && item.type.match('^text/plain')) {
       //alert('paste text')
@@ -910,18 +271,6 @@ async function onPaste(e: ClipboardEvent) {
         }),
       ])
     }
-
-  }
-}
-
-function calcScale() {
-  overlayStyle.value.border = '1px solid blue'
-  const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
-  const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
-
-  videoScale.value = scaleX < scaleY ? scaleX : scaleY
-  if (videoScale.value > 1) {
-    videoScale.value = 1
   }
 }
 
@@ -932,22 +281,6 @@ function toggleMessage(message: string) {
 function hideMessage(message: string) {
   if (activeMessage.value === message)
     activeMessage.value = undefined
-}
-
-function isTouchEnabled() {
-  if (window.matchMedia("(pointer: coarse)").matches) {
-    return true
-  }
-
-  return false
-  /*return ('ontouchstart' in window) ||
-    (navigator.maxTouchPoints > 0) ||
-    (navigator.msMaxTouchPoints > 0)*/
-}
-
-type SendOptions = {
-  volatile?: boolean
-  receiveSelf?: boolean
 }
 
 function sendFile(item: DataTransferItem, name?: string) {
@@ -988,12 +321,6 @@ function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: Sen
     receive(event, data)
 }
 
-type ReceiveEventHandlers = {
-  [K in RemoteEvent]: (data: RemoteData<K>) => void
-}
-
-const receiveEvents: Partial<ReceiveEventHandlers> = {}
-
 function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
   receiveEvents[event]?.(data)
 }
@@ -1008,14 +335,22 @@ defineExpose({
 </script>
 
 <template>
-  <div class="remote-viewer" ref="remoteViewer">
-    <div class="overlay" ref="overlay" :style="overlayStyle">
-      <div v-for="(cursor, cursorId) in overlayCursors" :key="cursorId" class="cursor">
-        <div v-if="cursorId !== id && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }"> {{ cursor.name }}</div>
-      </div>
-      <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" class="signal" :signal="signal" />
-      <div v-if="sharerToolbarBoundsStyle" class="sharer-toolbar-bounds" :style="sharerToolbarBoundsStyle"></div>
-    </div>
+  <div class="remote-viewer">
+    <StreamOverlay
+      ref="overlay"
+      input-enabled
+      :users="users"
+      :user-id="userId"
+      :video-transform="videoTransform"
+      :mouse-enabled="mouseEnabled"
+      :remote-control-active="remoteControlActive"
+      :dragging-over="draggingOver"
+      @rescale="emit('rescale', $event)"
+      @synchronized="hideMessage('mouseSync')"
+      @mouse-inside="remoteClipboard = $event"
+      @send="send($event.event, $event.data, $event.options)"
+    >
+    </StreamOverlay>
     <div class="size-info" :style="sizeInfoStyle"></div>
     <div v-if="activeMessage" class="message">
       <template v-if="activeMessage === 'mouseSync' || activeMessage === 'mouseHelp'">
@@ -1080,41 +415,6 @@ defineExpose({
     src: local('Abel Regular'), local('Abel-Regular'), url('../../../assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
   }
 
-  .remote-viewer .cursor {
-    transition: all 0.05s ease-out;
-    pointer-events: none;
-    float: left;
-    width: 300px;
-    position: absolute;
-    z-index: 99;
-  }
-
-  .remote-viewer .cursor img {
-    height: 25px;
-    width: 25px;
-  }
-
-  .remote-viewer .cursor .cursor-name {
-    float: left;
-    width: auto;
-    margin-left: 10px;
-    margin-top: 10px;
-    background: white;
-    font-size: 12px;
-    padding: 4px;
-  }
-
-  .remote-viewer .overlay {
-    margin: 0px;
-    padding: 0px;
-    z-index:99;
-    position: absolute;
-    top: 0px;
-    left: 0px;
-    width: 400px;
-    height: 400px;
-  }
-
   .remote-viewer .clipboard-container {
     position: absolute;
     bottom: 0;
@@ -1134,22 +434,6 @@ defineExpose({
     margin: 0px;
     position: absolute;
     z-index: 2
-  }
-
-  .remote-viewer .cursorsignal {
-    border-radius: 50%;
-    width: 50px;
-    background-color: red;
-    height: 50px;
-    position: absolute;
-    opacity: 0;
-    animation: scaleIn 1s infinite cubic-bezier(.36, .11, .89, .32);
-  }
-
-  .remote-viewer .sharer-toolbar-bounds {
-    position: absolute;
-    z-index: 100;
-    background: repeating-linear-gradient(-45deg, #222, #333 15px, #aa0 15px, #cc0 20px);
   }
 
   .remote-viewer .item {
@@ -1283,17 +567,5 @@ defineExpose({
     border: solid white;
     border-width: 0 3px 3px 0;
     transform: rotate(45deg);
-  }
-
-  @keyframes scaleIn {
-    from {
-      transform: scale(.5, .5);
-      opacity: .2;
-    }
-
-    to {
-      transform: scale(2.5, 2.5);
-      opacity: 0;
-    }
   }
 </style>

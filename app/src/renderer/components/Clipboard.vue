@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
 import { File } from '../../interface.js'
-import { b64DecodeUnicode } from "../util.js"
+import { b64DecodeUnicode } from "../../util.js"
 
 import ArrowCollapseVerticalSvg from '../../assets/icons/arrow-collapse-vertical.svg'
 import ArrowExpandVerticalSvg from '../../assets/icons/arrow-expand-vertical.svg'
