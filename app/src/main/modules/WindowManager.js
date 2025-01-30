@@ -1009,6 +1009,8 @@ export class WindowManager {
           // In the 40-60 range, use the smaller scale factor to ensure overlay is large enough
           scaleFactor = Math.min(leftScreen.scaleFactor, rightScreen.scaleFactor)
         }
+        console.log('Left percentage:', leftPercentage)
+        console.log('Right percentage:', rightPercentage)
       }
 
       // Calculate dimensions using the chosen scale factor
@@ -1039,8 +1041,6 @@ export class WindowManager {
       console.log('Shared Windowdimensions:', windowdimensions)
       console.log('Left screen scale factor:', leftScreen.scaleFactor)
       console.log('Right screen scale factor:', rightScreen.scaleFactor)
-      console.log('Left percentage:', leftPercentage)
-      console.log('Right percentage:', rightPercentage)
       console.log('Chosen scale factor:', scaleFactor)
       console.log("Overlay BrowserWindow created:", this.overlayrecord.getBounds())
 

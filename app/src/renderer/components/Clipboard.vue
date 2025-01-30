@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { File } from '../../interface.js'
 import { b64DecodeUnicode } from "../../util.js"
 
@@ -28,8 +27,6 @@ const emit = defineEmits<{
   (e: 'onCollapse', collapsed: boolean): void
   (e: 'close'): void
 }>()
-
-const { t } = useI18n()
 
 const imageRef = useTemplateRef('image')
 const downloadRef = useTemplateRef('download')
