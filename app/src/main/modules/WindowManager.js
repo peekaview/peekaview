@@ -36,6 +36,7 @@ if (isWin32) {
       GetWindowTextW: lib.func('__stdcall', 'GetWindowTextW', 'bool', ['int64', 'void *', 'int']),
       GetClassNameW: lib.func('__stdcall', 'GetClassNameW', 'bool', ['int64', 'void *', 'int']),
       GetWindowLongA: lib.func('__stdcall', 'GetWindowLongA', 'int64', ['int64', 'int']),
+      IsZoomed: lib.func('__stdcall', 'IsZoomed', 'bool', ['int64']),
     };
     isUser32Available = true;
   } catch (error) {
@@ -354,6 +355,10 @@ export class WindowManager {
           windowdimensions.bottom = Math.round(windowdimensions.bottom / scalefactor);
         }
 
+        console.log("current screeninfo")
+        console.log(screeninfo)
+        console.log("current windowdimensions")
+        console.log(windowdimensions)
         return windowdimensions;
       } catch (error) {
         console.warn('Error getting window dimensions:', error);
@@ -960,20 +965,64 @@ export class WindowManager {
 
 
   showRecordOverlay() {
+    console.log('showRecordOverlay:' + this.isScreen())
+
     if (!this.isScreen()) {
       const windowdimensions = this.getWindowOuterDimensions()
+      
+      // Get both screens that the window might span
+      const leftScreen = screen.getDisplayNearestPoint({
+        x: windowdimensions.left,
+        y: (windowdimensions.top + windowdimensions.bottom) / 2
+      })
+      
+      const rightScreen = screen.getDisplayNearestPoint({
+        x: windowdimensions.right,
+        y: (windowdimensions.top + windowdimensions.bottom) / 2
+      })
 
+      // Calculate how much of the window is on each screen
+      const rawWidth = windowdimensions.right - windowdimensions.left
+      const rawHeight = windowdimensions.bottom - windowdimensions.top
+
+      let scaleFactor
+
+      if (leftScreen.id === rightScreen.id) {
+        // Window is entirely on one screen
+        scaleFactor = leftScreen.scaleFactor
+      } else {
+        // Window spans two screens - determine which screen contains more of the window
+        const splitX = Math.max(leftScreen.bounds.x + leftScreen.bounds.width, windowdimensions.left)
+        const leftPortion = splitX - windowdimensions.left
+        const rightPortion = windowdimensions.right - splitX
+        
+        // Calculate percentages
+        const leftPercentage = (leftPortion / rawWidth) * 100
+        const rightPercentage = (rightPortion / rawWidth) * 100
+        
+        // Use 60/40 threshold for scale factor selection
+        if (leftPercentage >= 60) {
+          scaleFactor = leftScreen.scaleFactor
+        } else if (rightPercentage >= 60) {
+          scaleFactor = rightScreen.scaleFactor
+        } else {
+          // In the 40-60 range, use the smaller scale factor to ensure overlay is large enough
+          scaleFactor = Math.min(leftScreen.scaleFactor, rightScreen.scaleFactor)
+        }
+      }
+
+      // Calculate dimensions using the chosen scale factor
+      const width = Math.round(rawWidth / scaleFactor) + (isMac ? 20 : isWin32 ? 20 : 0)
+      const height = Math.round(rawHeight / scaleFactor)
+      
       const x = windowdimensions.left - 2
       const y = windowdimensions.top - 2
-      const width = windowdimensions.right - windowdimensions.left + (isMac ? 20 : isWin32 ? 20 : 0)
-      const height = windowdimensions.bottom - windowdimensions.top + 4
-      const scalefactor = this.getScaleFactor()
 
       this.overlayrecord = new BrowserWindow({
-        x: Math.round(x / scalefactor),
-        y: Math.round(y / scalefactor),
-        width: Math.round(width / scalefactor),
-        height: Math.round(height / scalefactor),
+        x: x,
+        y: y,
+        width: width,
+        height: height,
         transparent: true,
         skipTaskbar: true,
         focusable: false,
@@ -987,8 +1036,13 @@ export class WindowManager {
         },
       })
 
-      console.log('Overlay:')
-      console.log(windowdimensions)
+      console.log('Shared Windowdimensions:', windowdimensions)
+      console.log('Left screen scale factor:', leftScreen.scaleFactor)
+      console.log('Right screen scale factor:', rightScreen.scaleFactor)
+      console.log('Left percentage:', leftPercentage)
+      console.log('Right percentage:', rightPercentage)
+      console.log('Chosen scale factor:', scaleFactor)
+      console.log("Overlay BrowserWindow created:", this.overlayrecord.getBounds())
 
       this.overlayrecord.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       this.overlayrecord.setAlwaysOnTop(true, 'screen-saver', 1);
@@ -997,8 +1051,6 @@ export class WindowManager {
       this.overlayrecord.loadFile(resolvePath('static/windowoverlay.html'))
       this.overlayrecord.setIgnoreMouseEvents(true)
 
-
-      //this.overlayrecord.webContents.openDevTools();
     } else {
       const windowdimensions = this.getWindowOuterDimensions()
 
