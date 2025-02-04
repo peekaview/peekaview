@@ -1,10 +1,12 @@
 import { dialog } from 'electron'
 
-import { WindowManager } from '../modules/WindowManager.js'
+import { createSourceManager } from '../sources/createSourceManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
 import { i18n } from '../i18n'
 
 import type { RemoteData, RemoteEvent } from '../../interface.d.ts'
+import { getWindowList } from '../util.js'
+import { SourceManager } from '../sources/SourceManager.js'
 
 //const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -17,7 +19,7 @@ export type Streamer = ReturnType<typeof useStreamer>
 
 export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) {
   // Dependencies
-  const windowManager = new WindowManager()
+  let sourceManager: SourceManager
   const remotePresenter = useRemotePresenter(sendRemote)
   
   // Streaming control flags
@@ -30,22 +32,21 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
   // Last state for pause/resume
   let pausedState: {
     mouseEnabled: boolean;
-    remoteControlInputEnabled: boolean;
+    remoteControlActive: boolean;
   } | undefined
 
   let hwnd: string | undefined
   let roomid: string | undefined
 
   async function startSharing(sourceId: string, roomId: string) {
-    hwnd = sourceId.includes(':') 
-      ? sourceId.split(':')[1]
-      : hwnd
+    if (sourceId.includes(':'))
+      hwnd = sourceId.split(':')[1]
     roomid = roomId
 
     console.log(`hwndstreamer:${hwnd}`)
 
-    const windowList = await windowManager.getWindowList()
-    if (!windowList.includes(hwnd) && hwnd != '0') {
+    const windowList = await getWindowList()
+    if (!hwnd || (!windowList.includes(hwnd) && hwnd != '0')) {
       dialog.showErrorBox(i18n.t('windowNotFound.title'), i18n.t('windowNotFound.content', { hwnd }))
       return
     }
@@ -54,7 +55,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
     await startStreaming()
 
-    windowManager.checkWindowSizeAndReposition()
+    sourceManager.checkIfRectangleUpdated()
     checkWindow()
     if (!checkWindowInterval)
       checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
@@ -62,21 +63,21 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
   function checkWindow() {
     // pause streaming, if window is minimized
-    remotePresenter.updateWindowBorders(windowManager.getWindowOuterDimensions())
-    if (windowManager.isMinimized()) {
+    remotePresenter.updateWindowBorders(sourceManager.getOuterDimensions())
+    if (sourceManager.isMinimized()) {
       console.log('window is minimized')
       pauseStreaming(true)
     }
-    else if (windowManager.checkWindowSizeAndReposition()) {
+    else if (sourceManager.checkIfRectangleUpdated()) {
       console.log('window was resized')
       pauseStreaming(true)
       // resume streaming, if window is back to normal state
     }
-    else if (windowManager.isVisible()) {
+    else if (sourceManager.isVisible()) {
       resumeStreamingIfPaused(true)
     }
 
-    if (!windowManager.isVisible() && streamingState !== 'hidden') {
+    if (!sourceManager.isVisible() && streamingState !== 'hidden') {
       console.log('window is not visible')
       //stopSharing()
       pauseStreaming(true)
@@ -94,7 +95,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       checkWindowInterval = undefined
     }
 
-    windowManager.hideRecordOverlay()
+    remotePresenter.hideOverlayWindow()
     remotePresenter.hideRemoteControl()
     remotePresenter.deactivate()
 
@@ -110,15 +111,15 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     if (pausedState === undefined) {
       pausedState = {
         mouseEnabled: remotePresenter.mouseEnabled,
-        remoteControlInputEnabled: remotePresenter.remoteControlInputEnabled
+        remoteControlActive: remotePresenter.remoteControlActive
       }
       remotePresenter.mouseEnabled = false
-      remotePresenter.remoteControlInputEnabled = false
+      remotePresenter.remoteControlActive = false
       sendReset()
     }
 
     console.log('pause')
-    windowManager.hideRecordOverlay()
+    remotePresenter.hideOverlayWindow()
     remotePresenter.hideRemoteControl()
   }
 
@@ -128,7 +129,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
     if (pausedState !== undefined) {
       remotePresenter.mouseEnabled = pausedState.mouseEnabled
-      remotePresenter.remoteControlInputEnabled = pausedState.remoteControlInputEnabled
+      remotePresenter.remoteControlActive = pausedState.remoteControlActive
       pausedState = undefined
     }
     
@@ -143,10 +144,10 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
       streamingState = 'active'
 
-      await windowManager.selectAndActivateWindow(hwnd)
-      windowManager.showRecordOverlay()
-      //windowManager.showDebugOverlay(args)
-      remotePresenter.activate(windowManager)
+      sourceManager = createSourceManager(hwnd)
+      await sourceManager.onInit()
+      sourceManager.bringToFront()
+      remotePresenter.activate(sourceManager)
 
       sendReset()
     }
@@ -159,8 +160,8 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     const send = () => {
       const toolbarBounds = remotePresenter.getToolbarBounds()
       sendRemote('reset', {
-        isScreen: windowManager.isScreen(),
-        dimensions: windowManager.getWindowOuterDimensions(),
+        isScreen: sourceManager.isScreen(),
+        dimensions: sourceManager.getOuterDimensions(),
         coverBounds: toolbarBounds ? [toolbarBounds] : [],
       })
     }

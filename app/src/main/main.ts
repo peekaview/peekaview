@@ -37,13 +37,10 @@ import LogoutIcon from '../assets/img/logout.png'
 import PresentIcon from '../assets/img/present.png'
 import RequestIcon from '../assets/img/request.png'
 import QuitIcon from '../assets/img/quit.png'
+import { getStore } from './store'
 
 declare const APP_VERSION: string
 declare const CSP_POLICY: string
-
-interface StoreSchema {
-  code: string | undefined
-}
 
 (async () => {
   const gotTheLock = app.requestSingleInstanceLock()
@@ -86,16 +83,7 @@ interface StoreSchema {
   let streamer: Streamer | undefined
   const customDialog = useCustomDialog()
 
-  const Store = (await import('electron-store')).default
-  const store = new Store<StoreSchema>({
-    schema: {
-      code: {
-        type: 'string',
-        default: undefined,
-      }
-    }
-  }) as any
-  log.info('Store initialized')
+  const store = await getStore()
 
   if (process.platform === 'win32')
     app.setAppUserModelId(app.name)
@@ -244,7 +232,7 @@ interface StoreSchema {
 
   const showAbout = () => {
     dialog.showMessageBox({
-      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024-2025 - info@limtec.de`,
+      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2025 - info@limtec.de`,
       title: i18n.t('trayMenu.about'),
     })
   }

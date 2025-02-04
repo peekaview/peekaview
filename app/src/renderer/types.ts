@@ -29,9 +29,3 @@ export type VideoTransform = {
   fullwidth: number
   fullheight: number
 }
-
-export type Signal = {
-  color: string
-  left: number
-  top: number
-}

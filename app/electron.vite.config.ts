@@ -57,7 +57,7 @@ export default defineConfig({
         input: {
           app: resolve('src/preload/app.ts'),
           clipboard: resolve('src/preload/clipboard.ts'),
-          drawOverlay: resolve('src/preload/drawOverlay.ts'),
+          overlay: resolve('src/preload/overlay.ts'),
           login: resolve('src/preload/login.ts'),
           sources: resolve('src/preload/sources.ts'),
           dialog: resolve('src/preload/dialog.ts'),
@@ -76,7 +76,7 @@ export default defineConfig({
         input: {
           app: resolve('src/renderer/index.html'),
           clipboard: resolve('src/renderer/clipboard/index.html'),
-          drawOverlay: resolve('src/renderer/drawOverlay/index.html'),
+          overlay: resolve('src/renderer/overlay/index.html'),
           login: resolve('src/renderer/login/index.html'),
           sources: resolve('src/renderer/sources/index.html'),
           dialog: resolve('src/renderer/dialog/index.html'),

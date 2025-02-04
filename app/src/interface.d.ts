@@ -56,8 +56,8 @@ export interface IElectronAPI {
   onMouseDown: (callback: (data: RemoteMouseData) => void) => void,
   onMouseMove: (callback: (data: RemoteMouseData) => void) => void,
   onMouseUp: (callback: (data: RemoteMouseData) => void) => void,
-  onUpdateUsers: (callback: (users: UserData[]) => void) => void,
-  onUpdateScale: (callback: (scale: number) => void) => void,
+  onMouseClick: (callback: (data: RemoteMouseData) => void) => void,
+  onUpdateOverlayData: (callback: (data: OverlayData) => void) => void,
   updateUsers: (users: string) => Promise<void>,
   quit: () => Promise<void>,
   closeClipboard: () => Promise<void>,
@@ -171,6 +171,13 @@ export type RemoteData<T extends RemoteEvent> =
     coverBounds: Rectangle[]
   }
 
+  export type OverlayData = {
+    users?: UserData[]
+    scale?: number
+    mouseEnabled?: boolean
+    remoteControlActive?: boolean
+  }
+
   export type Dimensions = {
     left: number
     top: number
@@ -183,6 +190,11 @@ export type RemoteData<T extends RemoteEvent> =
     y: number
     width: number
     height: number
+  }
+
+  export type Point = {
+    x: number
+    y: number
   }
 
   export type File = {

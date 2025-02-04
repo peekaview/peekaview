@@ -97,7 +97,7 @@ async function handleLogout() {
   <footer v-if="!viewActive" class="main-footer">
     <div class="footer-content">
       <p>
-        &copy; 2024-2025 PeekaView | 
+        &copy; 2025 PeekaView | 
         <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | 
         <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | 
         <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a> | 

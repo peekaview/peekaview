@@ -36,7 +36,7 @@
     "@panzoom/panzoom": "^4.5.1",
     "bootstrap": "^5.3.3",
     "electron-log": "^5.2.2",
-    "electron-store": "^10.0.0",
+    "electron-store": "^10.0.1",
     "electron-updater": "^6.1.7",
     "engine.io-client": "^6.5.3",
     "i18next": "^23.16.5",
