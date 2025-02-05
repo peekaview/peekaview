@@ -981,6 +981,9 @@ export class WindowManager {
         y: (windowdimensions.top + windowdimensions.bottom) / 2
       })
 
+      let leftPercentage = 0
+      let rightPercentage = 0
+
       // Calculate how much of the window is on each screen
       const rawWidth = windowdimensions.right - windowdimensions.left
       const rawHeight = windowdimensions.bottom - windowdimensions.top
@@ -997,8 +1000,8 @@ export class WindowManager {
         const rightPortion = windowdimensions.right - splitX
         
         // Calculate percentages
-        const leftPercentage = (leftPortion / rawWidth) * 100
-        const rightPercentage = (rightPortion / rawWidth) * 100
+        leftPercentage = (leftPortion / rawWidth) * 100
+        rightPercentage = (rightPortion / rawWidth) * 100
         
         // Use 60/40 threshold for scale factor selection
         if (leftPercentage >= 60) {

@@ -43,6 +43,7 @@ func isWindowOverlapped(windowNumber: Int) -> Bool {
            ownerName.contains("SystemUIServer") ||
            ownerName.contains("Window Server") ||
            ownerName.contains("Spotlight") ||
+           ownerName.contains("Electron") ||
            ownerName.contains("Control Centre") ||
            (ownerName == "Finder" && (windowInfo[kCGWindowName as String] as? String) == nil) ||
            (windowInfo[kCGWindowName as String] as? String)?.lowercased().hasPrefix("__peekaview") == true ||
