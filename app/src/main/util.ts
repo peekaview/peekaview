@@ -20,9 +20,9 @@ export function generateColorFromName(name: string) {
 
 export function windowLoad(window: BrowserWindow, entryKey?: string | undefined, params?: Record<string, string>) {
   if (is.dev && process.env.ELECTRON_RENDERER_URL)
-    window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/${entryKey ? entryKey + '/': ''}index.html${params ? '?' + (new URLSearchParams(params).toString()) : ''}`)
+    window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/windows/${entryKey ? entryKey + '/': ''}index.html${params ? '?' + (new URLSearchParams(params).toString()) : ''}`)
   else
-    window.loadFile(path.join(__dirname, `../renderer/${entryKey ? entryKey + '/': ''}index.html`), { query: params })
+    window.loadFile(path.join(__dirname, `../renderer/windows/${entryKey ? entryKey + '/': ''}index.html`), { query: params })
 }
 
 export function isBlacklistedWindow(title: string) {

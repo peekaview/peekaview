@@ -1,10 +1,10 @@
 import { screen } from 'electron'
 import { getWindowListFormatted } from "../util"
 import { SourceManager } from "./SourceManager"
-import { Dimensions } from '../../interface'
 
 export class ScreenManager extends SourceManager {
   protected screen: Electron.Display;
+  
   constructor(hwnd: string) {
     super(hwnd)
     this.fixOverlayBoundsAfterCreation = (process.platform === 'win32')
@@ -73,14 +73,5 @@ export class ScreenManager extends SourceManager {
 
   isVisible() {
     return true
-  }
-
-  getOverlayRectangle(dimensions: Dimensions) {
-    return {
-      x: dimensions.left,
-      y: dimensions.top,
-      width: dimensions.right - dimensions.left,
-      height: dimensions.bottom - dimensions.top,
-    }
   }
 }

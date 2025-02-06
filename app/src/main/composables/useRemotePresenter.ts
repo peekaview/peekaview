@@ -21,7 +21,7 @@ const isMac = process.platform === 'darwin'
 
 const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 
-export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) {
+export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, newUsers: UserData[] = []) {
   const mousePressed: Record<string, boolean> = {}
 
   let overlayWindow: BrowserWindow | undefined
@@ -42,55 +42,8 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     bottom: 0,
   }
   let sourceManager: SourceManager
-  let users: UserData[] = []
+  let users: UserData[] = newUsers
   const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
-
-  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
-    onRemote(event, data)
-  })
-
-  ipcMain.handle('set-toolbar-size', async (_event, width: number, height: number) => {
-    toolbarSize = { width, height }
-  })
-
-  ipcMain.handle('toggle-clipboard', async (_event, toggle?: boolean) => {
-    toggleClipboardWindow(toggle)
-  })
-
-  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
-    toggleMouse(toggle)
-  })
-  
-  ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
-    toggleRemoteControl(toggle)
-  })
-
-  ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
-    let window: BrowserWindow | undefined
-    switch (windowName) {
-      case 'clipboard':
-        window = clipboardWindow
-        break
-      case 'toolbar':
-        window = toolbarWindow
-        break
-      default:
-        return
-    }
-
-    if (!window)
-      return
-
-    let size = window?.getMinimumSize()
-    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
-
-    size = window?.getSize()
-    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
-  })
-
-  ipcMain.handle('close-clipboard', async (_event) => {
-    clipboardWindow?.close()
-  })
 
   function deactivate() {
     active = false
@@ -198,6 +151,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     return new Promise<void>((resolve) => {
       overlayWindow!.on('ready-to-show', () => {
+        toolbarWindow?.moveTop()
         overlayWindow!.webContents.send('on-update-overlay-data', { users, scale: 1 / sourceManager.getScaleFactor() })
         resolve()
       })
@@ -322,11 +276,13 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     toolbarWindow.setAlwaysOnTop(true, 'screen-saver')
     windowLoad(toolbarWindow, 'toolbar')
     toolbarWindow.show()
-    //toolbarWindow.webContents.openDevTools()
+    toolbarWindow.webContents.openDevTools()
 
     toolbarWindow.on('closed', () => {
       toolbarWindow = undefined
     })
+
+    toolbarWindow.moveTop()
   }
 
   function getToolbarBounds() {
@@ -337,6 +293,33 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       ...toolbarWindow.getBounds(),
       ...toolbarSize,
     }
+  }
+
+  function setToolbarSize(width: number, height: number) {
+    toolbarSize = { width, height }
+  }
+
+  function resizeWindow(windowName: string, dimensions: ElectronWindowDimensions) {
+    let window: BrowserWindow | undefined
+    switch (windowName) {
+      case 'clipboard':
+        window = clipboardWindow
+        break
+      case 'toolbar':
+        window = toolbarWindow
+        break
+      default:
+        return
+    }
+
+    if (!window)
+      return
+
+    let size = window?.getMinimumSize()
+    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
+
+    size = window?.getSize()
+    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
   }
 
   function hideOverlays() {
@@ -469,7 +452,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     await clipboard.copy(tmpclipboard)
   }
 
-  function toggleClipboardWindow(toggle?: boolean) {
+  function toggleClipboard(toggle?: boolean) {
     if (toggle === undefined)
       toggle = !clipboardWindow
 
@@ -822,7 +805,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     deactivate,
     createOverlayWindow,
     hideOverlayWindow,
-    toggleClipboardWindow,
+    toggleClipboard,
     toggleRemoteControl,
     toggleMouse,
     getToolbarBounds,
@@ -830,5 +813,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     updateUsers,
     updateWindowBorders,
     onRemote,
+    resizeWindow,
+    setToolbarSize,
   }
 }

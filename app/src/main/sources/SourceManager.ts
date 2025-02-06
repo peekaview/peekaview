@@ -81,4 +81,13 @@ export class SourceManager {
   hideWindow() {}
 
   showWindow() {}
+
+  getOverlayRectangle(dimensions: Dimensions) {
+    return {
+      x: dimensions.left,
+      y: dimensions.top,
+      width: dimensions.right - dimensions.left,
+      height: dimensions.bottom - dimensions.top,
+    }
+  }
 }

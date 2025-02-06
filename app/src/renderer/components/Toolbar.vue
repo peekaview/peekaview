@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, useTemplateRef, watch } from 'vue'
 
-import ArrowCollapseHorizontalSvg from '../../assets/icons/arrow-collapse-horizontal.svg'
-import ArrowExpandHorizontalSvg from '../../assets/icons/arrow-expand-horizontal.svg'
+import ChevronLeftSvg from '../../assets/icons/chevron-left.svg'
+import ChevronRightSvg from '../../assets/icons/chevron-right.svg'
 import DragSvg from '../../assets/icons/drag.svg'
 
 const props = withDefaults(defineProps<{
@@ -33,7 +33,7 @@ setInterval(() => {
   if (!rect)
     return
   
-  window.electronAPI?.setToolbarSize(rect.width, rect.height)
+  window.electronAPI?.setToolbarSize(rect.width + 10, rect.height)
 }, 500)
 </script>
 
@@ -43,8 +43,8 @@ setInterval(() => {
       <DragSvg />
     </div>
     <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="width: 30px" @click="collapsed = !collapsed">
-      <ArrowExpandHorizontalSvg v-if="collapsed" />
-      <ArrowCollapseHorizontalSvg v-else />
+      <ChevronRightSvg v-if="collapsed" />
+      <ChevronLeftSvg v-else />
     </div>
     <template v-if="!collapsed">
       <slot />
@@ -63,6 +63,9 @@ setInterval(() => {
     color: #EEE;
     padding: 4px;
     min-width: 0;
+    border-radius: 5px;
+    border: 1px solid hsla(0, 0%, 25%, 0.75);
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
   }
 
   .toolbar svg {

@@ -3,8 +3,8 @@ import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
 import { File } from '../../interface.js'
 import { b64DecodeUnicode } from "../../util.js"
 
-import ArrowCollapseVerticalSvg from '../../assets/icons/arrow-collapse-vertical.svg'
-import ArrowExpandVerticalSvg from '../../assets/icons/arrow-expand-vertical.svg'
+import ChevronDownSvg from '../../assets/icons/chevron-down.svg'
+import ChevronUpSvg from '../../assets/icons/chevron-up.svg'
 import CloseSvg from '../../assets/icons/close.svg'
 import CopySvg from '../../assets/icons/content-copy.svg'
 import DownloadSvg from '../../assets/icons/download.svg'
@@ -174,11 +174,11 @@ function close() {
 <template>
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar :draggable="draggable">
-      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="width: 30px" @click="collapsed = !collapsed">
-        <ArrowExpandVerticalSvg v-if="collapsed" />
-        <ArrowCollapseVerticalSvg v-else />
+      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" @click="collapsed = !collapsed">
+        <ChevronDownSvg v-if="collapsed" />
+        <ChevronUpSvg v-else />
       </div>
-      <div class="btn btn-sm btn-secondary" :title="$t('general.close')" @click="close">
+      <div class="btn btn-sm btn-secondary" :title="$t('general.close')" style="flex:0 0 auto" @click="close">
         <CloseSvg />
       </div>
     </Toolbar>
@@ -223,8 +223,10 @@ function close() {
   width: 100%;
   height: 100%;
   padding: 5px;
-  border-radius: 5px;
   background: #1a1a1a;
+  border: 1px solid hsla(0, 0%, 25%, 0.75);
+  border-radius: 5px;
+  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
 }
 
 .clipboard.collapsed {

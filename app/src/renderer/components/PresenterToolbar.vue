@@ -45,7 +45,7 @@ function onCollapse() {
     if (!rect)
       return
 
-    const width = Math.round(rect.width)
+    const width = Math.round(rect.width) + 10
     window.electronAPI!.resizeWindow('toolbar', {
       size: { width },
       minimumSize: { width },

@@ -4,7 +4,7 @@ import { createSourceManager } from '../sources/createSourceManager.js'
 import { useRemotePresenter } from './useRemotePresenter.js'
 import { i18n } from '../i18n'
 
-import type { RemoteData, RemoteEvent } from '../../interface.d.ts'
+import type { RemoteData, RemoteEvent, UserData } from '../../interface.d.ts'
 import { getWindowList } from '../util.js'
 import { SourceManager } from '../sources/SourceManager.js'
 
@@ -17,10 +17,10 @@ const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 1000
 
 export type Streamer = ReturnType<typeof useStreamer>
 
-export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) {
+export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, users: UserData[] = []) {
   // Dependencies
   let sourceManager: SourceManager
-  const remotePresenter = useRemotePresenter(sendRemote)
+  const remotePresenter = useRemotePresenter(sendRemote, users)
   
   // Streaming control flags
   let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
