@@ -23,7 +23,7 @@ import fs from 'fs'
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useStreamer, type Streamer } from './composables/useStreamer'
 
-import { DialogOptions, ScreenSource, StreamerData, UserData } from '../interface.js'
+import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -37,13 +37,10 @@ import LogoutIcon from '../assets/img/logout.png'
 import PresentIcon from '../assets/img/present.png'
 import RequestIcon from '../assets/img/request.png'
 import QuitIcon from '../assets/img/quit.png'
+import { getStore } from './store'
 
 declare const APP_VERSION: string
 declare const CSP_POLICY: string
-
-interface StoreSchema {
-  code: string | undefined
-}
 
 (async () => {
   const gotTheLock = app.requestSingleInstanceLock()
@@ -72,13 +69,12 @@ interface StoreSchema {
   // allow superhigh cpu usage for faster video-encoding
   app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
-  let appWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
-  let sourcesWindow: BrowserWindow | undefined
+  let viewerWindow: BrowserWindow | undefined
+  let presenterWindow: BrowserWindow | undefined
 
   let tray: Tray
 
-  let selectedScreenSource: ScreenSource | undefined
   let isQuitting = false
 
   let currentViewCode: string | undefined
@@ -86,16 +82,8 @@ interface StoreSchema {
   let streamer: Streamer | undefined
   const customDialog = useCustomDialog()
 
-  const Store = (await import('electron-store')).default
-  const store = new Store<StoreSchema>({
-    schema: {
-      code: {
-        type: 'string',
-        default: undefined,
-      }
-    }
-  }) as any
-  log.info('Store initialized')
+  const store = await getStore()
+  let users: UserData[] = []
 
   if (process.platform === 'win32')
     app.setAppUserModelId(app.name)
@@ -148,16 +136,15 @@ interface StoreSchema {
       })
     })
 
-    createAppWindow()
-    log.info('Main window created')
-
     // On OS X it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         log.info('No windows found, creating new window on activate')
-        appWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-        createAppWindow(true)
+        loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+        viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+        presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+        tryPresenting()
       }
     })
 
@@ -171,10 +158,7 @@ interface StoreSchema {
         handleProtocol(protocolUrl)
       }
 
-      if (appWindow) {
-        if (appWindow.isMinimized()) appWindow.restore()
-        appWindow.focus()
-      }
+      focusApp()
     })
 
     log.info("App initialization complete")
@@ -182,22 +166,23 @@ interface StoreSchema {
     new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()
   })
 
+  const focusApp = () => {
+    let currentWindow = loginWindow ?? viewerWindow ?? presenterWindow
+    if (currentWindow) {
+      if (currentWindow.isMinimized())
+        currentWindow.restore()
+      currentWindow.show()
+      currentWindow.focus()
+
+      return true
+    }
+
+    return false
+  }
+
   const onTrayClick = () => {
-    if (sourcesWindow?.isMinimized()) {
-      sourcesWindow.restore()
-      sourcesWindow.show()
-      return
-    }
-
-    if (appWindow) {
-      if (!app.isPackaged) {
-        appWindow.restore()
-        appWindow.show()
-      }
-      return
-    }
-
-    tryShareScreen()
+    if (!focusApp())
+      tryPresenting()
   }
 
   const updateContextMenu = () => {
@@ -219,16 +204,16 @@ interface StoreSchema {
       )
       
       menuItems.push(
-        { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryShareScreen() },
-        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => loadParams({ action: 'view' }, true) },
+        { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
+        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
         { type: 'separator' },
         { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
           { icon: createMenuIcon(LanguageIcon), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
             { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
-              appWindow?.webContents.send('change-language', locale)
-              sourcesWindow?.webContents.send('change-language', locale)
+              viewerWindow?.webContents.send('change-language', locale)
+              presenterWindow?.webContents.send('change-language', locale)
               loginWindow?.webContents.send('change-language', locale)
               updateContextMenu()
             })}
@@ -244,17 +229,16 @@ interface StoreSchema {
 
   const showAbout = () => {
     dialog.showMessageBox({
-      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2024-2025 - info@limtec.de`,
+      message: `PeekaView v${APP_VERSION}\n\n© Limtec GmbH 2025 - info@limtec.de`,
       title: i18n.t('trayMenu.about'),
     })
   }
 
-  const createAppWindow = (show = false) => {
-    log.info('Creating main window', { show })
-    appWindow = new BrowserWindow({
+  const createPresenterWindow = (code: string) => {
+    presenterWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
-      show,
+      show: true,
       width: 1280,
       height: 720,
       resizable: false,
@@ -264,30 +248,59 @@ interface StoreSchema {
         contextIsolation: true,
         //webSecurity: false, // Make sure this is off only for development, adjust for production.
         //allowRunningInsecureContent: true,
-        preload: path.join(__dirname, '../preload/app.js'),
+        preload: path.join(__dirname, '../preload/presenter.js'),
       }
     })
 
-    appWindow.webContents.setWindowOpenHandler(({ url }) => {
+    presenterWindow.webContents.setWindowOpenHandler(({ url }) => {
       log.info('External URL requested:', url)
       shell.openExternal(url)
       return { action: 'deny' }
     })
 
-    appWindow.on('close', (e) => {
+    presenterWindow.on('close', (e) => {
       if (!isQuitting) {
         e.preventDefault()
-        appWindow!.hide()
-        sourcesWindow?.close()
+        presenterWindow!.hide()
       }
     })
 
-    windowLoad(appWindow)
+    windowLoad(presenterWindow, 'presenter', { data: code })
 
-    appWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    log.info('Main window loaded')
+    presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
 
-    !app.isPackaged && appWindow.webContents.openDevTools()
+    !app.isPackaged && presenterWindow.webContents.openDevTools()
+  }
+
+  const createViewerWindow = () => {
+    viewerWindow = new BrowserWindow({
+      title: 'PeekaView',
+      icon: path.join(__dirname, PeekaViewLogo),
+      show: true,
+      width: 1280,
+      height: 720,
+      resizable: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: true,
+        //webSecurity: false, // Make sure this is off only for development, adjust for production.
+        //allowRunningInsecureContent: true,
+      }
+    })
+
+    viewerWindow.on('close', (e) => {
+      if (!isQuitting) {
+        e.preventDefault()
+        viewerWindow!.hide()
+      }
+    })
+
+    windowLoad(viewerWindow, 'viewer')
+
+    viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+
+    !app.isPackaged && viewerWindow.webContents.openDevTools()
   }
 
   const createLoginWindow = (discardSession = false) => {
@@ -320,56 +333,6 @@ interface StoreSchema {
     loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
   }
 
-  const createSourcesWindow = () => {
-    log.info('Opening sources window')
-    if (sourcesWindow) {
-      log.info('Reusing existing sources window')
-      if (sourcesWindow.isMinimized()) sourcesWindow.restore()
-      sourcesWindow.focus()
-      return
-    }
-
-    log.info('Creating new sources window')
-    sourcesWindow = new BrowserWindow({
-      icon: path.join(__dirname, PeekaViewLogo),
-      width: 960,
-      height: 640,
-      autoHideMenuBar: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: true,
-        preload: path.join(__dirname, '../preload/sources.js'),
-      }
-    })
-
-    sourcesWindow.on('close', (e) => {
-      if (selectedScreenSource) {
-        appWindow?.webContents.send('clean-up-stream')
-        appWindow?.webContents.send('send-screen-source', selectedScreenSource)
-      } else if (!currentViewCode && !isQuitting) {
-        const response = dialog.showMessageBoxSync({
-          message: i18n.t('sourcesWindow.confirmCancel'),
-          title: i18n.t('general.areYouSure'),
-          buttons: [
-            i18n.t('general.yes'),
-            i18n.t('general.no'),
-          ]
-        })
-
-        if (response === 1) {
-          e.preventDefault()
-          return
-        }
-
-        appWindow?.hide()
-      }
-
-      sourcesWindow = undefined
-    })
-    windowLoad(sourcesWindow, 'sources')
-    sourcesWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-  }
-
   function handleProtocol(url: string) {
     log.info("Processing protocol URL", url)
     const params = new URL(url).searchParams
@@ -378,31 +341,24 @@ interface StoreSchema {
     store.set('code', code)
     log.info('Auth code stored from protocol')
     loginWindow?.close()
-    tryShareScreen()
+    loginWindow = undefined
+    tryPresenting()
   }
 
-  function tryShareScreen() {
+  function tryPresenting() {
     const code = store.get('code')
     if (!code) {
       createLoginWindow()
       return
     }
 
-    if (!appWindow)
-      return
-
-    const url = appWindow.webContents.getURL()
-    const params = new URL(url).searchParams
-    const share = params.get('share')
-    if (currentViewCode && share === code)
-      return
-
-    loadParams({ share: code }, !app.isPackaged)
+    createPresenterWindow(code)
   }
 
   function logout(discardSession = false) {
     log.info('Logging out, discarding session:', discardSession)
-    appWindow?.hide()
+    presenterWindow?.close()
+    presenterWindow = undefined
     store.delete('code')
     createLoginWindow(discardSession)
   }
@@ -418,7 +374,7 @@ interface StoreSchema {
     streamer?.stopSharing()
 
     //if (streamer === undefined) {
-      streamer = useStreamer((event, data) => appWindow?.webContents.send('send-remote', event, data))
+      streamer = useStreamer((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users)
     //}
     streamer.startSharing(sourceId, data.roomId)
   }
@@ -426,19 +382,8 @@ interface StoreSchema {
   function stopSharing() {
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
-    appWindow?.webContents.send('clean-up-stream')
     streamer?.stopSharing()
     customDialog.closeTrayDialogs()
-  }
-
-  function loadParams(params: Record<string, string>, show?: boolean) {
-    if (!appWindow)
-      return
-
-    log.info('Loading app with params:', params)
-    windowLoad(appWindow, undefined, params)
-    if (show !== undefined)
-      show ? appWindow.show() : appWindow.hide()
   }
 
   function getAppUrl() {
@@ -454,27 +399,6 @@ interface StoreSchema {
     app.quit()
   }
 
-  ipcMain.handle('close-app-window', async () => {
-    
-  })
-
-  // Handle graceful shutdown
-  ipcMain.handle('handle-app-closing', async () => {
-    if (process.platform === "darwin")
-      return false
-    
-    log.info('Handling app closing request')
-    isQuitting = true
-    app.quit()
-
-    setTimeout(() => {
-      log.warn('Force quitting after timeout')
-      app.exit(0)
-    }, 1000)
-
-    return true
-  })
-
   // Error handling
   process.on('uncaughtException', (error) => {
     log.error('Uncaught Exception:', error)
@@ -489,11 +413,13 @@ interface StoreSchema {
   })
 
   ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
-    appWindow?.webContents.send('reply-dialog', id, result)
+    presenterWindow?.webContents.send('reply-dialog', id, result)
   })
 
   ipcMain.handle('open-screen-source-selection', async () => {
-    createSourcesWindow()
+    presenterWindow?.show()
+    presenterWindow?.focus()
+    presenterWindow?.webContents.send('open-screen-source-selection')
   })
 
   ipcMain.handle('log', async (_event, messages: any[]) => {
@@ -514,20 +440,29 @@ interface StoreSchema {
   ipcMain.handle('login-with-code', async (_event, code: string) => {
     log.info('Logging in with code:', code)
     loginWindow?.close()
+    loginWindow = undefined
     store.set('code', code)
-    tryShareScreen()
+    tryPresenting()
   })
 
   ipcMain.handle('get-screen-sources', async () => {
     log.info('Fetching screen sources')
     const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] })
-    return sources.map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
+    return sources
+      .map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
+      .filter(({ id }) => id !== presenterWindow?.getMediaSourceId())
   })
 
-  ipcMain.handle('select-screen-source', async (_event, source: ScreenSource | undefined) => {
-    log.info('Screen source selected:', source?.id, source?.name)
-    selectedScreenSource = source
-    sourcesWindow?.close()
+  ipcMain.handle('source-selected', async (_event, source: string | undefined) => {
+    const data = source ? JSON.parse(source) as ScreenSource : undefined
+    if (!data) {
+      presenterWindow?.close()
+      presenterWindow = undefined
+      return
+    }
+
+    log.info('Source selected:', data)
+    presenterWindow?.hide()
   })
 
   const openShareMessage = async () => {
@@ -575,7 +510,8 @@ interface StoreSchema {
   ipcMain.handle('stop-sharing', async (_event) => {
     stopSharing()
     console.log('stop-sharing handler called')
-    appWindow?.hide()
+    presenterWindow?.close()
+    presenterWindow = undefined
   })
 
   ipcMain.handle('pause-sharing', async (_event) => {
@@ -592,12 +528,33 @@ interface StoreSchema {
     streamer?.resumeStreamingIfPaused()
   })
 
-  ipcMain.handle('update-users', async (_event, users: string) => {
-    streamer?.remotePresenter?.updateUsers(JSON.parse(users) as UserData[])
+  ipcMain.handle('update-users', async (_event, newUsers: string) => {
+    users = JSON.parse(newUsers) as UserData[]
+    streamer?.remotePresenter?.updateUsers(users)
   })
 
-  ipcMain.handle('quit', async (_event) => {
-    quit()
+  ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
+    streamer?.remotePresenter?.onRemote(event, data)
+  })
+
+  ipcMain.handle('set-toolbar-size', async (_event, width: number, height: number) => {
+    streamer?.remotePresenter?.setToolbarSize(width, height)
+  })
+
+  ipcMain.handle('toggle-clipboard', async (_event, toggle?: boolean) => {
+    streamer?.remotePresenter?.toggleClipboard(toggle)
+  })
+
+  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
+    streamer?.remotePresenter?.toggleMouse(toggle)
+  })
+  
+  ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
+    streamer?.remotePresenter?.toggleRemoteControl(toggle)
+  })
+
+  ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
+    streamer?.remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
   // Create a helper function to create resized template menu icons

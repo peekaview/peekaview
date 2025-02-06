@@ -229,6 +229,7 @@ function onCut() {
 }
 
 async function onPaste(e: ClipboardEvent) {
+  console.log('onPaste', e)
   if (!e.clipboardData)
     return
 

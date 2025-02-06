@@ -55,12 +55,11 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          app: resolve('src/preload/app.ts'),
           clipboard: resolve('src/preload/clipboard.ts'),
-          drawOverlay: resolve('src/preload/drawOverlay.ts'),
-          login: resolve('src/preload/login.ts'),
-          sources: resolve('src/preload/sources.ts'),
           dialog: resolve('src/preload/dialog.ts'),
+          login: resolve('src/preload/login.ts'),
+          overlay: resolve('src/preload/overlay.ts'),
+          presenter: resolve('src/preload/presenter.ts'),
           toolbar: resolve('src/preload/toolbar.ts'),
         },
         output: {
@@ -75,13 +74,14 @@ export default defineConfig({
       rollupOptions: {
         input: {
           app: resolve('src/renderer/index.html'),
-          clipboard: resolve('src/renderer/clipboard/index.html'),
-          drawOverlay: resolve('src/renderer/drawOverlay/index.html'),
-          login: resolve('src/renderer/login/index.html'),
-          sources: resolve('src/renderer/sources/index.html'),
-          dialog: resolve('src/renderer/dialog/index.html'),
-          toolbar: resolve('src/renderer/toolbar/index.html'),
-          preview: resolve('src/renderer/preview/index.html'),
+          browserPresenter: resolve('src/renderer/browserPresenter/index.html'),
+          clipboard: resolve('src/renderer/windows/clipboard/index.html'),
+          dialog: resolve('src/renderer/windows/dialog/index.html'),
+          login: resolve('src/renderer/windows/login/index.html'),
+          overlay: resolve('src/renderer/windows/overlay/index.html'),
+          presenter: resolve('src/renderer/windows/presenter/index.html'),
+          toolbar: resolve('src/renderer/windows/toolbar/index.html'),
+          viewer: resolve('src/renderer/windows/viewer/index.html'),
         },
         output: {
           preserveModules: false

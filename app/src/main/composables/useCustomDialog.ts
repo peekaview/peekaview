@@ -1,7 +1,9 @@
 import path from 'path'
 import { ipcMain, screen, BrowserWindow } from 'electron'
-import { resolvePath, windowLoad } from '../util'
+import { windowLoad } from '../util'
 import { DialogOptions } from '../../interface'
+
+import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
@@ -111,7 +113,7 @@ export function useCustomDialog() {
       frame: false,
       x: windowParams.x,
       y: windowParams.y,
-      icon: resolvePath('static/img/peekaviewlogo.png'),
+      icon: path.join(__dirname, PeekaViewLogo),
       webPreferences: {
         preload: path.join(__dirname, '../preload/dialog.js'),
         additionalArguments: [hostname],

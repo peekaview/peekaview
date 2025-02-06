@@ -35,13 +35,10 @@ export interface IElectronAPI {
   loginViaBrowser: (discardSession?: boolean) => Promise<void>,
   loginWithCode: (code: string) => Promise<void>,
   getScreenSources: () => Promise<ScreenSource[]>,
-  selectScreenSource: (source: ScreenSource | undefined) => Promise<void>,
-  onSendScreenSource: (callback: (source: ScreenSource | undefined) => void) => void,
-  startRemoteControl: (data: StreamerData) => Promise<void>,
-  createJwtToken: (identity: string | null, roomName?: string) => Promise<string>,
   openScreenSourceSelection: () => Promise<void>,
+  onOpenScreenSourceSelection: (callback: () => void) => void,
+  sourceSelected: (source: string | undefined) => Promise<void>,
   sharingActive: (viewCode: string, data: string) => Promise<void>,
-  handleAppClosing: () => Promise<void>,
   toggleRemoteControl: (toggle?: boolean) => Promise<void>,
   toggleMouse: (toggle?: boolean) => Promise<void>,
   toggleClipboard: (toggle?: boolean) => Promise<void>,
@@ -53,15 +50,13 @@ export interface IElectronAPI {
   resumeSharing: () => Promise<void>,
   showSharingActive: () => Promise<void>,
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
+  closeWindow: () => Promise<void>,
   onMouseDown: (callback: (data: RemoteMouseData) => void) => void,
   onMouseMove: (callback: (data: RemoteMouseData) => void) => void,
   onMouseUp: (callback: (data: RemoteMouseData) => void) => void,
-  onUpdateUsers: (callback: (users: UserData[]) => void) => void,
-  onUpdateScale: (callback: (scale: number) => void) => void,
+  onMouseClick: (callback: (data: RemoteMouseData) => void) => void,
+  onUpdateOverlayData: (callback: (data: OverlayData) => void) => void,
   updateUsers: (users: string) => Promise<void>,
-  quit: () => Promise<void>,
-  closeClipboard: () => Promise<void>,
-  onCleanUpStream: (callback: () => void) => void
 }
 
 export interface ScreenSource {
@@ -171,6 +166,13 @@ export type RemoteData<T extends RemoteEvent> =
     coverBounds: Rectangle[]
   }
 
+  export type OverlayData = {
+    users?: UserData[]
+    scale?: number
+    mouseEnabled?: boolean
+    remoteControlActive?: boolean
+  }
+
   export type Dimensions = {
     left: number
     top: number
@@ -183,6 +185,11 @@ export type RemoteData<T extends RemoteEvent> =
     y: number
     width: number
     height: number
+  }
+
+  export type Point = {
+    x: number
+    y: number
   }
 
   export type File = {

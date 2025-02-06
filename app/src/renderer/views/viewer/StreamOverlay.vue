@@ -1,23 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, useTemplateRef, watch } from 'vue'
 
-import SignalContainer from "./SignalContainer.vue"
-
-import CursorPng from '../../../assets/img/cursor.png'
+import Signal from "../../components/Signal.vue"
+import Cursor from "../../components/Cursor.vue"
 
 import { useDrawOverlay } from '../../composables/useDrawOverlay'
 import { usePanzoom } from './usePanzoom'
 import { Dimensions, RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData } from '../../../interface'
-import { ScaleInfo, Signal, VideoTransform } from '../../types'
+import { ScaleInfo, VideoTransform } from '../../types'
 import { useKeyListeners } from './useEventListeners'
-
-type Cursor = {
-  name?: string
-  color: string
-  left: string
-  top: string
-  lastAction: number
-}
+import { useOverlayCursors } from '../../composables/useOverlayCursors'
+import { useOverlaySignals } from '../../composables/useOverlaySignals'
 
 type SendOptions = {
   volatile?: boolean
@@ -47,8 +40,6 @@ const emit = defineEmits<{
   (e: 'synchronized'): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, options: SendOptions }): void
 }>()
-
-watch(() => props.mouseEnabled, () => clearMouseCursors(true))
 
 const isSharingScreen = ref(true)
 const mappedUsers = computed(() => {
@@ -82,6 +73,14 @@ const drawOverlay = useDrawOverlay(canvasRef, {
   users: mappedUsers
 })
 
+const overlayCursors = useOverlayCursors(mappedUsers)
+const overlaySignals = useOverlaySignals(mappedUsers)
+window.setInterval(() => overlayCursors.clear(), 1000)
+watch(() => props.mouseEnabled, () => {
+  overlayCursors.clear(true)
+  overlaySignals.clear()
+})
+
 const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "type", data: { key }, options: { receiveSelf: true, volatile: true } }), toRef(props.inputEnabled))
 
 // Websocket-Message Object
@@ -96,11 +95,6 @@ let lastMouseData: RemoteMouseData
 let isMouseDown = false
 let isMouseDragging = false
 let synchronized = false
-
-// Maus-Overlays
-const signals = reactive<Record<string, Signal>>({})
-const overlayCursors = reactive<Record<string, Cursor>>({})
-window.setInterval(() => clearMouseCursors(), 1000)
 
 const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(overlayRef, toRef(pressed.space), toRef(props.inputEnabled))
 
@@ -138,20 +132,7 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
   if (props.remoteControlActive && data.draw)
     return
 
-  const user = mappedUsers.value[data.userId]
-  if (signals[user.id])
-    return
-
-  signals[user.id] = {
-    color: user.color,
-    left: Math.round(data.x),
-    top: Math.round(data.y),
-  }
-
-  setTimeout(() => {
-    if (signals[user.id])
-      delete signals[user.id]
-  }, 2000)
+  overlaySignals.send(data.userId, data.x, data.y)
 
   emit('interacted')
 }
@@ -159,25 +140,13 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
 function receiveMouseMove(data: RemoteMouseData) {
   if (!props.remoteControlActive || data.draw) {
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
+
   }
 
   if (!synchronized || data.userId === props.userId)
     return
 
-  const user = mappedUsers.value[data.userId]
-  if (!overlayCursors[user.id]) {
-    overlayCursors[user.id] = {
-      name: user.name,
-      color: user.color,
-      left: '0',
-      top: '0',
-      lastAction: 0
-    }
-  }
-
-  overlayCursors[user.id].left = Math.round(data.x * totalScale.value) + "px"
-  overlayCursors[user.id].top = Math.round(data.y * totalScale.value) + "px"
-  overlayCursors[user.id].lastAction = Date.now()
+  overlayCursors.move(data.userId, data.x, data.y)
 }
 
 function receiveMouseDown(data: RemoteMouseData) {
@@ -188,13 +157,6 @@ function receiveMouseDown(data: RemoteMouseData) {
 function receiveMouseUp(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
   emit('interacted')
-}
-
-function clearMouseCursors(instant = false) {
-  for (const id in overlayCursors) {
-    if (instant || overlayCursors[id].lastAction < (Date.now() - 10000))
-      delete overlayCursors[id]
-  }
 }
 
 let lastWheel = 0
@@ -429,11 +391,14 @@ defineExpose({
     @panzoomchange="onPanzoomChange"
     @contextmenu="() => false"
   >
-    <div v-for="(cursor, cursorId) in overlayCursors" :key="cursorId" class="cursor" :style="{ left: cursor.left, top: cursor.top }">
-      <img :src="CursorPng"/>
-      <div v-if="cursorId !== userId && cursor.name" class="cursor-name" :style="{ border: `1px solid #${cursor.color}`, color: `#${cursor.color}` }">{{ cursor.name }}</div>
-    </div>
-    <SignalContainer v-for="(signal, signalId) in signals" :key="signalId" :signal="signal" :scale="totalScale" />
+    <Cursor
+      v-for="(cursor, cursorId) in overlayCursors.cursors"
+      :key="cursorId"
+      v-bind="cursor"
+      :scale="totalScale"
+      :is-self="cursorId === userId"
+    />
+    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
     <canvas ref="canvas" />
     <template v-if="isSharingScreen">
       <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
@@ -447,31 +412,6 @@ defineExpose({
   padding: 0px;
   z-index: 99;
   position: absolute;
-}
-
-.stream-overlay .cursor {
-  transition: all 0.05s ease-out;
-  pointer-events: none;
-  float: left;
-  width: 300px;
-  position: absolute;
-  z-index: 99;
-}
-
-.stream-overlay .cursor img {
-  float: left;
-  height: 25px;
-  width: 25px;
-}
-
-.stream-overlay .cursor .cursor-name {
-  float: left;
-  width: auto;
-  margin-left: 10px;
-  margin-top: 10px;
-  background: white;
-  font-size: 12px;
-  padding: 4px;
 }
 
 .stream-overlay canvas {
