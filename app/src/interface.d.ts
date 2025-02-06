@@ -111,11 +111,10 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "browser" | "text" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "type" | "copy" | "paste" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
-  : T extends "text" ? { text: string }
   : T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
   : T extends "mouse-leftclick" ? RemoteMouseData
@@ -127,7 +126,8 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "type" ? { key: string }
   : T extends "copy" ? {}
   : T extends "cut" ? {}
-  : T extends "paste" ? RemotePasteData
+  : T extends "paste" ? { text: string }
+  : T extends "text" ? RemoteTextData
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
   : T extends "reset" ? RemoteResetData
@@ -143,7 +143,7 @@ export type RemoteData<T extends RemoteEvent> =
     draw?: boolean
   }
 
-  export type RemotePasteData = {
+  export type RemoteTextData = {
     text: string
     time: number
   }
