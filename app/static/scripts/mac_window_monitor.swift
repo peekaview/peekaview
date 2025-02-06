@@ -60,6 +60,7 @@ func isWindowOverlapped(windowNumber: Int) -> Bool {
            ownerName.contains("SystemUIServer") ||
            ownerName.contains("Window Server") ||
            ownerName.contains("Spotlight") ||
+           ownerName.contains("Electron") ||
            ownerName.contains("Control Centre") ||
            (ownerName == "Finder" && (windowInfo[kCGWindowName as String] as? String) == nil) ||
            (windowInfo[kCGWindowName as String] as? String)?.lowercased().hasPrefix("__peekaview") == true ||
@@ -108,11 +109,22 @@ func getWindowInfo(windowNumber: Int) -> String? {
         
         guard let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] else { continue }
         
+        // Get the window's screen to determine its scale factor
+        let windowRect = CGRect(x: bounds["X"] ?? 0, 
+                              y: bounds["Y"] ?? 0, 
+                              width: bounds["Width"] ?? 0, 
+                              height: bounds["Height"] ?? 0)
+        let screenWithWindow = NSScreen.screens.first { screen in
+            screen.frame.intersects(windowRect)
+        }
+        let backingScaleFactor = screenWithWindow?.backingScaleFactor ?? 1.0
+        
+        // Apply scale factor to window coordinates and dimensions
         let info: [String: Any] = [
-            "x": bounds["X"] ?? 0,
-            "y": bounds["Y"] ?? 0,
-            "width": bounds["Width"] ?? 0,
-            "height": bounds["Height"] ?? 0
+            "x": (bounds["X"] ?? 0),
+            "y": (bounds["Y"] ?? 0),
+            "width": (bounds["Width"] ?? 0) * backingScaleFactor,
+            "height": (bounds["Height"] ?? 0) * backingScaleFactor
         ]
         
         if let jsonData = try? JSONSerialization.data(withJSONObject: info),
