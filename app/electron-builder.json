@@ -69,7 +69,7 @@
       "dmg"
     ],
     "category": "public.app-category.utilities",
-    "icon": "build-resources/icon.icns",
+    "icon": "build-resources/AppIcon.icns",
     "artifactName": "${productName}-${version}-mac.${ext}",
     "entitlements": "build-resources/entitlements.mac.plist",
     "entitlementsInherit": "build-resources/entitlements.mac.plist",
@@ -79,15 +79,15 @@
   },
   "dmg": {
     "background": "build-resources/dmg-background.png",
-    "iconSize": 128,
+    "iconSize": 64,
     "contents": [
       {
-        "x": 130,
-        "y": 220
+        "x": 30,
+        "y": 190
       },
       {
-        "x": 410,
-        "y": 220,
+        "x": 220,
+        "y": 190,
         "type": "link",
         "path": "/Applications"
       }

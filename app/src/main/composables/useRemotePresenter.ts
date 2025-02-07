@@ -276,7 +276,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     toolbarWindow.setAlwaysOnTop(true, 'screen-saver')
     windowLoad(toolbarWindow, 'toolbar')
     toolbarWindow.show()
-    toolbarWindow.webContents.openDevTools()
+    //toolbarWindow.webContents.openDevTools()
 
     toolbarWindow.on('closed', () => {
       toolbarWindow = undefined
