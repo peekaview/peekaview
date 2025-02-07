@@ -1,5 +1,5 @@
 import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ComposerTranslation } from 'vue-i18n'
 
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
@@ -23,9 +23,7 @@ type PresenterOptions = {
   onStop?: () => void
 }
 
-export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
-  const { t } = useI18n()
-
+export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t: ComposerTranslation, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()

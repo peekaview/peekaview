@@ -141,6 +141,9 @@
     },
     "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
   },
+  "browserPresenter": {
+    "start": "Freigabe starten"
+  },
   "loginWindow": {
     "login": "Anmelden",
     "clickToLogin": "Hier klicken um via Browser anzumelden",

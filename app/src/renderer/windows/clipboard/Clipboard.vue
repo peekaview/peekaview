@@ -5,7 +5,7 @@ import Clipboard from '../../components/Clipboard.vue'
 
 import { File } from '../../../interface'
 
-const file = ref<File | undefined>()
+const file = ref<File>({ content: 'data:text/plain;base64,' })
 
 const clipboardRef = useTemplateRef<InstanceType<typeof Clipboard>>('clipboard')
 

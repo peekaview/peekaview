@@ -141,6 +141,9 @@
     },
     "requestError": "There was a problem processing your request. Please try again."
   },
+  "browserPresenter": {
+    "start": "Start sharing"
+  },
   "loginWindow": {
     "login": "Login",
     "clickToLogin": "Click to login via browser",

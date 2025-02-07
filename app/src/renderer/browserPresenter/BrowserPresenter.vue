@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
@@ -10,6 +10,8 @@ import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStream, type Presenter } from '../composables/usePresenter'
 import { prompt } from '../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
+
+import LoadingDarkGif from '../../assets/img/loading_dark.gif'
 
 const { t } = useI18n()
 
@@ -28,14 +30,16 @@ watch(mouseEnabled, (enabled) => {
   presenter.value?.sendRemote?.('mouse-control', { enabled })
 })
 
-const showClipboard = ref(true)
-const clipboardFile = ref<File>()
+const showClipboard = ref(false)
+const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
-onMounted(() => start())
+const userInputRequired = ref(true)
+//onMounted(() => start())
 
 async function start() {
+  userInputRequired.value = false
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')
   if (!data)
@@ -44,7 +48,7 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, async (shareAudio) => {
+  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
     window.resizeTo(...windowSelectSize)
     const stream = await getStream(shareAudio)
     window.resizeTo(...windowDefaultSize)
@@ -214,12 +218,18 @@ async function showInviteLink() {
 </script>
 
 <template>
-  <PresenterToolbar
-    v-if="presenter"
-    @toggle-mouse="mouseEnabled = $event"
-    @toggle-clipboard="showClipboard = !showClipboard"
-    @stop-sharing="presenter.stopSharing()"
-    @pause-sharing="presenter.pauseSharing()"
+  <div v-if="userInputRequired" class="input-container">
+    <button class="btn btn-primary" @click="start">{{ $t('browserPresenter.start') }}</button>
+  </div>
+  <div v-else-if="!presenter" class="input-container">
+    <img :src="LoadingDarkGif">
+  </div>
+  <template v-else>
+    <PresenterToolbar
+      @toggle-mouse="mouseEnabled = $event"
+      @toggle-clipboard="showClipboard = !showClipboard"
+      @stop-sharing="presenter.stopSharing()"
+      @pause-sharing="presenter.pauseSharing()"
     @resume-sharing="presenter.resumeSharing()"
     @share-different-screen="presenter.presentSource()"
     @show-invite-link="showInviteLink"
@@ -241,12 +251,13 @@ async function showInviteLink() {
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
-    <div v-if="shutterActive" class="shutter" />
-  </div>
+      <div v-if="shutterActive" class="shutter" />
+    </div>
+  </template>
 </template>
 
 <style>
-#presenter {
+#browser-presenter {
   width: 100%;
   height: 100%;
 }
@@ -255,6 +266,14 @@ video {
   max-width: 100%;
   max-height: 100%;
   filter: grayscale(50%);
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 
 .veil {

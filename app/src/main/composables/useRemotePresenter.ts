@@ -29,7 +29,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let toolbarWindow: BrowserWindow | undefined
   let toolbarSize: { width: number, height: number } | {} = {}
   let localClipboardTime = 0
-  let lastClipboardData: File | undefined
+  let lastClipboardData: File = {
+    content: 'data:text/plain;base64,'
+  }
   let lastKey: string
   let active = false
   let remoteControlActive = false
@@ -457,7 +459,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     if (!toggle)
       clipboardWindow?.close()
-    else if (lastClipboardData !== undefined)
+    else
       dataToClipboard(lastClipboardData)
   }
 
