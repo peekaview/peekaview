@@ -17,12 +17,12 @@ const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
+const windowModalSize = [400, 500] as const
 
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
 
-const appUrl = ref(import.meta.env.VITE_APP_URL)
 const presenter = ref<Presenter>()
 
 const mouseEnabled = ref(true)
@@ -203,7 +203,8 @@ function freezeAndFocus() {
 }
 
 async function showInviteLink() {
-  const url = `${appUrl.value}?view=${presenter.value?.viewCode}`
+  window.resizeTo(...windowModalSize)
+  const url = `${import.meta.env.VITE_APP_URL}?view=${presenter.value?.viewCode}`
   const result = await prompt({
     type: 'info',
     title: t('toolbar.inviteLink'),
@@ -214,6 +215,8 @@ async function showInviteLink() {
 
   if (result === '0')
     navigator.clipboard.writeText(url)
+
+  window.resizeTo(...windowDefaultSize)
 }
 </script>
 
@@ -230,27 +233,27 @@ async function showInviteLink() {
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="presenter.stopSharing()"
       @pause-sharing="presenter.pauseSharing()"
-    @resume-sharing="presenter.resumeSharing()"
-    @share-different-screen="presenter.presentSource()"
-    @show-invite-link="showInviteLink"
-  />
-  <div ref="container" class="preview-container">
-    <video ref="video" muted />
-    <div class="veil" />
-    <StreamOverlay
-      v-if="presenter?.screenShareData"
-      ref="overlay"
-      :input-enabled="false"
-      :users="presenter.viewers"
-      :user-id="presenter.screenShareData.user.id"
-      :video-transform="videoTransform"
-      :mouse-enabled="mouseEnabled"
-      @rescale="rescale"
-      @send="send($event.event, $event.data, $event.options)"
+      @resume-sharing="presenter.resumeSharing()"
+      @share-different-screen="presenter.presentSource()"
+      @show-invite-link="showInviteLink"
     />
-    <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
-    </div>
+    <div ref="container" class="preview-container">
+      <video ref="video" muted />
+      <div class="veil" />
+      <StreamOverlay
+        v-if="presenter?.screenShareData"
+        ref="overlay"
+        :input-enabled="false"
+        :users="presenter.viewers"
+        :user-id="presenter.screenShareData.user.id"
+        :video-transform="videoTransform"
+        :mouse-enabled="mouseEnabled"
+        @rescale="rescale"
+        @send="send($event.event, $event.data, $event.options)"
+      />
+      <div class="clipboard-container">
+        <Clipboard v-if="showClipboard" :data="clipboardFile"/>
+      </div>
       <div v-if="shutterActive" class="shutter" />
     </div>
   </template>
@@ -258,8 +261,14 @@ async function showInviteLink() {
 
 <style>
 #browser-presenter {
+  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
   width: 100%;
   height: 100%;
+}
+
+#browser-presenter .toolbar {
+  border-radius: 0;
+  border: none;
 }
 
 video {

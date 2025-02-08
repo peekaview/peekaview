@@ -13,6 +13,7 @@ const { t } = useI18n()
 
 const downloadLink = ref('downloads/PeekaView.exe')
 const presenterWindow = ref<Window | undefined>()
+const inviteUrl = computed(() => `${import.meta.env.VITE_APP_URL}?view=${btoa(`viewEmail=${ props.email }`)}`)
 
 onBeforeUnmount(() => {
   presenterWindow.value?.close()
@@ -62,7 +63,21 @@ function shareViaApp() {
 
 <template>
   <div class="content-wrapper">
-    <div class="section-content">
+    <div v-if="presenterWindow" class="section-content">
+      <h3 class="text-center mb-4">{{ $t('share.activeSession.active') }}</h3>
+      <div class="panel">
+        <div class="text-center">
+          <p style="font-size: 1.33rem;font-weight: bold">{{ $t('share.activeSession.canBeClosed') }}</p>
+          <p>{{ $t('share.activeSession.keepAlive') }}</p>
+        </div>
+        <hr />
+        <div class="text-center">
+          <p>{{ $t('share.activeSession.invite') }}</p>
+          <code>{{ inviteUrl }}</code>
+        </div>
+      </div>
+    </div>
+    <div v-else class="section-content">
       <h3 class="text-center mb-4">{{ $t('share.howToShare') }}</h3>
       <div class="panel share-options-stack">
         <div class="share-option primary">

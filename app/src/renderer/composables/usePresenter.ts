@@ -186,11 +186,12 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
       return
 
     try {
-      cleanUpStream()
-      stream.value = await getStream(shareAudio)
-      if (!stream.value)
+      const s = await getStream(shareAudio)
+      if (!s)
         return
 
+      cleanUpStream()
+      stream.value = s
       console.debug('Screen stream obtained:', stream.value)
       await screenPresent.value.addStream(stream.value, shareAudio)
       options?.onStream?.(stream.value, shareAudio)

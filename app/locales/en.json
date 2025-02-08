@@ -111,14 +111,9 @@
     },
     "activeSession": {
       "active": "Sharing Session Active",
-      "paused": "Sharing Session Paused",
-      "description": "Your screen is currently being shared.",
-      "invite": "You can invite someone to join your view your screen with this link:",
-      "stop": "Stop",
-      "pause": "Pause",
-      "resume": "Resume",
-      "shareDifferentScreen": "Share Different Screen",
-      "openPreview": "Open Preview"
+      "canBeClosed": "You can close this browser tab.",
+      "keepAlive": "Your session will remain active as long as you keep the preview window opened.",
+      "invite": "You can invite someone to join your view with this link:"
     },
     "requestAccess": {
       "message": "{name} wants to see your screen. Do you want to accept?",
