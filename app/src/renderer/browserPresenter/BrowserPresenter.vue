@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
@@ -11,16 +11,18 @@ import { usePresenter, getStream, type Presenter } from '../composables/usePrese
 import { prompt } from '../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
+import LoadingDarkGif from '../../assets/img/loading_dark.gif'
+
 const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
+const windowModalSize = [400, 500] as const
 
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
 
-const appUrl = ref(import.meta.env.VITE_APP_URL)
 const presenter = ref<Presenter>()
 
 const mouseEnabled = ref(true)
@@ -28,14 +30,16 @@ watch(mouseEnabled, (enabled) => {
   presenter.value?.sendRemote?.('mouse-control', { enabled })
 })
 
-const showClipboard = ref(true)
-const clipboardFile = ref<File>()
+const showClipboard = ref(false)
+const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
-onMounted(() => start())
+const userInputRequired = ref(true)
+//onMounted(() => start())
 
 async function start() {
+  userInputRequired.value = false
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')
   if (!data)
@@ -44,7 +48,7 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, async (shareAudio) => {
+  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
     window.resizeTo(...windowSelectSize)
     const stream = await getStream(shareAudio)
     window.resizeTo(...windowDefaultSize)
@@ -199,7 +203,8 @@ function freezeAndFocus() {
 }
 
 async function showInviteLink() {
-  const url = `${appUrl.value}?view=${presenter.value?.viewCode}`
+  window.resizeTo(...windowModalSize)
+  const url = `${import.meta.env.VITE_APP_URL}?view=${presenter.value?.viewCode}`
   const result = await prompt({
     type: 'info',
     title: t('toolbar.inviteLink'),
@@ -210,51 +215,74 @@ async function showInviteLink() {
 
   if (result === '0')
     navigator.clipboard.writeText(url)
+
+  window.resizeTo(...windowDefaultSize)
 }
 </script>
 
 <template>
-  <PresenterToolbar
-    v-if="presenter"
-    @toggle-mouse="mouseEnabled = $event"
-    @toggle-clipboard="showClipboard = !showClipboard"
-    @stop-sharing="presenter.stopSharing()"
-    @pause-sharing="presenter.pauseSharing()"
-    @resume-sharing="presenter.resumeSharing()"
-    @share-different-screen="presenter.presentSource()"
-    @show-invite-link="showInviteLink"
-  />
-  <div ref="container" class="preview-container">
-    <video ref="video" muted />
-    <div class="veil" />
-    <StreamOverlay
-      v-if="presenter?.screenShareData"
-      ref="overlay"
-      :input-enabled="false"
-      :users="presenter.viewers"
-      :user-id="presenter.screenShareData.user.id"
-      :video-transform="videoTransform"
-      :mouse-enabled="mouseEnabled"
-      @rescale="rescale"
-      @send="send($event.event, $event.data, $event.options)"
-    />
-    <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
-    </div>
-    <div v-if="shutterActive" class="shutter" />
+  <div v-if="userInputRequired" class="input-container">
+    <button class="btn btn-primary" @click="start">{{ $t('browserPresenter.start') }}</button>
   </div>
+  <div v-else-if="!presenter" class="input-container">
+    <img :src="LoadingDarkGif">
+  </div>
+  <template v-else>
+    <PresenterToolbar
+      @toggle-mouse="mouseEnabled = $event"
+      @toggle-clipboard="showClipboard = !showClipboard"
+      @stop-sharing="presenter.stopSharing()"
+      @pause-sharing="presenter.pauseSharing()"
+      @resume-sharing="presenter.resumeSharing()"
+      @share-different-screen="presenter.presentSource()"
+      @show-invite-link="showInviteLink"
+    />
+    <div ref="container" class="preview-container">
+      <video ref="video" muted />
+      <div class="veil" />
+      <StreamOverlay
+        v-if="presenter?.screenShareData"
+        ref="overlay"
+        :input-enabled="false"
+        :users="presenter.viewers"
+        :user-id="presenter.screenShareData.user.id"
+        :video-transform="videoTransform"
+        :mouse-enabled="mouseEnabled"
+        @rescale="rescale"
+        @send="send($event.event, $event.data, $event.options)"
+      />
+      <div class="clipboard-container">
+        <Clipboard v-if="showClipboard" :data="clipboardFile"/>
+      </div>
+      <div v-if="shutterActive" class="shutter" />
+    </div>
+  </template>
 </template>
 
 <style>
-#presenter {
+#browser-presenter {
+  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
   width: 100%;
   height: 100%;
+}
+
+#browser-presenter .toolbar {
+  border-radius: 0;
+  border: none;
 }
 
 video {
   max-width: 100%;
   max-height: 100%;
   filter: grayscale(50%);
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 
 .veil {

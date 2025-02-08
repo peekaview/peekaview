@@ -112,10 +112,17 @@ onReceive("mouse-up", (data) => {
   overlayRef.value?.receiveMouseUp(data)
 })
 
+onReceive("paste", (data) => {
+  navigator.clipboard.writeText(data.text)
+})
+
 onReceive("text", (data) => {
   console.log("text", data)
 
-  navigator.clipboard.writeText(data.text)
+  clipboardFile.value = {
+    content: 'data:text/plain;base64,' + btoa(data.text),
+    name: ''
+  }
 })
 
 onReceive("file", (data) => {
@@ -229,31 +236,30 @@ function onCut() {
 }
 
 async function onPaste(e: ClipboardEvent) {
-  console.log('onPaste', e)
   if (!e.clipboardData)
     return
+  
+  const textContent = e.clipboardData.getData('text')
+  if (textContent) {
+    send('text', {
+      text: textContent.replace(/\r/g, ""),
+      time: Date.now()
+    }, { receiveSelf: true })
+    return
+  }
 
-  const items = e.clipboardData.items
+  const items = Array.from(e.clipboardData.items)
   for (let index in items) {
     const item = items[index]
 
-    if (item.kind === 'string' && item.type.match('^text/plain')) {
-      //alert('paste text')
+    console.log('item', item)
+    if (item.kind === 'string') {
       item.getAsString((clipText) => {
-        send('paste', {
+        send('text', {
           text: clipText.replace(/\r/g, ""),
           time: Date.now()
         }, { receiveSelf: true })
       })
-    } else if (item.kind === 'string' && item.type.match('^text/html')) {
-      // Drag data item is HTML
-      item.getAsString((clipText) => {
-        send('paste', {
-          text: clipText.replace(/\r/g, ""),
-          time: Date.now()
-        }, { receiveSelf: true })
-      })
-      //alert('paste html')
     } else if (item.kind === 'file') {
       const blob = await sendFile(item)
 

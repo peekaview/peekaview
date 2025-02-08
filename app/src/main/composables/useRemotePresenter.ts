@@ -12,7 +12,7 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { SourceManager } from '../sources/SourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemotePasteData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
@@ -29,7 +29,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let toolbarWindow: BrowserWindow | undefined
   let toolbarSize: { width: number, height: number } | {} = {}
   let localClipboardTime = 0
-  let lastClipboardData: File | undefined
+  let lastClipboardData: File = {
+    content: 'data:text/plain;base64,'
+  }
   let lastKey: string
   let active = false
   let remoteControlActive = false
@@ -441,12 +443,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       console.log(`cut to clipboad: ${remoteclipboard}`)
       keyboard.type(Key.Delete)
     }
-
-    const sendobj = {
-      room: data.room,
+    
+    sendRemote('text', {
       text: remoteclipboard,
-    }
-    sendRemote('text', sendobj)
+      time: Date.now()
+    })
 
     // @ts-ignore: nut-js does not support clipboard.copy
     await clipboard.copy(tmpclipboard)
@@ -458,7 +459,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     if (!toggle)
       clipboardWindow?.close()
-    else if (lastClipboardData !== undefined)
+    else
       dataToClipboard(lastClipboardData)
   }
 
@@ -470,10 +471,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     fileChunkRegistry.receiveChunk(data)
   }
 
-  function textToClipboard(data: RemotePasteData) {
-    if (data.text)
-      return
-
+  function textToClipboard(data: RemoteTextData) {
     if (!active || !remoteControlActive) {
       dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
@@ -730,9 +728,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         if (remoteControlActive)
           copyToClipboard(data, false)
         break
-      case 'paste':
+      case 'text':
         //if (remoteControlActive)
-          textToClipboard(data as RemotePasteData)
+          textToClipboard(data as RemoteTextData)
         break
       case 'file':
         if (mouseEnabled)

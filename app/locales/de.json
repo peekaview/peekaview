@@ -111,14 +111,9 @@
     },
     "activeSession": {
       "active": "Bildschirmfreigabe aktiv",
-      "paused": "Bildschirmfreigabe pausiert",
-      "description": "Ihr Bildschirm wird aktuell geteilt.",
-      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:",
-      "stop": "Beenden",
-      "pause": "Pausieren",
-      "resume": "Fortfahren",
-      "shareDifferentScreen": "Anderen Bildschirm teilen",
-      "openPreview": "Vorschau öffnen"
+      "canBeClosed": "Sie können dieses Browserfenster nun schließen",
+      "keepAlive": "Ihre Sitzung bleibt aktiv, solange Sie das Vorschaufenster geöffnet lassen.",
+      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
     },
     "requestAccess": {
       "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
@@ -140,6 +135,9 @@
       "content": "{hwnd} existiert nicht"
     },
     "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "browserPresenter": {
+    "start": "Freigabe starten"
   },
   "loginWindow": {
     "login": "Anmelden",

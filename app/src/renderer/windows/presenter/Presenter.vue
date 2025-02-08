@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
+
+const { t } = useI18n()
 
 const showSources = ref(false)
 const selectedSource = ref<ScreenSource>()
@@ -30,7 +34,7 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, async (shareAudio) => {
+  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {
       watch<[ScreenSource | undefined, boolean]>(() => [selectedSource.value, showSources.value], ([source, show]) => {
