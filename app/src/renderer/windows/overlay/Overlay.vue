@@ -65,13 +65,17 @@ window.electronAPI!.onMouseUp((data) => {
 </template>
 
 <style>
+html {
+  background: transparent !important;
+}
+
 body, #overlay {
   border: 0px;
   margin: 0px;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: transparent;
+  background: transparent !important;
 }
 
 #overlay {
