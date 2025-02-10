@@ -75,8 +75,6 @@ declare const CSP_POLICY: string
 
   let tray: Tray
 
-  let isQuitting = false
-
   let currentViewCode: string | undefined
 
   let streamer: Streamer | undefined
@@ -258,13 +256,6 @@ declare const CSP_POLICY: string
       return { action: 'deny' }
     })
 
-    presenterWindow.on('close', (e) => {
-      if (!isQuitting) {
-        e.preventDefault()
-        presenterWindow!.hide()
-      }
-    })
-
     windowLoad(presenterWindow, 'presenter', { data: code })
 
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
@@ -286,13 +277,6 @@ declare const CSP_POLICY: string
         contextIsolation: true,
         //webSecurity: false, // Make sure this is off only for development, adjust for production.
         //allowRunningInsecureContent: true,
-      }
-    })
-
-    viewerWindow.on('close', (e) => {
-      if (!isQuitting) {
-        e.preventDefault()
-        viewerWindow!.hide()
       }
     })
 
@@ -395,7 +379,6 @@ declare const CSP_POLICY: string
 
   function quit() {
     log.info('Initiating app quit')
-    isQuitting = true
     app.quit()
   }
 
