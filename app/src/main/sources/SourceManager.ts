@@ -25,21 +25,25 @@ export class SourceManager {
   }
 
   getScaleFactor() {
-    return 1
+    return this.getCurrentScreen().scaleFactor
   }
 
   convertDipPosition(mp: Point) {
-    const screeninfo = this.getScreenInfo({ x: mp.x, y: mp.y })
+    const display = screen.getDisplayNearestPoint({ x: mp.x, y: mp.y })
     const scaleFactor = this.getScaleFactor()
 
     return {
-      x: Math.round((mp.x - screeninfo.bounds.x) * scaleFactor + screeninfo.bounds.x),
-      y: Math.round((mp.y - screeninfo.bounds.y) * scaleFactor + screeninfo.bounds.y)
+      x: Math.round((mp.x - display.bounds.x) * scaleFactor + display.bounds.x),
+      y: Math.round((mp.y - display.bounds.y) * scaleFactor + display.bounds.y)
     }
   }
 
-  getScreenInfo(mp: Point) {
-    return screen.getDisplayNearestPoint({ x: mp.x, y: mp.y })
+  getCurrentScreen() {
+    const dimensions = this.getOuterDimensions()
+    return screen.getDisplayNearestPoint({
+      x: (dimensions.left + dimensions.right) / 2,
+      y: (dimensions.top + dimensions.bottom) / 2
+    })
   }
 
   getOuterDimensions(): Dimensions {
@@ -82,7 +86,8 @@ export class SourceManager {
 
   showWindow() {}
 
-  getOverlayRectangle(dimensions: Dimensions) {
+  getOverlayRectangle() {
+    const dimensions = this.getOuterDimensions()
     return {
       x: dimensions.left,
       y: dimensions.top,

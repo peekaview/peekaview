@@ -13,7 +13,7 @@ export function createSourceManager(hwnd: string): SourceManager {
       return new Win32WindowManager(hwnd)
     case 'darwin':
       return new MacWindowManager(hwnd)
-    case 'linux':
+    case 'linux': //TODO: KDE or GNOME?
       return new LinuxWindowManager(hwnd)
   }
 

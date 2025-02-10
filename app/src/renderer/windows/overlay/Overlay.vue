@@ -59,6 +59,7 @@ window.electronAPI!.onMouseUp((data) => {
     v-for="(cursor, cursorId) in overlayCursors.cursors"
     :key="cursorId"
     v-bind="cursor"
+    :scale="scale"
   />
   <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="scale" />
   <canvas ref="canvas" />

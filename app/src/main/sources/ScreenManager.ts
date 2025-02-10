@@ -12,14 +12,6 @@ export class ScreenManager extends SourceManager {
   }
 
   async onInit() {
-    await this.getScreen()
-  }
-
-  isScreen() {
-    return true
-  }
-
-  async getScreen() {
     const items = await getWindowListFormatted({
       types: ['screen'],
       thumbnailSize: { height: 0, width: 0 },
@@ -40,21 +32,21 @@ export class ScreenManager extends SourceManager {
     }
   }
 
-  getScreenInfo() {
+  isScreen() {
+    return true
+  }
+
+  getCurrentScreen() {
     return this.screen
   }
 
-  getScaleFactor() {
-    return this.screen.scaleFactor
-  }
-
   getOuterDimensions() {
-    const screen = this.screen
+    const bounds = this.screen.bounds
     return {
-      left: screen.bounds.x,
-      top: screen.bounds.y,
-      right: screen.bounds.x + screen.bounds.width,
-      bottom: screen.bounds.y + screen.bounds.height,
+      left: bounds.x,
+      top: bounds.y,
+      right: bounds.x + bounds.width,
+      bottom: bounds.y + bounds.height,
     };
   }
 

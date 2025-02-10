@@ -113,35 +113,35 @@ export class Win32WindowManager extends WindowManager {
       throw new Error('Failed to get window rect')
     
     const windowdimensions = this.pointerToRect(rectPointer);
-    const screeninfo = this.getScreenInfo({
+    const display = screen.getDisplayNearestPoint({
       x: (windowdimensions.right + windowdimensions.left) / 2,
       y: (windowdimensions.top + windowdimensions.bottom) / 2
     });
-    const scalefactor = screeninfo.scaleFactor;
+    const scalefactor = display.scaleFactor;
 
     // Remove shadow from dimensions // todo: only if not maximized
     windowdimensions.left = windowdimensions.left + 7;
     windowdimensions.right = windowdimensions.right - 7;
     windowdimensions.bottom = windowdimensions.bottom - 7;
 
-    if (screeninfo.bounds.x >= 0) {
-      windowdimensions.left = Math.round((windowdimensions.left - screeninfo.bounds.x) / scalefactor + screeninfo.bounds.x);
-      windowdimensions.right = Math.round((windowdimensions.right - screeninfo.bounds.x) / scalefactor + screeninfo.bounds.x);
+    if (display.bounds.x >= 0) {
+      windowdimensions.left = Math.round((windowdimensions.left - display.bounds.x) / scalefactor + display.bounds.x);
+      windowdimensions.right = Math.round((windowdimensions.right - display.bounds.x) / scalefactor + display.bounds.x);
     } else {
       windowdimensions.left = Math.round(windowdimensions.left / scalefactor);
       windowdimensions.right = Math.round(windowdimensions.right / scalefactor);
     }
     
-    if (screeninfo.bounds.y >= 0) {
-      windowdimensions.top = Math.round((windowdimensions.top - screeninfo.bounds.y) / scalefactor + screeninfo.bounds.y);
-      windowdimensions.bottom = Math.round((windowdimensions.bottom - screeninfo.bounds.y) / scalefactor + screeninfo.bounds.y);
+    if (display.bounds.y >= 0) {
+      windowdimensions.top = Math.round((windowdimensions.top - display.bounds.y) / scalefactor + display.bounds.y);
+      windowdimensions.bottom = Math.round((windowdimensions.bottom - display.bounds.y) / scalefactor + display.bounds.y);
     } else {
       windowdimensions.top = Math.round(windowdimensions.top / scalefactor);
       windowdimensions.bottom = Math.round(windowdimensions.bottom / scalefactor);
     }
 
-    console.log("current screeninfo")
-    console.log(screeninfo)
+    console.log("current display")
+    console.log(display)
     console.log("current windowdimensions")
     console.log(windowdimensions)
     return windowdimensions;

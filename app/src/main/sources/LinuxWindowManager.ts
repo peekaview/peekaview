@@ -1,15 +1,9 @@
-import { screen } from 'electron'
 import { executeCmd, executeCmdCached, resolvePath } from "../util";
 import { WindowManager } from "./WindowManager";
 
 export class LinuxWindowManager extends WindowManager {
   constructor(hwnd: string) {
     super(hwnd)
-  }
-
-  getScaleFactor() {
-    // is equivalent across all displays on Linux
-    return screen.getPrimaryDisplay().scaleFactor
   }
 
   getOuterDimensions() {

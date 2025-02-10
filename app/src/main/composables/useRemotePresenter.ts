@@ -109,13 +109,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (overlayWindow)
       return
 
-    const dimensions = sourceManager.getOuterDimensions()
-
-    if (dimensions == null)
-      throw new Error('Dimensions not found')
-
-    console.log('Shared dimensions:', dimensions)
-    const { x, y, width, height } = sourceManager.getOverlayRectangle(dimensions)
+    const { x, y, width, height } = sourceManager.getOverlayRectangle()
 
     overlayWindow = new BrowserWindow({
       x,
@@ -139,9 +133,9 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     console.log("Overlay window created:", overlayWindow.getBounds())
 
-    //overlayWindow.webContents.openDevTools()
     overlayWindow.removeMenu()
     overlayWindow.setIgnoreMouseEvents(true)
+    //overlayWindow.webContents.openDevTools()
     
     overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     overlayWindow.setAlwaysOnTop(true, 'screen-saver', 1)
@@ -203,6 +197,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     const width = 240
     const height = 320
 
+    const primary = screen.getPrimaryDisplay()
     clipboardWindow = new BrowserWindow({
       width,
       height,
@@ -216,8 +211,8 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       frame: false,
       alwaysOnTop: true,
       titleBarStyle: 'hidden',
-      x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width + 10),
-      y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux ? 60 : screen.getPrimaryDisplay().workAreaSize.height - height + 30),
+      x: primary.bounds.x + (isMac || isLinux ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width + 10),
+      y: primary.bounds.y + (isMac || isLinux ? 60 : primary.workAreaSize.height - height + 30),
       webPreferences: {
         preload: path.join(__dirname, '../preload/clipboard.js'),
         webSecurity: false,
@@ -251,6 +246,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     const width = 480
     const height = 50
 
+    const primary = screen.getPrimaryDisplay()
     toolbarWindow = new BrowserWindow({
       width,
       height,
@@ -263,7 +259,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       skipTaskbar: true,
       show: false,
       frame: false,
-      x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - width) / 2,
+      x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
       y: 0,
       webPreferences: {
         preload: path.join(__dirname, '../preload/toolbar.js'),
@@ -695,24 +691,19 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function convertObjToAbsolutePosition(data: RemoteMouseData) {
-    const screeninfo = sourceManager.getScreenInfo({
-      x: windowBorders.left + (windowBorders.right - windowBorders.left) / 2,
-      y: windowBorders.top + (windowBorders.bottom - windowBorders.top) / 2,
-    })
+    const display = sourceManager.getCurrentScreen()
 
-    console.log(windowBorders.left + (windowBorders.right - windowBorders.left) / 2)
-    console.log(windowBorders)
-    console.log(screeninfo.bounds.x)
-    console.log(screeninfo.bounds.y)
-    console.log(screeninfo)
+    console.log(display)
+    console.log(display.bounds)
 
     const scalefactor = sourceManager.getScaleFactor()
-    let posx = Math.round((data.x + windowBorders.left - screeninfo.bounds.x) * scalefactor + screeninfo.bounds.x)
-    let posy = Math.round((data.y + windowBorders.top - screeninfo.bounds.y) * scalefactor + screeninfo.bounds.y)
+    let posx = Math.round((data.x + windowBorders.left - display.bounds.x) * scalefactor + display.bounds.x)
+    let posy = Math.round((data.y + windowBorders.top - display.bounds.y) * scalefactor + display.bounds.y)
 
-    if (screeninfo.id == screen.getPrimaryDisplay().id) {
-      posx = posx * screen.getPrimaryDisplay().scaleFactor
-      posy = posy * screen.getPrimaryDisplay().scaleFactor
+    const primary = screen.getPrimaryDisplay()
+    if (display.id == primary.id) {
+      posx = posx * primary.scaleFactor
+      posy = posy * primary.scaleFactor
     }
 
     console.log(`${posx}:${posy}`)
