@@ -111,6 +111,11 @@ async function handleLogout() {
 </template>
 
 <style>
+body {
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
 body:not(.view-active) {
   background: url('../assets/img/background.jpg') no-repeat center center fixed;
   background-size: cover;

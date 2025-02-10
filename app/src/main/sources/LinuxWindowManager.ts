@@ -4,6 +4,7 @@ import { WindowManager } from "./WindowManager";
 export class LinuxWindowManager extends WindowManager {
   constructor(hwnd: string) {
     super(hwnd)
+    this.areCoordinatesScaling = true
   }
 
   getOuterDimensions() {

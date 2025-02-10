@@ -28,6 +28,7 @@ const remoteViewerRef = useTemplateRef('remoteViewer')
 const videoRef = useTemplateRef('video')
 const videoStyle = ref<Record<string, string>>({
   transform: 'scale(1) translate(0px,0px)',
+  'object-fit': process.platform === 'darwin' ? 'fill' : 'cover',
 })
 const containerRef = useTemplateRef('container')
 const containerStyle = ref<Record<string, string>>({
@@ -222,7 +223,6 @@ function stop() {
   height: 100%;
   max-width: 100%;
   max-height: 100%;
-  object-fit: cover;
 }
 
 .remote-container {

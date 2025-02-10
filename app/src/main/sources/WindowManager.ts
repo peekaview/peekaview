@@ -6,6 +6,7 @@ import { SourceManager } from './SourceManager'
 export class WindowManager extends SourceManager {
   protected currentRectangle: Rectangle | undefined;
   protected overlayPadding: { x: number, y: number };
+  protected areCoordinatesScaling: boolean;
   
   constructor(hwnd: string) {
     super(hwnd)
@@ -13,6 +14,7 @@ export class WindowManager extends SourceManager {
       x: 0,
       y: 0,
     }
+    this.areCoordinatesScaling = false
   }
 
   checkIfRectangleUpdated() {
@@ -95,8 +97,8 @@ export class WindowManager extends SourceManager {
     const width = Math.round(rawWidth / scaleFactor) + this.overlayPadding.x
     const height = Math.round(rawHeight / scaleFactor) + this.overlayPadding.y
     
-    const x = Math.round(dimensions.left / scaleFactor)
-    const y = Math.round(dimensions.top / scaleFactor)
+    const x = Math.round(dimensions.left / (this.areCoordinatesScaling ? scaleFactor : 1))
+    const y = Math.round(dimensions.top / (this.areCoordinatesScaling ? scaleFactor : 1))
 
     console.log('Left screen scale factor:', leftScreen.scaleFactor)
     console.log('Right screen scale factor:', rightScreen.scaleFactor)
