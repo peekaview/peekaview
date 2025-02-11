@@ -83,10 +83,14 @@ export interface DialogOptions {
   data?: any
 }
 
+export type Platform = 'mac' | 'win' | 'linux' | 'android' | 'ios' | 'other'
+
 export type UserData = {
   id: string
   name: string
   color: string
+  platform: Platform
+  inApp: boolean
 }
 
 export type PeerData = {

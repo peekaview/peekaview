@@ -23,12 +23,11 @@ const { t } = useI18n()
 
 const inApp = ref(!!window.electronAPI)
 const screenView = ref<ScreenView>()
-const users = computed(() => screenView.value?.users ?? [])
+const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const remoteViewerRef = useTemplateRef('remoteViewer')
 const videoRef = useTemplateRef('video')
 const videoStyle = ref<Record<string, string>>({
   transform: 'scale(1) translate(0px,0px)',
-  'object-fit': process.platform === 'darwin' ? 'fill' : 'cover',
 })
 const containerRef = useTemplateRef('container')
 const containerStyle = ref<Record<string, string>>({
@@ -147,6 +146,9 @@ function rescale(scaleinfo: ScaleInfo) {
 
   containerStyle.value.overflow = 'visible'
   videoStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
+
+  const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
+  videoStyle.value['object-fit'] = participant?.user.platform === 'mac' ? 'fill' : 'cover'
 
   nextTick(() => {  
     const containerRect = containerRef.value!.getBoundingClientRect()

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { AcceptedRequestData } from '../../types'
 import { callApi } from '../../api'
-import { notify } from '../../util'
+import { getPlatform, notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { stringToColor, uuidv4 } from '../../../util'
 
@@ -170,6 +170,8 @@ function handleRequestAccepted(data: AcceptedRequestData) {
       id: uuidv4(),
       name: inputName.value,
       color: stringToColor(inputName.value ?? 'Anonymous'),
+      platform: getPlatform(),
+      inApp: !!window.electronAPI,
     },
     roomName: data.roomId,
     roomId: data.roomId,

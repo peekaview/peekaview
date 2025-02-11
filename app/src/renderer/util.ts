@@ -1,3 +1,4 @@
+import { Platform } from 'src/interface'
 import Swal from 'sweetalert2'
 
 interface DialogOptions {
@@ -98,4 +99,19 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
 
 export function isTouchEnabled() {
   return window.matchMedia("(pointer: coarse)").matches
+}
+
+export function getPlatform(): Platform {
+  const userAgent = navigator.userAgent.toLowerCase()
+  return userAgent.indexOf('mac') >= 0
+    ? 'mac'
+    : userAgent.indexOf('win') >= 0
+      ? 'win'
+      : userAgent.indexOf('linux') >= 0
+        ? 'linux'
+        : userAgent.indexOf('android') >= 0
+          ? 'android'
+          : userAgent.indexOf('ios') >= 0
+            ? 'ios'
+            : 'other'
 }
