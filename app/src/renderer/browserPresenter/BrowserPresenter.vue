@@ -218,6 +218,21 @@ async function showInviteLink() {
 
   window.resizeTo(...windowDefaultSize)
 }
+
+function onStopSharing() {
+  window.electronAPI?.stopSharing()
+  presenter.value?.stopSharing()
+}
+
+function onPauseSharing() {
+  window.electronAPI?.pauseSharing()
+  presenter.value?.pauseSharing()
+}
+
+function onResumeSharing() {
+  window.electronAPI?.resumeSharing()
+  presenter.value?.resumeSharing()
+}
 </script>
 
 <template>
@@ -231,9 +246,9 @@ async function showInviteLink() {
     <PresenterToolbar
       @toggle-mouse="mouseEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
-      @stop-sharing="presenter.stopSharing()"
-      @pause-sharing="presenter.pauseSharing()"
-      @resume-sharing="presenter.resumeSharing()"
+      @stop-sharing="onStopSharing()"
+      @pause-sharing="onPauseSharing()"
+      @resume-sharing="onResumeSharing()"
       @share-different-screen="presenter.presentSource()"
       @show-invite-link="showInviteLink"
     />

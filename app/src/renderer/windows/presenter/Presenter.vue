@@ -25,6 +25,14 @@ window.electronAPI?.onOpenScreenSourceSelection(() => {
   presenter.value?.presentSource()
 })
 
+window.electronAPI?.onPauseSharing(() => {
+  presenter.value?.pauseSharing()
+})
+
+window.electronAPI?.onResumeSharing(() => {
+  presenter.value?.resumeSharing()
+})
+
 async function start() {
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')

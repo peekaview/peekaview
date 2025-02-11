@@ -499,16 +499,12 @@ declare const CSP_POLICY: string
 
   ipcMain.handle('pause-sharing', async (_event) => {
     streamer?.pauseStreaming()
+    presenterWindow?.webContents.send('on-pause-sharing')
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
-    customDialog.playSoundOnOpen('ping')
-    customDialog.openDialog('dialog', {
-      title: 'Sharing resumed',
-      detail: "Sharing resumed, other users can now see your shared screen or application",
-      timeout: 3000
-    })
     streamer?.resumeStreamingIfPaused()
+    presenterWindow?.webContents.send('on-resume-sharing')
   })
 
   ipcMain.handle('update-users', async (_event, newUsers: string) => {

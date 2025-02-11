@@ -79,6 +79,14 @@
       "fileUpload": {
         "title": "Datei wird hochgeladen...",
         "description": "Es kann etwas dauern, bis alle Teilnehmer die Datei erhalten haben."
+      },
+      "paused": {
+        "title": "Bildschirmfreigabe pausiert",
+        "description": "Die Bildschirmfreigabe wurde vom Host pausiert. Bitte warten Sie, bis der Host die Freigabe fortsetzt."
+      },
+      "resumed": {
+        "title": "Bildschirmfreigabe fortgesetzt",
+        "description": "Die Bildschirmfreigabe wird vom Host nun wieder fortgesetzt."
       }
     },
     "stop": "Beenden",

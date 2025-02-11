@@ -295,17 +295,17 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
   }
   
   function pauseSharing() {
-    window.electronAPI?.pauseSharing()
     if (stream.value)
       stream.value.getTracks()[0].enabled = false
     sessionState.value = 'paused'
+    screenPresent.value?.sendRemote('pause', { enabled: true })
   }
   
   function resumeSharing() {
-    window.electronAPI?.resumeSharing()
     if (stream.value)
       stream.value.getTracks()[0].enabled = true
     sessionState.value = 'active'
+    screenPresent.value?.sendRemote('pause', { enabled: false })
   }
   
   function stopSharing() {
