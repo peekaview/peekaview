@@ -17,7 +17,7 @@ const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 1000
 
 export type Streamer = ReturnType<typeof useStreamer>
 
-export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, users: UserData[] = []) {
+export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, users: UserData[] = [], onHidden: (hidden: boolean) => void) {
   // Dependencies
   let sourceManager: SourceManager
   const remotePresenter = useRemotePresenter(sendRemote, users)
@@ -103,8 +103,12 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
   }
 
   function pauseStreaming(fromHidden = false) {
-    if (streamingState === 'paused' || (streamingState === 'hidden' && !fromHidden))
+    if (streamingState === 'paused' || (streamingState === 'hidden' && fromHidden))
       return
+
+    console.log('pauseStreaming', streamingState, fromHidden, streamingState === 'hidden' && !fromHidden)
+    if (fromHidden)
+      onHidden(true)
 
     streamingState = fromHidden ? 'hidden' : 'paused'
 
@@ -126,6 +130,9 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
   async function resumeStreamingIfPaused(fromHidden = false) {
     if (streamingState !== 'hidden' && (streamingState !== 'paused' || fromHidden))
       return
+
+    if (fromHidden)
+      onHidden(false)
 
     if (pausedState !== undefined) {
       remotePresenter.mouseEnabled = pausedState.mouseEnabled

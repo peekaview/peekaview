@@ -87,6 +87,14 @@
       "resumed": {
         "title": "Bildschirmfreigabe fortgesetzt",
         "description": "Die Bildschirmfreigabe wird vom Host nun wieder fortgesetzt."
+      },
+      "hidden": {
+        "title": "Keine Interaktion möglich",
+        "description": "Das freigegebene Fenster wurde entweder minimiert oder ist hinter anderen Fenstern versteckt. Bitte warten Sie, bis der Host es wieder sichtbar macht."
+      },
+      "visible": {
+        "title": "Bildschirmfreigabe fortgesetzt",
+        "description": "Das freigegebene Fenster ist nun wieder sichtbar."
       }
     },
     "stop": "Beenden",

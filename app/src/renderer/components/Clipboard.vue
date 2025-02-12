@@ -174,17 +174,18 @@ function close() {
 <template>
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar :draggable="draggable">
-      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" @click="collapsed = !collapsed">
+      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="flex:0 0 auto" @click="collapsed = !collapsed">
         <ChevronDownSvg v-if="collapsed" />
         <ChevronUpSvg v-else />
       </div>
+      <div style="flex:1 1 auto"></div>
       <div class="btn btn-sm btn-secondary" :title="$t('general.close')" style="flex:0 0 auto" @click="close">
         <CloseSvg />
       </div>
     </Toolbar>
     <template v-if="!collapsed">
       <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
-        <textarea>{{ clipboardFile.content }}</textarea>
+        <textarea rows="8">{{ clipboardFile.content }}</textarea>
       </div>
       <div v-else class="clipboard-content">
         <img
@@ -249,7 +250,7 @@ function close() {
 .clipboard textarea {
   width: 100%;
   height: 100%;
-  font-size: 10px;
+  font-size: 12px;
   font-family: sans-serif;
   background: black;
   color: white;

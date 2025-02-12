@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resumeSharing: () => ipcRenderer.invoke('resume-sharing'),
   onPauseSharing: (callback: () => void) => ipcRenderer.on('on-pause-sharing', () => callback()),
   onResumeSharing: (callback: () => void) => ipcRenderer.on('on-resume-sharing', () => callback()),
+  onHidden: (callback: (hidden: boolean) => void) => ipcRenderer.on('on-hidden', (_event, hidden: boolean) => callback(hidden)),
   updateUsers: (users: string) => ipcRenderer.invoke('update-users', users),
   onOpenScreenSourceSelection: (callback: () => void) => ipcRenderer.on('open-screen-source-selection', () => callback()),
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),

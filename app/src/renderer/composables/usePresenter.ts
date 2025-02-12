@@ -130,6 +130,12 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
     else
       denyRequest()
   })
+
+  window.electronAPI?.onHidden((hidden) => {
+    if (screenPresent.value) {
+      screenPresent.value.sendRemote('hide', { hidden })
+    }
+  })
   
   window.electronAPI?.onRemote((event, data) => {
     if (screenPresent.value) {

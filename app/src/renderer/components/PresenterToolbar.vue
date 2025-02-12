@@ -3,8 +3,8 @@ import { ref, nextTick, useTemplateRef, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
-import CloseSvg from '../../assets/icons/close.svg'
-import LinkSvg from '../../assets/icons/link.svg'
+import LogoutSvg from '../../assets/icons/logout.svg'
+import AccountPlusOutlineSvg from '../../assets/icons/account-plus-outline.svg'
 import MonitorSvg from '../../assets/icons/monitor.svg'
 import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
@@ -68,21 +68,21 @@ function onCollapse() {
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
     </label>
-    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" style="width: 30px" @click="$emit('toggle-clipboard')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.shareDifferentScreen')" style="width: 30px" @click="$emit('share-different-screen')">
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.shareDifferentScreen')" @click="$emit('share-different-screen')">
       <MonitorSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.showInviteLink')" style="width: 30px" @click="$emit('show-invite-link')">
-      <LinkSvg />
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.showInviteLink')" @click="$emit('show-invite-link')">
+      <AccountPlusOutlineSvg />
     </div>
-    <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${isPaused ? 'resume' : 'pause'}`)" style="width: 30px" @click="isPaused = !isPaused">
+    <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${isPaused ? 'resume' : 'pause'}`)" @click="isPaused = !isPaused">
       <PlaySvg v-if="isPaused" />
       <PauseSvg v-else />
     </div>
-    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.stop')" style="width: 30px" @click="$emit('stop-sharing')">
-      <CloseSvg />
+    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.stop')" @click="$emit('stop-sharing')">
+      <LogoutSvg />
     </div>
   </Toolbar>
 </template>

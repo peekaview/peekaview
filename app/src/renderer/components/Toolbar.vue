@@ -42,7 +42,7 @@ setInterval(() => {
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>
-    <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="width: 30px" @click="collapsed = !collapsed">
+    <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" @click="collapsed = !collapsed">
       <ChevronRightSvg v-if="collapsed" />
       <ChevronLeftSvg v-else />
     </div>
@@ -77,16 +77,21 @@ setInterval(() => {
       cursor: pointer;
       text-align: center;
       padding: 5px;
-      border: 1px solid #404040;
+      border: 1px solid #464646;
       color: #aaa;
       font-family: Verdana;
       font-size: 10px;
-      background: #2a2a2a;
+      background: #343434;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2rem;
+      --bs-btn-disabled-opacity: 0.5;
   }
 
   .toolbar .button:hover, .toolbar .btn.btn-secondary:hover {
-      background: #404040 !important;
-      border-color: #505050;
+      background: #464646 !important;
+      border-color: #565656;
       color: #ddd;
   }
 
