@@ -426,6 +426,6 @@ defineExpose({
 .stream-overlay .cover-bounds {
   position: absolute;
   z-index: 100;
-  background: repeating-linear-gradient(-45deg, #222, #333 15px, #aa0 15px, #cc0 20px);
+  background: repeating-linear-gradient(-45deg, #222, #333 15px, #884 15px, #aa4 20px);
 }
 </style>

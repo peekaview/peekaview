@@ -6,6 +6,7 @@ import { SourceManager } from './SourceManager'
 export class WindowManager extends SourceManager {
   protected currentRectangle: Rectangle | undefined;
   protected overlayPadding: { x: number, y: number };
+  protected areCoordinatesScaling: boolean;
   
   constructor(hwnd: string) {
     super(hwnd)
@@ -13,6 +14,7 @@ export class WindowManager extends SourceManager {
       x: 0,
       y: 0,
     }
+    this.areCoordinatesScaling = false
   }
 
   checkIfRectangleUpdated() {
@@ -46,7 +48,8 @@ export class WindowManager extends SourceManager {
       || this.currentRectangle.height != lastRectangle.height
   }
 
-  getOverlayRectangle(dimensions: Dimensions) {
+  getOverlayRectangle() {
+    const dimensions = this.getOuterDimensions()
     // Get both screens that the window might span
     const leftScreen = screen.getDisplayNearestPoint({
       x: dimensions.left,
@@ -64,7 +67,7 @@ export class WindowManager extends SourceManager {
 
     let scaleFactor
 
-    if (leftScreen.id === rightScreen.id) {
+    if (leftScreen.id === rightScreen.id || leftScreen.scaleFactor === rightScreen.scaleFactor) {
       // Window is entirely on one screen
       scaleFactor = leftScreen.scaleFactor
     } else {
@@ -94,12 +97,14 @@ export class WindowManager extends SourceManager {
     const width = Math.round(rawWidth / scaleFactor) + this.overlayPadding.x
     const height = Math.round(rawHeight / scaleFactor) + this.overlayPadding.y
     
-    const x = dimensions.left
-    const y = dimensions.top
+    const x = Math.round(dimensions.left / (this.areCoordinatesScaling ? scaleFactor : 1))
+    const y = Math.round(dimensions.top / (this.areCoordinatesScaling ? scaleFactor : 1))
 
     console.log('Left screen scale factor:', leftScreen.scaleFactor)
     console.log('Right screen scale factor:', rightScreen.scaleFactor)
     console.log('Chosen scale factor:', scaleFactor)
+
+    console.log('Overlay rectangle:', { x, y, width, height })
     return { x, y, width, height }
   }
 }

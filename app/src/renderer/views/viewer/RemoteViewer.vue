@@ -142,6 +142,12 @@ onReceive('remote-control', (data) => {
   remoteControlActive.value = data.enabled
 })
 
+onReceive('pause', (data) => {
+  activeMessage.value = data.enabled ? 'paused' : 'resumed'
+  setTimeout(() => hideMessage('paused'), 5000)
+  setTimeout(() => hideMessage('resumed'), 3000)
+})
+
 onReceive('reset', (data) => {
   overlayRef.value?.reset(data)
 })
@@ -384,20 +390,32 @@ defineExpose({
           {{ $t('viewer.messages.mouseHelp.copy') }}
         </template>
       </template>
+      <template v-else-if="activeMessage === 'paused'">>
+        <b>{{ $t('viewer.messages.paused.title') }}</b>
+        <br>
+        <br>
+        {{ $t('viewer.messages.paused.description') }}
+      </template>
+      <template v-else-if="activeMessage === 'resumed'">>
+        <b>{{ $t('viewer.messages.resumed.title') }}</b>
+        <br>
+        <br>
+        {{ $t('viewer.messages.resumed.description') }}
+      </template>
       <template v-else-if="activeMessage === 'fileDrop'">
         <b>{{ $t('viewer.messages.fileDrop.title') }}</b>
         <br>
         <br>
         {{ $t('viewer.messages.fileDrop.description') }}
       </template>
-      <template v-if="activeMessage === 'fileUpload'">
+      <template v-else-if="activeMessage === 'fileUpload'">
         <b>{{ $t('viewer.messages.fileUpload.title') }}</b>
         <br>
         <br>
         {{ $t('viewer.messages.fileUpload.description') }}
         <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
-      <template v-if="activeMessage === 'remote' && remoteMessage">
+      <template v-else-if="activeMessage === 'remote' && remoteMessage">
         <b>{{ remoteMessage }}</b>
       </template>
     </div>

@@ -84,7 +84,6 @@ export class MacWindowManager extends WindowManager {
     try {
       // Read from the temp file instead of executing the Swift script
       const result = require('fs').readFileSync('/tmp/.peekaview_windowoverlap', 'utf8').trim();
-      console.log("overlapstatus: ", result)
       return result === '1'
     } catch (error) {
       console.warn('Error reading window overlap status from temp file:', error);

@@ -49,9 +49,14 @@ function showInviteLink() {
 </template>
 
 <style>
+  html {
+    background: transparent !important;
+  }
+
   body {
     padding: 5px;
     overflow: hidden;
+    background: transparent !important;
   }
 
   #toolbar {

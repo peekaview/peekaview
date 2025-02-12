@@ -5,7 +5,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { notify, prompt } from '../util'
+import { getPlatform, notify, prompt } from '../util'
 import { RemoteData, RemoteEvent, ScreenSource } from '../../interface'
 import { stringToColor, uuidv4 } from '../../util'
 
@@ -27,7 +27,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
-  const viewers = computed(() => screenPresent.value?.users ?? [])
+  const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(email) }`))
   const latestRequest = ref<Request>()
 
@@ -158,6 +158,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
           id: uuidv4(),
           name: unref(email),
           color: stringToColor(unref(email)),
+          platform: getPlatform(),
+          inApp,
         },
         roomName: data.roomId,
         roomId: data.roomId,
@@ -293,17 +295,17 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
   }
   
   function pauseSharing() {
-    window.electronAPI?.pauseSharing()
     if (stream.value)
       stream.value.getTracks()[0].enabled = false
     sessionState.value = 'paused'
+    screenPresent.value?.sendRemote('pause', { enabled: true })
   }
   
   function resumeSharing() {
-    window.electronAPI?.resumeSharing()
     if (stream.value)
       stream.value.getTracks()[0].enabled = true
     sessionState.value = 'active'
+    screenPresent.value?.sendRemote('pause', { enabled: false })
   }
   
   function stopSharing() {

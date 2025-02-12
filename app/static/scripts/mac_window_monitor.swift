@@ -1,7 +1,7 @@
 import Cocoa
 import Foundation
 
-let DEBUG = true
+let DEBUG = false
 
 // Sleep for 3 seconds before starting monitoring
 //sleep(3)

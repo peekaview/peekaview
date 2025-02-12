@@ -79,6 +79,14 @@
       "fileUpload": {
         "title": "File is being uploaded...",
         "description": "It may take a while for all participants to receive the file."
+      },
+      "paused": {
+        "title": "Screen sharing paused",
+        "description": "Screen sharing has been paused by the host. Please wait until the host resumes the sharing."
+      },
+      "resumed": {
+        "title": "Screen sharing resumed",
+        "description": "Screen sharing is resumed by the host."
       }
     },
     "stop": "Stop",

@@ -48,6 +48,8 @@ export interface IElectronAPI {
   stopSharing: () => Promise<void>,
   pauseSharing: () => Promise<void>,
   resumeSharing: () => Promise<void>,
+  onPauseSharing: (callback: () => void) => void,
+  onResumeSharing: (callback: () => void) => void,
   showSharingActive: () => Promise<void>,
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
   closeWindow: () => Promise<void>,
@@ -83,10 +85,14 @@ export interface DialogOptions {
   data?: any
 }
 
+export type Platform = 'mac' | 'win' | 'linux' | 'android' | 'ios' | 'other'
+
 export type UserData = {
   id: string
   name: string
   color: string
+  platform: Platform
+  inApp: boolean
 }
 
 export type PeerData = {
@@ -111,7 +117,7 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
@@ -123,6 +129,7 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
   : T extends "toggle-freeze" ? { enabled: boolean }
+  : T extends "pause" ? { enabled: boolean }
   : T extends "type" ? { key: string }
   : T extends "copy" ? {}
   : T extends "cut" ? {}
