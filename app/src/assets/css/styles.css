@@ -58,6 +58,11 @@ body {
   text-align: left;
 }
 
+.form-main-label {
+  text-shadow: #fff 1px 0 10px;
+  font-size: 1.125rem;
+}
+
 .form-label {
   font-weight: 500;
   color: #374151;

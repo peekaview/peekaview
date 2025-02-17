@@ -29,3 +29,8 @@ export type VideoTransform = {
   fullwidth: number
   fullheight: number
 }
+
+export type ViewerContact = {
+  email: string
+  name: string
+}

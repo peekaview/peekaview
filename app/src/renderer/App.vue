@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
 import Presenter from './views/Presenter.vue'
-
+import ViewerForm from './views/form/ViewerForm.vue'
+import PresenterForm from './views/form/PresenterForm.vue'
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
 
@@ -14,16 +15,20 @@ import { prompt } from './util'
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
+import { ViewerContact } from './types'
 
 const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, name, target, viewEmail } = useParamsData()
 
-const viewActive = ref(false)
+const presenterActive = ref(false)
+const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
+const lastContacts = ref<ViewerContact[]>([])
+const activeViewerContact = ref<ViewerContact | undefined>()
 
-watch(viewActive, (viewActive) => {
-  if (viewActive)
+watch(activeViewerContact, (contact) => {
+  if (contact)
     document.body.classList.add('view-active')
   else
     document.body.classList.remove('view-active')
@@ -52,7 +57,7 @@ async function handleLogout() {
 
 <template>
   <!-- Header -->
-  <header v-if="!viewActive" class="main-header">
+  <header v-if="!activeViewerContact" class="main-header">
     <div class="header-content">
       <div class="logo-container">
         <a href="/">
@@ -72,29 +77,87 @@ async function handleLogout() {
     </div>
   </header>
 
-    <!-- Main Content -->
+  <!-- Main Content -->
   <div class="main-container">
-    <Login
-      v-if="action === Action.Login"
-      :target="target"
-    />
-    <Presenter
-      v-else-if="action === Action.Share && email && token"
-      :email="email"
-      :token="token"
-    />
     <Viewer
-      v-else
-      :email="viewEmail"
-      :name="name"
-      @toggle-full-video="viewActive = $event"
+      v-if="activeViewerContact"
+      :contact="activeViewerContact"
+      @stop="activeViewerContact = undefined"
     />
+    <div v-else class="content-wrapper">
+      <div class="section-content">
+        <div class="text-center">
+          <div class="panel">
+            <Login
+              v-if="action === Action.Login"
+              :target="target"
+            />
+            <Presenter
+              v-else-if="presenterActive && email && token"
+              :email="email"
+              :token="token"
+              @stop="presenterActive = false"
+            />
+            <template v-else>
+              <div class="form-content">
+                <div class="d-flex gap-4 align-items-center">
+                  <div>
+                    <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
+                  </div>
+                  <div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
+                        {{ $t('app.form.likeToView') }}
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
+                        {{ $t('app.form.likeToShare') }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <hr>
+
+              <template v-if="plannedAction === 'view'">
+                <ViewerForm
+                  :model-value="activeViewerContact ?? { email: viewEmail ?? '', name: name ?? '' }"
+                  @update:model-value="activeViewerContact = $event"
+                />
+
+                <template v-if="lastContacts.length > 0">
+                  <hr>
+                  <h4>{{ $t('app.form.lastContacts') }}</h4>
+                  <div v-for="contact in lastContacts" :key="contact.email">
+                    <p>{{ contact.name }} ({{ contact.email }})</p>
+                  </div>
+                </template>
+              </template>
+
+              <template v-else-if="plannedAction === 'share'">
+                <PresenterForm
+                  v-if="email && token"
+                  :email="email"
+                  :token="token"
+                  @present="presenterActive = true"
+                />
+                <Login v-else target="web" />
+              </template>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
   <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
 
-  <footer v-if="!viewActive" class="main-footer">
+  <footer v-if="!activeViewerContact" class="main-footer">
     <div class="footer-content">
       <p>
         &copy; 2025 PeekaView | 
@@ -172,6 +235,10 @@ body.view-active {
 
 .header-actions {
   min-width: 120px;
+}
+
+.panel {
+  color: #64748b;
 }
 
 /* Footer Styles */

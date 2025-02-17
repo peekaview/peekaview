@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData } from '../../types'
+import type { AcceptedRequestData, ViewerContact } from '../../types'
 import { callApi } from '../../api'
 import { getPlatform, notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
@@ -38,18 +38,14 @@ type RequestParams = {
 }
 
 const props = defineProps<{
-  email?: string
-  name?: string
+  contact: ViewerContact
 }>()
 
-const emit =defineEmits<{
+const emit = defineEmits<{
   (e: 'accept', data: ScreenShareData): void
 }>()
 
 const { t } = useI18n()
-
-const inputEmail = ref<string>()
-const inputName = ref<string>(props.name ?? '')
 
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
@@ -61,7 +57,7 @@ watch(requestStatus, (status) => {
 
   notify({
     type: 'info',
-    text: t('viewer.requestDenied', { email: props.email }),
+    text: t('viewer.requestDenied', { email: props.contact.email }),
     confirmButtonText: t('general.ok'),
   })
 
@@ -69,6 +65,30 @@ watch(requestStatus, (status) => {
 })
 
 const waitingStatus = ref<WaitingStatus | undefined>()
+
+onMounted(() => {
+  if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
+    notify({
+      type: 'error',
+      title: t('viewer.sessionAlreadyActiveTitle'),
+      text: t('viewer.sessionAlreadyActive'),
+      confirmButtonText: t('general.ok'),
+    })
+    return
+  }
+
+  localStorage.setItem('name', props.contact.name)
+
+  waitingStatus.value = 'establishing'
+  requestStatus.value = undefined
+
+  const params = {
+    email: props.contact.email,
+    name: props.contact.name,
+    request_id: getRequestId(),
+  }
+  requestScreen(params, true)
+})
 
 function getRequestId(length = 8) {
   const requestId = localStorage.getItem('requestId')
@@ -82,35 +102,6 @@ function getRequestId(length = 8) {
   }
   localStorage.setItem('requestId', result)
   return result
-}
-    
-async function handleSubmit(e: Event) {
-  e.preventDefault()
-
-  if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
-    notify({
-      type: 'error',
-      title: t('viewer.sessionAlreadyActiveTitle'),
-      text: t('viewer.sessionAlreadyActive'),
-      confirmButtonText: t('general.ok'),
-    })
-    return
-  }
-
-  if ((!props.email && !inputEmail.value) || !inputName.value)
-    return
-
-  localStorage.setItem('name', inputName.value)
-
-  waitingStatus.value = 'establishing'
-  requestStatus.value = undefined
-
-  const params = {
-    email: props.email ?? inputEmail.value!,
-    name: inputName.value,
-    request_id: getRequestId(),
-  }
-  requestScreen(params, true)
 }
 
 async function requestScreen(params: RequestParams, initial = false) {
@@ -168,8 +159,8 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   emit('accept', {
     user: {
       id: uuidv4(),
-      name: inputName.value,
-      color: stringToColor(inputName.value ?? 'Anonymous'),
+      name: props.contact.name,
+      color: stringToColor(props.contact.name ?? 'Anonymous'),
       platform: getPlatform(),
       inApp: !!window.electronAPI,
     },
@@ -218,50 +209,21 @@ function formatLastSeen(timestamp: number | undefined) {
 </script>
 
 <template>
-  <div class="content-wrapper">
-    <div v-if="!waitingStatus" class="section-content">
-      <h3 class="text-center mb-4">{{ $t('viewer.requestScreenShare') }}</h3>
-
-      <h5 v-if="email" class="text-center mb-4">{{ $t('viewer.requestFrom', { email }) }}</h5>
-
-      <form class="panel" @submit="handleSubmit">
-        <div class="form-content">
-          <div v-if="!email" class="mb-4">
-            <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>
-            <input type="email" class="form-control form-control-lg" name="email"
-              v-model="inputEmail"
-              placeholder="example@email.com" required>
-          </div>
-          <div class="mb-4">
-            <label for="name" class="form-label">{{ $t('labels.yourName') }}</label>
-            <input type="text" class="form-control form-control-lg" name="name"
-              v-model="inputName"
-              :placeholder="$t('labels.enterYourName')" required>
-          </div>
-          <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
-        </div>
-      </form>
+  <div class="form-content">
+    <div class="text-center">
+      <div class="waiting-spinner"></div>
+      <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email: props.contact.email }) }}</h4>
+      <p v-if="requestUserStatus" class="mb-3">
+        <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+        <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
+        <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
+        <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
+      </p>
     </div>
-    <div v-else class="section-content">
-      <div class="panel">
-        <div class="form-content">
-          <div class="text-center">
-            <div class="waiting-spinner"></div>
-            <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email }) }}</h4>
-            <p v-if="requestUserStatus" class="mb-3">
-              <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-              <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
-              <span v-else-if="requestUserStatus === 'offline'" class="badge bg-secondary">{{ $t('viewer.userStatus.offline') }}</span>
-              <span v-else class="badge bg-warning">{{ $t('viewer.userStatus.inactive') }}</span>
-            </p>
-          </div>
-          <div class="btn-row">
-            <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
-              {{ $t('general.cancel') }}
-            </button>
-          </div>
-        </div>
-      </div>
+    <div class="btn-row">
+      <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+        {{ $t('general.cancel') }}
+      </button>
     </div>
   </div>
 </template>

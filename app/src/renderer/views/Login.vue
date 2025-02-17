@@ -35,6 +35,10 @@ onMounted(() => {
 function handleOpenApp() {
   window.location.href = `peekaview://login/?code=${code.value}`
 }
+
+function toScreenShare() {
+  window.location.search = '?share'
+}
     
 async function handleRegister(e: Event) {
   e.preventDefault();
@@ -75,39 +79,46 @@ function handleError() {
 </script>
 
 <template>
-  <div class="content-wrapper">
-    <div class="section-content">
-      <div class="text-center">
-        <form v-if="!registered" class="panel" @submit="handleRegister">
-          <div class="form-content">
-            <div class="mb-4">
-              <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
-              <input type="email" class="form-control form-control-lg" id="email" name="email"
-                v-model="email"
-                placeholder="example@email.com" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
-          </div>
-        </form>
-        <div v-else class="panel">
-          <div class="form-content">
-            <h2 class="mb-3">{{ $t('login.successful') }}</h2>
-            <p class="text-secondary mb-4">{{ $t('login.successMessage') }}</p>
-            
-            <button class="btn btn-primary btn-lg w-100 mb-4" @click="handleOpenApp">
-              {{ $t('login.openApp') }}
-            </button>
-
-            <div class="text-secondary">
-              <small>{{ $t('login.orEnterCode') }}</small>
-              <div class="bg-light p-3 rounded mt-2 mb-3">
-                <code>{{ code }}</code>
-              </div>
-              <small>{{ $t('login.contactSupport') }}</small>
-            </div>
-          </div>
-        </div>
+  <form v-if="!registered" @submit="handleRegister">
+    <div class="form-content">
+      <div class="mb-4">
+        <p>{{ $t('login.notLoggedIn') }}</p>
       </div>
+      <div class="mb-4">
+        <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
+        <input type="email" class="form-control form-control-lg" id="email" name="email"
+          v-model="email"
+          placeholder="example@email.com" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
+    </div>
+  </form>
+  <div v-else-if="target === 'app'">
+    <div class="form-content">
+      <h2 class="mb-3">{{ $t('login.successful') }}</h2>
+      <p class="text-secondary mb-4">{{ $t('login.successMessageApp') }}</p>
+      
+      <button class="btn btn-primary btn-lg w-100 mb-4" @click="handleOpenApp">
+        {{ $t('login.openApp') }}
+      </button>
+
+      <div class="text-secondary">
+        <small>{{ $t('login.orEnterCode') }}</small>
+        <div class="bg-light p-3 rounded mt-2 mb-3">
+          <code>{{ code }}</code>
+        </div>
+        <small>{{ $t('login.contactSupport') }}</small>
+      </div>
+    </div>
+  </div>
+  <div v-else>
+    <div class="form-content">
+      <h2 class="mb-3">{{ $t('login.successful') }}</h2>
+      <p class="text-secondary mb-4">{{ $t('login.successMessage') }}</p>
+      
+      <button class="btn btn-primary btn-lg w-100 mb-4" @click="toScreenShare">
+        {{ $t('login.toShare') }}
+      </button>
     </div>
   </div>
 </template>

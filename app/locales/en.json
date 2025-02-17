@@ -18,17 +18,26 @@
     "logout": "Logout",
     "confirmLogout": "Are you sure you want to logout?",
     "imprint": "Imprint",
-    "gdpr": "GDPR"
+    "gdpr": "GDPR",
+    "form": {
+      "iWouldLikeTo": "I would like to",
+      "likeToView": "view a shared screen",
+      "likeToShare": "share my own screen",
+      "lastContacts": "Last contacts"
+    }
   },
   "login": {
     "register": "Register",
+    "notLoggedIn": "You are not logged in. Please enter your email address to register / login.",
     "login": "Login to app",
     "loggingIn": "Logging in to the app...",
     "code": "Your login code",
     "justRegistered": "You have successfully registered. Please check your mails for the login link.",
     "successful": "Login Successful",
-    "successMessage": "Your login was successful. You can now proceed to the app.",
+    "successMessage": "Your login was successful",
+    "successMessageApp": "Your login was successful. You can now proceed to the app.",
     "openApp": "Open App",
+    "toShare": "Go to screen sharing",
     "orEnterCode": "Or enter this code in the app to proceed:",
     "contactSupport": "If you're having trouble, please contact support.",
     "connectionError": {

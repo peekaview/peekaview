@@ -16,7 +16,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'stop'): void
-  (e: 'toggle-full-video', active: boolean): void
 }>()
 
 const { t } = useI18n()
@@ -52,7 +51,6 @@ watch(() => props.data, async (screenShareData) => {
     return
   }
 
-  emit('toggle-full-video', true)
   screenView.value = await useScreenView(screenShareData, {
     videoElement: videoRef.value ?? undefined,
     onRemote: (event, data) => {
@@ -181,7 +179,6 @@ function stop() {
   screenView.value = undefined
 
   emit('stop')
-  emit('toggle-full-video', false)
 }
 </script>
 

@@ -11,5 +11,6 @@ import '../assets/css/styles.css'
 
 const app = createApp(App)
 
+
 app.use(i18n)
 app.mount('#app')
