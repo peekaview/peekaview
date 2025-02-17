@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { ViewerContact } from '../../types'
+import { ViewerData } from '../../types'
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', { email, name }: ViewerContact): void
+  (e: 'submit'): void
+  (e: 'update:modelValue', { email, name }: ViewerData): void
 }>()
 
-const model = defineModel<ViewerContact>({ default: { email: '', name: '' } })
-
-function submit() {
-  emit('update:modelValue', model.value)
-}
+const model = defineModel<ViewerData>({ default: { email: '', name: '' } })
 </script>
 
 <template>
-  <form @submit.prevent="submit">
+  <form @submit.prevent="$emit('submit')">
     <div class="form-content">
       <div class="mb-4">
         <label for="email" class="form-label">{{ $t('labels.connectToEmail') }}</label>

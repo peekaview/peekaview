@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData, ViewerContact } from '../../types'
+import type { AcceptedRequestData, ViewerData } from '../../types'
 import { callApi } from '../../api'
 import { getPlatform, notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
@@ -38,11 +38,12 @@ type RequestParams = {
 }
 
 const props = defineProps<{
-  contact: ViewerContact
+  contact: ViewerData
 }>()
 
 const emit = defineEmits<{
   (e: 'accept', data: ScreenShareData): void
+  (e: 'stop'): void
 }>()
 
 const { t } = useI18n()
@@ -64,7 +65,7 @@ watch(requestStatus, (status) => {
   requestStatus.value = undefined
 })
 
-const waitingStatus = ref<WaitingStatus | undefined>()
+const waitingStatus = ref<WaitingStatus>('establishing')
 
 onMounted(() => {
   if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
@@ -79,7 +80,6 @@ onMounted(() => {
 
   localStorage.setItem('name', props.contact.name)
 
-  waitingStatus.value = 'establishing'
   requestStatus.value = undefined
 
   const params = {
@@ -221,7 +221,7 @@ function formatLastSeen(timestamp: number | undefined) {
       </p>
     </div>
     <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+      <button type="button" class="btn btn-secondary" @click="$emit('stop')">
         {{ $t('general.cancel') }}
       </button>
     </div>

@@ -5,10 +5,10 @@ import RemoteControl from "./RemoteControl.vue"
 import RequestAccess from '../form/RequestAccess.vue'
 
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
-import { ViewerContact } from '../../types'
+import { ViewerData } from '../../types'
 
 defineProps<{
-  contact: ViewerContact
+  contact: ViewerData
 }>()
 
 const emit = defineEmits<{
@@ -56,6 +56,7 @@ function stop() {
           <RequestAccess
             :contact="contact"
             @accept="screenShareData = $event"
+            @stop="stop"
           />
         </div>
       </div>

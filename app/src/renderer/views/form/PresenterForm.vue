@@ -71,6 +71,7 @@ function shareViaApp() {
   border-radius: 12px;
   padding: 1.5rem;
   border: 1px solid rgba(0,0,0,0.08);
+  text-align: center;
 }
 
 .share-option.primary {

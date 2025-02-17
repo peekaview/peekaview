@@ -15,7 +15,7 @@ import { prompt } from './util'
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
-import { ViewerContact } from './types'
+import { ViewerData } from './types'
 
 const { t } = useI18n()
 
@@ -24,14 +24,27 @@ const { action, token, email, name, target, viewEmail } = useParamsData()
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
-const lastContacts = ref<ViewerContact[]>([])
-const activeViewerContact = ref<ViewerContact | undefined>()
+const lastContacts = ref<string[]>(JSON.parse(localStorage.getItem('lastContacts') ?? '[]'))
+const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
+const activeViewerData = ref<ViewerData | undefined>()
 
-watch(activeViewerContact, (contact) => {
-  if (contact)
-    document.body.classList.add('view-active')
-  else
+watch(activeViewerData, (data) => {
+  if (!data) {
     document.body.classList.remove('view-active')
+    return
+  }
+  
+  document.body.classList.add('view-active')
+  const index = lastContacts.value.findIndex(email => email === data.email)
+  let newContacts = lastContacts.value
+  if (index >= 0)
+    newContacts.splice(index, 1)
+  lastContacts.value = [...newContacts, data.email]
+})
+
+watch(lastContacts, (value) => {
+  localStorage.setItem('lastContacts', JSON.stringify(value))
+  console.log('lastContacts', lastContacts.value)
 })
 
 const locale = computed({
@@ -57,7 +70,7 @@ async function handleLogout() {
 
 <template>
   <!-- Header -->
-  <header v-if="!activeViewerContact" class="main-header">
+  <header v-if="!activeViewerData" class="main-header">
     <div class="header-content">
       <div class="logo-container">
         <a href="/">
@@ -80,75 +93,73 @@ async function handleLogout() {
   <!-- Main Content -->
   <div class="main-container">
     <Viewer
-      v-if="activeViewerContact"
-      :contact="activeViewerContact"
-      @stop="activeViewerContact = undefined"
+      v-if="activeViewerData"
+      :contact="activeViewerData"
+      @stop="activeViewerData = undefined"
     />
     <div v-else class="content-wrapper">
       <div class="section-content">
-        <div class="text-center">
-          <div class="panel">
-            <Login
-              v-if="action === Action.Login"
-              :target="target"
-            />
-            <Presenter
-              v-else-if="presenterActive && email && token"
-              :email="email"
-              :token="token"
-              @stop="presenterActive = false"
-            />
-            <template v-else>
-              <div class="form-content">
-                <div class="d-flex gap-4 align-items-center">
-                  <div>
-                    <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
+        <div class="panel">
+          <Login
+            v-if="action === Action.Login"
+            :target="target"
+          />
+          <Presenter
+            v-else-if="presenterActive && email && token"
+            :email="email"
+            :token="token"
+            @stop="presenterActive = false"
+          />
+          <template v-else>
+            <div class="form-content">
+              <div class="d-flex gap-4 align-items-center">
+                <div>
+                  <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
+                </div>
+                <div>
+                  <div class="form-check">
+                    <label class="form-check-label">
+                      <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
+                      {{ $t('app.form.likeToView') }}
+                    </label>
                   </div>
-                  <div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
-                        {{ $t('app.form.likeToView') }}
-                      </label>
-                    </div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
-                        {{ $t('app.form.likeToShare') }}
-                      </label>
-                    </div>
+                  <div class="form-check">
+                    <label class="form-check-label">
+                      <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
+                      {{ $t('app.form.likeToShare') }}
+                    </label>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <hr>
+            <hr>
 
-              <template v-if="plannedAction === 'view'">
-                <ViewerForm
-                  :model-value="activeViewerContact ?? { email: viewEmail ?? '', name: name ?? '' }"
-                  @update:model-value="activeViewerContact = $event"
-                />
+            <template v-if="plannedAction === 'view'">
+              <ViewerForm
+                v-model="formViewerData"
+                @submit="activeViewerData = formViewerData"
+              />
 
-                <template v-if="lastContacts.length > 0">
-                  <hr>
-                  <h4>{{ $t('app.form.lastContacts') }}</h4>
-                  <div v-for="contact in lastContacts" :key="contact.email">
-                    <p>{{ contact.name }} ({{ contact.email }})</p>
-                  </div>
-                </template>
-              </template>
-
-              <template v-else-if="plannedAction === 'share'">
-                <PresenterForm
-                  v-if="email && token"
-                  :email="email"
-                  :token="token"
-                  @present="presenterActive = true"
-                />
-                <Login v-else target="web" />
+              <template v-if="lastContacts.length > 0">
+                <hr>
+                <h6>{{ $t('app.form.lastContacts') }}</h6>
+                <div v-for="email in lastContacts" :key="email">
+                  <a href="#" @click="formViewerData.email = email">{{ email }}</a>
+                </div>
               </template>
             </template>
-          </div>
+
+            <template v-else-if="plannedAction === 'share'">
+              <PresenterForm
+                v-if="email && token"
+                :email="email"
+                :token="token"
+                @present="presenterActive = true"
+              />
+              <Login v-else target="web" />
+            </template>
+          </template>
         </div>
       </div>
     </div>
@@ -157,7 +168,7 @@ async function handleLogout() {
   <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
   <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
 
-  <footer v-if="!activeViewerContact" class="main-footer">
+  <footer v-if="!activeViewerData" class="main-footer">
     <div class="footer-content">
       <p>
         &copy; 2025 PeekaView | 

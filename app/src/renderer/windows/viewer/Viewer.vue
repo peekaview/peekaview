@@ -1,24 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ViewerContact } from '../../types'
+import { ViewerData } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
+import ViewerForm from '../../views/form/ViewerForm.vue'
 
-const activeViewerContact = ref<ViewerContact | undefined>()
+const formViewerData = ref<ViewerData>({ email: '', name: '' })
+const activeViewerData = ref<ViewerData | undefined>()
 </script>
 
 <template>
   <Viewer
-    v-if="activeViewerContact"
-    :contact="activeViewerContact"
-    @stop="activeViewerContact = undefined"
+    v-if="activeViewerData"
+    :contact="activeViewerData"
+    @stop="activeViewerData = undefined"
   />
   <div v-else class="content-wrapper">
     <div class="section-content">
       <div class="text-center">
         <div class="panel">
           <ViewerForm
-            :model-value="activeViewerContact ?? { email: '', name: '' }"
-            @update:model-value="activeViewerContact = $event"
+            v-model="formViewerData"
+            @submit="activeViewerData = formViewerData"
           />
         </div>
       </div>
