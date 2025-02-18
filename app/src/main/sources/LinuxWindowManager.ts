@@ -85,7 +85,7 @@ export class LinuxWindowManager extends WindowManager {
     throw new Error('Unknown display server')
   }
 
-  resizeWindow(left: number, top: number, width: number, height: number) {
+  resizeWindow(_left: number, _top: number, _width: number, _height: number) {
     throw new Error('Unknown display server')
   }
 }

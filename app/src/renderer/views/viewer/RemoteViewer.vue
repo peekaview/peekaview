@@ -18,7 +18,7 @@ import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outlin
 import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
 
-import type { RemoteData, RemoteEvent, File, UserData } from '../../../interface'
+import type { RemoteData, RemoteEvent, File } from '../../../interface'
 import type { ScaleInfo, VideoTransform } from "../../types.js"
 
 type ReceiveEventHandlers = {
