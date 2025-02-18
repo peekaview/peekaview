@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onBeforeUnmount } from 'vue'
 
-import RemoteControl from "./RemoteControl.vue"
+import RemoteViewer from "./RemoteViewer.vue"
 import RequestAccess from '../form/RequestAccess.vue'
 
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
@@ -41,16 +41,16 @@ function stop() {
 </script>
 
 <template>
-  <RemoteControl
+  <RemoteViewer
     v-show="screenShareData"
     :data="screenShareData"
     @stop="stop"
   />
-  <div class="content-wrapper">
-    <div
-      v-if="!screenShareData"
-      class="section-content"
-    >
+  <div 
+    v-if="!screenShareData"
+    class="content-wrapper"
+  >
+    <div class="section-content">
       <div class="text-center">
         <div class="panel">
           <RequestAccess

@@ -48,7 +48,7 @@
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",
     "requestFrom": "Von {email}",
-    "requestAccess": "Zugriff anfordern",
+    "requestAccess": "Zugriff anfragen",
     "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
     "waitingStatus": {
       "establishing": "Verbindung wird aufgebaut...",

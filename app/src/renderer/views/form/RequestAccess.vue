@@ -48,6 +48,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const waitingStatus = ref<WaitingStatus | undefined>('establishing')
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
@@ -65,8 +66,6 @@ watch(requestStatus, (status) => {
   requestStatus.value = undefined
 })
 
-const waitingStatus = ref<WaitingStatus>('establishing')
-
 onMounted(() => {
   if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
     notify({
@@ -79,8 +78,6 @@ onMounted(() => {
   }
 
   localStorage.setItem('name', props.contact.name)
-
-  requestStatus.value = undefined
 
   const params = {
     email: props.contact.email,
@@ -209,7 +206,7 @@ function formatLastSeen(timestamp: number | undefined) {
 </script>
 
 <template>
-  <div class="form-content">
+  <div v-if="waitingStatus" class="form-content">
     <div class="text-center">
       <div class="waiting-spinner"></div>
       <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email: props.contact.email }) }}</h4>

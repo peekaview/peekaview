@@ -18,9 +18,11 @@ type ClipboardFile = File & {
 const props = withDefaults(defineProps<{
   data: File | undefined
   draggable?: boolean
+  initialRows?: number
 }>(), {
   data: undefined,
   draggable: false,
+  initialRows: 8,
 })
 
 const emit = defineEmits<{
@@ -33,6 +35,9 @@ const downloadRef = useTemplateRef('download')
 const downloadData = ref<File | undefined>()
 
 const clipboardFile = ref<ClipboardFile | undefined>()
+watch(clipboardFile, (file) => {
+  console.log('clipboardFile', file)
+})
 const fileSvg = computed(() => {
   if (!clipboardFile.value)
     return
@@ -71,6 +76,8 @@ watch(() => props.data, (data) => {
 
   if (content.startsWith('data:application/octet-stream') || content.startsWith('data:text/') || content.startsWith('data:application/json')) {
     type = 'text'
+    extension = 'txt'
+    
     if (content.startsWith('data:application/octet-stream')) {
       content = b64DecodeUnicode(content.replace('data:application/octet-streambase64,', ''))
     } else {
@@ -82,36 +89,29 @@ watch(() => props.data, (data) => {
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'txt'
     }
-
-    if (name != undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
   else if (content.startsWith('data:image/')) {
     type = 'image'
+
     // Wenns ein Bild ist, aber mime-Extension Sonderzeichen enthält, dann ists irgendein komisches Format und wir nehmen png als Default
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'png'
     }
-
-    // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
-    if (name !== undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
   else {
     type = 'binary'
+
     extension = extension.replace('x-msdownload', 'exe')
     extension = extension.replace('x-zip-compressed', 'zip')
 
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'bin'
     }
-
-    if (name != undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
+
+  // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
+  if (name)
+    extension = name.split('.').pop() || extension
 
   clipboardFile.value = {
     type,
@@ -185,7 +185,7 @@ function close() {
     </Toolbar>
     <template v-if="!collapsed">
       <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
-        <textarea rows="8">{{ clipboardFile.content }}</textarea>
+        <textarea :rows="initialRows">{{ clipboardFile.content }}</textarea>
       </div>
       <div v-else class="clipboard-content">
         <img
@@ -220,7 +220,6 @@ function close() {
 .clipboard {
   display: flex;
   flex-direction: column;
-  min-width: 10rem;
   width: 100%;
   height: 100%;
   padding: 5px;
@@ -229,6 +228,7 @@ function close() {
   border-radius: 5px;
   box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
 }
+
 
 .clipboard.collapsed {
   height: auto;

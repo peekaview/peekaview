@@ -11,7 +11,7 @@ export class MacWindowManager extends WindowManager {
     super(hwnd)
     this.maxCacheAge = 1000
     this.overlayPadding = {
-      x: 20,
+      x: 0,
       y: 0,
     }
     this.currentMonitorProcess = null

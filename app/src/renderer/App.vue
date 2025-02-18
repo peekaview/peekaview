@@ -44,7 +44,6 @@ watch(activeViewerData, (data) => {
 
 watch(lastContacts, (value) => {
   localStorage.setItem('lastContacts', JSON.stringify(value))
-  console.log('lastContacts', lastContacts.value)
 })
 
 const locale = computed({
@@ -111,37 +110,40 @@ async function handleLogout() {
             @stop="presenterActive = false"
           />
           <template v-else>
-            <div class="form-content">
-              <div class="d-flex gap-4 align-items-center">
-                <div>
-                  <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
-                </div>
-                <div>
-                  <div class="form-check">
-                    <label class="form-check-label">
-                      <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
-                      {{ $t('app.form.likeToView') }}
-                    </label>
+            <template v-if="action !== Action.View && action !== Action.Share">
+              <div class="form-content">
+                <div class="d-flex gap-4 align-items-center">
+                  <div>
+                    <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
                   </div>
-                  <div class="form-check">
-                    <label class="form-check-label">
-                      <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
-                      {{ $t('app.form.likeToShare') }}
-                    </label>
+                  <div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
+                        {{ $t('app.form.likeToView') }}
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <label class="form-check-label">
+                        <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
+                        {{ $t('app.form.likeToShare') }}
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <hr>
+              <hr>
+            </template>
 
             <template v-if="plannedAction === 'view'">
               <ViewerForm
                 v-model="formViewerData"
+                :is-email-fixed="action === Action.View"
                 @submit="activeViewerData = formViewerData"
               />
 
-              <template v-if="lastContacts.length > 0">
+              <template v-if="action !== Action.View && lastContacts.length > 0">
                 <hr>
                 <h6>{{ $t('app.form.lastContacts') }}</h6>
                 <div v-for="email in lastContacts" :key="email">
@@ -196,7 +198,7 @@ body:not(.view-active) {
 }
 
 body.view-active {
-  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
 }
 
 .main-header,

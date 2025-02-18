@@ -55,11 +55,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     clipboardWindow?.close()
   }
 
-  function activate(manager: SourceManager) {
+  async function activate(manager: SourceManager) {
     sourceManager = manager
     active = true
-    createOverlayWindow()
-    createToolbarWindow()
+    await createOverlayWindow()
+    await createToolbarWindow()
   }
 
   function updateWindowBorders(newBorders: Dimensions) {
@@ -116,34 +116,32 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       y,
       width,
       height,
-      transparent: true,
-      skipTaskbar: true,
       focusable: false,
+      alwaysOnTop: true,
       roundedCorners: false,
       enableLargerThanScreen: true,
+      transparent: true,
+      skipTaskbar: true,
       frame: false,
-      alwaysOnTop: true,
       webPreferences: {
         preload: path.join(__dirname, '../preload/overlay.js'),
-        webSecurity: false,
         nodeIntegration: true,
         contextIsolation: true,
+        webSecurity: false,
       },
     })
-
-    console.log("Overlay window created:", overlayWindow.getBounds())
 
     overlayWindow.removeMenu()
     overlayWindow.setIgnoreMouseEvents(true)
     //overlayWindow.webContents.openDevTools()
     
     overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-    overlayWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+    overlayWindow.setAlwaysOnTop(true)
     windowLoad(overlayWindow, 'overlay')
 
-    if (sourceManager.fixOverlayBoundsAfterCreation) {
+    /*if (sourceManager.fixOverlayBoundsAfterCreation) {
       overlayWindow.setBounds({ x, y, width, height }, false) // false means don't animate the change
-    }
+    }*/
 
     return new Promise<void>((resolve) => {
       overlayWindow!.on('ready-to-show', () => {
@@ -221,9 +219,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     })
 
     clipboardWindow.removeMenu()
-    clipboardWindow.setAlwaysOnTop(true, 'screen-saver')
-    windowLoad(clipboardWindow, 'clipboard')
     //clipboardWindow.webContents.openDevTools()
+
+    clipboardWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    clipboardWindow.setAlwaysOnTop(true)
+    windowLoad(clipboardWindow, 'clipboard')
 
     return new Promise<void>((resolve) => {
       ipcMain.handleOnce('clipboard-ready', async (_event) => {
@@ -245,10 +245,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     const width = 495
     const height = 50
 
-    const primary = screen.getPrimaryDisplay()
+    const display = sourceManager.getCurrentScreen()
+    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width) / 2)
+    const y = display.bounds.y
     toolbarWindow = new BrowserWindow({
-      x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
-      y: 0,
+      x,
+      y,
       width,
       height,
       minHeight: height,
@@ -258,34 +260,38 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       alwaysOnTop: true,
       transparent: true,
       skipTaskbar: true,
-      show: false,
       frame: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/toolbar.js'),
         additionalArguments: [import.meta.env.VITE_APP_URL],
         nodeIntegration: true,
         contextIsolation: true,
-        sandbox: false,
         webSecurity: false,
       },
     })
 
-    toolbarWindow.setAlwaysOnTop(true, 'screen-saver')
-    windowLoad(toolbarWindow, 'toolbar')
-    toolbarWindow.show()
     //toolbarWindow.webContents.openDevTools()
+
+    toolbarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    toolbarWindow.setAlwaysOnTop(true)
+    windowLoad(toolbarWindow, 'toolbar')
 
     toolbarWindow.on('closed', () => {
       toolbarWindow = undefined
     })
 
-    toolbarWindow.moveTop()
+    return new Promise<void>((resolve) => {
+      toolbarWindow!.on('ready-to-show', () => {
+        toolbarWindow!.moveTop()
+        resolve()
+      })
+    })
   }
 
   function getToolbarBounds() {
     if (!toolbarWindow)
       return undefined
-
+    
     return {
       ...toolbarWindow.getBounds(),
       ...toolbarSize,

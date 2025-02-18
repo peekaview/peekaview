@@ -24,6 +24,7 @@ const containerRef = useTemplateRef('container')
 const overlayRef = useTemplateRef('overlay')
 
 const presenter = ref<Presenter>()
+const lastWindowPosition = ref<[number, number]>([0, 0])
 
 const mouseEnabled = ref(true)
 watch(mouseEnabled, (enabled) => {
@@ -193,10 +194,12 @@ function freezeAndFocus() {
   window.setTimeout(() => { // wait until shutter is streamed
     videoRef.value?.pause()
     shutterActive.value = false
+    lastWindowPosition.value = [window.screenX, window.screenY]
     window.resizeTo(window.screen.width, window.screen.height)
     window.focus()
     window.setTimeout(() => {
       window.resizeTo(...windowDefaultSize)
+      window.moveTo(...lastWindowPosition.value)
       videoRef.value?.play()
     }, 3000)
   }, 150)

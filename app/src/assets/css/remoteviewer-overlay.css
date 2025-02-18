@@ -17,16 +17,6 @@
     color: #ddd;
 }
 
-/* Specialized buttons */
-.dragbutton {
-    float: right;
-    padding: 3px 0;
-    margin-right: 15px;
-    width: 20px;
-    -webkit-user-select: none;
-    -webkit-app-region: drag;
-}
-
 .copybutton, .downloadbutton {
     position: absolute;
     z-index: 10;
