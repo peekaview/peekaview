@@ -94,8 +94,8 @@ export class WindowManager extends SourceManager {
     }
 
     // Calculate dimensions using the chosen scale factor
-    const width = Math.round(rawWidth / scaleFactor) + this.overlayPadding.x
-    const height = Math.round(rawHeight / scaleFactor) + this.overlayPadding.y
+    const width = Math.ceil(rawWidth / scaleFactor) + this.overlayPadding.x
+    const height = Math.ceil(rawHeight / scaleFactor) + this.overlayPadding.y
     
     const x = Math.round(dimensions.left / (this.areCoordinatesScaling ? scaleFactor : 1))
     const y = Math.round(dimensions.top / (this.areCoordinatesScaling ? scaleFactor : 1))

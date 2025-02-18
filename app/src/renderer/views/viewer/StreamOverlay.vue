@@ -161,7 +161,7 @@ function receiveMouseUp(data: RemoteMouseData) {
 
 let lastWheel = 0
 function onWheel(e: WheelEvent) {
-  if (e.ctrlKey || !props.inputEnabled)
+  if (e.ctrlKey || e.metaKey || !e.shiftKey || !props.inputEnabled)
     return
 
   if (lastWheel < (Date.now() - 200)) {
@@ -319,6 +319,7 @@ function updateVideoScale(scaleInfo: ScaleInfo) {
 }
 
 function calcScale() {
+  console.log("calcScale")
   const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
   const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
 
@@ -410,8 +411,6 @@ defineExpose({
 .stream-overlay {
   margin: 0px;
   padding: 0px;
-  z-index: 99;
-  position: absolute;
 }
 
 .stream-overlay canvas {

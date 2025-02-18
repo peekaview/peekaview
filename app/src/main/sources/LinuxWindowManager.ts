@@ -1,5 +1,4 @@
-import { executeCmd, executeCmdCached, resolvePath } from "../util";
-import { WindowManager } from "./WindowManager";
+import { WindowManager } from "./WindowManager"
 
 export class LinuxWindowManager extends WindowManager {
   constructor(hwnd: string) {
@@ -65,52 +64,28 @@ export class LinuxWindowManager extends WindowManager {
       bottom
     };
   }
-
-  // Combine both commands into one to reduce executions
-  getWindowInfo() {
-    const cmd = `
-      xwininfo -id ${this.hwnd} | egrep -e "Absolute upper-left X:|Absolute upper-left Y:|Width:|Height:" && 
-      xprop -id ${this.hwnd} | grep FRAME_EXTENTS || true
-    `;
-    
-    const result = executeCmdCached(cmd, this.maxCacheAge).toString();
-    const [dimensions, frame] = result.split('FRAME_EXTENTS');
-    
-    return {
-      dimensions: dimensions.replaceAll(' ', ''),
-      frame: frame ? frame.toString() : ''
-    };
+  
+  getWindowInfo(): { dimensions: string, frame: string } {
+    throw new Error('Unknown display server')
   }
 
-  isMinimized() {
-    const windowstate = executeCmdCached(`xprop -id ${this.hwnd} WM_STATE | grep "Iconic" || true`, this.maxCacheAge).toString().replaceAll('\n', '')
-    return windowstate.includes('Iconic')
+  isMinimized(): boolean {
+    throw new Error('Unknown display server')
   }
 
-  isVisible() {
-    try {
-      const result = executeCmdCached(`bash ${resolvePath('static/scripts/windowvisible.sh')} ${this.hwnd}`, this.maxCacheAge).toString().trim()
-      return result === '1'
-    } catch (error) {
-      return true // Default to visible if script fails
-    }
+  isVisible(): boolean {
+    throw new Error('Unknown display server')
   }
 
   focus() {
-    try {
-      executeCmd(`xdotool windowactivate ${this.hwnd}`)
-    }
-    catch (e) { }
+    throw new Error('Unknown display server')
   }
 
   bringToFront() {
-    try {
-      executeCmd(`xdotool windowactivate ${this.hwnd}`)
-    }
-    catch (e) { }
+    throw new Error('Unknown display server')
   }
 
-  resizeWindow(left: number, top: number, width: number, height: number) {
-    executeCmd(`xdotool windowactivate ${this.hwnd} && xdotool windowsize ${this.hwnd} ${width} ${height} && xdotool windowmove ${this.hwnd} ${left} ${top}`)
+  resizeWindow(_left: number, _top: number, _width: number, _height: number) {
+    throw new Error('Unknown display server')
   }
 }

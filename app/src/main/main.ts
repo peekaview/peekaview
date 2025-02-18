@@ -159,6 +159,8 @@ declare const CSP_POLICY: string
       focusApp()
     })
 
+    app.on('will-quit', e => e.preventDefault())
+
     log.info("App initialization complete")
     const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
     new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()

@@ -80,4 +80,7 @@ function close() {
 </template>
 
 <style>
+#presenter {
+  height: 100%;
+}
 </style>

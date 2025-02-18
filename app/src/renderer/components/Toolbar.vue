@@ -33,7 +33,7 @@ setInterval(() => {
   if (!rect)
     return
   
-  window.electronAPI?.setToolbarSize(rect.width + 10, rect.height)
+  window.electronAPI?.setToolbarSize(Math.round(rect.width + 10), Math.round(rect.height + 10))
 }, 500)
 </script>
 

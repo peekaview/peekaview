@@ -154,7 +154,7 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       sourceManager = createSourceManager(hwnd)
       await sourceManager.onInit()
       sourceManager.bringToFront()
-      remotePresenter.activate(sourceManager)
+      await remotePresenter.activate(sourceManager)
 
       sendReset()
     }

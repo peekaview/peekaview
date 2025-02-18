@@ -7,6 +7,7 @@ export function usePanzoom(el: Readonly<ShallowRef<HTMLElement | null>>, active 
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
   if (!isTouchEnabled())
     options.handleStartEvent = event => {
+      console.log('panzoom', event)
       if (!inputEnabled.value)
         throw "input disabled"
       if ((event as MouseEvent).button !== 1 && !active.value)

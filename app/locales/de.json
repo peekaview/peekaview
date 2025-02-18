@@ -18,17 +18,26 @@
     "logout": "Abmelden",
     "confirmLogout": "Möchten Sie sich wirklich ausloggen?",
     "imprint": "Impressum",
-    "gdpr": "Datenschutzerklärung"
+    "gdpr": "Datenschutzerklärung",
+    "form": {
+      "iWouldLikeTo": "Ich möchte",
+      "likeToView": "bei einer Freigabe teilnehmen",
+      "likeToShare": "meinen Bildschirm freigeben",
+      "lastContacts": "Letzte Kontakte"
+    }
   },
   "login": {
     "register": "Registrieren",
+    "notLoggedIn": "Sie sind nicht angemeldet. Geben Sie Ihre E-Mail-Adresse ein, um sich zu registrieren / anzumelden.",
     "login": "Jetzt in App anmelden",
     "loggingIn": "Logge in der App ein...",
     "code": "Ihr Login-Code",
     "justRegistered": "Sie haben sich erfolgreich registriert. Bitte prüfen Sie Ihre Mails für den Anmelde-Link.",
     "successful": "Anmeldung erfolgreich",
-    "successMessage": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
+    "successMessage": "Ihre Anmeldung war erfolgreich.",
+    "successMessageApp": "Ihre Anmeldung war erfolgreich. Sie können jetzt zur App wechseln.",
     "openApp": "App öffnen",
+    "toShare": "Zur Bildschirmfreigabe",
     "orEnterCode": "Oder geben Sie diesen Code in der App ein, um fortzufahren:",
     "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support.",
     "connectionError": {
@@ -39,7 +48,7 @@
   "viewer": {
     "requestScreenShare": "Bildschirmfreigabe anfordern",
     "requestFrom": "Von {email}",
-    "requestAccess": "Zugriff anfordern",
+    "requestAccess": "Zugriff anfragen",
     "requestDenied": "{email} hat Ihre Anfrage abgelehnt.",
     "waitingStatus": {
       "establishing": "Verbindung wird aufgebaut...",

@@ -1,0 +1,18 @@
+import { initializeApp } from 'firebase/app'
+import { getMessaging, getToken } from "firebase/messaging"
+
+// TODO: Replace the following with your app's Firebase project configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyA1kh7B1ZjH9IDCMEGT83sYgoDY2n3fwTE",
+  authDomain: "peekaview-a05e4.firebaseapp.com",
+  projectId: "peekaview-a05e4",
+  storageBucket: "peekaview-a05e4.firebasestorage.app",
+  messagingSenderId: "61688649636",
+  appId: "1:61688649636:web:406e089fadbd7f879bd331"
+}
+
+const app = initializeApp(firebaseConfig)
+const messaging = getMessaging(app)
+getToken(messaging, { vapidKey: 'BJ-49jj90QppmMhE76WgyJctFvJO-TP_tya5zPKvmC1bcMG-00WtegYgUyQx66mPFQ6nwUOFA0Ok9gbfKeEbFr4' }).then(token => {
+  console.log(token)
+})
