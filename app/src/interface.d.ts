@@ -51,6 +51,7 @@ export interface IElectronAPI {
   onPauseSharing: (callback: () => void) => void,
   onResumeSharing: (callback: () => void) => void,
   showSharingActive: () => Promise<void>,
+  onHidden: (callback: (hidden: boolean) => void) => void,
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => Promise<void>,
   closeWindow: () => Promise<void>,
   onMouseDown: (callback: (data: RemoteMouseData) => void) => void,
@@ -117,7 +118,7 @@ export type StreamerData = {
   roomId: string
 }
 
-export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
@@ -130,6 +131,7 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-wheel" ? RemoteMouseData
   : T extends "toggle-freeze" ? { enabled: boolean }
   : T extends "pause" ? { enabled: boolean }
+  : T extends "hide" ? { hidden: boolean }
   : T extends "type" ? { key: string }
   : T extends "copy" ? {}
   : T extends "cut" ? {}

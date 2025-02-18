@@ -49,6 +49,13 @@ function showInviteLink() {
 </template>
 
 <style>
+  @font-face {
+    font-family: 'Abel';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Abel Regular'), local('Abel-Regular'), url('../../../assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
+  }
+
   html {
     background: transparent !important;
   }

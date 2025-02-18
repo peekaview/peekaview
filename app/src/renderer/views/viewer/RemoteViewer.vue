@@ -52,17 +52,20 @@ const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
 
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
+const hidden = ref(false)
 const mouseEnabled = ref(true)
 const remoteControlActive = ref(false)
 const remoteClipboard = ref(false)
 
+let remoteTimeout: number
 watch(mouseEnabled, (enabled) => {
   if (activeMessage.value === 'init')
     return
 
   activeMessage.value = 'remote'
   remoteMessage.value = t(`viewer.messages.mouse${enabled ? 'En' : 'Dis'}abled`)
-  setTimeout(() => {
+  clearTimeout(remoteTimeout)
+  remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
     remoteMessage.value = undefined
   }, 3000)
@@ -74,7 +77,8 @@ watch(remoteControlActive, (active) => {
   
   activeMessage.value = 'remote'
   remoteMessage.value = t(`viewer.messages.remoteControl${active ? 'En' : 'Dis'}abled`)
-  setTimeout(() => {
+  clearTimeout(remoteTimeout)
+  remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
     remoteMessage.value = undefined
   }, 3000)
@@ -142,10 +146,30 @@ onReceive('remote-control', (data) => {
   remoteControlActive.value = data.enabled
 })
 
+let pauseTimeout: number
 onReceive('pause', (data) => {
-  activeMessage.value = data.enabled ? 'paused' : 'resumed'
-  setTimeout(() => hideMessage('paused'), 5000)
-  setTimeout(() => hideMessage('resumed'), 3000)
+  clearTimeout(pauseTimeout)
+  if (data.enabled) {
+    activeMessage.value = 'paused'
+    pauseTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
+  } else {
+    activeMessage.value = 'resumed'
+    pauseTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
+  }
+})
+
+let hiddenTimeout: number
+onReceive('hide', (data) => {
+  console.log('hide', data)
+  hidden.value = data.hidden
+  clearTimeout(hiddenTimeout)
+  if (data.hidden) {
+    activeMessage.value = 'hidden'
+    hiddenTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
+  } else {
+    activeMessage.value = 'visible'
+    hiddenTimeout = window.setTimeout(() => hideMessage('visible'), 3000)
+  }
 })
 
 onReceive('reset', (data) => {
@@ -210,6 +234,7 @@ async function onDrop(e: DragEvent) {
   hideMessage('fileUpload')
 }
 
+let fileDropTimeout: number
 function onDragOver(e: DragEvent) {
   // Prevent default behavior (Prevent file from being opened)
   e.preventDefault()
@@ -222,7 +247,8 @@ function onDragOver(e: DragEvent) {
 
   activeMessage.value = 'fileDrop'
 
-  setTimeout(() => {
+  clearTimeout(fileDropTimeout)
+  fileDropTimeout = window.setTimeout(() => {
     hideMessage('fileDrop')
   }, 5000)
 }
@@ -356,7 +382,7 @@ defineExpose({
   <div class="remote-viewer">
     <StreamOverlay
       ref="overlay"
-      input-enabled
+      :input-enabled="!hidden"
       :users="users"
       :user-id="userId"
       :video-transform="videoTransform"
@@ -402,6 +428,18 @@ defineExpose({
         <br>
         {{ $t('viewer.messages.resumed.description') }}
       </template>
+      <template v-else-if="activeMessage === 'hidden'">>
+        <b>{{ $t('viewer.messages.hidden.title') }}</b>
+        <br>
+        <br>
+        {{ $t('viewer.messages.hidden.description') }}
+      </template>
+      <template v-else-if="activeMessage === 'visible'">>
+        <b>{{ $t('viewer.messages.visible.title') }}</b>
+        <br>
+        <br>
+        {{ $t('viewer.messages.visible.description') }}
+      </template>
       <template v-else-if="activeMessage === 'fileDrop'">
         <b>{{ $t('viewer.messages.fileDrop.title') }}</b>
         <br>
@@ -420,18 +458,18 @@ defineExpose({
       </template>
     </div>
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" style="width: 30px" @click="showClipboard = !showClipboard">
+      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Help" style="width: 30px" @click="toggleMessage('mouseHelp')">
+      <div class="btn btn-sm btn-secondary" title="Help" @click="toggleMessage('mouseHelp')">
         <HelpSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Leave" style="width: 30px" @click="$emit('stop')">
+      <div class="btn btn-sm btn-secondary" title="Leave" @click="$emit('stop')">
         <LogoutSvg />
       </div>
     </Toolbar>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
+      <Clipboard v-if="showClipboard" :data="clipboardFile" />
     </div>
   </div>
 </template>
@@ -519,22 +557,9 @@ defineExpose({
   }
 
   /* Textarea styles */
-  .remote-viewer textarea {
-    width: 100%;
-    height: 100%;
+  .remote-viewer .clipboard textarea {
     max-height: 120px;
     max-width: 170px;
-    font-size: 10px;
-    font-family: sans-serif;
-    background: black;
-    color: white;
-    border: none;
-    outline: none;
-    resize: none;
-    overflow: auto;
-    -webkit-box-shadow: none;
-    -moz-box-shadow: none;
-    box-shadow: none;
   }
 
   .remote-viewer textarea::-webkit-scrollbar {
@@ -596,5 +621,9 @@ defineExpose({
     border: solid white;
     border-width: 0 3px 3px 0;
     transform: rotate(45deg);
+  }
+
+  .remote-viewer .main-toolbar {
+    cursor: default;
   }
 </style>

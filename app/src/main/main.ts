@@ -358,7 +358,9 @@ declare const CSP_POLICY: string
     streamer?.stopSharing()
 
     //if (streamer === undefined) {
-      streamer = useStreamer((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users)
+      streamer = useStreamer((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
+        presenterWindow?.webContents.send('on-hidden', hidden)
+      })
     //}
     streamer.startSharing(sourceId, data.roomId)
   }

@@ -87,6 +87,14 @@
       "resumed": {
         "title": "Screen sharing resumed",
         "description": "Screen sharing is resumed by the host."
+      },
+      "hidden": {
+        "title": "No interaction possible",
+        "description": "The shared window has either been minimized or is hidden behind other windows. Please wait until the host makes it visible again."
+      },
+      "visible": {
+        "title": "Screen sharing resumed",
+        "description": "The shared window is now visible again."
       }
     },
     "stop": "Stop",

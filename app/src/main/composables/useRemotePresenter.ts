@@ -199,20 +199,19 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     const primary = screen.getPrimaryDisplay()
     clipboardWindow = new BrowserWindow({
+      x: primary.bounds.x + (isMac || isLinux ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width + 10),
+      y: primary.bounds.y + (isMac || isLinux ? 60 : primary.workAreaSize.height - height + 30),
       width,
       height,
       minWidth: width,
       minHeight: 50,
+      minimizable: false,
+      maximizable: false,
+      focusable: true,
       transparent: true,
       skipTaskbar: true,
-      focusable: true,
-      enableLargerThanScreen: true,
-      useContentSize: true,
-      frame: false,
       alwaysOnTop: true,
-      titleBarStyle: 'hidden',
-      x: primary.bounds.x + (isMac || isLinux ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width + 10),
-      y: primary.bounds.y + (isMac || isLinux ? 60 : primary.workAreaSize.height - height + 30),
+      frame: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/clipboard.js'),
         webSecurity: false,
@@ -243,11 +242,13 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (toolbarWindow)
       return
 
-    const width = 480
+    const width = 495
     const height = 50
 
     const primary = screen.getPrimaryDisplay()
     toolbarWindow = new BrowserWindow({
+      x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
+      y: 0,
       width,
       height,
       minHeight: height,
@@ -259,8 +260,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       skipTaskbar: true,
       show: false,
       frame: false,
-      x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
-      y: 0,
       webPreferences: {
         preload: path.join(__dirname, '../preload/toolbar.js'),
         additionalArguments: [import.meta.env.VITE_APP_URL],
