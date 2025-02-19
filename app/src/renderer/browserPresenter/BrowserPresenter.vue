@@ -26,9 +26,9 @@ const overlayRef = useTemplateRef('overlay')
 const presenter = ref<Presenter>()
 const lastWindowPosition = ref<[number, number]>([0, 0])
 
-const mouseEnabled = ref(true)
-watch(mouseEnabled, (enabled) => {
-  presenter.value?.sendRemote?.('mouse-control', { enabled })
+const pointerEnabled = ref(true)
+watch(pointerEnabled, (enabled) => {
+  presenter.value?.sendRemote?.('pointer-enabled', { enabled })
 })
 
 const showClipboard = ref(false)
@@ -247,7 +247,7 @@ function onResumeSharing() {
   </div>
   <template v-else>
     <PresenterToolbar
-      @toggle-mouse="mouseEnabled = $event"
+      @toggle-pointer="pointerEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"
       @pause-sharing="onPauseSharing()"
@@ -261,11 +261,11 @@ function onResumeSharing() {
       <StreamOverlay
         v-if="presenter?.screenShareData"
         ref="overlay"
-        :input-enabled="false"
         :users="presenter.viewers"
         :user-id="presenter.screenShareData.user.id"
         :video-transform="videoTransform"
-        :mouse-enabled="mouseEnabled"
+        :input-enabled="false"
+        :pointer-enabled="pointerEnabled"
         @rescale="rescale"
         @send="send($event.event, $event.data, $event.options)"
       />
@@ -310,7 +310,7 @@ video {
   width: 100%;
   height: 100%;
   background-color: #8886;
-  z-index: 1000;
+  z-index: 500;
 }
 
 .preview-container {
@@ -321,7 +321,7 @@ video {
 
 .clipboard-container {
   position: absolute;
-  z-index: 1002;
+  z-index: 2000;
   top: 50px;
   left: 50px;
 }
@@ -333,6 +333,6 @@ video {
   width: 100%;
   height: 100%;
   background-color: black;
-  z-index: 1001;
+  z-index: 1500;
 }
 </style>

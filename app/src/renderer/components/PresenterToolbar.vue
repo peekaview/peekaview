@@ -17,7 +17,7 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle-remote-control', enabled: boolean): void
-  (e: 'toggle-mouse', enabled: boolean): void
+  (e: 'toggle-pointer', enabled: boolean): void
   (e: 'toggle-clipboard'): void
   (e: 'pause-sharing'): void
   (e: 'resume-sharing'): void
@@ -28,12 +28,12 @@ const emit = defineEmits<{
 
 const inApp = !!window.electronAPI
 const remoteControlEnabled = ref(false)
-const mouseEnabled = ref(true)
+const pointerEnabled = ref(true)
 const isPaused = ref(false)
 const toolbarRef = useTemplateRef('toolbar')
 
 watch(remoteControlEnabled, (enabled) => emit('toggle-remote-control', enabled))
-watch(mouseEnabled, (enabled) => emit('toggle-mouse', enabled))
+watch(pointerEnabled, (enabled) => emit('toggle-pointer', enabled))
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
 
 function onCollapse() {
@@ -57,16 +57,15 @@ function onCollapse() {
 
 <template>
   <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" poll-size @on-collapse="onCollapse">
+    <label class="checkbox-container">
+      <input type="checkbox" v-model="pointerEnabled" />
+      <span class="checkmark"></span>
+      <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
+    </label>
     <label v-if="inApp" class="checkbox-container">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
-    </label>
-    <label class="checkbox-container">
-      <input v-if="remoteControlEnabled" type="checkbox" checked disabled />
-      <input v-else type="checkbox" v-model="mouseEnabled" />
-      <span class="checkmark"></span>
-      <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
     </label>
     <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />

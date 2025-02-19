@@ -68,9 +68,16 @@
       "hoursAgo": "vor einer Stunde | vor {n} Stunden",
       "daysAgo": "vor einem Tag | vor {n} Tagen"
     },
+    "toolbar": {
+      "pointer": "Zeichnen / Zeiger",
+      "remoteControl": "Fernsteuerung",
+      "showClipboard": "Zwischenablage anzeigen",
+      "help": "Hilfe",
+      "leave": "Verlassen"
+    },
     "messages": {
-      "mouseEnabled": "Remote-Mauszeiger ist jetzt aktiviert",
-      "mouseDisabled": "Remote-Mauszeiger wurde deaktiviert",
+      "pointerEnabled": "Mauszeiger ist jetzt aktiviert",
+      "pointerDisabled": "Mauszeiger wurde deaktiviert",
       "remoteControlEnabled": "Fernzugriff ist jetzt aktiviert",
       "remoteControlDisabled": "Fernzugriff wurde deaktiviert",
       "establishing": "Verbindung wird hergestellt...",

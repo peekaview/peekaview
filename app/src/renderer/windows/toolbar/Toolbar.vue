@@ -5,8 +5,8 @@ function toggleRemoteControl(enabled: boolean) {
   window.electronAPI!.toggleRemoteControl(enabled)
 }
 
-function toggleMouse(enabled: boolean) {
-  window.electronAPI!.toggleMouse(enabled)
+function togglePointer(enabled: boolean) {
+  window.electronAPI!.togglePointer(enabled)
 }
 
 function pauseSharing() {
@@ -38,7 +38,7 @@ function showInviteLink() {
   <PresenterToolbar
     draggable
     @toggle-remote-control="toggleRemoteControl"
-    @toggle-mouse="toggleMouse"
+    @toggle-pointer="togglePointer"
     @pause-sharing="pauseSharing"
     @resume-sharing="resumeSharing"
     @stop-sharing="stopSharing"

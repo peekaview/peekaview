@@ -12,7 +12,8 @@ import { UserData } from '../../../interface'
 
 const canvasRef = useTemplateRef('canvas')
 const scale = ref(1)
-const mouseEnabled = ref(false)
+const pointerEnabled = ref(false)
+const remoteControlEnabled = ref(false)
 const users = ref<UserData[]>([])
 const mappedUsers = computed(() => {
   const mappedUsers: Record<string, UserData> = {}
@@ -25,15 +26,16 @@ const mappedUsers = computed(() => {
 const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers, scale })
 const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
-watch(mouseEnabled, () => {
+watch(pointerEnabled, () => {
   overlayCursors.clear(true)
   overlaySignals.clear()
 })
 
 window.electronAPI!.onUpdateOverlayData((data) => {
-  data.users && (users.value = data.users)
-  data.scale && (scale.value = data.scale)
-  data.mouseEnabled && (mouseEnabled.value = data.mouseEnabled)
+  data.users !== undefined && (users.value = data.users)
+  data.scale !== undefined && (scale.value = data.scale)
+  data.pointerEnabled !== undefined && (pointerEnabled.value = data.pointerEnabled)
+  data.remoteControlEnabled !== undefined && (remoteControlEnabled.value = data.remoteControlEnabled)
 })
 
 window.electronAPI!.onMouseClick((data) => {

@@ -92,6 +92,10 @@ body {
   min-height: 0;
 }
 
+.btn svg {
+  fill: var(--bs-btn-color);
+}
+
 .btn-lg {
   padding: 0.875rem 1.5rem;
   font-weight: 500;

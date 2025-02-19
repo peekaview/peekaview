@@ -12,7 +12,7 @@ import { ipcMain, BrowserWindow, screen } from 'electron'
 
 import { SourceManager } from '../sources/SourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 const isWin32 = process.platform === 'win32'
@@ -20,6 +20,86 @@ const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
 
 const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
+const SpecialKeys = [
+  // Original characters
+  '@', ';', ':', '_', '°', '^', '!', '"', '§', '$', '%', '&', '/', '=', '?', '`', '´', 
+  '{', '[', ']', '}', '\\', '\'', '*', '~', '<', '>', '|',
+  'ß', 'ö', 'ä', 'ü', 'Ö', 'Ä', 'Ü',
+  
+  // Additional European characters
+  // Scandinavian
+  'å', 'Å', 'ø', 'Ø', 'æ', 'Æ',
+  
+  // French
+  'é', 'è', 'ê', 'ë', 'É', 'È', 'Ê', 'Ë',
+  'à', 'â', 'À', 'Â',
+  'ù', 'û', 'Ù', 'Û',
+  'ï', 'î', 'Ï', 'Î',
+  'ç', 'Ç',
+  'œ', 'Œ',
+  
+  // Spanish/Portuguese
+  'ñ', 'Ñ',
+  'á', 'Á',
+  'í', 'Í',
+  'ó', 'Ó',
+  'ú', 'Ú',
+  'ã', 'Ã',
+  'õ', 'Õ',
+  
+  // Italian
+  'ì', 'Ì',
+  
+  // Polish
+  'ą', 'Ą',
+  'ć', 'Ć',
+  'ę', 'Ę',
+  'ł', 'Ł',
+  'ń', 'Ń',
+  'ś', 'Ś',
+  'ź', 'Ź',
+  'ż', 'Ż',
+  
+  // Czech/Slovak
+  'ě', 'Ě',
+  'š', 'Š',
+  'č', 'Č',
+  'ř', 'Ř',
+  'ž', 'Ž',
+  'ý', 'Ý',
+  'ť', 'Ť',
+  'ď', 'Ď',
+  'ň', 'Ň'
+]
+
+const KeyMap: Record<string, Key> = {
+  'Escape': Key.Escape,
+  'Tab': Key.Tab,
+  'Grave': Key.Grave,
+  'Minus': Key.Minus,
+  'Equal': Key.Equal,
+  'Backspace': Key.Backspace,
+  'LeftBracket': Key.LeftBracket,
+  'RightBracket': Key.RightBracket,
+  'Quote': Key.Quote,
+  'Return': Key.Return,
+  'Comma': Key.Comma,
+  'Period': Key.Period,
+  'Slash': Key.Slash,
+  'ArrowLeft': Key.Left,
+  'ArrowUp': Key.Up,
+  'ArrowRight': Key.Right,
+  'ArrowDown': Key.Down,
+  'Print': Key.Print,
+  'Pause': Key.Pause,
+  'Insert': Key.Insert,
+  'Delete': Key.Delete,
+  'Enter': Key.Enter,
+  'Shift': Key.LeftShift,
+  'Alt': Key.LeftAlt,
+  'AltGraph': Key.RightAlt,
+  'NumLock': Key.NumLock,
+}
 
 export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, newUsers: UserData[] = []) {
   const mousePressed: Record<string, boolean> = {}
@@ -34,9 +114,8 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
   let lastKey: string
   let active = false
-  let remoteControlActive = false
-  let mouseEnabled = true
-  let lastMouseEnabled: boolean | undefined = undefined
+  let remoteControlEnabled = false
+  let pointerEnabled = true
   let windowBorders: Dimensions = {
     left: 0,
     top: 0,
@@ -67,42 +146,33 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function toggleRemoteControl(toggle?: boolean) {
-    if (remoteControlActive === toggle)
+    if (remoteControlEnabled === toggle)
       return
 
     if (toggle === undefined)
-      toggle = !remoteControlActive
+      toggle = !remoteControlEnabled
 
     console.log('Toggling remote control', toggle)
-    remoteControlActive = toggle
-    if (toggle) {
-      const enabled = mouseEnabled
-      toggleMouse(true)
-      lastMouseEnabled = enabled
-    }
-    else if (lastMouseEnabled !== undefined)
-      toggleMouse(lastMouseEnabled)
+    remoteControlEnabled = toggle
 
-    overlayWindow?.webContents.send('on-update-overlay-data', { remoteControlActive })
-    sendRemote('remote-control', { enabled: remoteControlActive })
+    overlayWindow?.webContents.send('on-update-overlay-data', { remoteControlEnabled })
+    sendRemote('remote-enabled', { enabled: remoteControlEnabled })
   }
 
-  function toggleMouse(toggle?: boolean) {
-    if (mouseEnabled === toggle)
+  function togglePointer(toggle?: boolean) {
+    if (pointerEnabled === toggle)
       return
 
-    lastMouseEnabled = undefined
-
     if (toggle === undefined)
-      toggle = !mouseEnabled
+      toggle = !pointerEnabled
 
-    console.log('Toggling mouse control', toggle)
-    mouseEnabled = toggle
-    if (!mouseEnabled)
+    console.log('Toggling pointer', toggle)
+    pointerEnabled = toggle
+    if (!pointerEnabled)
       hideOverlays()
 
-    overlayWindow?.webContents.send('on-update-overlay-data', { mouseEnabled })
-    sendRemote('mouse-control', { enabled: mouseEnabled })
+    overlayWindow?.webContents.send('on-update-overlay-data', { pointerEnabled })
+    sendRemote('pointer-enabled', { enabled: pointerEnabled })
   }
 
   function createOverlayWindow() {
@@ -427,31 +497,32 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     }
   }
 
-  async function copyToClipboard(data: any, cut: boolean) {
+  async function copyToClipboard(data: RemoteCopyData) {
     localClipboardTime = Date.now()
 
-    console.log(data)
-
-    const tmpclipboard = await clipboard.getContent()
+    const tmp = await clipboard.getContent()
     await keyboard.pressKey(controlkey, Key.C)
     await keyboard.releaseKey(controlkey, Key.C)
-    const remoteclipboard = await clipboard.getContent()
+    const content = await clipboard.getContent()
 
-    if (!cut) {
-      console.log(`copy to clipboad: ${remoteclipboard}`)
-    }
-    else {
-      console.log(`cut to clipboad: ${remoteclipboard}`)
+    if (data.cut)
       keyboard.type(Key.Delete)
-    }
     
     sendRemote('text', {
-      text: remoteclipboard,
+      text: content,
       time: Date.now()
     })
 
     // @ts-ignore: nut-js does not support clipboard.copy
-    await clipboard.copy(tmpclipboard)
+    await clipboard.copy(tmp)
+  }
+
+  async function pasteFromClipboard(data: RemotePasteData) {
+    const tmp = await clipboard.getContent()
+    await clipboard.setContent(data.text)
+    await keyboard.pressKey(controlkey, Key.V)
+    await keyboard.releaseKey(controlkey, Key.V)
+    await clipboard.setContent(tmp)
   }
 
   function toggleClipboard(toggle?: boolean) {
@@ -473,114 +544,34 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   }
 
   function textToClipboard(data: RemoteTextData) {
-    if (!active || !remoteControlActive) {
+    if (!active || !remoteControlEnabled) {
       dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
     else {
       console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
       if (data.time > localClipboardTime) {
-        (async () => {
-          const tmpclipboard = await clipboard.getContent()
-          await clipboard.setContent(data.text)
-          await keyboard.pressKey(controlkey, Key.V)
-          await keyboard.releaseKey(controlkey, Key.V)
-          await clipboard.setContent(tmpclipboard)
-        })()
+        pasteFromClipboard(data)
       }
     }
   }
 
-  function typeKey(data: any) {
+  function keyDown(data: RemoteKeyData) {
     if (!data.key)
       return
 
     console.log(data.key)
     const key = data.key
-    const specialkeys = [
-      // Original characters
-      '@', ';', ':', '_', '°', '^', '!', '"', '§', '$', '%', '&', '/', '=', '?', '`', '´', 
-      '{', '[', ']', '}', '\\', '\'', '*', '~', '<', '>', '|',
-      'ß', 'ö', 'ä', 'ü', 'Ö', 'Ä', 'Ü',
-      
-      // Additional European characters
-      // Scandinavian
-      'å', 'Å', 'ø', 'Ø', 'æ', 'Æ',
-      
-      // French
-      'é', 'è', 'ê', 'ë', 'É', 'È', 'Ê', 'Ë',
-      'à', 'â', 'À', 'Â',
-      'ù', 'û', 'Ù', 'Û',
-      'ï', 'î', 'Ï', 'Î',
-      'ç', 'Ç',
-      'œ', 'Œ',
-      
-      // Spanish/Portuguese
-      'ñ', 'Ñ',
-      'á', 'Á',
-      'í', 'Í',
-      'ó', 'Ó',
-      'ú', 'Ú',
-      'ã', 'Ã',
-      'õ', 'Õ',
-      
-      // Italian
-      'ì', 'Ì',
-      
-      // Polish
-      'ą', 'Ą',
-      'ć', 'Ć',
-      'ę', 'Ę',
-      'ł', 'Ł',
-      'ń', 'Ń',
-      'ś', 'Ś',
-      'ź', 'Ź',
-      'ż', 'Ż',
-      
-      // Czech/Slovak
-      'ě', 'Ě',
-      'š', 'Š',
-      'č', 'Č',
-      'ř', 'Ř',
-      'ž', 'Ž',
-      'ý', 'Ý',
-      'ť', 'Ť',
-      'ď', 'Ď',
-      'ň', 'Ň'
-    ]
 
-    if (key == 'Space') {
+    if (KeyMap[key]) {
+      keyboard.type(KeyMap[key])
+    } else if (key == 'Space') {
       if (lastKey == 'Dead') {
         keyboard.type('^')
       }
       else {
         keyboard.type(Key.Space)
       }
-    }
-    else if (key == 'Escape') {
-      keyboard.type(Key.Escape)
-    }
-    else if (key == 'Tab') {
-      keyboard.type(Key.Tab)
-    }
-    else if (key == 'Grave') {
-      keyboard.type(Key.Grave)
-    }
-    else if (key == 'Minus') {
-      keyboard.type(Key.Minus)
-    }
-    else if (key == 'Equal') {
-      keyboard.type(Key.Equal)
-    }
-    else if (key == 'Backspace') {
-      keyboard.type(Key.Backspace)
-    }
-    else if (key == 'LeftBracket') {
-      keyboard.type(Key.LeftBracket)
-    }
-    else if (key == 'RightBracket') {
-      keyboard.type(Key.RightBracket)
-    }
-    else if (specialkeys.includes(key)) {
+    } else if (SpecialKeys.includes(key)) {
       (async () => {
         const tmpclipboard = await clipboard.getContent()
         await clipboard.setContent(key)
@@ -588,65 +579,11 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         await keyboard.releaseKey(controlkey, Key.V)
         await clipboard.setContent(tmpclipboard)
       })()
-    }
-    else if (key == 'Quote') {
-      keyboard.type(Key.Quote)
-    }
-    else if (key == 'Return') {
-      keyboard.type(Key.Return)
-    }
-    else if (key == 'Comma') {
-      keyboard.type(Key.Comma)
-    }
-    else if (key == 'Period') {
-      keyboard.type(Key.Period)
-    }
-    else if (key == 'Slash') {
-      keyboard.type(Key.Slash)
-    }
-    else if (key == 'ArrowLeft') {
-      keyboard.type(Key.Left)
-    }
-    else if (key == 'ArrowUp') {
-      keyboard.type(Key.Up)
-    }
-    else if (key == 'ArrowRight') {
-      keyboard.type(Key.Right)
-    }
-    else if (key == 'ArrowDown') {
-      keyboard.type(Key.Down)
-    }
-    else if (key == 'Print') {
-      keyboard.type(Key.Print)
-    }
-    else if (key == 'Pause') {
-      keyboard.type(Key.Pause)
-    }
-    else if (key == 'Insert') {
-      keyboard.type(Key.Insert)
-    }
-    else if (key == 'Delete') {
-      keyboard.type(Key.Delete)
-    }
-    else if (key == 'Enter') {
-      keyboard.type(Key.Enter)
-    }
-    else if (key == 'Shift') {
-      keyboard.type(Key.LeftShift)
-    }
-    else if (key == 'Alt') {
-      keyboard.type(Key.LeftAlt)
-    }
-    else if (key == 'Dead') {
+    } else if (key == 'Dead') {
       lastKey = 'Dead'
-    }
-    else if (key == 'AltGraph') {
-      keyboard.type(Key.RightAlt)
-    }
-    else if (key == 'NumLock' || key == 'Dead') {
+    } else if (key == 'NumLock') {
       // skip
-    }
-    else if (key.startsWith('_____strg+')) {
+    } else if (key.startsWith('_____strg+')) {
       console.log(key)
       console.log(key.replace('_____strg+', ''))
 
@@ -698,102 +635,98 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   function convertObjToAbsolutePosition(data: RemoteMouseData) {
     const display = sourceManager.getCurrentScreen()
 
-    console.log(display)
-    console.log(display.bounds)
-
     const scalefactor = sourceManager.getScaleFactor()
-    let posx = Math.round((data.x + windowBorders.left - display.bounds.x) * scalefactor + display.bounds.x)
-    let posy = Math.round((data.y + windowBorders.top - display.bounds.y) * scalefactor + display.bounds.y)
+    let x = Math.round((data.x + windowBorders.left - display.bounds.x) * scalefactor + display.bounds.x)
+    let y = Math.round((data.y + windowBorders.top - display.bounds.y) * scalefactor + display.bounds.y)
 
     const primary = screen.getPrimaryDisplay()
     if (display.id == primary.id) {
-      posx = posx * primary.scaleFactor
-      posy = posy * primary.scaleFactor
+      x *= primary.scaleFactor
+      y *= primary.scaleFactor
     }
 
-    console.log(`${posx}:${posy}`)
+    console.log(`${x}:${y}`)
 
-    return new Point(posx, posy)
+    return new Point(x, y)
   }
 
   function onRemote<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
     keyboard.config.autoDelayMs = 5
-    let mouseData
+    let mouseData: RemoteMouseData
     switch (event) {
-      case 'copy':
-        if (remoteControlActive)
-          copyToClipboard(data, false)
-        break
       case 'text':
-        //if (remoteControlActive)
-          textToClipboard(data as RemoteTextData)
+        textToClipboard(data as RemoteTextData)
         break
       case 'file':
-        if (mouseEnabled)
-          receiveFile(data as RemoteFileData)
+        receiveFile(data as RemoteFileData)
         break
       case 'file-chunk':
-        if (mouseEnabled)
-          receiveFileChunk(data as RemoteFileChunkData)
+        receiveFileChunk(data as RemoteFileChunkData)
         break
-      case 'cut':
-        if (remoteControlActive)
-          copyToClipboard(data, true)
+      case 'copy':
+        const copyData = data as RemoteCopyData
+        if (remoteControlEnabled && copyData.tool == 'remoteControl')
+          copyToClipboard(copyData)
+        break
+      case 'paste':
+        const pasteData = data as RemotePasteData
+        if (remoteControlEnabled && pasteData.tool == 'remoteControl')
+          pasteFromClipboard(pasteData)
         break
       case 'mouse-move':
-        if (mouseEnabled) {
-          mouseMove(data as RemoteMouseData)
-          sendToOverlayWindow('on-mouse-move', data as RemoteMouseData)
-        }
+        mouseData = data as RemoteMouseData
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
+          mouseMove(mouseData)
+        if (pointerEnabled && mouseData.tool == 'pointer')
+          sendToOverlayWindow('on-mouse-move', mouseData)
         break
       case 'mouse-click':
-        if (remoteControlActive)
-          mouseClick(data as RemoteMouseData)
+        mouseData = data as RemoteMouseData
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
+          mouseClick(mouseData)
         break
       case 'mouse-dblclick':
-        if (remoteControlActive)
-          mouseDblClick(data as RemoteMouseData)
+        mouseData = data as RemoteMouseData
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
+          mouseDblClick(mouseData)
         break
       case 'mouse-leftclick':
         mouseData = data as RemoteMouseData
-        if (remoteControlActive && !mouseData.draw) {
-          if (!isMac)
-            sendToOverlayWindow('on-mouse-click', mouseData)
-
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
           mouseLeftClick(mouseData)
-        }
-        else if (mouseEnabled) {
+        if (pointerEnabled && mouseData.tool == 'pointer')
           sendToOverlayWindow('on-mouse-click', mouseData)
-        }
         break
       case 'mouse-down':
         mouseData = data as RemoteMouseData
-        if (remoteControlActive && !mouseData.draw)
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
           mouseDown(mouseData)
-        else if (mouseEnabled)
+        if (pointerEnabled && mouseData.tool == 'pointer')
           sendToOverlayWindow('on-mouse-down', mouseData)
         break;
       case 'mouse-wheel':
-        if (remoteControlActive)
-          mouseWheel(data as RemoteMouseData)
+        mouseData = data as RemoteMouseData
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
+          mouseWheel(mouseData)
         break;
       case 'mouse-up':
         mouseData = data as RemoteMouseData
-        if (remoteControlActive && !mouseData.draw)
-          mouseUp(data as RemoteMouseData)
-        else if (mouseEnabled)
+        if (remoteControlEnabled && mouseData.tool == 'remoteControl')
+          mouseUp(mouseData)
+        if (pointerEnabled && mouseData.tool == 'pointer')
           sendToOverlayWindow('on-mouse-up', mouseData)
         break;
-      case 'type':
-        if (remoteControlActive)
-          typeKey(data)
+      case 'key-down':
+        const keyData = data as RemoteKeyData
+        if (remoteControlEnabled && keyData.tool == 'remoteControl')
+          keyDown(keyData)
         break;
     }
   }
   
   return {
-    mouseEnabled,
-    remoteControlActive,
+    pointerEnabled,
+    remoteControlEnabled,
 
     activate,
     deactivate,
@@ -801,7 +734,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     hideOverlayWindow,
     toggleClipboard,
     toggleRemoteControl,
-    toggleMouse,
+    togglePointer,
     getToolbarBounds,
     hideRemoteControl,
     updateUsers,

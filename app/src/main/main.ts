@@ -528,8 +528,8 @@ declare const CSP_POLICY: string
     streamer?.remotePresenter?.toggleClipboard(toggle)
   })
 
-  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleMouse(toggle)
+  ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
+    streamer?.remotePresenter?.togglePointer(toggle)
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
