@@ -19,10 +19,12 @@ const props = withDefaults(defineProps<{
   data: File | undefined
   draggable?: boolean
   initialRows?: number
+  invertCollapseIcons?: boolean
 }>(), {
   data: undefined,
   draggable: false,
   initialRows: 8,
+  invertCollapseIcons: false
 })
 
 const emit = defineEmits<{
@@ -45,10 +47,11 @@ const fileSvg = computed(() => {
   if (clipboardFile.value.type !== 'binary')
     return clipboardFile.value.content
 
-  return `${window.electronAPI ? '../': ''}icons/${clipboardFile.value.extension}.svg`
+  return `/assets/icons/ext/${clipboardFile.value.extension}.svg`
 })
 
 const collapsed = ref(false)
+const iconCollapsed  = computed(() => (collapsed.value && !props.invertCollapseIcons) || (!collapsed.value && props.invertCollapseIcons))
 
 watch(collapsed, value => emit('onCollapse', value))
 
@@ -175,7 +178,7 @@ function close() {
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar :draggable="draggable">
       <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="flex:0 0 auto" @click="collapsed = !collapsed">
-        <ChevronDownSvg v-if="collapsed" />
+        <ChevronDownSvg v-if="iconCollapsed" />
         <ChevronUpSvg v-else />
       </div>
       <div style="flex:1 1 auto"></div>
@@ -184,7 +187,7 @@ function close() {
       </div>
     </Toolbar>
     <template v-if="!collapsed">
-      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
+      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(/assets/icons/ext/${clipboardFile.extension}.svg)` }">
         <textarea :rows="initialRows">{{ clipboardFile.content }}</textarea>
       </div>
       <div v-else class="clipboard-content">
@@ -194,6 +197,7 @@ function close() {
           :src="fileSvg"
           @click="downloadFile"
         />
+        <span>{{ clipboardFile.name }}</span>
       </div>
       <Toolbar>
         <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" :title="$t('toolbar.copyToClipboard')" @click="copy">
@@ -229,7 +233,6 @@ function close() {
   box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
 }
 
-
 .clipboard.collapsed {
   height: auto;
 }
@@ -241,10 +244,12 @@ function close() {
 .clipboard .clipboard-content {
   flex-grow: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background-repeat: 'no-repeat';
   background-position-x: 'right';
+  color: #ddd;
 }
   
 .clipboard textarea {
@@ -272,8 +277,8 @@ function close() {
 }
 
 .clipboard img.image {
-  max-height: 120px;
-  max-width: 140px;
+  max-height: 200px;
+  max-width: 200px;
   opacity: 0.8;
 }
 

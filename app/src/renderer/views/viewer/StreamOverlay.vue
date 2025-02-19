@@ -132,14 +132,14 @@ const overlayStyle = computed(() => {
 
 function receiveMouseLeftClick(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
-  if (props.activeTool === 'pointer') {
+  if (data.tool === 'pointer') {
     overlaySignals.send(data.userId, data.x, data.y)
     emit('interacted')
   }
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
-  if (props.activeTool === 'pointer') {
+  if (data.tool === 'pointer') {
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
   }
 
@@ -150,7 +150,7 @@ function receiveMouseMove(data: RemoteMouseData) {
 }
 
 function receiveMouseDown(data: RemoteMouseData) {
-  if (props.activeTool === 'pointer' && !props.draggingOver)
+  if (data.tool === 'pointer' && !props.draggingOver)
     drawOverlay.startStroke(data.userId, [data.x, data.y])
 }
 
@@ -391,6 +391,8 @@ defineExpose({
     @panzoomchange="onPanzoomChange"
     @contextmenu="() => false"
   >
+    <canvas ref="canvas" />
+    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
     <Cursor
       v-for="(cursor, cursorId) in overlayCursors.cursors"
       :key="cursorId"
@@ -398,8 +400,6 @@ defineExpose({
       :scale="totalScale"
       :is-self="cursorId === userId"
     />
-    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
-    <canvas ref="canvas" />
     <template v-if="isSharingScreen">
       <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
     </template>

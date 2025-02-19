@@ -550,7 +550,7 @@ function stop() {
       </StreamOverlay>
     </div>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" />
+      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
     </div>
     <div v-if="activeMessage" class="message">
       <template v-if="activeMessage === 'init' || activeMessage === 'mouseHelp'">

@@ -17,7 +17,7 @@ const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
-const windowModalSize = [400, 500] as const
+const windowModalSize = [400, 550] as const
 
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
@@ -51,6 +51,7 @@ async function start() {
   const token = params.get('token')!
   presenter.value = usePresenter(email, token, t, async (shareAudio) => {
     window.resizeTo(...windowSelectSize)
+    console.log(windowSelectSize, window.outerWidth, window.outerHeight)
     const stream = await getStream(shareAudio)
     window.resizeTo(...windowDefaultSize)
 
@@ -63,6 +64,9 @@ async function start() {
 
     return stream
   }, {
+    onStream: () => {
+      showInviteLink()
+    },
     onRemote: (event, data) => {
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -150,6 +154,7 @@ onReceive("mouse-move", (data) => {
 })
 
 onReceive("mouse-down", (data) => {
+  console.log("mouse-down", data)
   overlayRef.value?.receiveMouseDown(data)
 })
 
@@ -279,7 +284,7 @@ function onResumeSharing() {
 
 <style>
 #browser-presenter {
-  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
   width: 100%;
   height: 100%;
 }
@@ -309,14 +314,12 @@ video {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: #8886;
+  background-color: #8884;
   z-index: 500;
 }
 
 .preview-container {
   position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 .clipboard-container {
