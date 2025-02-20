@@ -16,9 +16,9 @@ import { isTouchEnabled } from "../../util.js"
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
 import HelpSvg from '../../../assets/icons/help.svg'
-import LaserPointerSvg from '../../../assets/icons/laser-pointer.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
-import RemoteSvg from '../../../assets/icons/remote.svg'
+import MouseSvg from '../../../assets/icons/mouse.svg'
+import PencilSvg from '../../../assets/icons/pencil.svg'
 
 import type { RemoteData, RemoteEvent, File, ViewerTool } from '../../../interface'
 import type { ScaleInfo, VideoTransform } from "../../types.js"
@@ -31,6 +31,8 @@ type SendOptions = {
   volatile?: boolean
   receiveSelf?: boolean
 }
+
+type Message = 'init' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -54,7 +56,7 @@ const remoteControlEnabled = ref(false)
 const remoteClipboard = ref(false)
 const activeTool = ref<ViewerTool | undefined>('pointer')
 
-const activeMessage = ref<string | undefined>('init')
+const activeMessage = ref<Message | undefined>('init')
 const remoteMessage = ref<string>()
 let remoteTimeout: number
 watch(pointerEnabled, (enabled) => {
@@ -311,11 +313,11 @@ function freezeVideo() {
   }, 3500)
 }
 
-function toggleMessage(message: string) {
+function toggleMessage(message: Message) {
   activeMessage.value = activeMessage.value === message ? undefined : message
 }
 
-function hideMessage(message: string) {
+function hideMessage(message: Message) {
   if (activeMessage.value === message)
     activeMessage.value = undefined
 }
@@ -513,16 +515,16 @@ function stop() {
 <template>
   <div class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t('viewer.toolbar.pointer')" @click="pointerEnabled && (activeTool = 'pointer')">
-        <LaserPointerSvg />
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+        <PencilSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t('viewer.toolbar.remoteControl')" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
-        <RemoteSvg />
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+        <MouseSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" :title="$t('viewer.toolbar.showClipboard')" @click="showClipboard = !showClipboard">
+      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.help')" @click="toggleMessage('mouseHelp')">
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
         <HelpSvg />
       </div>
       <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
@@ -553,22 +555,28 @@ function stop() {
       <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
     </div>
     <div v-if="activeMessage" class="message">
-      <template v-if="activeMessage === 'init' || activeMessage === 'mouseHelp'">
+      <template v-if="activeMessage === 'init' || activeMessage === 'help'">
         <template v-if="activeMessage === 'init'">
           <b>{{ $t('viewer.messages.establishing') }}</b>
           <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
         </template>
-        <b v-else>{{ $t('viewer.messages.mouseHelp.title') }}</b>
-        <br>
-        <br>
-        <template v-if="!isTouchEnabled()">
-          {{ $t('viewer.messages.mouseHelp.zoom') }}
+        <template v-else-if="!isTouchEnabled()">
+          <h4>{{ $t('viewer.messages.help.title') }}</h4>
           <br>
-          {{ $t('viewer.messages.mouseHelp.move') }}
+          <b>{{ $t('viewer.messages.help.general.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.general.zoom') }}</li>
+            <li>{{ $t('viewer.messages.help.general.move') }}</li>
+            <li>{{ $t('viewer.messages.help.general.copy') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.pointer.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.pointer.draw') }}</li>
+            <li>{{ $t('viewer.messages.help.pointer.signal') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.remoteControl.title') }}</b>
           <br>
-          {{ $t('viewer.messages.mouseHelp.draw') }}
-          <br>
-          {{ $t('viewer.messages.mouseHelp.copy') }}
+          {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
       </template>
       <template v-else-if="activeMessage === 'paused'">

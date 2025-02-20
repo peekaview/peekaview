@@ -88,10 +88,16 @@ setInterval(() => {
     --bs-btn-disabled-bg: #343434;
     --bs-btn-border-color: #464646;
     --bs-btn-disabled-border-color: #343434;
+    --bs-btn-disabled-opacity: 0.25;
+  }
+
+  .toolbar .button.disabled, .toolbar .btn.btn-secondary.disabled {
+    pointer-events: auto; 
+    cursor: not-allowed;
   }
 
   .toolbar .button:hover, .toolbar .btn.btn-secondary:hover {
-      background: #464646 !important;
+      background: #070707 !important;
       border-color: #565656;
       color: #ddd;
   }
