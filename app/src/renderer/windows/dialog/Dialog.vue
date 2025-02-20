@@ -7,6 +7,9 @@ import RingtoneWave from '../../../assets/sounds/ringtone.wav'
 
 import { DialogOptions, DialogType } from '../../../interface'
 
+import ContentCopySvg from '../../../assets/icons/content-copy.svg'
+import CheckSvg from '../../../assets/icons/check.svg'
+
 export type DialogButton = {
   id: number
   label: string
@@ -22,7 +25,7 @@ const modalRef = useTemplateRef<InstanceType<typeof Modal>>('modal')
 const id = ref<number>()
 const title = ref<string>()
 const message = ref<string>()
-const detail = ref<string>()
+const copyText = ref<string>()
 const type = ref<DialogType>()
 const buttons = ref<DialogButton[]>([])
 const defaultId = ref<number>()
@@ -33,7 +36,7 @@ window.electronAPI!.onDialog((options: DialogOptions) => {
   id.value = options.id
   title.value = options.title
   message.value = options.message
-  detail.value = options.detail
+  copyText.value = options.copyText
   type.value = options.type
   defaultId.value = options.defaultId
   cancelId.value = options.cancelId
@@ -78,6 +81,16 @@ function reply(result: number) {
     window.electronAPI!.replyDialog(id.value, result.toString())
   replySent = true
   modalRef.value?.close()
+}
+
+const copied = ref(false)
+async function copy() {
+  if (!copyText.value)
+    return
+
+  await navigator.clipboard.writeText(copyText.value)
+  copied.value = true
+  setTimeout(() => copied.value = false, 2000);
 }
 </script>
 
@@ -134,8 +147,23 @@ function reply(result: number) {
         
         <p>
           <b v-if="message">{{ message }}</b>
-          <br v-if="message && detail">
-          <div v-if="detail" v-html="detail"></div>
+          <br v-if="message && copyText">
+          <div v-if="copyText" class="copy-text-wrapper">
+            <div class="copy-text-container">
+              <input
+                v-model="copyText"
+                type="text"
+                readonly
+              >
+              <button
+                class="btn btn-sm btn-secondary" 
+                @click="copy"
+              >
+                <CheckSvg v-if="copied" />
+                <ContentCopySvg v-else />
+              </button>
+            </div>
+          </div>
         </p>
 
         <div class="modal-buttons">
@@ -176,6 +204,41 @@ function reply(result: number) {
     transform: scale(0.4);
     margin-right: 10px;
     margin-left: -10px;
+  }
+
+  .modal-body .copy-text-wrapper {
+    margin: 10px 0;
+    width: 80vw;
+    padding: 8px;
+    background: transparent;
+  }
+
+  .modal-body .copy-text-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .modal-body .copy-text-container input {
+    flex: 1;
+    padding: 4px;
+    background: #333;
+    color: #fff;
+    border: 1px solid #bcc3ce;
+    border-radius: 2px;
+    height: 28px;
+    line-height: 20px;
+  }
+
+  .modal-body .copy-text-container button {
+    margin: 0;
+    padding: 5px;
+    min-width: 32px;
+    transition: all 0.2s ease;
+  }
+
+  .modal-body .copy-text-container button svg {
+    fill: #ddd;
   }
 
   .modal-body .modal-buttons {

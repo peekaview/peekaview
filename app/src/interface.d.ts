@@ -74,7 +74,7 @@ export interface DialogOptions {
   id?: number
   title?: string
   message?: string
-  detail?: string
+  copyText?: string
   type?: DialogType
   windowType?: 'tray' | 'dialog'
   sound?: string | null
