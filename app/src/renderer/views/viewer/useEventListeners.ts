@@ -103,7 +103,7 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
       }
     }
     
-    if (!_skip) {
+    if (!_skip.value) {
       console.log(keyToSend)
 
       send(keyToSend)

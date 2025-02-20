@@ -6,7 +6,7 @@ import { ElectronWindowDimensions } from '../interface';
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
   toggleRemoteControl: (toggle?: boolean) => ipcRenderer.invoke('toggle-remote-control', toggle),
-  toggleMouse: (toggle?: boolean) => ipcRenderer.invoke('toggle-mouse', toggle),
+  togglePointer: (toggle?: boolean) => ipcRenderer.invoke('toggle-pointer', toggle),
   toggleClipboard: (toggle?: boolean) => ipcRenderer.invoke('toggle-clipboard', toggle),
   setToolbarSize: (width: number, height: number) => ipcRenderer.invoke('set-toolbar-size', width, height),
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),

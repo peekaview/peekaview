@@ -31,8 +31,8 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
   
   // Last state for pause/resume
   let pausedState: {
-    mouseEnabled: boolean;
-    remoteControlActive: boolean;
+    pointerEnabled: boolean;
+    remoteControlEnabled: boolean;
   } | undefined
 
   let hwnd: string | undefined
@@ -114,11 +114,11 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
     if (pausedState === undefined) {
       pausedState = {
-        mouseEnabled: remotePresenter.mouseEnabled,
-        remoteControlActive: remotePresenter.remoteControlActive
+        pointerEnabled: remotePresenter.pointerEnabled,
+        remoteControlEnabled: remotePresenter.remoteControlEnabled
       }
-      remotePresenter.mouseEnabled = false
-      remotePresenter.remoteControlActive = false
+      remotePresenter.pointerEnabled = false
+      remotePresenter.remoteControlEnabled = false
       sendReset()
     }
 
@@ -135,8 +135,8 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
       onHidden(false)
 
     if (pausedState !== undefined) {
-      remotePresenter.mouseEnabled = pausedState.mouseEnabled
-      remotePresenter.remoteControlActive = pausedState.remoteControlActive
+      remotePresenter.pointerEnabled = pausedState.pointerEnabled
+      remotePresenter.remoteControlEnabled = pausedState.remoteControlEnabled
       pausedState = undefined
     }
     

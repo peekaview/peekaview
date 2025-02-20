@@ -55,6 +55,7 @@ export function useCustomDialog() {
       entryKey: string
     }
 
+    const primary = screen.getPrimaryDisplay()
     if (type === 'tray') {
       const width = 600
       const height = 240
@@ -62,8 +63,8 @@ export function useCustomDialog() {
       windowParams = {
         width,
         height,
-        x: screen.getPrimaryDisplay().bounds.x + (isMac || isLinux || isWin32 ? (screen.getPrimaryDisplay().workAreaSize.width - width) / 2 : screen.getPrimaryDisplay().workAreaSize.width - width),
-        y: screen.getPrimaryDisplay().bounds.y + (isMac || isLinux || isWin32 ? 70 : screen.getPrimaryDisplay().workAreaSize.height - 200),
+        x: primary.bounds.x + (isMac || isLinux || isWin32 ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width),
+        y: primary.bounds.y + (isMac || isLinux || isWin32 ? 70 : primary.workAreaSize.height - 200),
         entryKey: 'dialog',
       }
     } else if (type === 'dialog') {
@@ -73,8 +74,8 @@ export function useCustomDialog() {
       windowParams = {
         width,
         height,
-        x: screen.getPrimaryDisplay().bounds.x + (screen.getPrimaryDisplay().workAreaSize.width - width) / 2,
-        y: screen.getPrimaryDisplay().bounds.y + (screen.getPrimaryDisplay().workAreaSize.height - height) / 2,
+        x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
+        y: primary.bounds.y + (primary.workAreaSize.height - height) / 2,
         entryKey: 'dialog',
       }
     } else {
@@ -91,7 +92,7 @@ export function useCustomDialog() {
       windowType: type,
       message: '',
       timeout: (type === 'tray' ? 8000 : 0),
-      detail: '',
+      copyText: '',
       sound,
     }
 

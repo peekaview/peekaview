@@ -6,7 +6,7 @@ import Cursor from "../../components/Cursor.vue"
 
 import { useDrawOverlay } from '../../composables/useDrawOverlay'
 import { usePanzoom } from './usePanzoom'
-import { Dimensions, RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData } from '../../../interface'
+import { Dimensions, RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, ViewerTool } from '../../../interface'
 import { ScaleInfo, VideoTransform } from '../../types'
 import { useKeyListeners } from './useEventListeners'
 import { useOverlayCursors } from '../../composables/useOverlayCursors'
@@ -19,16 +19,16 @@ type SendOptions = {
 
 const props = withDefaults(defineProps<{
   inputEnabled?: boolean
-  mouseEnabled: boolean
-  remoteControlActive?: boolean
+  pointerEnabled: boolean
+  activeTool?: ViewerTool | undefined
   draggingOver?: boolean
   users: UserData[]
   userId: string
   videoTransform?: VideoTransform
 }>(), {
   inputEnabled: true,
+  activeTool: undefined,
   draggingOver: false,
-  remoteControlActive: false,
   users: () => [],
   videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 }),
 })
@@ -76,21 +76,24 @@ const drawOverlay = useDrawOverlay(canvasRef, {
 const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
 window.setInterval(() => overlayCursors.clear(), 1000)
-watch(() => props.mouseEnabled, () => {
+watch(() => props.pointerEnabled, () => {
   overlayCursors.clear(true)
   overlaySignals.clear()
 })
 
-const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "type", data: { key }, options: { receiveSelf: true, volatile: true } }), toRef(props.inputEnabled))
+const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "key-down", data: { key, tool: props.activeTool }, options: { receiveSelf: true, volatile: true } }), toRef(props.inputEnabled))
 
 // Websocket-Message Object
 let currentMouseData: RemoteMouseData = {
   x: 0,
   y: 0,
   userId: props.userId,
-  draw: false
+  tool: props.activeTool
 }
 let lastMouseData: RemoteMouseData
+watch(() => props.activeTool, () => {
+  currentMouseData.tool = props.activeTool
+})
 
 let isMouseDown = false
 let isMouseDragging = false
@@ -129,18 +132,15 @@ const overlayStyle = computed(() => {
 
 function receiveMouseLeftClick(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
-  if (props.remoteControlActive && data.draw)
-    return
-
-  overlaySignals.send(data.userId, data.x, data.y)
-
-  emit('interacted')
+  if (data.tool === 'pointer') {
+    overlaySignals.send(data.userId, data.x, data.y)
+    emit('interacted')
+  }
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
-  if (!props.remoteControlActive || data.draw) {
+  if (data.tool === 'pointer') {
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
-
   }
 
   if (!synchronized || data.userId === props.userId)
@@ -150,7 +150,7 @@ function receiveMouseMove(data: RemoteMouseData) {
 }
 
 function receiveMouseDown(data: RemoteMouseData) {
-  if ((!props.remoteControlActive && !props.draggingOver) || data.draw)
+  if (data.tool === 'pointer' && !props.draggingOver)
     drawOverlay.startStroke(data.userId, [data.x, data.y])
 }
 
@@ -178,7 +178,7 @@ let eventToSend: number | undefined
 let lastMouseDown = 0
 let moveHandler: ((event: MouseEvent) => void) | undefined
 function onMouseUp() {
-  if (!props.mouseEnabled || !props.inputEnabled)
+  if (!props.inputEnabled)
     return
 
   if (moveHandler !== undefined) {
@@ -192,10 +192,10 @@ function onMouseUp() {
 
   if (isMouseDown || isMouseDragging) {
     console.log("mouse-up")
-    emit('send', { event: "mouse-up", data: { ...currentMouseData, draw: pressed.control }, options: { receiveSelf: true, volatile: true } })
+    emit('send', { event: "mouse-up", data: { ...currentMouseData }, options: { receiveSelf: true, volatile: true } })
   } else {
     console.log("mouse-leftclick")
-    emit('send', { event: "mouse-leftclick", data: { ...lastMouseData, draw: pressed.control }, options: { receiveSelf: true, volatile: true } })
+    emit('send', { event: "mouse-leftclick", data: { ...lastMouseData }, options: { receiveSelf: true, volatile: true } })
   }
 
   isMouseDown = false
@@ -203,7 +203,7 @@ function onMouseUp() {
 }
 
 function onMouseDown(e: MouseEvent) {
-  if (!props.mouseEnabled || !props.inputEnabled)
+  if (!props.inputEnabled)
     return
 
   console.log("mouse-down", e.which, lastMouseDown)
@@ -211,7 +211,7 @@ function onMouseDown(e: MouseEvent) {
     isMouseDown = false
     lastMouseDown = 0
     console.log("mouse-rightclick")
-    emit('send', { event: "mouse-click", data: currentMouseData, options: { receiveSelf: true, volatile: true } })
+    emit('send', { event: "mouse-click", data: { ...currentMouseData }, options: { receiveSelf: true, volatile: true } })
   } else if (lastMouseDown === 0) {
     isMouseDragging = false
     lastMouseDown = Date.now()
@@ -235,7 +235,7 @@ function onMouseDown(e: MouseEvent) {
         isMouseDown = true
         
         console.log("mouse-down (immediate due to movement)")
-        emit('send', { event: "mouse-down", data: { ...lastMouseData, draw: pressed.control }, options: { receiveSelf: true, volatile: true } })
+        emit('send', { event: "mouse-down", data: { ...lastMouseData }, options: { receiveSelf: true, volatile: true } })
         
         // Remove this handler since we've triggered the event
         moveHandler && document.removeEventListener('mousemove', moveHandler)
@@ -248,7 +248,7 @@ function onMouseDown(e: MouseEvent) {
     eventToSend = window.setTimeout(() => {
       isMouseDown = true
       console.log("mouse-down")
-      emit('send', { event: "mouse-down", data: { ...lastMouseData, draw: pressed.control }, options: { receiveSelf: true, volatile: true } })
+      emit('send', { event: "mouse-down", data: { ...lastMouseData }, options: { receiveSelf: true, volatile: true } })
     }, 120)
   }
 
@@ -259,7 +259,7 @@ let lastPosX = 0
 let lastPosY = 0
 let lastMove = 0
 function onMouseMove(e: MouseEvent) {
-  if (!props.mouseEnabled || !props.inputEnabled || !synchronized)
+  if (!props.inputEnabled || !synchronized)
     return false
 
   emit('mouse-inside', true)
@@ -272,14 +272,14 @@ function onMouseMove(e: MouseEvent) {
     x: Math.round(x / (totalScale.value * (zoom.value?.scale ?? 1))),
     y: Math.round(y / (totalScale.value * (zoom.value?.scale ?? 1))),
     userId: props.userId,
-    draw: pressed.control,
+    tool: props.activeTool
   }
 
   if ((lastMouseDown > 0 && lastMove < Date.now() - 10) || 
     (lastMove < Date.now() - 100) ||
     (lastMove < Date.now() - 50 && (Math.abs(lastPosX - x) < 3 || Math.abs(lastPosY - y) < 3))) {
     lastMove = Date.now()
-    emit('send', { event: "mouse-move", data: currentMouseData, options: { receiveSelf: true, volatile: true } })
+    emit('send', { event: "mouse-move", data: { ...currentMouseData }, options: { receiveSelf: true, volatile: true } })
   }
 
   lastPosX = x
@@ -302,7 +302,7 @@ function onMouseLeave() {
 
   emit('mouse-inside', false)
   if (lastMouseDown > 0) {
-    emit('send', { event: "mouse-up", data: currentMouseData, options: { receiveSelf: true, volatile: true } })
+    emit('send', { event: "mouse-up", data: { ...currentMouseData }, options: { receiveSelf: true, volatile: true } })
     clearTimeout(eventToSend)
     eventToSend = undefined
     lastMouseDown = 0
@@ -319,7 +319,6 @@ function updateVideoScale(scaleInfo: ScaleInfo) {
 }
 
 function calcScale() {
-  console.log("calcScale")
   const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
   const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
 
@@ -392,6 +391,8 @@ defineExpose({
     @panzoomchange="onPanzoomChange"
     @contextmenu="() => false"
   >
+    <canvas ref="canvas" />
+    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
     <Cursor
       v-for="(cursor, cursorId) in overlayCursors.cursors"
       :key="cursorId"
@@ -399,8 +400,6 @@ defineExpose({
       :scale="totalScale"
       :is-self="cursorId === userId"
     />
-    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
-    <canvas ref="canvas" />
     <template v-if="isSharingScreen">
       <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
     </template>
@@ -409,6 +408,12 @@ defineExpose({
 
 <style>
 .stream-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
   margin: 0px;
   padding: 0px;
 }
@@ -424,7 +429,7 @@ defineExpose({
 
 .stream-overlay .cover-bounds {
   position: absolute;
-  z-index: 100;
+  z-index: 1100;
   background: repeating-linear-gradient(-45deg, #222, #333 15px, #884 15px, #aa4 20px);
   filter: blur(2px);
 }

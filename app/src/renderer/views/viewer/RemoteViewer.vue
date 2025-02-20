@@ -17,8 +17,10 @@ import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
 import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
+import MouseSvg from '../../../assets/icons/mouse.svg'
+import PencilSvg from '../../../assets/icons/pencil.svg'
 
-import type { RemoteData, RemoteEvent, File } from '../../../interface'
+import type { RemoteData, RemoteEvent, File, ViewerTool } from '../../../interface'
 import type { ScaleInfo, VideoTransform } from "../../types.js"
 
 type ReceiveEventHandlers = {
@@ -29,6 +31,8 @@ type SendOptions = {
   volatile?: boolean
   receiveSelf?: boolean
 }
+
+type Message = 'init' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -47,17 +51,22 @@ const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
 const hidden = ref(false)
-const mouseEnabled = ref(true)
-const remoteControlActive = ref(false)
+const pointerEnabled = ref(true)
+const remoteControlEnabled = ref(false)
 const remoteClipboard = ref(false)
+const activeTool = ref<ViewerTool | undefined>('pointer')
 
+const activeMessage = ref<Message | undefined>('init')
+const remoteMessage = ref<string>()
 let remoteTimeout: number
-watch(mouseEnabled, (enabled) => {
-  if (activeMessage.value === 'init')
-    return
+watch(pointerEnabled, (enabled) => {
+  if (!enabled)
+    activeTool.value = remoteControlEnabled.value ? 'remoteControl' : undefined
+  else if (!activeTool.value)
+    activeTool.value = 'pointer'
 
   activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.mouse${enabled ? 'En' : 'Dis'}abled`)
+  remoteMessage.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
   clearTimeout(remoteTimeout)
   remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
@@ -65,12 +74,14 @@ watch(mouseEnabled, (enabled) => {
   }, 3000)
 })
 
-watch(remoteControlActive, (active) => {
-  if (activeMessage.value === 'remote')
-    return
+watch(remoteControlEnabled, (enabled) => {
+  if (!enabled)
+    activeTool.value = pointerEnabled.value ? 'pointer' : undefined
+  else if (!activeTool.value)
+    activeTool.value = 'remoteControl'
   
   activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.remoteControl${active ? 'En' : 'Dis'}abled`)
+  remoteMessage.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
   clearTimeout(remoteTimeout)
   remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
@@ -78,10 +89,7 @@ watch(remoteControlActive, (active) => {
   }, 3000)
 })
 
-const activeMessage = ref<string | undefined>('init')
-const remoteMessage = ref<string>()
 const draggingOver = ref(false)
-
 const showClipboard = ref(true)
 const clipboardFile = ref<File>()
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
@@ -125,12 +133,12 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-onReceive('mouse-control', (data) => {
-  mouseEnabled.value = data.enabled
+onReceive('pointer-enabled', (data) => {
+  pointerEnabled.value = data.enabled
 })
 
-onReceive('remote-control', (data) => {
-  remoteControlActive.value = data.enabled
+onReceive('remote-enabled', (data) => {
+  remoteControlEnabled.value = data.enabled
 })
 
 let pauseTimeout: number
@@ -238,18 +246,20 @@ function onDragOver(e: DragEvent) {
   }, 5000)
 }
 
-function onCopy() {
+function sendCopy(cut = false) {
   if (remoteClipboard.value)
     send('copy', {
-      room: props.data?.roomId,
+      cut,
+      tool: activeTool.value,
     }, { receiveSelf: true })
 }
 
+function onCopy() {
+  sendCopy(false)
+}
+
 function onCut() {
-  if (remoteClipboard.value)
-    send('cut', {
-      room: props.data?.roomId,
-    }, { receiveSelf: true })
+  sendCopy(true)
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -303,11 +313,11 @@ function freezeVideo() {
   }, 3500)
 }
 
-function toggleMessage(message: string) {
+function toggleMessage(message: Message) {
   activeMessage.value = activeMessage.value === message ? undefined : message
 }
 
-function hideMessage(message: string) {
+function hideMessage(message: Message) {
   if (activeMessage.value === message)
     activeMessage.value = undefined
 }
@@ -419,7 +429,7 @@ watch(() => props.data, async (screenShareData) => {
         try {
           parsedData = JSON.parse(data)
         } catch (err) {
-          console.error('Failed to parse remote control data:', err)
+          console.error('Failed to parse remote data:', err)
           return
         }
       }
@@ -441,7 +451,6 @@ watch(() => props.data, async (screenShareData) => {
 }, { flush: 'post', immediate: true })
 
 onMounted(() => {
-
   denyLoadingInTopWindow()
   const cleanupZoom = disableBrowserZoom()
   window.addEventListener('resize', repaint)
@@ -504,62 +513,70 @@ function stop() {
 </script>
 
 <template>
-  <div class="remote-control">
+  <div class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" @click="showClipboard = !showClipboard">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+        <PencilSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+        <MouseSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Help" @click="toggleMessage('mouseHelp')">
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
         <HelpSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" title="Leave" @click="$emit('stop')">
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
         <LogoutSvg />
       </div>
     </Toolbar>
     <div ref="container" class="remote-container" :style="containerStyle">
       <video ref="video" playsinline autoplay :style="videoStyle" />
-      <div 
+      <StreamOverlay
         v-if="data"
-        class="remote-viewer"
+        ref="overlay"
+        :users="[...users, data.user]"
+        :user-id="data.user.id"
+        :video-transform="videoTransform"
+        :input-enabled="!hidden"
+        :pointer-enabled="pointerEnabled"
+        :active-tool="activeTool"
+        :dragging-over="draggingOver"
+        @rescale="rescale"
+        @synchronized="hideMessage('init')"
+        @interacted="freezeVideo"
+        @mouse-inside="remoteClipboard = $event"
+        @send="send($event.event, $event.data, $event.options)"
       >
-        <StreamOverlay
-          ref="overlay"
-          :input-enabled="!hidden"
-          :users="[...users, data.user]"
-          :user-id="data.user.id"
-          :video-transform="videoTransform"
-          :mouse-enabled="mouseEnabled"
-          :remote-control-active="remoteControlActive"
-          :dragging-over="draggingOver"
-          @rescale="rescale"
-          @synchronized="hideMessage('init')"
-          @interacted="freezeVideo"
-          @mouse-inside="remoteClipboard = $event"
-          @send="send($event.event, $event.data, $event.options)"
-        >
-        </StreamOverlay>
-      </div>
+      </StreamOverlay>
     </div>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" />
+      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
     </div>
     <div v-if="activeMessage" class="message">
-      <template v-if="activeMessage === 'init' || activeMessage === 'mouseHelp'">
+      <template v-if="activeMessage === 'init' || activeMessage === 'help'">
         <template v-if="activeMessage === 'init'">
           <b>{{ $t('viewer.messages.establishing') }}</b>
           <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
         </template>
-        <b v-else>{{ $t('viewer.messages.mouseHelp.title') }}</b>
-        <br>
-        <br>
-        <template v-if="!isTouchEnabled()">
-          {{ $t('viewer.messages.mouseHelp.zoom') }}
+        <template v-else-if="!isTouchEnabled()">
+          <h4>{{ $t('viewer.messages.help.title') }}</h4>
           <br>
-          {{ $t('viewer.messages.mouseHelp.move') }}
+          <b>{{ $t('viewer.messages.help.general.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.general.zoom') }}</li>
+            <li>{{ $t('viewer.messages.help.general.move') }}</li>
+            <li>{{ $t('viewer.messages.help.general.copy') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.pointer.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.pointer.draw') }}</li>
+            <li>{{ $t('viewer.messages.help.pointer.signal') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.remoteControl.title') }}</b>
           <br>
-          {{ $t('viewer.messages.mouseHelp.draw') }}
-          <br>
-          {{ $t('viewer.messages.mouseHelp.copy') }}
+          {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
       </template>
       <template v-else-if="activeMessage === 'paused'">
@@ -615,7 +632,7 @@ function stop() {
     src: local('Abel Regular'), local('Abel-Regular'), url('../../../assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
   }
 
-  .remote-control {
+  .remote-viewer {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -623,34 +640,26 @@ function stop() {
     height: 100%;
   }
 
-  .remote-control .remote-container {
+  .remote-viewer .remote-container {
     position: relative;
     width: 100%;
     height: 100%;
   }
 
-  .remote-control video {
+  .remote-viewer video {
     width: 100%;
     height: 100%;
     max-width: 100%;
     max-height: 100%;
   }
 
-  .remote-control .main-toolbar {
+  .remote-viewer .main-toolbar {
     cursor: default;
     position: relative;
-    z-index: 100;
-  }
-
-  .remote-control .remote-viewer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    z-index:3000;
   }
   
-  .remote-control .message {
+  .remote-viewer .message {
     padding-left: 100px;
     position: absolute;
     bottom: 0px;
@@ -664,23 +673,23 @@ function stop() {
     pointer-events: none;
   }
 
-  .remote-control .clipboard-container {
+  .remote-viewer .clipboard-container {
     position: absolute;
     bottom: 0;
     right: 0;
-    z-index: 300;
+    z-index: 2000;
   }
 
-  .remote-control .clipboard {
+  .remote-viewer .clipboard {
     min-width: 15rem;
   }
 
-  .remote-control textarea::-webkit-scrollbar {
+  .remote-viewer textarea::-webkit-scrollbar {
     display: none;
   }
 
   /* Checkbox styles */
-  .remote-control .checkbox-container {
+  .remote-viewer .checkbox-container {
     display: block;
     position: relative;
     padding-left: 5px;
@@ -691,7 +700,7 @@ function stop() {
     user-select: none;
   }
 
-  .remote-control .checkbox-container input {
+  .remote-viewer .checkbox-container input {
     position: absolute;
     opacity: 0;
     cursor: pointer;
@@ -699,7 +708,7 @@ function stop() {
     width: 0;
   }
 
-  .remote-control .checkmark {
+  .remote-viewer .checkmark {
     position: absolute;
     top: 2px;
     left: 0;
@@ -708,25 +717,25 @@ function stop() {
     background-color: #eee;
   }
 
-  .remote-control .checkbox-container:hover input ~ .checkmark {
+  .remote-viewer .checkbox-container:hover input ~ .checkmark {
     background-color: #ccc;
   }
 
-  .remote-control .checkbox-container input:checked ~ .checkmark {
+  .remote-viewer .checkbox-container input:checked ~ .checkmark {
     background-color: #2196F3;
   }
 
-  .remote-control .checkmark:after {
+  .remote-viewer .checkmark:after {
     content: "";
     position: absolute;
     display: none;
   }
 
-  .remote-control .checkbox-container input:checked ~ .checkmark:after {
+  .remote-viewer .checkbox-container input:checked ~ .checkmark:after {
     display: block;
   }
 
-  .remote-control .checkbox-container .checkmark:after {
+  .remote-viewer .checkbox-container .checkmark:after {
     left: 3px;
     top: 0;
     width: 5px;

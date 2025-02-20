@@ -28,7 +28,7 @@ withDefaults(defineProps<{
   float: left;
   width: 300px;
   position: absolute;
-  z-index: 99;
+  z-index: 300;
 }
 
 .cursor img {

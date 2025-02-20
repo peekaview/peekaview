@@ -17,7 +17,7 @@ const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
-const windowModalSize = [400, 500] as const
+const windowModalSize = [400, 550] as const
 
 const videoRef = useTemplateRef('video')
 const containerRef = useTemplateRef('container')
@@ -26,9 +26,9 @@ const overlayRef = useTemplateRef('overlay')
 const presenter = ref<Presenter>()
 const lastWindowPosition = ref<[number, number]>([0, 0])
 
-const mouseEnabled = ref(true)
-watch(mouseEnabled, (enabled) => {
-  presenter.value?.sendRemote?.('mouse-control', { enabled })
+const pointerEnabled = ref(true)
+watch(pointerEnabled, (enabled) => {
+  presenter.value?.sendRemote?.('pointer-enabled', { enabled })
 })
 
 const showClipboard = ref(false)
@@ -51,6 +51,7 @@ async function start() {
   const token = params.get('token')!
   presenter.value = usePresenter(email, token, t, async (shareAudio) => {
     window.resizeTo(...windowSelectSize)
+    console.log(windowSelectSize, window.outerWidth, window.outerHeight)
     const stream = await getStream(shareAudio)
     window.resizeTo(...windowDefaultSize)
 
@@ -63,6 +64,9 @@ async function start() {
 
     return stream
   }, {
+    onStream: () => {
+      showInviteLink()
+    },
     onRemote: (event, data) => {
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -150,6 +154,7 @@ onReceive("mouse-move", (data) => {
 })
 
 onReceive("mouse-down", (data) => {
+  console.log("mouse-down", data)
   overlayRef.value?.receiveMouseDown(data)
 })
 
@@ -247,7 +252,7 @@ function onResumeSharing() {
   </div>
   <template v-else>
     <PresenterToolbar
-      @toggle-mouse="mouseEnabled = $event"
+      @toggle-pointer="pointerEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"
       @pause-sharing="onPauseSharing()"
@@ -261,11 +266,11 @@ function onResumeSharing() {
       <StreamOverlay
         v-if="presenter?.screenShareData"
         ref="overlay"
-        :input-enabled="false"
         :users="presenter.viewers"
         :user-id="presenter.screenShareData.user.id"
         :video-transform="videoTransform"
-        :mouse-enabled="mouseEnabled"
+        :input-enabled="false"
+        :pointer-enabled="pointerEnabled"
         @rescale="rescale"
         @send="send($event.event, $event.data, $event.options)"
       />
@@ -279,7 +284,7 @@ function onResumeSharing() {
 
 <style>
 #browser-presenter {
-  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
   width: 100%;
   height: 100%;
 }
@@ -309,19 +314,17 @@ video {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: #8886;
-  z-index: 1000;
+  background-color: #8884;
+  z-index: 500;
 }
 
 .preview-container {
   position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 .clipboard-container {
   position: absolute;
-  z-index: 1002;
+  z-index: 2000;
   top: 50px;
   left: 50px;
 }
@@ -333,6 +336,6 @@ video {
   width: 100%;
   height: 100%;
   background-color: black;
-  z-index: 1001;
+  z-index: 1500;
 }
 </style>

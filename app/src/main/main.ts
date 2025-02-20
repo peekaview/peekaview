@@ -18,13 +18,12 @@ import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
-import fs from 'fs'
 
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useStreamer, type Streamer } from './composables/useStreamer'
 
 import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
-import { resolvePath, windowLoad } from './util'
+import { windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
@@ -259,10 +258,8 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-
-    !app.isPackaged && presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
@@ -283,10 +280,8 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(viewerWindow, 'viewer')
-
     viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-
-    !app.isPackaged && viewerWindow.webContents.openDevTools()
+    //viewerWindow.webContents.openDevTools()
   }
 
   const createLoginWindow = (discardSession = false) => {
@@ -459,19 +454,10 @@ declare const CSP_POLICY: string
       return
     }
 
-    const url = `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`
-    
-    // Load and process template
-    const templatePath = resolvePath('/static/templates/sharing-active.html')
-
-    let htmlContent = (await fs.promises.readFile(templatePath, 'utf8'))
-      .replace('{{message}}', i18n.t('sharingActive.message'))
-      .replaceAll('{{url}}', url)
-
-    
     customDialog.openTrayDialog(import.meta.env.VITE_APP_URL, {
       title: i18n.t('sharingActive.title'),
-      detail: htmlContent,
+      message: i18n.t('sharingActive.message'),
+      copyText: `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`,
       timeout: 30000
     })
   }
@@ -528,8 +514,8 @@ declare const CSP_POLICY: string
     streamer?.remotePresenter?.toggleClipboard(toggle)
   })
 
-  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleMouse(toggle)
+  ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
+    streamer?.remotePresenter?.togglePointer(toggle)
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {

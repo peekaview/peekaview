@@ -74,23 +74,30 @@ setInterval(() => {
 
     /* Base button styles */
   .toolbar .button, .toolbar .btn.btn-secondary {
-      cursor: pointer;
-      text-align: center;
-      padding: 5px;
-      border: 1px solid #464646;
-      color: #aaa;
-      font-family: Verdana;
-      font-size: 10px;
-      background: #343434;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2rem;
-      --bs-btn-disabled-opacity: 0.5;
+    cursor: pointer;
+    text-align: center;
+    padding: 5px;
+    font-family: Verdana;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    --bs-btn-color: #aaa;
+    --bs-btn-bg: #343434;
+    --bs-btn-disabled-bg: #343434;
+    --bs-btn-border-color: #464646;
+    --bs-btn-disabled-border-color: #343434;
+    --bs-btn-disabled-opacity: 0.25;
+  }
+
+  .toolbar .button.disabled, .toolbar .btn.btn-secondary.disabled {
+    pointer-events: auto; 
+    cursor: not-allowed;
   }
 
   .toolbar .button:hover, .toolbar .btn.btn-secondary:hover {
-      background: #464646 !important;
+      background: #070707 !important;
       border-color: #565656;
       color: #ddd;
   }
