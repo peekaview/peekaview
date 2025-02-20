@@ -268,7 +268,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     const primary = screen.getPrimaryDisplay()
     clipboardWindow = new BrowserWindow({
       x: primary.bounds.x + (isMac || isLinux ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width + 10),
-      y: primary.bounds.y + (isMac || isLinux ? 60 : primary.workAreaSize.height - height + 30),
+      y: primary.bounds.y + (isMac || isLinux ? 60 : primary.workAreaSize.height - height),
       width,
       height,
       minWidth: width,
@@ -312,7 +312,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (toolbarWindow)
       return
 
-    const width = 495
+    const width = 520
     const height = 50
 
     const display = sourceManager.getCurrentScreen()

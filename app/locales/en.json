@@ -219,8 +219,8 @@
   "toolbar": {
     "collapse": "Collapse",
     "expand": "Expand",
-    "pointer": "Allow Draw / Point",
-    "remoteControl": "Allow Remote Control",
+    "pointer": "Draw / Point",
+    "remoteControl": "Remote Control",
     "openClipboard": "Open clipboard",
     "shareDifferentScreen": "Share different screen",
     "inviteLink": "Invite link",

@@ -226,6 +226,7 @@ function close() {
   flex-direction: column;
   width: 100%;
   height: 100%;
+  max-width: 15rem;
   padding: 5px;
   background: #1a1a1a;
   border: 1px solid hsla(0, 0%, 25%, 0.75);
@@ -277,8 +278,8 @@ function close() {
 }
 
 .clipboard img.image {
-  max-height: 200px;
-  max-width: 200px;
+  max-height: 100%;
+  max-width: 100%;
   opacity: 0.8;
 }
 

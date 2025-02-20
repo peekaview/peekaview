@@ -521,10 +521,10 @@ function stop() {
       <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
         <MouseSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
+      <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeMessage === 'help' }" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
         <HelpSvg />
       </div>
       <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
@@ -660,10 +660,9 @@ function stop() {
   }
   
   .remote-viewer .message {
-    padding-left: 100px;
     position: absolute;
     bottom: 0px;
-    z-index: 100;
+    z-index: 3000;
     color: white;
     background: #000;
     padding: 20px;

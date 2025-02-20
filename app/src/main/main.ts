@@ -42,6 +42,7 @@ declare const APP_VERSION: string
 declare const CSP_POLICY: string
 
 (async () => {
+  let isQuitting = false
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
     const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
@@ -50,6 +51,7 @@ declare const CSP_POLICY: string
       app.emit('second-instance', null, [protocolUrl], null)
     }
     log.info('Another instance is running, quitting...')
+    isQuitting = true
     app.quit()
     return
   }
@@ -158,7 +160,10 @@ declare const CSP_POLICY: string
       focusApp()
     })
 
-    app.on('will-quit', e => e.preventDefault())
+    app.on('will-quit', e => {
+      if (!isQuitting)
+        e.preventDefault()
+    })
 
     log.info("App initialization complete")
     const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
@@ -378,6 +383,7 @@ declare const CSP_POLICY: string
 
   function quit() {
     log.info('Initiating app quit')
+    isQuitting = true
     app.quit()
   }
 

@@ -57,12 +57,12 @@ function onCollapse() {
 
 <template>
   <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" poll-size @on-collapse="onCollapse">
-    <label class="checkbox-container">
+    <label class="checkbox-container" style="width:85px">
       <input type="checkbox" v-model="pointerEnabled" />
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
     </label>
-    <label v-if="inApp" class="checkbox-container">
+    <label v-if="inApp" class="checkbox-container" style="width:100px">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>

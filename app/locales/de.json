@@ -219,8 +219,8 @@
   "toolbar": {
     "collapse": "Einklappen",
     "expand": "Ausklappen",
-    "pointer": "Zeichnen / Zeiger erlauben",
-    "remoteControl": "Fernsteuerung erlauben",
+    "pointer": "Zeichnen / Zeiger",
+    "remoteControl": "Fernsteuerung",
     "openClipboard": "Zwischenablage öffnen",
     "shareDifferentScreen": "Anderen Bildschirm teilen",
     "inviteLink": "Einladungslink",
