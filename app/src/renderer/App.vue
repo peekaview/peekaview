@@ -27,6 +27,7 @@ const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 
 const lastContacts = ref<string[]>(JSON.parse(localStorage.getItem('lastContacts') ?? '[]'))
 const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
 const activeViewerData = ref<ViewerData | undefined>()
+const isViewFixed = computed(() => action === Action.View && !!formViewerData.value.email)
 
 watch(activeViewerData, (data) => {
   if (!data) {
@@ -76,11 +77,13 @@ async function handleLogout() {
           <img :src="PeekaViewLogo" alt="Logo" class="logo">
         </a>
       </div>
-      <h1 class="header-title">
-        <b>SHARE</b>YOUR<b>SCREEN</b>
-        <br>
-        <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
-      </h1>
+      <a href="/" style="text-decoration:none;">
+        <h1 class="header-title">
+          <b>SHARE</b>YOUR<b>SCREEN</b>
+          <br>
+          <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
+        </h1>
+      </a>
       <div class="header-actions">
         <button v-if="action === 'share' && token" class="btn btn-outline-light" @click="handleLogout">
           {{ $t('app.logout') }}
@@ -110,7 +113,7 @@ async function handleLogout() {
             @stop="presenterActive = false"
           />
           <template v-else>
-            <template v-if="action !== Action.View && action !== Action.Share">
+            <template v-if="!isViewFixed">
               <div class="form-content">
                 <div class="d-flex gap-4 align-items-center">
                   <div>
@@ -139,11 +142,11 @@ async function handleLogout() {
             <template v-if="plannedAction === 'view'">
               <ViewerForm
                 v-model="formViewerData"
-                :is-email-fixed="action === Action.View"
+                :is-fixed="isViewFixed"
                 @submit="activeViewerData = formViewerData"
               />
 
-              <template v-if="action !== Action.View && lastContacts.length > 0">
+              <template v-if="!isViewFixed && lastContacts.length > 0">
                 <hr>
                 <h6>{{ $t('app.form.lastContacts') }}</h6>
                 <div v-for="email in lastContacts" :key="email">

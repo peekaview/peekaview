@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
+import { nextTick, ref, onBeforeUnmount, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
@@ -19,25 +19,23 @@ const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
 const windowModalSize = [400, 550] as const
 
-const videoRef = useTemplateRef('video')
+const outerRef = useTemplateRef('outer')
 const containerRef = useTemplateRef('container')
+const toolbarRef = useTemplateRef('toolbar')
+const videoRef = useTemplateRef('video')
 const overlayRef = useTemplateRef('overlay')
 
 const presenter = ref<Presenter>()
 const lastWindowPosition = ref<[number, number]>([0, 0])
+const windowSizeFixed = ref(false)
 
 const pointerEnabled = ref(true)
-watch(pointerEnabled, (enabled) => {
-  presenter.value?.sendRemote?.('pointer-enabled', { enabled })
-})
-
 const showClipboard = ref(false)
 const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
 const userInputRequired = ref(true)
-//onMounted(() => start())
 
 async function start() {
   userInputRequired.value = false
@@ -49,10 +47,17 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
+  presenter.value = usePresenter({
+    email,
+    token,
+    pointerEnabled,
+    remoteControlEnabled: false
+  }, t, async (shareAudio) => {
+    windowSizeFixed.value = true
     window.resizeTo(...windowSelectSize)
     console.log(windowSelectSize, window.outerWidth, window.outerHeight)
     const stream = await getStream(shareAudio)
+    windowSizeFixed.value = false
     window.resizeTo(...windowDefaultSize)
 
     videoRef.value!.srcObject = stream
@@ -102,18 +107,17 @@ function rescale(scaleInfo: ScaleInfo) {
   const currentHeight = Math.round(containerRect.height)
   const currentWidth = Math.round(containerRect.width)
 
-  let scaleDownY = 1
-  let scaleDownX = 1
-  if (scaleInfo.height > window.innerHeight)
-    scaleDownY = window.innerHeight / scaleInfo.height
+  let xScale = 1
+  let yScale = 1
   if (scaleInfo.width > window.innerWidth)
-    scaleDownX = window.innerWidth / scaleInfo.width
+    xScale = window.innerWidth / scaleInfo.width
+  if (scaleInfo.height > window.innerHeight)
+    yScale = window.innerHeight / scaleInfo.height
 
-  let scaleDown = scaleDownY < scaleDownX ? scaleDownY : scaleDownX
-  
+  const scale = yScale < xScale ? yScale : xScale
   if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
-    containerStyle.value.height = scaleInfo.height * scaleDown + 'px'
-    containerStyle.value.width = scaleInfo.width * scaleDown + 'px'
+    containerStyle.value.height = scaleInfo.height * scale + 'px'
+    containerStyle.value.width = scaleInfo.width * scale + 'px'
   }
 
   containerStyle.value.overflow = 'visible'
@@ -174,6 +178,41 @@ onReceive("mouse-up", (data) => {
   freezeAndFocus()
 })
 
+window.addEventListener('resize', onResize)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+})
+
+let resizeDebounceTimeout: number | null = null
+function onResize() {
+  if (resizeDebounceTimeout)
+    clearTimeout(resizeDebounceTimeout)
+
+  resizeDebounceTimeout = window.setTimeout(() => {
+    resizeDebounceTimeout = null
+    fitPreview()
+  }, 500)
+}
+
+function fitPreview() {
+  if (!videoRef.value || windowSizeFixed.value)
+    return
+
+  const outerRect = outerRef.value!.getBoundingClientRect()
+  const containerRect = containerRef.value!.getBoundingClientRect()
+  const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
+  const videoRect = videoRef.value!.getBoundingClientRect()
+
+  const deltaWidth = containerRect.width - videoRect.width
+  const deltaHeight = outerRect.height - containerRect.height - toolbarRect.height
+  const width = window.outerWidth
+  const height = window.outerHeight
+
+  if (deltaWidth > 0 || deltaHeight > 0)
+    window.resizeTo(width - deltaWidth, height - deltaHeight)
+}
+
 function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
   presenter.value?.sendRemote?.(event, data)
   if (options.receiveSelf)
@@ -200,9 +239,11 @@ function freezeAndFocus() {
     videoRef.value?.pause()
     shutterActive.value = false
     lastWindowPosition.value = [window.screenX, window.screenY]
+    windowSizeFixed.value = true
     window.resizeTo(window.screen.width, window.screen.height)
     window.focus()
     window.setTimeout(() => {
+      windowSizeFixed.value = false
       window.resizeTo(...windowDefaultSize)
       window.moveTo(...lastWindowPosition.value)
       videoRef.value?.play()
@@ -211,6 +252,7 @@ function freezeAndFocus() {
 }
 
 async function showInviteLink() {
+  windowSizeFixed.value = true
   window.resizeTo(...windowModalSize)
   const url = `${import.meta.env.VITE_APP_URL}?view=${presenter.value?.viewCode}`
   const result = await prompt({
@@ -224,6 +266,7 @@ async function showInviteLink() {
   if (result === '0')
     navigator.clipboard.writeText(url)
 
+  windowSizeFixed.value = false
   window.resizeTo(...windowDefaultSize)
 }
 
@@ -250,8 +293,9 @@ function onResumeSharing() {
   <div v-else-if="!presenter" class="input-container">
     <img :src="LoadingDarkGif">
   </div>
-  <template v-else>
+  <div v-else ref="outer" class="presenter-container">
     <PresenterToolbar
+      ref="toolbar"
       @toggle-pointer="pointerEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"
@@ -279,7 +323,7 @@ function onResumeSharing() {
       </div>
       <div v-if="shutterActive" class="shutter" />
     </div>
-  </template>
+  </div>
 </template>
 
 <style>
@@ -289,7 +333,14 @@ function onResumeSharing() {
   height: 100%;
 }
 
-#browser-presenter .toolbar {
+.presenter-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.presenter-container .toolbar {
   border-radius: 0;
   border: none;
 }

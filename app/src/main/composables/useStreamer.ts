@@ -30,18 +30,16 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
   let resetInterval: NodeJS.Timeout | undefined
   
   // Last state for pause/resume
-  let pausedState: {
-    pointerEnabled: boolean;
-    remoteControlEnabled: boolean;
+  let pausedToggleState: {
+    pointer: boolean;
+    remoteControl: boolean;
   } | undefined
 
   let hwnd: string | undefined
-  let roomid: string | undefined
 
-  async function startSharing(sourceId: string, roomId: string) {
+  async function startSharing(sourceId: string) {
     if (sourceId.includes(':'))
       hwnd = sourceId.split(':')[1]
-    roomid = roomId
 
     console.log(`hwndstreamer:${hwnd}`)
 
@@ -112,13 +110,10 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
 
     streamingState = fromHidden ? 'hidden' : 'paused'
 
-    if (pausedState === undefined) {
-      pausedState = {
-        pointerEnabled: remotePresenter.pointerEnabled,
-        remoteControlEnabled: remotePresenter.remoteControlEnabled
-      }
-      remotePresenter.pointerEnabled = false
-      remotePresenter.remoteControlEnabled = false
+    if (pausedToggleState === undefined) {
+      pausedToggleState = { ...remotePresenter.toggles }
+      remotePresenter.toggles.pointer = false
+      remotePresenter.toggles.remoteControl = false
       sendReset()
     }
 
@@ -134,10 +129,9 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     if (fromHidden)
       onHidden(false)
 
-    if (pausedState !== undefined) {
-      remotePresenter.pointerEnabled = pausedState.pointerEnabled
-      remotePresenter.remoteControlEnabled = pausedState.remoteControlEnabled
-      pausedState = undefined
+    if (pausedToggleState !== undefined) {
+      remotePresenter.toggles = { ...pausedToggleState }
+      pausedToggleState = undefined
     }
     
     streamingState = 'stopped'
@@ -160,27 +154,22 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     }
   }
 
+  let resetTimeout: NodeJS.Timeout | undefined
   function sendReset() {
-    if (roomid === undefined)
-      return
-
-    const send = () => {
-      const toolbarBounds = remotePresenter.getToolbarBounds()
-      sendRemote('reset', {
-        isScreen: sourceManager.isScreen(),
-        dimensions: sourceManager.getOuterDimensions(),
-        coverBounds: toolbarBounds ? [toolbarBounds] : [],
-      })
+    clearTimeout(resetTimeout)
+    
+    const toolbarBounds = remotePresenter.getToolbarBounds()
+    const data = {
+      isScreen: sourceManager.isScreen(),
+      dimensions: sourceManager.getOuterDimensions(),
+      coverBounds: toolbarBounds ? [toolbarBounds] : [],
+      pointerEnabled: remotePresenter.toggles.pointer,
+      remoteControlEnabled: remotePresenter.toggles.remoteControl,
     }
+    console.log('sendReset', data)
+    sendRemote('reset', data)
 
-    send()
-
-    if (resetInterval != undefined) {
-      clearInterval(resetInterval)
-      resetInterval = undefined
-    }
-
-    resetInterval = setInterval(() => send(), 2000)
+    resetTimeout = setTimeout(() => sendReset(), 2000)
   }
 
   return {
@@ -190,5 +179,6 @@ export function useStreamer(sendRemote: <T extends RemoteEvent>(event: T, data: 
     stopSharing,
     pauseStreaming,
     resumeStreamingIfPaused,
+    sendReset,
   }
 }

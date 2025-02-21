@@ -40,7 +40,9 @@ export interface IElectronAPI {
   sourceSelected: (source: string | undefined) => Promise<void>,
   sharingActive: (viewCode: string, data: string) => Promise<void>,
   toggleRemoteControl: (toggle?: boolean) => Promise<void>,
+  onToggleRemoteControl: (callback: (toggle?: boolean) => void) => void,
   togglePointer: (toggle?: boolean) => Promise<void>,
+  onTogglePointer: (callback: (toggle?: boolean) => void) => void,
   toggleClipboard: (toggle?: boolean) => Promise<void>,
   clipboardReady: () => Promise<void>,
   dataToClipboard: (callback: (data: string) => void) => Electron.IpcRenderer,
@@ -115,12 +117,11 @@ export type TurnCredentials = {
 
 export type StreamerData = {
   source: ScreenSource
-  roomId: string
 }
 
 export type ViewerTool = 'pointer' | 'remoteControl'
 
-export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset" | "pointer-enabled" | "remote-enabled"
+export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "browser" ? { }
@@ -141,8 +142,6 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
   : T extends "reset" ? RemoteResetData
-  : T extends "pointer-enabled" ? { enabled: boolean }
-  : T extends "remote-enabled" ? { enabled: boolean }
   : never
 
   export type RemoteMouseData = {
@@ -189,6 +188,8 @@ export type RemoteData<T extends RemoteEvent> =
     isScreen: boolean
     dimensions: Dimensions
     coverBounds: Rectangle[]
+    pointerEnabled: boolean
+    remoteControlEnabled: boolean
   }
 
   export type OverlayData = {

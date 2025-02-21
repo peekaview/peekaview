@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, useTemplateRef, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 import ChevronLeftSvg from '../../assets/icons/chevron-left.svg'
 import ChevronRightSvg from '../../assets/icons/chevron-right.svg'
@@ -8,37 +8,23 @@ import DragSvg from '../../assets/icons/drag.svg'
 const props = withDefaults(defineProps<{
   draggable?: boolean
   collapsible?: boolean
-  pollSize?: boolean
 }>(), {
   draggable: false,
   collapsible: false,
-  pollSize: false
 })
 
 const emit = defineEmits<{
   (e: 'onCollapse', collapsed: boolean): void
 }>()
 
-const toolbarRef = useTemplateRef('toolbar')
 const collapsed = ref(false)
 
 watch(collapsed, value => emit('onCollapse', value))
 watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
-
-setInterval(() => {
-  if (!props.pollSize)
-    return
-
-  const rect = toolbarRef.value?.getBoundingClientRect()
-  if (!rect)
-    return
-  
-  window.electronAPI?.setToolbarSize(Math.round(rect.width + 10), Math.round(rect.height + 10))
-}, 500)
 </script>
 
 <template>
-  <div ref="toolbar" class="toolbar" :class="{ collapsed: collapsed }">
+  <div class="toolbar" :class="{ collapsed: collapsed }">
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>

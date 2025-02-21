@@ -79,7 +79,10 @@ export type ScreenPeerData = {
 
 export type PeerRole = 'presenter' | 'viewer'
 
-const rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
+let rtcIceServer: RTCIceServer = { urls: [] }
+try {
+  rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
+} catch (e) {}
 
 export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPeerData, role: PeerRole, options?: ScreenPeerOptions): Promise<ScreenPeer> {
   const socket = io(import.meta.env.VITE_RTC_CONTROL_SERVER)

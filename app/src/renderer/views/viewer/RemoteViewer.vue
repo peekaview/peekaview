@@ -133,14 +133,6 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-onReceive('pointer-enabled', (data) => {
-  pointerEnabled.value = data.enabled
-})
-
-onReceive('remote-enabled', (data) => {
-  remoteControlEnabled.value = data.enabled
-})
-
 let pauseTimeout: number
 onReceive('pause', (data) => {
   clearTimeout(pauseTimeout)
@@ -168,6 +160,9 @@ onReceive('hide', (data) => {
 })
 
 onReceive('reset', (data) => {
+  console.log('reset', data)
+  pointerEnabled.value = data.pointerEnabled
+  remoteControlEnabled.value = data.remoteControlEnabled
   overlayRef.value?.reset(data)
 })
 
@@ -461,27 +456,26 @@ onMounted(() => {
   })
 })
 
-function rescale(scaleinfo: ScaleInfo) {
+function rescale(scaleInfo: ScaleInfo) {
   const containerRect = containerRef.value!.getBoundingClientRect()
   const currentHeight = Math.round(containerRect.height)
   const currentWidth = Math.round(containerRect.width)
 
-  let scaledowny = 1
-  let scaledownx = 1
-  if (scaleinfo.height > window.innerHeight)
-    scaledowny = window.innerHeight / scaleinfo.height
-  if (scaleinfo.width > window.innerWidth)
-    scaledownx = window.innerWidth / scaleinfo.width
+  let xScale = 1
+  let yScale = 1
+  if (scaleInfo.width > window.innerWidth)
+    xScale = window.innerWidth / scaleInfo.width
+  if (scaleInfo.height > window.innerHeight)
+    yScale = window.innerHeight / scaleInfo.height
 
-  let scaledown = scaledowny < scaledownx ? scaledowny : scaledownx
-  
-  if (scaleinfo.height != currentHeight || scaleinfo.width != currentWidth) {
-    containerStyle.value.height = scaleinfo.height * scaledown + 'px'
-    containerStyle.value.width = scaleinfo.width * scaledown + 'px'
+  const scale = yScale < xScale ? yScale : xScale
+  if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
+    containerStyle.value.height = scaleInfo.height * scale + 'px'
+    containerStyle.value.width = scaleInfo.width * scale + 'px'
   }
 
   containerStyle.value.overflow = 'visible'
-  videoStyle.value.transform = `scale(${scaleinfo.scale}) translate(${scaleinfo.x}px,${scaleinfo.y}px)`
+  videoStyle.value.transform = `scale(${scaleInfo.scale}) translate(${scaleInfo.x}px,${scaleInfo.y}px)`
 
   const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
   videoStyle.value['object-fit'] = participant?.user.platform === 'mac' ? 'fill' : 'cover'

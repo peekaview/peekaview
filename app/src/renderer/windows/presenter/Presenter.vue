@@ -12,6 +12,9 @@ const { t } = useI18n()
 const showSources = ref(false)
 const selectedSource = ref<ScreenSource>()
 
+const pointerEnabled = ref(false)
+const remoteControlEnabled = ref(false)
+
 const presenter = ref<Presenter>()
 
 onMounted(() => start())
@@ -33,6 +36,20 @@ window.electronAPI?.onResumeSharing(() => {
   presenter.value?.resumeSharing()
 })
 
+window.electronAPI?.onTogglePointer((toggle) => {
+  if (toggle === undefined)
+    pointerEnabled.value = !pointerEnabled.value
+  else
+    pointerEnabled.value = toggle
+})
+
+window.electronAPI?.onToggleRemoteControl((toggle) => {
+  if (toggle === undefined)
+    remoteControlEnabled.value = !remoteControlEnabled.value  
+  else
+    remoteControlEnabled.value = toggle
+})
+
 async function start() {
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')
@@ -42,7 +59,12 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
+  presenter.value = usePresenter({
+    email,
+    token,
+    pointerEnabled,
+    remoteControlEnabled,
+  }, t, async (shareAudio) => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {
       watch<[ScreenSource | undefined, boolean]>(() => [selectedSource.value, showSources.value], ([source, show]) => {
@@ -55,7 +77,7 @@ async function start() {
     if (!source)
       return
 
-    window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, roomId: presenter.value!.screenShareData!.roomId, userName: email }))
+    window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, userName: email }))
     return getStreamFromSource(source, shareAudio)
   })
   presenter.value.startSession()

@@ -12,7 +12,8 @@
     "yourEmail": "Your email address",
     "yourName": "Your Name",
     "enterYourName": "Enter your name",
-    "connectToEmail": "Email address of user to connect with"
+    "connectToEmail": "Mail address of user to connect with",
+    "joinSession": "Join Screen Sharing Session of"
   },
   "app": {
     "logout": "Logout",
@@ -132,7 +133,9 @@
     "connectionErrorTitle": "Connection Error",
     "connectionError": "There was a problem connecting to the server. Please try again.",
     "sessionAlreadyActiveTitle": "Session Already Active",
-    "sessionAlreadyActive": "You are already connected to an active session."
+    "sessionAlreadyActive": "You are already connected to an active session.",
+    "joinDifferentSession": "Join a different session",
+    "shareOwnScreen": "Share your own screen"
   },
   "share": {
     "howToShare": "How would you like to share your screen?",

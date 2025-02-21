@@ -77,7 +77,7 @@ const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
 window.setInterval(() => overlayCursors.clear(), 1000)
 watch(() => props.pointerEnabled, () => {
-  overlayCursors.clear(true)
+  //overlayCursors.clear(true)
   overlaySignals.clear()
 })
 
@@ -113,7 +113,6 @@ watch(scaleInfo, () => updateVideoScale(scaleInfo.value))
 
 const overlayStyle = computed(() => {
   const style = {
-    border: '1px solid blue',
     // Bei Screensharing sieht man den Mauszeiger des Presenters, daher den eigenen durch ein feines Crosshair ersetzen
     cursor: isSharingScreen.value ? 'url(img/minicrosshair.png) 5 5, auto' : 'default',
     width: '0',
@@ -310,15 +309,15 @@ function onMouseLeave() {
 }
 
 let lastScaleInfo: ScaleInfo | undefined
-function updateVideoScale(scaleInfo: ScaleInfo) {
-  if (!lastScaleInfo || scaleInfo.x != lastScaleInfo.x || scaleInfo.y != lastScaleInfo.y || scaleInfo.scale != lastScaleInfo.scale || scaleInfo.width != lastScaleInfo.width || scaleInfo.height != lastScaleInfo.height) {
+function updateVideoScale(scaleInfo: ScaleInfo, force = false) {
+  if (!lastScaleInfo || force || scaleInfo.x != lastScaleInfo.x || scaleInfo.y != lastScaleInfo.y || scaleInfo.scale != lastScaleInfo.scale || scaleInfo.width != lastScaleInfo.width || scaleInfo.height != lastScaleInfo.height) {
     console.debug('updateVideoScale', scaleInfo)
     emit('rescale', scaleInfo)
   }
   lastScaleInfo = scaleInfo
 }
 
-function calcScale() {
+function calcScale(force = false) {
   const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
   const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
 
@@ -327,8 +326,10 @@ function calcScale() {
     videoScale.value = 1
   }
 
-  emit('rescale', scaleInfo.value)
+  updateVideoScale(scaleInfo.value, force)
 }
+
+const forceCalcScale = () => calcScale(true)
 
 let lastDimensions: Dimensions
 function reset(data: RemoteResetData) {
@@ -358,14 +359,14 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onMouseLeave)
-  window.addEventListener('resize', calcScale)
+  window.addEventListener('resize', forceCalcScale)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
   window.removeEventListener('blur', onMouseLeave)
-  window.removeEventListener('resize', calcScale)
+  window.removeEventListener('resize', forceCalcScale)
 })
 
 defineExpose({

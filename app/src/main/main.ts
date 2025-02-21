@@ -364,7 +364,7 @@ declare const CSP_POLICY: string
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
     //}
-    streamer.startSharing(sourceId, data.roomId)
+    streamer.startSharing(sourceId)
   }
 
   function stopSharing() {
@@ -521,11 +521,15 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
+    presenterWindow?.webContents.send('on-toggle-pointer', toggle)
     streamer?.remotePresenter?.togglePointer(toggle)
+    streamer?.sendReset()
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
+    presenterWindow?.webContents.send('on-toggle-remote-control', toggle)
     streamer?.remotePresenter?.toggleRemoteControl(toggle)
+    streamer?.sendReset()
   })
 
   ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
