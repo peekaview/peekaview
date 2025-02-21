@@ -12,7 +12,8 @@ import {
   protocol,
   Tray,
   session,
-  shell
+  shell,
+  nativeTheme
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
@@ -95,9 +96,25 @@ declare const CSP_POLICY: string
 
     const trayIconPath = path.join(__dirname, PeekaViewIcon)
     const trayIcon: Electron.NativeImage = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-    trayIcon.setTemplateImage(true)
+    
+    if (process.platform === 'darwin') {
+      trayIcon.setTemplateImage(true)
+    }
 
+    // Create tray first
     tray = new Tray(trayIcon)
+
+    if (process.platform === 'win32') {
+      // For Windows, listen to system theme changes
+      nativeTheme.on('updated', () => {
+        const isDark = nativeTheme.shouldUseDarkColors
+        tray.setImage(isDark ? invertIcon(trayIcon) : trayIcon)
+      })
+      // Set initial icon based on current theme
+      if (nativeTheme.shouldUseDarkColors) {
+        tray.setImage(invertIcon(trayIcon))
+      }
+    }
 
     tray.setToolTip('PeekaView')
 
@@ -531,20 +548,35 @@ declare const CSP_POLICY: string
     const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
       .resize({ width: 16, height: 16 })
     
+    if (process.platform === 'darwin') {
+      icon.setTemplateImage(true)
+      return icon
+    }
+
+    // On Windows, invert for dark theme
+    if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors) {
+      return invertIcon(icon)
+    }
+
+    return icon
+  }
+
+  function invertIcon(icon: Electron.NativeImage): Electron.NativeImage {
     // Get bitmap data
     const bitmap = icon.getBitmap()
     
     // Invert colors (each pixel has 4 values: R,G,B,A)
     for (let i = 0; i < bitmap.length; i += 4) {
-      bitmap[i] = 255 - bitmap[i]     // R
-      bitmap[i + 1] = 255 - bitmap[i + 1] // G
-      bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      // Only invert if the pixel is not fully transparent
+      if (bitmap[i + 3] > 5) {
+        bitmap[i] = 255 - bitmap[i]     // R
+        bitmap[i + 1] = 255 - bitmap[i + 1] // G
+        bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      }
       // Leave alpha channel (i + 3) unchanged
     }
     
     // Create new image from inverted bitmap
-    const invertedIcon = nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
-    invertedIcon.setTemplateImage(true)
-    return invertedIcon
+    return nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
   }
 })()
