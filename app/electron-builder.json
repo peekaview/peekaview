@@ -19,10 +19,15 @@
     "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}",
     "!{.env,.env.*,.npmrc,pnpm-lock.yaml}",
     "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}",
+    "!**/*.{map,md,ts,scss,sass,styl,less}",
     "out/**/*",
     "build/**/*",
     "node_modules/**/*",
-    "package.json"
+    "package.json",
+    "!**/node_modules/.bin",
+    "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+    "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes}",
+    "!**/{__pycache__,*.pyc,*.pyo,*.pyd,*.so,*.dll,*.dylib}"
   ],
   "extraResources": [
     {

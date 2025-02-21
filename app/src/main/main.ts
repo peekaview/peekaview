@@ -12,7 +12,8 @@ import {
   protocol,
   Tray,
   session,
-  shell
+  shell,
+  nativeTheme
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
@@ -97,9 +98,25 @@ declare const CSP_POLICY: string
 
     const trayIconPath = path.join(__dirname, PeekaViewIcon)
     const trayIcon: Electron.NativeImage = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-    trayIcon.setTemplateImage(true)
+    
+    if (process.platform === 'darwin') {
+      trayIcon.setTemplateImage(true)
+    }
 
+    // Create tray first
     tray = new Tray(trayIcon)
+
+    if (process.platform === 'win32') {
+      // For Windows, listen to system theme changes
+      nativeTheme.on('updated', () => {
+        const isDark = nativeTheme.shouldUseDarkColors
+        tray.setImage(isDark ? invertIcon(trayIcon) : trayIcon)
+      })
+      // Set initial icon based on current theme
+      if (nativeTheme.shouldUseDarkColors) {
+        tray.setImage(invertIcon(trayIcon))
+      }
+    }
 
     tray.setToolTip('PeekaView')
 
@@ -539,22 +556,46 @@ declare const CSP_POLICY: string
   // Create a helper function to create resized template menu icons
   const createMenuIcon = (iconPath: string): Electron.NativeImage => {
     const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
-      .resize({ width: 16, height: 16 })
     
-    // Get bitmap data
+    if (process.platform === 'darwin') {
+      const newIcon = invertIcon(icon)
+      newIcon.setTemplateImage(true)
+      return newIcon.resize({ width: 16, height: 16 })
+    }
+
+    // On Windows, invert for dark theme
+    if (process.platform === 'win32' && ! nativeTheme.shouldUseDarkColors) {
+      return invertIcon(icon).resize({ 
+        width: 16, 
+        height: 16,
+        quality: 'best'  // Use best quality to preserve transparency
+      })
+    }
+
+    return icon.resize({ 
+      width: 16, 
+      height: 16,
+      quality: 'best'  // Use best quality to preserve transparency
+    })
+  }
+
+  function invertIcon(icon: Electron.NativeImage): Electron.NativeImage {
+    // Get bitmap data and size
+    const size = icon.getSize()
     const bitmap = icon.getBitmap()
     
     // Invert colors (each pixel has 4 values: R,G,B,A)
     for (let i = 0; i < bitmap.length; i += 4) {
-      bitmap[i] = 255 - bitmap[i]     // R
-      bitmap[i + 1] = 255 - bitmap[i + 1] // G
-      bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      // Only invert if the pixel is not fully transparent
+      if (bitmap[i + 3] > 5) {
+        bitmap[i] = 255 - bitmap[i]     // R
+        bitmap[i + 1] = 255 - bitmap[i + 1] // G
+        bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      }
       // Leave alpha channel (i + 3) unchanged
     }
     
-    // Create new image from inverted bitmap
-    const invertedIcon = nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
-    invertedIcon.setTemplateImage(true)
-    return invertedIcon
+    // Create new image from inverted bitmap with correct dimensions
+    return nativeImage.createFromBitmap(bitmap, size)
   }
 })()
