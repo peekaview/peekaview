@@ -19,6 +19,7 @@
     "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}",
     "!{.env,.env.*,.npmrc,pnpm-lock.yaml}",
     "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}",
+    "!**/*.{map,md,ts,scss,sass,styl,less}",
     "out/**/*",
     "build/**/*",
     "node_modules/**/*",
@@ -41,8 +42,10 @@
     }
   ],
   "asar": {
-    "smartUnpack": true
+    "smartUnpack": true,
+    "compression": "maximum"
   },
+  "afterPack": "./cleanup.js",
   "win": {
     "target": [
       {
