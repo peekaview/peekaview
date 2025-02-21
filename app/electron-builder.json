@@ -24,6 +24,8 @@
     "build/**/*",
     "node_modules/**/*",
     "package.json",
+    "!**/node_modules/.bin",
+    "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
     "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes}",
     "!**/{__pycache__,*.pyc,*.pyo,*.pyd,*.so,*.dll,*.dylib}"
   ],
