@@ -23,7 +23,9 @@
     "out/**/*",
     "build/**/*",
     "node_modules/**/*",
-    "package.json"
+    "package.json",
+    "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes}",
+    "!**/{__pycache__,*.pyc,*.pyo,*.pyd,*.so,*.dll,*.dylib}"
   ],
   "extraResources": [
     {
@@ -42,10 +44,8 @@
     }
   ],
   "asar": {
-    "smartUnpack": true,
-    "compression": "maximum"
+    "smartUnpack": true
   },
-  "afterPack": "./cleanup.js",
   "win": {
     "target": [
       {
