@@ -42,6 +42,7 @@ declare const APP_VERSION: string
 declare const CSP_POLICY: string
 
 (async () => {
+  let isQuitting = false
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
     const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
@@ -50,6 +51,7 @@ declare const CSP_POLICY: string
       app.emit('second-instance', null, [protocolUrl], null)
     }
     log.info('Another instance is running, quitting...')
+    isQuitting = true
     app.quit()
     return
   }
@@ -158,7 +160,10 @@ declare const CSP_POLICY: string
       focusApp()
     })
 
-    app.on('will-quit', e => e.preventDefault())
+    app.on('will-quit', e => {
+      if (!isQuitting)
+        e.preventDefault()
+    })
 
     log.info("App initialization complete")
     const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
@@ -359,7 +364,7 @@ declare const CSP_POLICY: string
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
     //}
-    streamer.startSharing(sourceId, data.roomId)
+    streamer.startSharing(sourceId)
   }
 
   function stopSharing() {
@@ -378,6 +383,7 @@ declare const CSP_POLICY: string
 
   function quit() {
     log.info('Initiating app quit')
+    isQuitting = true
     app.quit()
   }
 
@@ -515,11 +521,15 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
+    presenterWindow?.webContents.send('on-toggle-pointer', toggle)
     streamer?.remotePresenter?.togglePointer(toggle)
+    streamer?.sendReset()
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
+    presenterWindow?.webContents.send('on-toggle-remote-control', toggle)
     streamer?.remotePresenter?.toggleRemoteControl(toggle)
+    streamer?.sendReset()
   })
 
   ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {

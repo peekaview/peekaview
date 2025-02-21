@@ -92,6 +92,11 @@ async function copy() {
   copied.value = true
   setTimeout(() => copied.value = false, 2000);
 }
+
+async function select(e: MouseEvent) {
+  if (e.target instanceof HTMLInputElement)
+    e.target.select()
+}
 </script>
 
 <template>
@@ -154,6 +159,7 @@ async function copy() {
                 v-model="copyText"
                 type="text"
                 readonly
+                @click="select"
               >
               <button
                 class="btn btn-sm btn-secondary" 

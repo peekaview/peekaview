@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOpenScreenSourceSelection: (callback: () => void) => ipcRenderer.on('open-screen-source-selection', () => callback()),
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
   sourceSelected: (source: string | undefined) => ipcRenderer.invoke('source-selected', source),
+  onToggleRemoteControl: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-remote-control', (_event, toggle?: boolean) => callback(toggle)),
+  onTogglePointer: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-pointer', (_event, toggle?: boolean) => callback(toggle)),
 });
 
 console.log('Preload script has been loaded');

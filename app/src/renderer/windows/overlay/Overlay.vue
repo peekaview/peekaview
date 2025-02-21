@@ -27,7 +27,7 @@ const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers, scale })
 const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
 watch(pointerEnabled, () => {
-  overlayCursors.clear(true)
+  //overlayCursors.clear(true)
   overlaySignals.clear()
 })
 
@@ -39,20 +39,25 @@ window.electronAPI!.onUpdateOverlayData((data) => {
 })
 
 window.electronAPI!.onMouseClick((data) => {
-  overlaySignals.send(data.userId, data.x, data.y)
+  if (pointerEnabled.value && data.tool == 'pointer')
+    overlaySignals.send(data.userId, data.x, data.y)
 })
 
 window.electronAPI!.onMouseDown((data) => {
-  drawOverlay.startStroke(data.userId, [data.x, data.y])
+  if (pointerEnabled.value && data.tool == 'pointer')
+    drawOverlay.startStroke(data.userId, [data.x, data.y])
 })
 
 window.electronAPI!.onMouseMove((data) => {
-  drawOverlay.continueStroke(data.userId, [data.x, data.y])
+  if (pointerEnabled.value && data.tool == 'pointer')
+    drawOverlay.continueStroke(data.userId, [data.x, data.y])
+
   overlayCursors.move(data.userId, data.x, data.y)
 })
 
 window.electronAPI!.onMouseUp((data) => {
-  drawOverlay.endStroke(data.userId)
+  if (pointerEnabled.value && data.tool == 'pointer')
+    drawOverlay.endStroke(data.userId)
 })
 </script>
 

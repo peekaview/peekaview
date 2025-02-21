@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, useTemplateRef, watch } from 'vue'
+import { ref, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
@@ -36,27 +36,39 @@ watch(remoteControlEnabled, (enabled) => emit('toggle-remote-control', enabled))
 watch(pointerEnabled, (enabled) => emit('toggle-pointer', enabled))
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
 
+setInterval(() => {
+  const rect = toolbarRef.value?.$el.getBoundingClientRect()
+  if (!rect)
+    return
+  
+  window.electronAPI?.setToolbarSize(Math.round(rect.width + 10), Math.round(rect.height + 10))
+}, 500)
+
+onMounted(() => resizeWindow())
+
 function onCollapse() {
   if (!inApp)
     return
 
-  nextTick(() => {
-    const rect = toolbarRef.value?.$el.getBoundingClientRect()
-    if (!rect)
-      return
+  nextTick(() => resizeWindow())
+}
 
-    const width = Math.round(rect.width) + 10
-    const minimumWidth = Math.min(width, 175) // mac requires a bit of minimum width for window to stay transparent
-    window.electronAPI!.resizeWindow('toolbar', {
-      size: { width },
-      minimumSize: { width: minimumWidth },
-    })
+function resizeWindow() {
+  const rect = toolbarRef.value?.$el.getBoundingClientRect()
+  if (!rect)
+    return
+
+  const width = Math.round(rect.width) + 10
+  const minimumWidth = Math.min(width, 200) // mac requires a bit of minimum width for window to stay transparent
+  window.electronAPI!.resizeWindow('toolbar', {
+    size: { width },
+    minimumSize: { width: minimumWidth },
   })
 }
 </script>
 
 <template>
-  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" poll-size @on-collapse="onCollapse">
+  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" @on-collapse="onCollapse">
     <label class="checkbox-container">
       <input type="checkbox" v-model="pointerEnabled" />
       <span class="checkmark"></span>

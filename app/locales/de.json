@@ -12,7 +12,8 @@
     "yourEmail": "Ihre E-Mail-Adresse",
     "yourName": "Ihr Name",
     "enterYourName": "Geben Sie Ihren Namen ein",
-    "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten"
+    "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten",
+    "joinSession": "Bildschirmfreigabe beitreten von"
   },
   "app": {
     "logout": "Abmelden",
@@ -132,7 +133,9 @@
     "connectionErrorTitle": "Verbindungsfehler",
     "connectionError": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut.",
     "sessionAlreadyActiveTitle": "Sitzung bereits aktiv",
-    "sessionAlreadyActive": "Sie sind bereits mit einer aktiven Sitzung verbunden."
+    "sessionAlreadyActive": "Sie sind bereits mit einer aktiven Sitzung verbunden.",
+    "joinDifferentSession": "Anderer Sitzung beitreten",
+    "shareOwnScreen": "Eigenen Bildschirm teilen"
   },
   "share": {
     "howToShare": "Wie möchten Sie Ihren Bildschirm teilen?",
@@ -219,8 +222,8 @@
   "toolbar": {
     "collapse": "Einklappen",
     "expand": "Ausklappen",
-    "pointer": "Zeichnen / Zeiger erlauben",
-    "remoteControl": "Fernsteuerung erlauben",
+    "pointer": "Zeichnen / Zeiger",
+    "remoteControl": "Fernsteuerung",
     "openClipboard": "Zwischenablage öffnen",
     "shareDifferentScreen": "Anderen Bildschirm teilen",
     "inviteLink": "Einladungslink",

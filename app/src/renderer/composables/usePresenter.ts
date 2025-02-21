@@ -16,6 +16,13 @@ interface Request {
 
 export type Presenter = ReturnType<typeof usePresenter>
 
+type PresenterData = {
+  email: MaybeRef<string>
+  token: MaybeRef<string>
+  pointerEnabled: MaybeRef<boolean>
+  remoteControlEnabled: MaybeRef<boolean>
+}
+
 type PresenterOptions = {
   onStream?: (stream: MediaStream, shareAudio?: boolean) => void
   onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
@@ -23,12 +30,12 @@ type PresenterOptions = {
   onStop?: () => void
 }
 
-export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t: ComposerTranslation, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
+export function usePresenter(data: PresenterData, t: ComposerTranslation, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
-  const viewCode = computed(() => btoa(`viewEmail=${ unref(email) }`))
+  const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
   const latestRequest = ref<Request>()
 
   const requestInterval = ref<number>()
@@ -36,42 +43,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
   const lastPingTime = ref<number>()
   
   const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
-  const stream = shallowRef<MediaStream | undefined>() 
-
-  let resetInterval: number | undefined
-  //let lastResetWidth: number | undefined
-  //let lastResetHeight: number | undefined
-  watch(stream, (stream) => {
-    clearInterval(resetInterval)
-    if (!stream || inApp)
-      return
-    
-    resetInterval = window.setInterval(() => {
-      const width = stream.getVideoTracks()[0].getSettings().width ?? 0
-      const height = stream.getVideoTracks()[0].getSettings().height ?? 0
-
-      // TODO: do send in case a new viewer joins somehow
-      /*if (lastResetWidth === width && lastResetHeight === height)
-        return
-
-      lastResetWidth = width
-      lastResetHeight = height
-      */ 
-
-      const data = {
-        isScreen: true, // TODO
-        dimensions: {
-          left: 0,
-          top: 0,
-          right: width,
-          bottom: height,
-        },
-        coverBounds: []
-      }
-      screenPresent.value?.sendRemote('reset', data)
-      options?.onReset?.(data)
-    }, 2000)
-  })
+  const stream = shallowRef<MediaStream | undefined>()
 
   watch(viewers, (viewers) => {
     window.electronAPI?.updateUsers(JSON.stringify(viewers))
@@ -97,8 +69,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
   
       const requestData = {
         action: 'doesAnyoneWantToSeeMyScreen' as const,
-        email: unref(email),
-        token: unref(token),
+        email: unref(data.email),
+        token: unref(data.token),
       }
       
       try {
@@ -145,6 +117,55 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
 
   document.addEventListener('visibilitychange', togglePingInterval)
   togglePingInterval()
+
+  let resetTimeout: number | undefined
+  watch(stream, (stream) => {
+    clearTimeout(resetTimeout)
+    if (!stream)
+      return
+    
+    sendReset()
+  })
+
+  watch(() => [unref(data.pointerEnabled), unref(data.remoteControlEnabled)], () => {
+    sendReset()
+  })
+
+  //let lastResetWidth: number | undefined
+  //let lastResetHeight: number | undefined
+  function sendReset() {
+    clearTimeout(resetTimeout)
+    if (inApp)
+      return
+
+    const width = stream.value?.getVideoTracks()[0].getSettings().width ?? 0
+    const height = stream.value?.getVideoTracks()[0].getSettings().height ?? 0
+
+    // TODO: do send in case a new viewer joins somehow
+    /*if (lastResetWidth === width && lastResetHeight === height)
+      return
+
+    lastResetWidth = width
+    lastResetHeight = height
+    */ 
+
+    const resetData = {
+      isScreen: true, // TODO
+      dimensions: {
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height,
+      },
+      pointerEnabled: unref(data.pointerEnabled),
+      remoteControlEnabled: unref(data.remoteControlEnabled),
+      coverBounds: []
+    }
+    screenPresent.value?.sendRemote('reset', resetData)
+    options?.onReset?.(resetData)
+
+    resetTimeout = window.setTimeout(() => sendReset(), 2000)
+  }
   
   async function startSession() {
     if (screenPresent.value)
@@ -152,26 +173,26 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
 
     const requestData = {
       action: 'createScreenShareRoom' as const,
-      email: unref(email),
-      token: unref(token),
+      email: unref(data.email),
+      token: unref(data.token),
     }
 
     try {
-      const data = await callApi<AcceptedRequestData>(requestData)
+      const acceptedData = await callApi<AcceptedRequestData>(requestData)
 
       screenShareData.value = {
         user: {
           id: uuidv4(),
-          name: unref(email),
-          color: stringToColor(unref(email)),
+          name: unref(data.email),
+          color: stringToColor(unref(data.email)),
           platform: getPlatform(),
           inApp,
         },
-        roomName: data.roomId,
-        roomId: data.roomId,
-        turnCredentials: data.turnCredentials,
-        serverUrl: data.videoServer,
-        controlServer: data.controlServer,
+        roomName: acceptedData.roomId,
+        roomId: acceptedData.roomId,
+        turnCredentials: acceptedData.turnCredentials,
+        serverUrl: acceptedData.videoServer,
+        controlServer: acceptedData.controlServer,
       }
 
       screenPresent.value = await useScreenPresent(screenShareData.value, {
@@ -205,7 +226,7 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
       options?.onStream?.(stream.value, shareAudio)
       sessionState.value = 'active'
 
-      source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, roomId: screenShareData.value?.roomId, userName: unref(email) }))
+      source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, userName: unref(data.email) }))
     } catch (error) {
       console.error('Error sharing local screen:', error)
     }
@@ -215,8 +236,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
     console.log('Updating online status')
     const requestData = {
       action: 'doesAnyoneWantToSeeMyScreen' as const,
-      email: unref(email),
-      token: unref(token),
+      email: unref(data.email),
+      token: unref(data.token),
     }
 
     try {
@@ -234,8 +255,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
 
     const requestData = {
       action: 'youAreAllowedToSeeMyScreen' as const,
-      email: unref(email),
-      token: unref(token),
+      email: unref(data.email),
+      token: unref(data.token),
       request_id: latestRequest.value.request_id,
     }
 
@@ -255,8 +276,8 @@ export function usePresenter(email: MaybeRef<string>, token: MaybeRef<string>, t
 
     const requestData = {
       action: 'youAreNotAllowedToSeeMyScreen' as const,
-      email: unref(email),
-      token: unref(token),
+      email: unref(data.email),
+      token: unref(data.token),
       request_id: latestRequest.value.request_id,
     }
     try {

@@ -11,7 +11,7 @@ export class WindowManager extends SourceManager {
   constructor(hwnd: string) {
     super(hwnd)
     this.overlayPadding = {
-      x: -18,
+      x: 0,
       y: 0,
     }
     this.areCoordinatesScaling = false
