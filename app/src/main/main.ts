@@ -546,23 +546,32 @@ declare const CSP_POLICY: string
   // Create a helper function to create resized template menu icons
   const createMenuIcon = (iconPath: string): Electron.NativeImage => {
     const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
-      .resize({ width: 16, height: 16 })
     
     if (process.platform === 'darwin') {
-      icon.setTemplateImage(true)
-      return icon
+      const newIcon = invertIcon(icon)
+      newIcon.setTemplateImage(true)
+      return newIcon.resize({ width: 16, height: 16 })
     }
 
     // On Windows, invert for dark theme
-    if (process.platform === 'win32' && nativeTheme.shouldUseDarkColors) {
-      return invertIcon(icon)
+    if (process.platform === 'win32' && ! nativeTheme.shouldUseDarkColors) {
+      return invertIcon(icon).resize({ 
+        width: 16, 
+        height: 16,
+        quality: 'best'  // Use best quality to preserve transparency
+      })
     }
 
-    return icon
+    return icon.resize({ 
+      width: 16, 
+      height: 16,
+      quality: 'best'  // Use best quality to preserve transparency
+    })
   }
 
   function invertIcon(icon: Electron.NativeImage): Electron.NativeImage {
-    // Get bitmap data
+    // Get bitmap data and size
+    const size = icon.getSize()
     const bitmap = icon.getBitmap()
     
     // Invert colors (each pixel has 4 values: R,G,B,A)
@@ -576,7 +585,7 @@ declare const CSP_POLICY: string
       // Leave alpha channel (i + 3) unchanged
     }
     
-    // Create new image from inverted bitmap
-    return nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
+    // Create new image from inverted bitmap with correct dimensions
+    return nativeImage.createFromBitmap(bitmap, size)
   }
 })()
