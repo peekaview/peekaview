@@ -119,6 +119,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
   togglePingInterval()
 
   let resetTimeout: number | undefined
+  let resetJson: string
   watch(stream, (stream) => {
     clearTimeout(resetTimeout)
     if (!stream)
@@ -133,7 +134,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
 
   //let lastResetWidth: number | undefined
   //let lastResetHeight: number | undefined
-  function sendReset() {
+  function sendReset(interval = false) {
     clearTimeout(resetTimeout)
     if (inApp)
       return
@@ -157,14 +158,19 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
         right: width,
         bottom: height,
       },
+      coverBounds: [],
       pointerEnabled: unref(data.pointerEnabled),
       remoteControlEnabled: unref(data.remoteControlEnabled),
-      coverBounds: []
     }
-    screenPresent.value?.sendRemote('reset', resetData)
-    options?.onReset?.(resetData)
+    
+    const json = JSON.stringify(data)
+    if (!interval || resetJson != json) {
+      resetJson = json
+      screenPresent.value?.sendRemote('reset', resetData)
+      options?.onReset?.(resetData)
+    }
 
-    resetTimeout = window.setTimeout(() => sendReset(), 2000)
+    resetTimeout = window.setTimeout(() => sendReset(true), 2000)
   }
   
   async function startSession() {

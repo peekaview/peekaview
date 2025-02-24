@@ -20,7 +20,7 @@ import log from 'electron-log/main'
 import { exec } from 'child_process'
 
 import { useCustomDialog } from './composables/useCustomDialog'
-import { useStreamer, type Streamer } from './composables/useStreamer'
+import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
 import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
 import { windowLoad } from './util'
@@ -78,7 +78,7 @@ declare const CSP_POLICY: string
 
   let currentViewCode: string | undefined
 
-  let streamer: Streamer | undefined
+  let remotePresenter: RemotePresenter | undefined
   const customDialog = useCustomDialog()
 
   const store = await getStore()
@@ -357,20 +357,20 @@ declare const CSP_POLICY: string
     let sourceId = data.source.id
     log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
     
-    streamer?.stopSharing()
+    remotePresenter?.stopSharing()
 
-    //if (streamer === undefined) {
-      streamer = useStreamer((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
+    //if (remotePresenter === undefined) {
+      remotePresenter = useRemotePresenter((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
     //}
-    streamer.startSharing(sourceId)
+    remotePresenter.startSharing(sourceId)
   }
 
   function stopSharing() {
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
-    streamer?.stopSharing()
+    remotePresenter?.stopSharing()
     customDialog.closeTrayDialogs()
   }
 
@@ -494,46 +494,46 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('pause-sharing', async (_event) => {
-    streamer?.pauseStreaming()
+    remotePresenter?.pauseStreaming()
     presenterWindow?.webContents.send('on-pause-sharing')
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
-    streamer?.resumeStreamingIfPaused()
+    remotePresenter?.resumeStreamingIfPaused()
     presenterWindow?.webContents.send('on-resume-sharing')
   })
 
   ipcMain.handle('update-users', async (_event, newUsers: string) => {
     users = JSON.parse(newUsers) as UserData[]
-    streamer?.remotePresenter?.updateUsers(users)
+    remotePresenter?.updateUsers(users)
   })
 
   ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
-    streamer?.remotePresenter?.onRemote(event, data)
+    remotePresenter?.onRemote(event, data)
   })
 
   ipcMain.handle('set-toolbar-size', async (_event, width: number, height: number) => {
-    streamer?.remotePresenter?.setToolbarSize(width, height)
+    remotePresenter?.setToolbarSize(width, height)
   })
 
   ipcMain.handle('toggle-clipboard', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleClipboard(toggle)
+    remotePresenter?.toggleClipboard(toggle)
   })
 
   ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
     presenterWindow?.webContents.send('on-toggle-pointer', toggle)
-    streamer?.remotePresenter?.togglePointer(toggle)
-    streamer?.sendReset()
+    remotePresenter?.togglePointer(toggle)
+    remotePresenter?.sendReset()
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
     presenterWindow?.webContents.send('on-toggle-remote-control', toggle)
-    streamer?.remotePresenter?.toggleRemoteControl(toggle)
-    streamer?.sendReset()
+    remotePresenter?.toggleRemoteControl(toggle)
+    remotePresenter?.sendReset()
   })
 
   ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
-    streamer?.remotePresenter?.resizeWindow(windowName, dimensions)
+    remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
   // Create a helper function to create resized template menu icons
