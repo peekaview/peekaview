@@ -171,7 +171,7 @@ declare const CSP_POLICY: string
   })
 
   const focusApp = () => {
-    let currentWindow = loginWindow ?? viewerWindow ?? presenterWindow
+    let currentWindow = loginWindow ?? viewerWindow
     if (currentWindow) {
       if (currentWindow.isMinimized())
         currentWindow.restore()
@@ -238,19 +238,33 @@ declare const CSP_POLICY: string
     })
   }
 
+  const openPresenterWindow = (code: string) => {
+    if (!presenterWindow)
+      createPresenterWindow(code)
+    
+    presenterWindow?.show()
+    presenterWindow?.focus()
+    presenterWindow?.webContents.send('open-screen-source-selection')
+  }
+
   const createPresenterWindow = (code: string) => {
     presenterWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
       show: true,
-      width: 1280,
-      height: 720,
+      maxWidth: 1280,
+      maxHeight: 720,
+      minimizable: false,
+      maximizable: false,
       resizable: false,
-      autoHideMenuBar: true,
+      focusable: true,
+      transparent: true,
+      skipTaskbar: true,
+      frame: false,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        //webSecurity: false, // Make sure this is off only for development, adjust for production.
+        webSecurity: app.isPackaged,
         //allowRunningInsecureContent: true,
         preload: path.join(__dirname, '../preload/presenter.js'),
       }
@@ -264,7 +278,7 @@ declare const CSP_POLICY: string
 
     windowLoad(presenterWindow, 'presenter', { data: code })
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    //presenterWindow.webContents.openDevTools()
+    presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
@@ -279,7 +293,7 @@ declare const CSP_POLICY: string
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        //webSecurity: false, // Make sure this is off only for development, adjust for production.
+        webSecurity: app.isPackaged,
         //allowRunningInsecureContent: true,
       }
     })
@@ -338,7 +352,7 @@ declare const CSP_POLICY: string
       return
     }
 
-    createPresenterWindow(code)
+    openPresenterWindow(code)
   }
 
   function logout(discardSession = false) {
@@ -349,28 +363,27 @@ declare const CSP_POLICY: string
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(data: StreamerData) {
+  async function startPresenting(data: StreamerData) {
     if (!data.source) {
-      log.error('Invalid sourceId or name for remote control')
+      log.error('Invalid sourceId or name for presenting')
       return
     }
     let sourceId = data.source.id
-    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
     
-    remotePresenter?.stopSharing()
+    remotePresenter?.stop()
 
-    //if (remotePresenter === undefined) {
+    if (remotePresenter === undefined)
       remotePresenter = useRemotePresenter((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
-    //}
-    remotePresenter.startSharing(sourceId)
+  
+    remotePresenter.start(sourceId)
   }
 
   function stopSharing() {
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
-    remotePresenter?.stopSharing()
+    remotePresenter?.stop()
     customDialog.closeTrayDialogs()
   }
 
@@ -441,16 +454,20 @@ declare const CSP_POLICY: string
       .filter(({ id }) => id !== presenterWindow?.getMediaSourceId())
   })
 
+  let currentSource: ScreenSource | undefined
   ipcMain.handle('source-selected', async (_event, source: string | undefined) => {
     const data = source ? JSON.parse(source) as ScreenSource : undefined
-    if (!data) {
+    if (!data && !currentSource) {
       presenterWindow?.close()
       presenterWindow = undefined
-      return
+    } else {
+      if (data)
+        log.info('Source selected:', data.id, data.name)
+  
+      presenterWindow?.hide()
     }
 
-    log.info('Source selected:', data)
-    presenterWindow?.hide()
+    currentSource = data
   })
 
   const openShareMessage = async () => {
@@ -474,7 +491,7 @@ declare const CSP_POLICY: string
     
     if (viewCode !== null) {
       currentViewCode = viewCode
-      startRemoteControl(streamerData)
+      startPresenting(streamerData)
     
       customDialog.playSoundOnOpen('ping')
       await openShareMessage()

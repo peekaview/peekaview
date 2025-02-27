@@ -204,6 +204,12 @@ body.view-active {
   background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
 }
 
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .main-header,
 .main-footer {
   background: rgba(255, 255, 255, 0.5);
@@ -220,6 +226,14 @@ body.view-active {
   top: 0;
   z-index: 1000;
   border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.main-container {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%; /* required for viewer video to scale correctly */
 }
 
 .header-content {

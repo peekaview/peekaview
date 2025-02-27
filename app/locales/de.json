@@ -84,13 +84,13 @@
       "pointerDisabled": "Mauszeiger wurde deaktiviert",
       "remoteControlEnabled": "Fernzugriff ist jetzt aktiviert",
       "remoteControlDisabled": "Fernzugriff wurde deaktiviert",
-      "establishing": "Verbindung wird hergestellt...",
+      "init": "Verbindung wird hergestellt...",
       "help": {
         "title": "Hilfe",
         "general": {
           "title": "Allgemein",
           "zoom": "UMSCHALT gedrückt halten und MAUSRAD drehen, um die geteilte Oberfläche zu vergrößern / verkleinern",
-          "move": "UMSCHALT + MITTLERE MAUSTASTE gedrückt halten, um die geteilte Oberfläche zu nach dem Vergrößern zu verschieben",
+          "move": "UMSCHALT gedrückt halten und mit LINKER MAUSTASTE ziehen, um die geteilte Oberfläche zu nach dem Vergrößern zu verschieben",
           "copy": "STRG + C zum Kopieren / STRG + V zum Teilen von kopiertem Text, Bildern oder Dateien"
         },
         "pointer": {
@@ -202,8 +202,7 @@
       "windows": "Fenster",
       "screens": "Bilschirme"
     },
-    "share": "Teilen",
-    "confirmCancel": "Sind Sie sicher, dass Sie die Bildschirm-Auswahl abbrechen wollen? Es wird eine Auswahl benötigt, um ihren Bildschirm teilen zu können."
+    "share": "Teilen"
   },
   "sharingActive": {
     "title": "Bildschirmfreigabe aktiv",

@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRef, useTemplateRef, watch } from 'vue'
 
 import Signal from "../../components/Signal.vue"
 import Cursor from "../../components/Cursor.vue"
 
 import { useDrawOverlay } from '../../composables/useDrawOverlay'
-import { usePanzoom } from './usePanzoom'
-import { Dimensions, RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, ViewerTool } from '../../../interface'
-import { ScaleInfo, VideoTransform } from '../../types'
+import { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, ViewerTool, Rectangle, Size } from '../../../interface'
 import { useKeyListeners } from './useEventListeners'
 import { useOverlayCursors } from '../../composables/useOverlayCursors'
 import { useOverlaySignals } from '../../composables/useOverlaySignals'
+
+import MiniCrosshairPng from '../../../assets/img/minicrosshair.png'
 
 type SendOptions = {
   volatile?: boolean
@@ -21,23 +21,23 @@ const props = withDefaults(defineProps<{
   inputEnabled?: boolean
   pointerEnabled: boolean
   activeTool?: ViewerTool | undefined
-  draggingOver?: boolean
   users: UserData[]
   userId: string
-  videoTransform?: VideoTransform
+  videoTransform?: Rectangle
+  zoomScale?: number
 }>(), {
   inputEnabled: true,
   activeTool: undefined,
-  draggingOver: false,
   users: () => [],
-  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 }),
+  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0 }),
+  zoomScale: 1,
 })
 
 const emit = defineEmits<{
-  (e: 'rescale', scaleinfo: ScaleInfo): void
   (e: 'interacted'): void
   (e: 'mouse-inside', inside: boolean): void
-  (e: 'synchronized'): void
+  (e: 'on-stream-size-change', size: Size): void
+  (e: 'panzoom-toggle', active: boolean): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, options: SendOptions }): void
 }>()
 
@@ -50,26 +50,31 @@ const mappedUsers = computed(() => {
   return users
 })
 
-// Skalierungsinfos
-const streamDimensions = reactive({ width: 0, height: 0 })
-const videoScale = ref(1)
-const remoteScale = computed(() => {
-  if (!streamDimensions.height || !streamDimensions.width)
+const streamSize = ref<Size>({ width: 0, height: 0 })
+watch(streamSize, () => emit('on-stream-size-change', streamSize.value))
+
+const scale = computed(() => {
+  if (!streamSize.value.height || !streamSize.value.width)
     return 1
 
-  const height = props.videoTransform.height / streamDimensions.height
-  const width = props.videoTransform.width / streamDimensions.width
+  const height = props.videoTransform.height / streamSize.value.height
+  const width = props.videoTransform.width / streamSize.value.width
   return height < width ? height : width
 })
-const totalScale = computed(() => videoScale.value * remoteScale.value)
+
+const overlayStyle = computed(() => ({
+  cursor: isSharingScreen.value ? `url(${MiniCrosshairPng}) 5 5, auto` : 'default',
+  width: props.videoTransform?.width ?? '0px',
+  height: props.videoTransform?.height ?? '0px',
+}))
 
 const coverBounds = ref<Record<string, string>[]>()
 
 const overlayRef = useTemplateRef('overlay')
 const canvasRef = useTemplateRef('canvas')
 const drawOverlay = useDrawOverlay(canvasRef, {
-  scale: totalScale,
-  dimensions: computed(() => props.videoTransform ? [props.videoTransform!.fullwidth, props.videoTransform!.fullheight] : undefined),
+  scale,
+  dimensions: computed(() => props.videoTransform ? [props.videoTransform!.width, props.videoTransform!.height] : undefined),
   users: mappedUsers
 })
 
@@ -82,8 +87,10 @@ watch(() => props.pointerEnabled, () => {
 })
 
 const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "key-down", data: { key, tool: props.activeTool }, options: { receiveSelf: true, volatile: true } }), toRef(props.inputEnabled))
+watch(() => pressed.shift, (shift) => {
+  emit('panzoom-toggle', shift)
+}, { immediate: true })
 
-// Websocket-Message Object
 let currentMouseData: RemoteMouseData = {
   x: 0,
   y: 0,
@@ -97,37 +104,6 @@ watch(() => props.activeTool, () => {
 
 let isMouseDown = false
 let isMouseDragging = false
-let synchronized = false
-
-const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(overlayRef, toRef(pressed.space), toRef(props.inputEnabled))
-
-const scaleInfo = computed(() => ({
-  x: currentPan.x,
-  y: currentPan.y,
-  scale: currentPanScale.value,
-  width: streamDimensions.width,
-  height: streamDimensions.height
-}))
-
-watch(scaleInfo, () => updateVideoScale(scaleInfo.value))
-
-const overlayStyle = computed(() => {
-  const style = {
-    // Bei Screensharing sieht man den Mauszeiger des Presenters, daher den eigenen durch ein feines Crosshair ersetzen
-    cursor: isSharingScreen.value ? 'url(img/minicrosshair.png) 5 5, auto' : 'default',
-    width: '0',
-    height: '0',
-    left: '0',
-    top: '0',
-  }
-  if (props.videoTransform) {
-    style.width = props.videoTransform.width + "px"
-    style.height = props.videoTransform.height + "px"
-    //style.left = Math.round((props.videoTransform.x - 2) - (props.videoTransform.fullwidth / props.videoTransform.width * lastPan.x) + ((props.videoTransform.fullwidth - props.videoTransform.width) / 2)) + "px"
-    //style.top = Math.round((props.videoTransform.y - 2) - (props.videoTransform.fullwidth / props.videoTransform.width * lastPan.y) + ((props.videoTransform.fullheight - props.videoTransform.height) / 2)) + "px"
-  }
-  return style
-})
 
 function receiveMouseLeftClick(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
@@ -138,18 +114,17 @@ function receiveMouseLeftClick(data: RemoteMouseData) {
 }
 
 function receiveMouseMove(data: RemoteMouseData) {
-  if (data.tool === 'pointer') {
+  if (data.tool === 'pointer')
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
-  }
 
-  if (!synchronized || data.userId === props.userId)
+  if (data.userId === props.userId)
     return
 
   overlayCursors.move(data.userId, data.x, data.y)
 }
 
 function receiveMouseDown(data: RemoteMouseData) {
-  if (data.tool === 'pointer' && !props.draggingOver)
+  if (data.tool === 'pointer')
     drawOverlay.startStroke(data.userId, [data.x, data.y])
 }
 
@@ -169,8 +144,6 @@ function onWheel(e: WheelEvent) {
     lastWheel = Date.now()
     emit('send', { event: "mouse-wheel", data: currentMouseData, options: { receiveSelf: true } })
   }
-
-  doZoom(e.deltaY)
 }
 
 let eventToSend: number | undefined
@@ -205,7 +178,6 @@ function onMouseDown(e: MouseEvent) {
   if (!props.inputEnabled)
     return
 
-  console.log("mouse-down", e.which, lastMouseDown)
   if (e.which == 3) {
     isMouseDown = false
     lastMouseDown = 0
@@ -216,11 +188,9 @@ function onMouseDown(e: MouseEvent) {
     lastMouseDown = Date.now()
     isMouseDown = false
 
-    // Store initial cursor position
     const initialX = e.clientX
     const initialY = e.clientY
 
-    // Add mousemove handler to check distance
     moveHandler = (moveEvent) => {
       const deltaX = moveEvent.clientX - initialX
       const deltaY = moveEvent.clientY - initialY
@@ -258,7 +228,7 @@ let lastPosX = 0
 let lastPosY = 0
 let lastMove = 0
 function onMouseMove(e: MouseEvent) {
-  if (!props.inputEnabled || !synchronized)
+  if (!props.inputEnabled)
     return false
 
   emit('mouse-inside', true)
@@ -267,9 +237,10 @@ function onMouseMove(e: MouseEvent) {
   const x = e.pageX - rect.left
   const y = e.pageY - rect.top
 
+  const totalScale = scale.value * (props.zoomScale ?? 1)
   currentMouseData = {
-    x: Math.round(x / (totalScale.value * (zoom.value?.scale ?? 1))),
-    y: Math.round(y / (totalScale.value * (zoom.value?.scale ?? 1))),
+    x: Math.round(x / totalScale),
+    y: Math.round(y / totalScale),
     userId: props.userId,
     tool: props.activeTool
   }
@@ -308,65 +279,32 @@ function onMouseLeave() {
   }
 }
 
-let lastScaleInfo: ScaleInfo | undefined
-function updateVideoScale(scaleInfo: ScaleInfo, force = false) {
-  if (!lastScaleInfo || force || scaleInfo.x != lastScaleInfo.x || scaleInfo.y != lastScaleInfo.y || scaleInfo.scale != lastScaleInfo.scale || scaleInfo.width != lastScaleInfo.width || scaleInfo.height != lastScaleInfo.height) {
-    console.debug('updateVideoScale', scaleInfo)
-    emit('rescale', scaleInfo)
-  }
-  lastScaleInfo = scaleInfo
-}
-
-function calcScale(force = false) {
-  const scaleX = overlayRef.value!.getBoundingClientRect().width / props.videoTransform.width
-  const scaleY = overlayRef.value!.getBoundingClientRect().height / props.videoTransform.height
-
-  videoScale.value = scaleX < scaleY ? scaleX : scaleY
-  if (videoScale.value > 1) {
-    videoScale.value = 1
-  }
-
-  updateVideoScale(scaleInfo.value, force)
-}
-
-const forceCalcScale = () => calcScale(true)
-
-let lastDimensions: Dimensions
 function reset(data: RemoteResetData) {
   isSharingScreen.value = data.isScreen
 
-  // Speichern der Fensterabmessungen
-  streamDimensions.width = data.dimensions.right - data.dimensions.left
-  streamDimensions.height = data.dimensions.bottom - data.dimensions.top
+  streamSize.value = {
+    width: data.dimensions.right - data.dimensions.left,
+    height: data.dimensions.bottom - data.dimensions.top
+  }
 
   coverBounds.value = data.coverBounds.map(bound => ({
-    left: totalScale.value * (bound.x - data.dimensions.left) + "px",
-    top: totalScale.value * (bound.y - data.dimensions.top) + "px",
-    width: totalScale.value * bound.width + "px",
-    height: totalScale.value * bound.height + "px"
+    left: scale.value * (bound.x - data.dimensions.left) + "px",
+    top: scale.value * (bound.y - data.dimensions.top) + "px",
+    width: scale.value * bound.width + "px",
+    height: scale.value * bound.height + "px"
   }))
-
-  // Skalierungsinfos und Mauszeigerposition mit Remote-App synchronisiert
-  synchronized = !!lastDimensions && lastDimensions.left == data.dimensions.left && lastDimensions.right == data.dimensions.right && lastDimensions.top == data.dimensions.top && lastDimensions.bottom == data.dimensions.bottom
-  calcScale()
-  if (synchronized)
-    emit('synchronized')
-
-  lastDimensions = data.dimensions
 }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onMouseLeave)
-  window.addEventListener('resize', forceCalcScale)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
   window.removeEventListener('blur', onMouseLeave)
-  window.removeEventListener('resize', forceCalcScale)
 })
 
 defineExpose({
@@ -389,16 +327,14 @@ defineExpose({
     @mouseup="onMouseUp"
     @mousedown="onMouseDown"
     @wheel="onWheel"
-    @panzoomchange="onPanzoomChange"
-    @contextmenu="() => false"
   >
     <canvas ref="canvas" />
-    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="totalScale" />
+    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="scale" />
     <Cursor
       v-for="(cursor, cursorId) in overlayCursors.cursors"
       :key="cursorId"
       v-bind="cursor"
-      :scale="totalScale"
+      :scale="scale"
       :is-self="cursorId === userId"
     />
     <template v-if="isSharingScreen">
@@ -412,11 +348,7 @@ defineExpose({
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
   z-index: 1000;
-  margin: 0px;
-  padding: 0px;
 }
 
 .stream-overlay canvas {

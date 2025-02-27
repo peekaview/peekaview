@@ -1,5 +1,5 @@
 import { UserData } from "src/interface"
-import { reactive, Ref } from "vue"
+import { reactive, Ref, watch } from "vue"
 
 type Cursor = {
   name?: string
@@ -11,6 +11,13 @@ type Cursor = {
 
 export function useOverlayCursors(users: Ref<Record<string, UserData>>) {
   const cursors = reactive<Record<string, Cursor>>({})
+
+  watch(users, (users) => {
+    for (const userId in cursors) {
+      if (!users[userId])
+        delete cursors[userId]
+    }
+  })
 
   function move(userId: string, x: number, y: number) {
     const user = users.value[userId]

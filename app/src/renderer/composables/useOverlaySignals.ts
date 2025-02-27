@@ -10,18 +10,18 @@ type Signal = {
 export function useOverlaySignals(users: Ref<Record<string, UserData>>) {
   const signals = reactive<Record<string, Signal>>({})
 
+  let timeout: number | undefined
   function send(userId: string, x: number, y: number) {
+    clearTimeout(timeout)
+    
     const user = users.value[userId]
-    if (signals[user.id])
-      return
-  
     signals[user.id] = {
       color: user.color,
       left: Math.round(x),
       top: Math.round(y),
     }
   
-    setTimeout(() => {
+    timeout = window.setTimeout(() => {
       if (signals[user.id])
         delete signals[user.id]
     }, 2000)

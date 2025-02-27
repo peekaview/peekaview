@@ -1,5 +1,5 @@
 import path from 'path'
-import { ipcMain, screen, BrowserWindow } from 'electron'
+import { ipcMain, app, screen, BrowserWindow } from 'electron'
 import { windowLoad } from '../util'
 import { DialogOptions } from '../../interface'
 
@@ -121,7 +121,7 @@ export function useCustomDialog() {
         nodeIntegration: true,
         contextIsolation: true,
         sandbox: false,
-        webSecurity: false,
+        webSecurity: app.isPackaged,
       },
     })
 

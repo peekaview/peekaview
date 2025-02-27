@@ -7,13 +7,13 @@ import {
   Button,
 } from '@nut-tree-fork/nut-js'
 import path from 'path'
-import { ipcMain, dialog, BrowserWindow, screen } from 'electron'
+import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
 // import { fileTypeFromBlob } from 'file-type';
 
 import { SourceManager } from '../sources/SourceManager.js'
 import { createSourceManager } from '../sources/createSourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 import { i18n } from '../i18n'
@@ -117,7 +117,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   let overlayWindow: BrowserWindow | undefined
   let clipboardWindow: BrowserWindow | undefined
   let toolbarWindow: BrowserWindow | undefined
-  let toolbarSize: { width: number, height: number } | {} = {}
+  let toolbarSize: Size | {} = {}
   let localClipboardTime = 0
   let lastClipboardData: File = {
     content: 'data:text/plain;base64,'
@@ -155,7 +155,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
   let hwnd: string | undefined
 
-  async function startSharing(sourceId: string) {
+  async function start(sourceId: string) {
     if (sourceId.includes(':'))
       hwnd = sourceId.split(':')[1]
 
@@ -195,12 +195,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
 
     if (!sourceManager.isVisible() && streamingState !== 'hidden') {
       console.log('window is not visible')
-      //stopSharing()
+      //stop()
       pauseStreaming(true)
     }
   }
 
-  function stopSharing() {
+  function stop() {
     if (resetInterval != undefined) {
       clearInterval(resetInterval)
       resetInterval = undefined
@@ -361,7 +361,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         preload: path.join(__dirname, '../preload/overlay.js'),
         nodeIntegration: true,
         contextIsolation: true,
-        webSecurity: false,
+        webSecurity: app.isPackaged,
       },
     })
 
@@ -453,7 +453,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       frame: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/clipboard.js'),
-        webSecurity: false,
+        webSecurity: app.isPackaged,
         nodeIntegration: true,
         contextIsolation: true,
       },
@@ -507,7 +507,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         additionalArguments: [import.meta.env.VITE_APP_URL],
         nodeIntegration: true,
         contextIsolation: true,
-        webSecurity: false,
+        webSecurity: app.isPackaged,
       },
     })
 
@@ -575,7 +575,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     users = newUsers
     overlayWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     sendReset()
-    setTimeout(() => sendReset(), 2000) // for synchronization, TODO: find better solution
   }
 
   function mouseInteract(data: RemoteMouseData) {
@@ -893,8 +892,8 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   return {
     toggles,
 
-    startSharing,
-    stopSharing,
+    start,
+    stop,
     pauseStreaming,
     resumeStreamingIfPaused,
     sendReset,

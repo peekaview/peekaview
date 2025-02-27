@@ -54,6 +54,10 @@ export class SourceManager {
     throw new Error('Unsupported platform')
   }
 
+  isMaximized(): boolean {
+    throw new Error('Unknown display server')
+  }
+
   isMinimized(): boolean {
     throw new Error('Unsupported platform')
   }

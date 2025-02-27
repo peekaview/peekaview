@@ -17,7 +17,7 @@ const remoteControlEnabled = ref(false)
 
 const presenter = ref<Presenter>()
 
-onMounted(() => start())
+onMounted(() => present())
 
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
@@ -50,7 +50,7 @@ window.electronAPI?.onToggleRemoteControl((toggle) => {
     remoteControlEnabled.value = toggle
 })
 
-async function start() {
+async function present() {
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')
   if (!data)
@@ -102,7 +102,20 @@ function close() {
 </template>
 
 <style>
+html {
+  background: transparent !important;
+}
+
+body {
+  padding: 5px;
+  overflow: hidden;
+  background: transparent !important;
+}
+
 #presenter {
   height: 100%;
+  color: #ddd;
+  background-color: #282828;
+  border-radius: 15px;
 }
 </style>

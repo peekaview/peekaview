@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onUnmounted, onMounted, ref, useTemplateRef, watch } from "vue"
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
 
 import { notify } from '../../util'
@@ -12,6 +12,7 @@ import Toolbar from "../../components/Toolbar.vue"
 import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
 import { uuidv4 } from "../../../util.js"
 import { isTouchEnabled } from "../../util.js"
+import { usePanzoom } from './usePanzoom'
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
@@ -20,8 +21,7 @@ import LogoutSvg from '../../../assets/icons/logout.svg'
 import MouseSvg from '../../../assets/icons/mouse.svg'
 import PencilSvg from '../../../assets/icons/pencil.svg'
 
-import type { RemoteData, RemoteEvent, File, ViewerTool } from '../../../interface'
-import type { ScaleInfo, VideoTransform } from "../../types.js"
+import type { RemoteData, RemoteEvent, File, ViewerTool, Rectangle } from '../../../interface'
 
 type ReceiveEventHandlers = {
   [K in RemoteEvent]: (data: RemoteData<K>) => void
@@ -32,7 +32,7 @@ type SendOptions = {
   receiveSelf?: boolean
 }
 
-type Message = 'init' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
+type Message = 'init' | 'sync' |'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -47,10 +47,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
+const containerRef = useTemplateRef('container')
 
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
 const hidden = ref(false)
+const inputEnabled = computed(() => !hidden.value)
 const pointerEnabled = ref(true)
 const remoteControlEnabled = ref(false)
 const remoteClipboard = ref(false)
@@ -89,6 +91,15 @@ watch(remoteControlEnabled, (enabled) => {
   }, 3000)
 })
 
+const panzoomActive = ref(false)
+const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(containerRef, panzoomActive, inputEnabled)
+
+const scaleInfo = computed(() => ({
+  x: currentPan.x,
+  y: currentPan.y,
+  scale: currentPanScale.value,
+}))
+
 const draggingOver = ref(false)
 const showClipboard = ref(true)
 const clipboardFile = ref<File>()
@@ -104,7 +115,8 @@ onReceive("mouse-move", (data) => {
 })
 
 onReceive("mouse-down", (data) => {
-  overlayRef.value?.receiveMouseDown(data)
+  if (!draggingOver.value)
+    overlayRef.value?.receiveMouseDown(data)
 })
 
 onReceive("mouse-up", (data) => {
@@ -166,9 +178,15 @@ onReceive('reset', (data) => {
   overlayRef.value?.reset(data)
 })
 
-document.body.addEventListener('contextmenu', onContextMenu)
-document.body.addEventListener('keydown', preventBrowserZoom)
-document.body.addEventListener("wheel", onWheel)
+const onResize = () => {
+  hideOverflow.value = false
+  updateVideoTransform()
+}
+
+document.addEventListener('contextmenu', onContextMenu)
+document.addEventListener("wheel", onWheel)
+document.addEventListener('keydown', onKeydown, false)
+window.addEventListener('resize', onResize)
 window.addEventListener('drop', onDrop)
 window.addEventListener('dragover', onDragOver)
 window.addEventListener('paste', onPaste)
@@ -176,9 +194,10 @@ window.addEventListener('copy', onCopy)
 window.addEventListener('cut', onCut)
 
 onBeforeUnmount(() => {
-  document.body.removeEventListener('contextmenu', onContextMenu)
-  document.body.removeEventListener('keydown', preventBrowserZoom)
-  document.body.removeEventListener('wheel', onWheel)
+  document.removeEventListener('contextmenu', onContextMenu)
+  document.removeEventListener('wheel', onWheel)
+  document.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', onResize)
   window.removeEventListener('drop', onDrop)
   window.removeEventListener('dragover', onDragOver)
   window.removeEventListener('paste', onPaste)
@@ -187,26 +206,29 @@ onBeforeUnmount(() => {
 })
 
 function onContextMenu(e: MouseEvent) {
+  // disable context menu
   e.preventDefault()
 }
 
-// Disable Browser-Zoom
-function preventBrowserZoom(e: KeyboardEvent) {
+function onKeydown(e: KeyboardEvent) {
+  // prevent browser zoom
   if ((e.ctrlKey || e.metaKey) && (e.which === 61 || e.which === 107 || e.which === 173 || e.which === 109 || e.which === 187 || e.which === 189)) {
     e.preventDefault()
   }
 }
 
 function onWheel(e: WheelEvent) {
+  // prevent browser zoom
   if (e.ctrlKey || e.metaKey)
     e.preventDefault()
+  else if (e.shiftKey && inputEnabled.value)
+    doZoom(e.deltaY)
 }
 
 async function onDrop(e: DragEvent) {
-  // Prevent default behavior (Prevent file from being opened)
+  // prevent file from being opened
   e.preventDefault()
 
-  console.log('File(s) dropped')
   draggingOver.value = false
 
   const items = e.dataTransfer?.items
@@ -224,13 +246,12 @@ async function onDrop(e: DragEvent) {
 
 let fileDropTimeout: number
 function onDragOver(e: DragEvent) {
-  // Prevent default behavior (Prevent file from being opened)
+  // prevent file from being opened
   e.preventDefault()
 
   if (activeMessage.value === 'fileDrop')
     return
   
-  console.log('File(s) in drop zone')
   draggingOver.value = true
 
   activeMessage.value = 'fileDrop'
@@ -363,58 +384,36 @@ function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T
   receiveEvents[event] = handler as ReceiveEventHandlers[T]
 }
 
-const denyLoadingInTopWindow = (): void => {
-  if (window.self === window.top) {
-    //window.location.href = 'about:blank';
-  }
-}
-
-const disableBrowserZoom = (): () => void => {
-  const handleKeydown = (e: KeyboardEvent): void => {
-    if ((e.ctrlKey || e.metaKey) && (e.which === 61 || e.which === 107 || e.which === 173 || e.which === 109 || e.which === 187 || e.which === 189)) {
-      e.preventDefault()
-    }
-  }
-
-  const handleBrowserZoomWheel = (e: WheelEvent): void => {
-    console.log("wheel")
-    if (e.ctrlKey || e.metaKey)
-      e.preventDefault()
-  }
-
-  document.addEventListener('keydown', handleKeydown, false)
-  document.addEventListener("wheel", handleBrowserZoomWheel, { passive: false })
-
-  return () => {
-    document.removeEventListener('keydown', handleKeydown)
-    document.removeEventListener('wheel', handleBrowserZoomWheel)
-  }
-}
-
 const inApp = ref(!!window.electronAPI)
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const videoRef = useTemplateRef('video')
 const videoStyle = ref<Record<string, string>>({
-  transform: 'scale(1) translate(0px,0px)',
 })
-const containerRef = useTemplateRef('container')
-const containerStyle = ref<Record<string, string>>({
-  overflow: 'hidden',
-  width: '800px',
-  height: '600px',
-})
-const videoTransform = ref<VideoTransform>({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 })
+const hideOverflow = ref(true)
+const videoTransform = ref<Rectangle>({ x: 0, y: 0, width: 0, height: 0 })
 
 watch(() => props.data, async (screenShareData) => {
   if (!screenShareData) {
-    containerStyle.value.overflow = 'hidden'
+    hideOverflow.value = true
     screenView.value = undefined
     return
   }
 
   screenView.value = await useScreenView(screenShareData, {
-    videoElement: videoRef.value ?? undefined,
+    onStream: (stream) => {
+      if (!videoRef.value)
+        return
+      
+      videoRef.value.srcObject = stream
+      setTimeout(() => {
+        videoRef.value!.play().catch(err => {
+          console.error('Error playing video:', err)
+        })
+        hideMessage('init')
+        updateVideoTransform()
+      }, 2500)
+    },
     onRemote: (event, data) => {
       if (event === 'browser')
         inApp.value = false
@@ -442,60 +441,28 @@ watch(() => props.data, async (screenShareData) => {
       stop()
     }
   })
-  repaint()
+  hideOverflow.value = false
 }, { flush: 'post', immediate: true })
 
-onMounted(() => {
-  denyLoadingInTopWindow()
-  const cleanupZoom = disableBrowserZoom()
-  window.addEventListener('resize', repaint)
-
-  onUnmounted(() => {
-    cleanupZoom()
-    window.removeEventListener('resize', repaint)
-  })
-})
-
-function rescale(scaleInfo: ScaleInfo) {
-  const containerRect = containerRef.value!.getBoundingClientRect()
-  const currentHeight = Math.round(containerRect.height)
-  const currentWidth = Math.round(containerRect.width)
-
-  let xScale = 1
-  let yScale = 1
-  if (scaleInfo.width > window.innerWidth)
-    xScale = window.innerWidth / scaleInfo.width
-  if (scaleInfo.height > window.innerHeight)
-    yScale = window.innerHeight / scaleInfo.height
-
-  const scale = yScale < xScale ? yScale : xScale
-  if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
-    containerStyle.value.height = scaleInfo.height * scale + 'px'
-    containerStyle.value.width = scaleInfo.width * scale + 'px'
-  }
-
-  containerStyle.value.overflow = 'visible'
-  videoStyle.value.transform = `scale(${scaleInfo.scale}) translate(${scaleInfo.x}px,${scaleInfo.y}px)`
-
+watch(scaleInfo, () => {
   const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
   videoStyle.value['object-fit'] = participant?.user.platform === 'mac' ? 'fill' : 'cover'
+  hideOverflow.value = false
+}, { immediate: true })
 
-  nextTick(() => {  
-    const containerRect = containerRef.value!.getBoundingClientRect()
-    const videoRect = videoRef.value!.getBoundingClientRect()
-    videoTransform.value = {
-      x: Math.round(videoRect.left),
-      y: Math.round(videoRect.top),
-      fullwidth: Math.round(videoRect.right - videoRect.left),
-      fullheight: Math.round(videoRect.bottom - videoRect.top),
-      width: Math.round(containerRect.right - containerRect.left),
-      height: Math.round(containerRect.bottom - containerRect.top)
-    }
-  })
-}
+function updateVideoTransform() {
+  if (!videoRef.value)
+    return
 
-function repaint() {
-  containerStyle.value.overflow = 'visible'
+  const rect = videoRef.value.getBoundingClientRect()
+  const x = Math.round(rect.left)
+  const y = Math.round(rect.top)
+  const width = Math.round(rect.right - rect.left)
+  const height = Math.round(rect.bottom - rect.top)
+  if (x === videoTransform.value.x && y === videoTransform.value.y && width === videoTransform.value.width && height === videoTransform.value.height)
+    return
+
+  videoTransform.value = { x, y, width, height }
 }
 
 function stop() {
@@ -507,7 +474,7 @@ function stop() {
 </script>
 
 <template>
-  <div class="remote-viewer">
+  <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
       <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
         <PencilSvg />
@@ -525,7 +492,14 @@ function stop() {
         <LogoutSvg />
       </div>
     </Toolbar>
-    <div ref="container" class="remote-container" :style="containerStyle">
+    <div class="toolbar-spacer"></div>
+    <div
+      ref="container"
+      class="remote-container"
+      :style="{ overflow: hideOverflow ? 'hidden' : 'visible' }"
+      @panzoomchange="onPanzoomChange"
+      @contextmenu="() => false"
+    >
       <video ref="video" playsinline autoplay :style="videoStyle" />
       <StreamOverlay
         v-if="data"
@@ -536,12 +510,11 @@ function stop() {
         :input-enabled="!hidden"
         :pointer-enabled="pointerEnabled"
         :active-tool="activeTool"
-        :dragging-over="draggingOver"
-        @rescale="rescale"
-        @synchronized="hideMessage('init')"
+        :zoom-scale="zoom?.scale"
         @interacted="freezeVideo"
         @mouse-inside="remoteClipboard = $event"
         @send="send($event.event, $event.data, $event.options)"
+        @panzoom-toggle="panzoomActive = $event"
       >
       </StreamOverlay>
     </div>
@@ -551,7 +524,7 @@ function stop() {
     <div v-if="activeMessage" class="message">
       <template v-if="activeMessage === 'init' || activeMessage === 'help'">
         <template v-if="activeMessage === 'init'">
-          <b>{{ $t('viewer.messages.establishing') }}</b>
+          <b>{{ $t('viewer.messages.init') }}</b>
           <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
         </template>
         <template v-else-if="!isTouchEnabled()">
@@ -573,45 +546,15 @@ function stop() {
           {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
       </template>
-      <template v-else-if="activeMessage === 'paused'">
-        <b>{{ $t('viewer.messages.paused.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.paused.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'resumed'">
-        <b>{{ $t('viewer.messages.resumed.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.resumed.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'hidden'">
-        <b>{{ $t('viewer.messages.hidden.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.hidden.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'visible'">
-        <b>{{ $t('viewer.messages.visible.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.visible.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'fileDrop'">
-        <b>{{ $t('viewer.messages.fileDrop.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.fileDrop.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'fileUpload'">
-        <b>{{ $t('viewer.messages.fileUpload.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.fileUpload.description') }}
-        <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
-      </template>
       <template v-else-if="activeMessage === 'remote' && remoteMessage">
         <b>{{ remoteMessage }}</b>
+      </template>
+      <template v-else>
+        <b>{{ $t(`viewer.messages.${activeMessage}.title`) }}</b>
+        <br>
+        <br>
+        {{ $t(`viewer.messages.${activeMessage}.description`) }}
+        <img v-if="activeMessage === 'fileUpload'" style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
     </div>
     <slot />
@@ -636,21 +579,24 @@ function stop() {
 
   .remote-viewer .remote-container {
     position: relative;
-    width: 100%;
-    height: 100%;
+    flex-grow: 1;
+    min-height: 0;
   }
 
   .remote-viewer video {
-    width: 100%;
-    height: 100%;
     max-width: 100%;
     max-height: 100%;
   }
 
   .remote-viewer .main-toolbar {
     cursor: default;
-    position: relative;
-    z-index:3000;
+    position: absolute;
+    top: 0.125rem;
+    z-index: 3000;
+  }
+
+  .remote-viewer .toolbar-spacer {
+    flex: 0 1 2.5rem;
   }
   
   .remote-viewer .message {

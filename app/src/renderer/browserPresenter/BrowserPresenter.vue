@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { nextTick, ref, onBeforeUnmount, useTemplateRef, watch } from 'vue'
+import { ref, onBeforeUnmount, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamOverlay from '../views/viewer/StreamOverlay.vue'
 import Clipboard from '../components/Clipboard.vue'
-import { ScaleInfo, VideoTransform } from '../types'
-import { File, RemoteEvent, RemoteData } from '../../interface'
+import { File, RemoteEvent, RemoteData, Rectangle, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
-import { usePresenter, getStream, type Presenter } from '../composables/usePresenter'
+import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
 import { prompt } from '../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
@@ -19,14 +18,16 @@ const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
 const windowModalSize = [400, 550] as const
 
+const urlBarHeight = 36 // TODO: as of now this is Chrome on KDE, check other OS's / browsers
+
 const outerRef = useTemplateRef('outer')
-const containerRef = useTemplateRef('container')
 const toolbarRef = useTemplateRef('toolbar')
 const videoRef = useTemplateRef('video')
 const overlayRef = useTemplateRef('overlay')
 
 const presenter = ref<Presenter>()
-const lastWindowPosition = ref<[number, number]>([0, 0])
+const lastWindowTransform = ref<Rectangle>()
+const streamSize = ref<Size>({ width: 0, height: 0 })
 const windowSizeFixed = ref(false)
 
 const pointerEnabled = ref(true)
@@ -55,8 +56,7 @@ async function start() {
   }, t, async (shareAudio) => {
     windowSizeFixed.value = true
     window.resizeTo(...windowSelectSize)
-    console.log(windowSelectSize, window.outerWidth, window.outerHeight)
-    const stream = await getStream(shareAudio)
+    const stream = await getStreamInBrowser(shareAudio)
     windowSizeFixed.value = false
     window.resizeTo(...windowDefaultSize)
 
@@ -65,6 +65,7 @@ async function start() {
       videoRef.value!.play().catch(err => {
         console.error('Error playing video:', err)
       })
+      updateVideoTransform()
     }, 2500)
 
     return stream
@@ -92,49 +93,21 @@ async function start() {
   await presenter.value.startSession()
 }
 
-const videoStyle = ref<Record<string, string>>({
-  transform: 'scale(1) translate(0px,0px)',
-})
-const containerStyle = ref<Record<string, string>>({
-  overflow: 'hidden',
-  width: '800px',
-  height: '600px',
-})
-const videoTransform = ref<VideoTransform>()
+const videoTransform = ref<Rectangle>({ x: 0, y: 0, width: 0, height: 0 })
 
-function rescale(scaleInfo: ScaleInfo) {
-  const containerRect = containerRef.value!.getBoundingClientRect()
-  const currentHeight = Math.round(containerRect.height)
-  const currentWidth = Math.round(containerRect.width)
+function updateVideoTransform() {
+  if (!videoRef.value)
+    return
 
-  let xScale = 1
-  let yScale = 1
-  if (scaleInfo.width > window.innerWidth)
-    xScale = window.innerWidth / scaleInfo.width
-  if (scaleInfo.height > window.innerHeight)
-    yScale = window.innerHeight / scaleInfo.height
+  const rect = videoRef.value.getBoundingClientRect()
+  const x = Math.round(rect.left)
+  const y = Math.round(rect.top)
+  const width = Math.round(rect.right - rect.left)
+  const height = Math.round(rect.bottom - rect.top)
+  if (x === videoTransform.value.x && y === videoTransform.value.y && width === videoTransform.value.width && height === videoTransform.value.height)
+    return
 
-  const scale = yScale < xScale ? yScale : xScale
-  if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
-    containerStyle.value.height = scaleInfo.height * scale + 'px'
-    containerStyle.value.width = scaleInfo.width * scale + 'px'
-  }
-
-  containerStyle.value.overflow = 'visible'
-  videoStyle.value.transform = `scale(${scaleInfo.scale}) translate(${scaleInfo.x}px,${scaleInfo.y}px)`
-
-  nextTick(() => {  
-    const containerRect = containerRef.value!.getBoundingClientRect()
-    const videoRect = videoRef.value!.getBoundingClientRect()
-    videoTransform.value = {
-      x: Math.round(videoRect.left),
-      y: Math.round(videoRect.top),
-      fullwidth: Math.round(videoRect.right - videoRect.left),
-      fullheight: Math.round(videoRect.bottom - videoRect.top),
-      width: Math.round(containerRect.right - containerRect.left),
-      height: Math.round(containerRect.bottom - containerRect.top)
-    }
-  })
+  videoTransform.value = { x, y, width, height }
 }
 
 type SendOptions = {
@@ -192,7 +165,9 @@ function onResize() {
   resizeDebounceTimeout = window.setTimeout(() => {
     resizeDebounceTimeout = null
     fitPreview()
-  }, 500)
+  }, 200)
+
+  updateVideoTransform()
 }
 
 function fitPreview() {
@@ -200,35 +175,23 @@ function fitPreview() {
     return
 
   const outerRect = outerRef.value!.getBoundingClientRect()
-  const containerRect = containerRef.value!.getBoundingClientRect()
   const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
   const videoRect = videoRef.value!.getBoundingClientRect()
 
-  const deltaWidth = containerRect.width - videoRect.width
-  const deltaHeight = outerRect.height - containerRect.height - toolbarRect.height
-  const width = window.outerWidth
-  const height = window.outerHeight
-
+  const deltaWidth = Math.round(outerRect.width - videoRect.width)
+  const deltaHeight = Math.round(outerRect.height - videoRect.height - toolbarRect.height)
   if (deltaWidth > 0 || deltaHeight > 0)
-    window.resizeTo(width - deltaWidth, height - deltaHeight)
-}
-
-function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
-  presenter.value?.sendRemote?.(event, data)
-  if (options.receiveSelf)
-    receive(event, data)
-}
-
-function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
-  receiveEvents[event]?.(data)
-}
-
-function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
-  receiveEvents[event] = handler as ReceiveEventHandlers[T]
+    window.resizeTo(window.outerWidth - deltaWidth, window.outerHeight - deltaHeight)
 }
 
 function freezeAndFocus() {
   if (throttling)
+    return
+
+  const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
+  const width = streamSize.value.width
+  const height = streamSize.value.height + toolbarRect.height + urlBarHeight
+  if (width <= window.innerWidth && height <= window.innerHeight)
     return
 
   throttling = true
@@ -238,14 +201,20 @@ function freezeAndFocus() {
   window.setTimeout(() => { // wait until shutter is streamed
     videoRef.value?.pause()
     shutterActive.value = false
-    lastWindowPosition.value = [window.screenX, window.screenY]
+    lastWindowTransform.value = {
+      x: window.screenX,
+      y: window.screenY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
     windowSizeFixed.value = true
-    window.resizeTo(window.screen.width, window.screen.height)
+
+    window.resizeTo(width, height)
     window.focus()
     window.setTimeout(() => {
       windowSizeFixed.value = false
-      window.resizeTo(...windowDefaultSize)
-      window.moveTo(...lastWindowPosition.value)
+      window.resizeTo(lastWindowTransform.value!.width, lastWindowTransform.value!.height)
+      window.moveTo(lastWindowTransform.value!.x, lastWindowTransform.value!.y)
       videoRef.value?.play()
     }, 3000)
   }, 150)
@@ -268,6 +237,20 @@ async function showInviteLink() {
 
   windowSizeFixed.value = false
   window.resizeTo(...windowDefaultSize)
+}
+
+function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
+  presenter.value?.sendRemote?.(event, data)
+  if (options.receiveSelf)
+    receive(event, data)
+}
+
+function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
+  receiveEvents[event]?.(data)
+}
+
+function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
+  receiveEvents[event] = handler as ReceiveEventHandlers[T]
 }
 
 function onStopSharing() {
@@ -304,7 +287,7 @@ function onResumeSharing() {
       @share-different-screen="presenter.presentSource()"
       @show-invite-link="showInviteLink"
     />
-    <div ref="container" class="preview-container">
+    <div class="preview-container">
       <video ref="video" muted />
       <div class="veil" />
       <StreamOverlay
@@ -315,18 +298,22 @@ function onResumeSharing() {
         :video-transform="videoTransform"
         :input-enabled="false"
         :pointer-enabled="pointerEnabled"
-        @rescale="rescale"
+        @on-stream-size-change="streamSize = $event"
         @send="send($event.event, $event.data, $event.options)"
       />
-      <div class="clipboard-container">
-        <Clipboard v-if="showClipboard" :data="clipboardFile"/>
-      </div>
       <div v-if="shutterActive" class="shutter" />
+    </div>
+    <div class="clipboard-container">
+      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
   </div>
 </template>
 
 <style>
+html {
+  overflow: hidden;
+}
+
 #browser-presenter {
   background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
   width: 100%;
@@ -336,6 +323,7 @@ function onResumeSharing() {
 .presenter-container {
   display: flex;
   flex-direction: column;
+  align-items: center;
   width: 100%;
   height: 100%;
 }
@@ -343,6 +331,7 @@ function onResumeSharing() {
 .presenter-container .toolbar {
   border-radius: 0;
   border: none;
+  align-self: stretch;
 }
 
 video {
@@ -359,6 +348,12 @@ video {
   height: 100%;
 }
 
+.preview-container {
+  position: relative;
+  flex-grow: 1;
+  min-height: 0;
+}
+
 .veil {
   position: absolute;
   top: 0;
@@ -369,17 +364,6 @@ video {
   z-index: 500;
 }
 
-.preview-container {
-  position: relative;
-}
-
-.clipboard-container {
-  position: absolute;
-  z-index: 2000;
-  top: 50px;
-  left: 50px;
-}
-
 .shutter {
   position: absolute;
   top: 0;
@@ -388,5 +372,12 @@ video {
   height: 100%;
   background-color: black;
   z-index: 1500;
+}
+
+.clipboard-container {
+  position: absolute;
+  z-index: 2000;
+  top: 50px;
+  left: 50px;
 }
 </style>
