@@ -24,18 +24,17 @@ let lastViewActiveInterval = window.setInterval(() => {
   localStorage.setItem('lastViewActive', Date.now().toString())
 }, 1000)
 
-onBeforeUnmount(() => {
-  clearInterval(lastViewActiveInterval)
-  localStorage.removeItem('lastViewActive')
-})
+onBeforeUnmount(cleanUp)
+window.addEventListener('beforeunload', cleanUp)
 
-window.addEventListener('beforeunload', () => {
+function cleanUp() {
   clearInterval(lastViewActiveInterval)
   localStorage.removeItem('lastViewActive')
-})
+}
 
 function stop() {
   screenShareData.value = undefined
+  cleanUp()
   emit('stop')
 }
 </script>
@@ -55,7 +54,8 @@ function stop() {
         <div class="panel">
           <RequestAccess
             :contact="contact"
-            @accept="screenShareData = $event"
+            @accepted="screenShareData = $event"
+            @denied="stop"
             @stop="stop"
           />
         </div>

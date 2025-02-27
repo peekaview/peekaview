@@ -60,7 +60,7 @@ function resizeWindow() {
 
   const width = Math.round(rect.width) + 10
   const minimumWidth = Math.min(width, 200) // mac requires a bit of minimum width for window to stay transparent
-  window.electronAPI!.resizeWindow('toolbar', {
+  window.electronAPI?.resizeWindow('toolbar', {
     size: { width },
     minimumSize: { width: minimumWidth },
   })

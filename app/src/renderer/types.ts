@@ -13,23 +13,6 @@ export type RemoteControlData = {
   hostname: string
 }
 
-export type ScaleInfo = {
-  height: number
-  width: number
-  scale: number
-  x: number
-  y: number
-}
-
-export type VideoTransform = {
-  x: number
-  y: number
-  width: number
-  height: number
-  fullwidth: number
-  fullheight: number
-}
-
 export type ViewerData = {
   email: string
   name: string

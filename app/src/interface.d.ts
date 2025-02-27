@@ -206,23 +206,21 @@ export type RemoteData<T extends RemoteEvent> =
     bottom: number
   }
 
-  export type Rectangle = {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
-
   export type Point = {
     x: number
     y: number
   }
 
+  export type Size = {
+    width: number
+    height: number
+  }
+
+  export type Rectangle = Point & Size
+
   export type File = {
     content: string
     name?: string
   }
-
-  export type Size = { width: number, height: number }
 
   export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }

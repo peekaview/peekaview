@@ -12,7 +12,7 @@ import { UserData } from '../../../interface'
 
 const canvasRef = useTemplateRef('canvas')
 const scale = ref(1)
-const pointerEnabled = ref(false)
+const pointerEnabled = ref(true)
 const remoteControlEnabled = ref(false)
 const users = ref<UserData[]>([])
 const mappedUsers = computed(() => {

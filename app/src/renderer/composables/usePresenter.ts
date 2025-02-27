@@ -47,6 +47,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
 
   watch(viewers, (viewers) => {
     window.electronAPI?.updateUsers(JSON.stringify(viewers))
+    sendReset()
   })
 
   watch(sessionState, (state) => {
@@ -115,10 +116,8 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
     }
   })
 
-  document.addEventListener('visibilitychange', togglePingInterval)
-  togglePingInterval()
-
   let resetTimeout: number | undefined
+  let resetJson: string
   watch(stream, (stream) => {
     clearTimeout(resetTimeout)
     if (!stream)
@@ -133,7 +132,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
 
   //let lastResetWidth: number | undefined
   //let lastResetHeight: number | undefined
-  function sendReset() {
+  function sendReset(interval = false) {
     clearTimeout(resetTimeout)
     if (inApp)
       return
@@ -157,14 +156,20 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
         right: width,
         bottom: height,
       },
+      coverBounds: [],
       pointerEnabled: unref(data.pointerEnabled),
       remoteControlEnabled: unref(data.remoteControlEnabled),
-      coverBounds: []
     }
-    screenPresent.value?.sendRemote('reset', resetData)
-    options?.onReset?.(resetData)
+    
+    const json = JSON.stringify(resetData)
+    if (!interval || resetJson != json) {
+      resetJson = json
+      console.log('reset', resetData)
+      screenPresent.value?.sendRemote('reset', resetData)
+      options?.onReset?.(resetData)
+    }
 
-    resetTimeout = window.setTimeout(() => sendReset(), 2000)
+    resetTimeout = window.setTimeout(() => sendReset(true), 2000)
   }
   
   async function startSession() {
@@ -195,6 +200,11 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
         controlServer: acceptedData.controlServer,
       }
 
+      pingInterval.value = window.setInterval(() => {
+        updateOnlineStatus()
+      }, 10000)
+      updateOnlineStatus()
+
       screenPresent.value = await useScreenPresent(screenShareData.value, {
         inApp,
         onRemote: (event, data) => {
@@ -203,6 +213,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
             window.electronAPI?.sendRemote(event, data)
         }
       })
+      
       presentSource()
     } catch (error) {
       console.error('Error creating room:', error);
@@ -219,9 +230,8 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
       if (!s)
         return
 
-      cleanUpStream()
+      await cleanUpStream()
       stream.value = s
-      console.debug('Screen stream obtained:', stream.value)
       await screenPresent.value.addStream(stream.value, shareAudio)
       options?.onStream?.(stream.value, shareAudio)
       sessionState.value = 'active'
@@ -233,9 +243,12 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
   }
       
   async function updateOnlineStatus() {
+    if (document.hidden)
+      return
+
     console.log('Updating online status')
     const requestData = {
-      action: 'doesAnyoneWantToSeeMyScreen' as const,
+      action: 'iAmOnline' as const,
       email: unref(data.email),
       token: unref(data.token),
     }
@@ -307,19 +320,6 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
       confirmButtonText: t('general.ok'),
     })
   }
-
-  function togglePingInterval() {
-    if (document.hidden) {
-      clearInterval(pingInterval.value)
-      pingInterval.value = undefined
-      return
-    }
-  
-    pingInterval.value = window.setInterval(() => {
-      updateOnlineStatus()
-    }, 10000)
-    updateOnlineStatus()
-  }
   
   function pauseSharing() {
     if (stream.value)
@@ -349,8 +349,9 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
     options?.onStop?.()
   }
   
-  function cleanUpStream() {
+  async function cleanUpStream() {
     if (stream.value) {
+      await screenPresent.value?.cleanUpStream()
       stream.value.getTracks().forEach(track => track.stop())
       stream.value = undefined
     }
@@ -359,7 +360,6 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
   function cleanUpCallbacks() {
     clearInterval(requestInterval.value)
     clearInterval(pingInterval.value)
-    document.removeEventListener('visibilitychange', togglePingInterval)
   }
 
   return reactive({
@@ -368,7 +368,9 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
     viewers,
     screenShareData: computed(() => screenShareData.value),
     sendRemote: computed(() => screenPresent.value?.sendRemote),
+    
     startSession,
+    sendReset,
     pauseSharing,
     resumeSharing,
     stopSharing,
@@ -378,7 +380,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
   })
 }
 
-export function getStream(shareAudio = false) {
+export function getStreamInBrowser(shareAudio = false) {
   return navigator.mediaDevices.getDisplayMedia({
     video: true,
     audio: shareAudio

@@ -6,7 +6,6 @@ import {
   Ref,
   ref,
   shallowRef,
-  watch,
 } from "vue"
 
 import SimplePeer from 'simple-peer'
@@ -22,8 +21,9 @@ interface ScreenPresentOptions {
 
 interface ScreenViewOptions {
   turnCredentials?: TurnCredentials
-  videoElement?: HTMLVideoElement
   role?: PeerRole
+  onConnected?: () => void
+  onStream?: (stream: MediaStream) => void
   onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
   onEnding?: () => void
 }
@@ -37,6 +37,7 @@ interface ScreenPeerOptions {
 
 export type ScreenPresent = Reactive<ScreenBase & {
   addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
+  cleanUpStream: () => Promise<void>
   leave: () => void
 }>
 
@@ -248,6 +249,14 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
       participants.value[socketId].peer.addStream(stream.value);
   }
 
+  const cleanUpStream = async () => {
+    if (stream.value) {
+      for (const socketId in participants.value)
+        participants.value[socketId].peer.removeStream(stream.value)
+      stream.value = undefined
+    }
+  }
+
   const leave = () => {
     for (const socketId in participants.value) {
       if (stream.value)
@@ -267,6 +276,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
   return reactive({
     participants,
     addStream,
+    cleanUpStream,
     sendRemote,
     leave
   })
@@ -282,18 +292,6 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
         createParticipant(socketId, true, () => {}, () => dismiss(socketId))
       }
     },
-  })
-
-  watch(stream, (stream) => {
-    if (!stream || !options?.videoElement)
-      return
-
-    options.videoElement.srcObject = stream
-    setTimeout(() => {
-      options!.videoElement!.play().catch(err => {
-        console.error('Error playing video:', err)
-      })
-    }, 2500)
   })
 
   const leave = () => {
@@ -328,8 +326,10 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
 
     presenterPeer.on('stream', s => {
       stream.value = s
+      options?.onStream?.(s)
     })
 
+    options?.onConnected?.()
     resolve()
   }))
 

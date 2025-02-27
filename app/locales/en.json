@@ -84,13 +84,13 @@
       "pointerDisabled": "Draw / Point tool is now disabled",
       "remoteControlEnabled": "Remote control is now enabled",
       "remoteControlDisabled": "Remote control is now disabled",
-      "establishing": "Establishing connection...",
+      "init": "Establishing connection...",
       "help": {
         "title": "Help",
         "general": {
           "title": "General",
           "zoom": "Hold SHIFT and scroll MOUSE WHEEL to zoom in / out of the shared window",
-          "move": "Hold SHIFT + MIDDLE MOUSE BUTTON to move the shared window after zooming in",
+          "move": "Hold SHIFT and drag with LEFT MOUSE BUTTON to move the shared window after zooming in",
           "copy": "CTRL + C to copy and CTRL + V to share copied text, images or files"
         },
         "pointer": {
@@ -202,8 +202,7 @@
       "windows": "Windows",
       "screens": "Screens"
     },
-    "share": "Share",
-    "confirmCancel": "Are you sure you want to cancel the screen selection? A selection is required to share your screen."
+    "share": "Share"
   },
   "sharingActive": {
     "title": "Sharing Session Active",

@@ -42,7 +42,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'accept', data: ScreenShareData): void
+  (e: 'accepted', data: ScreenShareData): void
+  (e: 'denied'): void
   (e: 'stop'): void
 }>()
 
@@ -52,19 +53,6 @@ const waitingStatus = ref<WaitingStatus | undefined>('establishing')
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
-
-watch(requestStatus, (status) => {
-  if (status !== 'request_denied')
-    return
-
-  notify({
-    type: 'info',
-    text: t('viewer.requestDenied', { email: props.contact.email }),
-    confirmButtonText: t('general.ok'),
-  })
-
-  requestStatus.value = undefined
-})
 
 onMounted(() => {
   if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
@@ -129,7 +117,7 @@ async function requestScreen(params: RequestParams, initial = false) {
           })
           return
         case 'request_denied':
-          waitingStatus.value = undefined
+          handleRequestDenied()
           return
         case 'request_notified':
           waitingStatus.value = 'notified'
@@ -153,7 +141,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   waitingStatus.value = undefined
   requestStatus.value = undefined
 
-  emit('accept', {
+  emit('accepted', {
     user: {
       id: uuidv4(),
       name: props.contact.name,
@@ -167,6 +155,20 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     controlServer: data.controlServer,
     turnCredentials: data.turnCredentials,
   })
+}
+
+function handleRequestDenied() {
+  console.log('handleRequestDenied called')
+  waitingStatus.value = undefined
+  requestStatus.value = undefined
+
+  notify({
+    type: 'info',
+    text: t('viewer.requestDenied', { email: props.contact.email }),
+    confirmButtonText: t('general.ok'),
+  })
+
+  emit('denied')
 }
 
 function handleError() {

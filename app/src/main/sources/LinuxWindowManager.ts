@@ -4,6 +4,10 @@ export class LinuxWindowManager extends WindowManager {
   constructor(hwnd: string) {
     super(hwnd)
     this.areCoordinatesScaling = true
+    /*this.cropSize = {
+      width: 46, // this only applies to Firefox though
+      height: 46,
+    }*/
   }
 
   getOuterDimensions() {

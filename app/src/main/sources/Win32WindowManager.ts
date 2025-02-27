@@ -29,10 +29,6 @@ export class Win32WindowManager extends WindowManager {
 
   constructor(hwnd: string) {
     super(hwnd)
-    this.overlayPadding = {
-      x: 0,
-      y: 0,
-    }
 
     try {
       const lib = koffi.load('user32.dll');
@@ -162,6 +158,11 @@ export class Win32WindowManager extends WindowManager {
     innerDimensions.right = innerDimensions.left + innerDimensions.right
     innerDimensions.bottom = innerDimensions.top + innerDimensions.bottom
     return innerDimensions
+  }
+
+  isMaximized() {
+    const hwnd = parseInt(this.hwnd);
+    return this.user32.IsZoomed(hwnd)
   }
 
   isMinimized() {

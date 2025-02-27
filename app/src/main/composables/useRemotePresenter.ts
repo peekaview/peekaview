@@ -7,17 +7,25 @@ import {
   Button,
 } from '@nut-tree-fork/nut-js'
 import path from 'path'
-import { ipcMain, BrowserWindow, screen } from 'electron'
+import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
 // import { fileTypeFromBlob } from 'file-type';
 
 import { SourceManager } from '../sources/SourceManager.js'
+import { createSourceManager } from '../sources/createSourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
+
+import { i18n } from '../i18n'
+
+import { getWindowList } from '../util.js'
 
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
+
+// Intervals
+const checkWindowIntervalTime = (isMac || isLinux) ? 1000 : 1000
 
 const controlkey = isMac ? Key.LeftSuper : Key.LeftControl
 const SpecialKeys = [
@@ -101,13 +109,15 @@ const KeyMap: Record<string, Key> = {
   'NumLock': Key.NumLock,
 }
 
-export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, newUsers: UserData[] = []) {
+export type RemotePresenter = ReturnType<typeof useRemotePresenter>
+
+export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, newUsers: UserData[] = [], onHidden: (hidden: boolean) => void) {
   const mousePressed: Record<string, boolean> = {}
 
   let overlayWindow: BrowserWindow | undefined
   let clipboardWindow: BrowserWindow | undefined
   let toolbarWindow: BrowserWindow | undefined
-  let toolbarSize: { width: number, height: number } | {} = {}
+  let toolbarSize: Size | {} = {}
   let localClipboardTime = 0
   let lastClipboardData: File = {
     content: 'data:text/plain;base64,'
@@ -124,9 +134,167 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     right: 0,
     bottom: 0,
   }
-  let sourceManager: SourceManager
   let users: UserData[] = newUsers
   const fileChunkRegistry = useFileChunkRegistry(dataToClipboard)
+
+  // Dependencies
+  let sourceManager: SourceManager
+  
+  // Streaming control flags
+  let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
+  
+  // Intervals
+  let checkWindowInterval: NodeJS.Timeout | undefined
+  let resetInterval: NodeJS.Timeout | undefined
+  
+  // Last state for pause/resume
+  let pausedToggleState: {
+    pointer: boolean;
+    remoteControl: boolean;
+  } | undefined
+
+  let hwnd: string | undefined
+
+  async function start(sourceId: string) {
+    if (sourceId.includes(':'))
+      hwnd = sourceId.split(':')[1]
+
+    console.log(`hwndstreamer:${hwnd}`)
+
+    const windowList = await getWindowList()
+    if (!hwnd || (!windowList.includes(hwnd) && hwnd != '0')) {
+      dialog.showErrorBox(i18n.t('windowNotFound.title'), i18n.t('windowNotFound.content', { hwnd }))
+      return
+    }
+    
+    console.log(`${hwnd} in windowList`)
+
+    await startStreaming()
+
+    sourceManager.checkIfRectangleUpdated()
+    checkWindow()
+    if (!checkWindowInterval)
+      checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
+  }
+
+  function checkWindow() {
+    // pause streaming, if window is minimized
+    updateWindowBorders(sourceManager.getOuterDimensions())
+    if (sourceManager.isMinimized()) {
+      console.log('window is minimized')
+      pauseStreaming(true)
+    }
+    else if (sourceManager.checkIfRectangleUpdated()) {
+      console.log('window was resized')
+      pauseStreaming(true)
+      // resume streaming, if window is back to normal state
+    }
+    else if (sourceManager.isVisible()) {
+      resumeStreamingIfPaused(true)
+    }
+
+    if (!sourceManager.isVisible() && streamingState !== 'hidden') {
+      console.log('window is not visible')
+      //stop()
+      pauseStreaming(true)
+    }
+  }
+
+  function stop() {
+    if (resetInterval != undefined) {
+      clearInterval(resetInterval)
+      resetInterval = undefined
+    }
+
+    if (checkWindowInterval != undefined) {
+      clearInterval(checkWindowInterval)
+      checkWindowInterval = undefined
+    }
+
+    hideOverlayWindow()
+    hideRemoteControl()
+    deactivate()
+
+    streamingState = 'stopped'
+  }
+
+  function pauseStreaming(fromHidden = false) {
+    if (streamingState === 'paused' || (streamingState === 'hidden' && fromHidden))
+      return
+
+    console.log('pauseStreaming', streamingState, fromHidden, streamingState === 'hidden' && !fromHidden)
+    if (fromHidden)
+      onHidden(true)
+
+    streamingState = fromHidden ? 'hidden' : 'paused'
+
+    if (pausedToggleState === undefined) {
+      pausedToggleState = { ...toggles }
+      toggles.pointer = false
+      toggles.remoteControl = false
+      sendReset()
+    }
+
+    console.log('pause')
+    hideOverlayWindow()
+    hideRemoteControl()
+  }
+
+  async function resumeStreamingIfPaused(fromHidden = false) {
+    if (streamingState !== 'hidden' && (streamingState !== 'paused' || fromHidden))
+      return
+
+    if (fromHidden)
+      onHidden(false)
+
+    if (pausedToggleState !== undefined) {
+      toggles = { ...pausedToggleState }
+      pausedToggleState = undefined
+    }
+    
+    streamingState = 'stopped'
+    console.log('resume')
+    await startStreaming()
+  }
+
+  async function startStreaming() {
+    if (hwnd !== undefined && streamingState === 'stopped') {
+      console.log("startStreaming")
+
+      streamingState = 'active'
+
+      sourceManager = createSourceManager(hwnd)
+      await sourceManager.onInit()
+      sourceManager.bringToFront()
+      await activate(sourceManager)
+
+      sendReset()
+    }
+  }
+
+  let resetTimeout: NodeJS.Timeout | undefined
+  let resetJson: string
+  function sendReset(interval = false) {
+    clearTimeout(resetTimeout)
+    
+    const toolbarBounds = getToolbarBounds()
+    const data = {
+      isScreen: sourceManager.isScreen(),
+      dimensions: sourceManager.getOuterDimensions(),
+      coverBounds: toolbarBounds ? [toolbarBounds] : [],
+      pointerEnabled: toggles.pointer,
+      remoteControlEnabled: toggles.remoteControl,
+    }
+    
+    const json = JSON.stringify(data)
+    if (!interval || resetJson !== json) {
+      resetJson = json
+      console.log('sendReset', data)
+      sendRemote('reset', data)
+    }
+
+    resetTimeout = setTimeout(() => sendReset(true), 2000)
+  }
 
   function deactivate() {
     active = false
@@ -154,7 +322,6 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (toggle === undefined)
       toggle = !toggles.remoteControl
 
-    console.log('Toggling remote control', toggle)
     toggles.remoteControl = toggle
 
     overlayWindow?.webContents.send('on-update-overlay-data', { remoteControlEnabled: toggles.remoteControl })
@@ -167,10 +334,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     if (toggle === undefined)
       toggle = !toggles.pointer
 
-    console.log('Toggling pointer', toggle)
     toggles.pointer = toggle
-    if (!toggles.pointer)
-      hideOverlays()
 
     overlayWindow?.webContents.send('on-update-overlay-data', { pointerEnabled: toggles.pointer })
   }
@@ -197,7 +361,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         preload: path.join(__dirname, '../preload/overlay.js'),
         nodeIntegration: true,
         contextIsolation: true,
-        webSecurity: false,
+        webSecurity: app.isPackaged,
       },
     })
 
@@ -289,7 +453,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
       frame: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/clipboard.js'),
-        webSecurity: false,
+        webSecurity: app.isPackaged,
         nodeIntegration: true,
         contextIsolation: true,
       },
@@ -343,7 +507,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
         additionalArguments: [import.meta.env.VITE_APP_URL],
         nodeIntegration: true,
         contextIsolation: true,
-        webSecurity: false,
+        webSecurity: app.isPackaged,
       },
     })
 
@@ -410,6 +574,7 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   function updateUsers(newUsers: UserData[]) {
     users = newUsers
     overlayWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
+    sendReset()
   }
 
   function mouseInteract(data: RemoteMouseData) {
@@ -726,6 +891,12 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
   
   return {
     toggles,
+
+    start,
+    stop,
+    pauseStreaming,
+    resumeStreamingIfPaused,
+    sendReset,
 
     activate,
     deactivate,

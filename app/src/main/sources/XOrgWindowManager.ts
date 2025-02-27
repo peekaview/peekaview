@@ -21,12 +21,28 @@ export class XOrgWindowManager extends LinuxWindowManager {
     };
   }
 
+  isMaximized() {
+    try {
+      const cmd = `
+        xprop -id ${this.hwnd} WM_STATE | grep "_NET_WM_STATE(ATOM) || true"
+      `
+      const windowstate = executeCmdCached(cmd, this.maxCacheAge).toString().replaceAll('\n', '')
+      return windowstate.includes('_NET_WM_STATE_MAXIMIZED_VERT') && windowstate.includes('_NET_WM_STATE_MAXIMIZED_HORZ')
+    } catch (error) {
+      return false
+    }
+  }
+
   isMinimized() {
-    const cmd = `
-      xprop -id ${this.hwnd} WM_STATE | grep "Iconic" || true
-    `
-    const windowstate = executeCmdCached(cmd, this.maxCacheAge).toString().replaceAll('\n', '')
-    return windowstate.includes('Iconic')
+    try {
+      const cmd = `
+        xprop -id ${this.hwnd} WM_STATE | grep "Iconic" || true
+      `
+      const windowstate = executeCmdCached(cmd, this.maxCacheAge).toString().replaceAll('\n', '')
+      return windowstate.includes('Iconic')
+    } catch (error) {
+      return false
+    }
   }
 
   isVisible() {
@@ -37,7 +53,7 @@ export class XOrgWindowManager extends LinuxWindowManager {
       const result = executeCmdCached(cmd, this.maxCacheAge).toString().trim()
       return result === '1'
     } catch (error) {
-      return true // Default to visible if script fails
+      return true
     }
   }
 
