@@ -35,6 +35,8 @@ define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
 
+$log = [];
+
 // Input validation functions
 function validateEmail($email) {
     $email = filter_var(trim($email), FILTER_VALIDATE_EMAIL);
@@ -143,23 +145,30 @@ function getRequestFilename($email, $requestId) {
 
 function getUserFile() {
     $email = validateEmail($_GET['email'] ?? '');
+    $log[] = "Looking for user file for $email";
     
     $userFile = getEmailFilename($email);
+    $log[] = "User file: $userFile";
     if (!file_exists($userFile)) {
         throw new Exception('User not found');
     }
 
+    $log[] = "User file found";
     return $userFile;
 }
 
 function authorizeUser($userFile) {
     $token = validateToken($_GET['token'] ?? '');
+    $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
+    $log[] = "User data: " . json_encode($userData);
     $storedToken = $userData[1] ?? '';
     
     if ($token !== $storedToken) {
         throw new Exception('Unauthorized');
     }
+
+    $log[] = "User authorized";
 }
 
 function createScreenShareRoom() {
