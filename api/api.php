@@ -48,14 +48,6 @@ function validateEmail($email) {
     return strtolower($email);
 }
 
-function validateToken($token) {
-    $token = preg_replace('/[^a-zA-Z0-9]/', '', $token);
-    if (strlen($token) !== 16) {
-        throw new InvalidArgumentException("Invalid token format: $token");
-    }
-    return $token;
-}
-
 function validateRequestId($requestId) {
     $requestId = preg_replace('/[^a-zA-Z0-9]/', '', $requestId);
     if (strlen($requestId) !== 8) {
@@ -162,7 +154,7 @@ function getUserFile() {
 
 function authorizeUser($userFile) {
     global $log;
-    $token = validateToken($_GET['token'] ?? FALLBACK_TOKEN);
+    $token = $_GET['token'] ?? FALLBACK_TOKEN;
     $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
     $log[] = "User data: " . json_encode($userData);
@@ -183,6 +175,7 @@ function createScreenShareRoom() {
     $controlServer = CONTROL_SERVERS[array_rand(CONTROL_SERVERS)];
     $roomId = generateRandomString(8);
     
+    $userData = explode(';', file_get_contents($userFile));
     $userData[2] = 'active';
     $userData[3] = $roomId;
     $userData[4] = $videoServer;
