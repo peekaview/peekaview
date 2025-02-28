@@ -180,6 +180,7 @@ function fitPreview() {
 
   const deltaWidth = Math.round(outerRect.width - videoRect.width)
   const deltaHeight = Math.round(outerRect.height - videoRect.height - toolbarRect.height)
+  console.log("fitPreview", deltaWidth, deltaHeight, outerRect.width, outerRect.height, videoRect.width, videoRect.height, toolbarRect.height)
   if (deltaWidth > 0 || deltaHeight > 0)
     window.resizeTo(window.outerWidth - deltaWidth, window.outerHeight - deltaHeight)
 }
@@ -289,7 +290,6 @@ function onResumeSharing() {
     />
     <div class="preview-container">
       <video ref="video" muted />
-      <div class="veil" />
       <StreamOverlay
         v-if="presenter?.screenShareData"
         ref="overlay"
@@ -298,10 +298,11 @@ function onResumeSharing() {
         :video-transform="videoTransform"
         :input-enabled="false"
         :pointer-enabled="pointerEnabled"
+        :shutter-active="shutterActive"
+        use-veil
         @on-stream-size-change="streamSize = $event"
         @send="send($event.event, $event.data, $event.options)"
       />
-      <div v-if="shutterActive" class="shutter" />
     </div>
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile"/>
@@ -352,26 +353,6 @@ video {
   position: relative;
   flex-grow: 1;
   min-height: 0;
-}
-
-.veil {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #8884;
-  z-index: 500;
-}
-
-.shutter {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: black;
-  z-index: 1500;
 }
 
 .clipboard-container {

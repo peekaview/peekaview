@@ -25,12 +25,16 @@ const props = withDefaults(defineProps<{
   userId: string
   videoTransform?: Rectangle
   zoomScale?: number
+  shutterActive?: boolean
+  useVeil?: boolean
 }>(), {
   inputEnabled: true,
   activeTool: undefined,
   users: () => [],
   videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0 }),
   zoomScale: 1,
+  shutterActive: false,
+  useVeil: false,
 })
 
 const emit = defineEmits<{
@@ -317,6 +321,7 @@ defineExpose({
 </script>
 
 <template>
+  <div v-if="useVeil" class="veil" />
   <div
     ref="overlay"
     class="stream-overlay"
@@ -341,9 +346,30 @@ defineExpose({
       <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
     </template>
   </div>
+  <div v-if="shutterActive" class="shutter" />
 </template>
 
 <style>
+.veil {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #8884;
+  z-index: 500;
+}
+
+.shutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  z-index: 1500;
+}
+
 .stream-overlay {
   position: absolute;
   top: 0;

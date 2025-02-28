@@ -42,7 +42,7 @@ $log = [];
 function validateEmail($email) {
     $email = filter_var(trim($email), FILTER_VALIDATE_EMAIL);
     if (!$email) {
-        throw new InvalidArgumentException('Invalid email format');
+        throw new InvalidArgumentException("Invalid email format: $email");
     }
     return strtolower($email);
 }
@@ -50,7 +50,7 @@ function validateEmail($email) {
 function validateToken($token) {
     $token = preg_replace('/[^a-zA-Z0-9]/', '', $token);
     if (strlen($token) !== 16) {
-        throw new InvalidArgumentException('Invalid token format');
+        throw new InvalidArgumentException("Invalid token format: $token");
     }
     return $token;
 }
@@ -145,7 +145,8 @@ function getRequestFilename($email, $requestId) {
 }
 
 function getUserFile() {
-    $email = validateEmail($_GET['email'] ?? '');
+    global $log;
+    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $log[] = "Looking for user file for $email";
     
     $userFile = getEmailFilename($email);
@@ -159,7 +160,8 @@ function getUserFile() {
 }
 
 function authorizeUser($userFile) {
-    $token = validateToken($_GET['token'] ?? '');
+    global $log;
+    $token = validateToken($_GET['token'] ?? FALLBACK_TOKEN);
     $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
     $log[] = "User data: " . json_encode($userData);
@@ -188,7 +190,7 @@ function createScreenShareRoom() {
     
     $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
-    $out = [
+    return [
         'videoServer' => $videoServer,
         'controlServer' => $controlServer,
         'turnCredentials' => $turnCredentials,
@@ -202,13 +204,15 @@ function iAmOnline() {
 
     // Set user online
     touch($userFile, time());
+
+    return ['success' => true];
 }
 
 function doesAnyoneWantToSeeMyScreen() {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? '');
+    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $requests = [];
     $currentTime = time();
     $thirtyMinutesAgo = $currentTime - (30 * 60);
@@ -239,7 +243,7 @@ function doesAnyoneWantToSeeMyScreen() {
         unset($request['timestamp']);
     });
     
-    $out = $requests;
+    return $requests;
 }
 
 function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
@@ -254,7 +258,7 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
-    $email = validateEmail($_GET['email'] ?? '');
+    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $lang = validateLang($_GET['lang'] ?? '');
@@ -318,38 +322,35 @@ function showMeYourScreen() {
             
             // user seems to be offline
             if ($userStatus == 'offline') {
-                $out = [
+                return [
                     'status' => 'request_notified',
                     'message' => "$email ist leider gerade offline<br>Wir haben den Benutzer per Email benachrichtigt",
                     'user_status' => $userStatus,
                     'last_seen' => $lastSeen,
                 ];
-                return;
-            } else {
-                $out = [
-                    'status' => 'request_not_answered',
-                    'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
-                    'user_status' => 'away',
-                    'last_seen' => $lastSeen
-                ];
-                return;
             }
+
+            return [
+                'status' => 'request_not_answered',
+                'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
+                'user_status' => 'away',
+                'last_seen' => $lastSeen
+            ];
         }
 
         if ($status === 'request_denied') {
-            $out = [
+            return [
                 'status' => 'request_denied',
                 'message' => "$email hat die Anfrage abgelehnt",
                 'user_status' => $userStatus,
                 'last_seen' => $lastSeen
             ];
-            return;
         }
         
         if ($status === 'request_accepted') {
             $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
-            $out = [
+            return [
                 'status' => 'request_accepted',
                 //'jwt' => generateJWT($name, $userData[3]),
                 'roomId' => $userData[3],
@@ -359,11 +360,10 @@ function showMeYourScreen() {
                 'user_status' => $userStatus,
                 'last_seen' => $lastSeen
             ];
-            return;
         }
     }
     
-    $out = [
+    return [
         'status' => 'request_open',
         'request_id' => $requestId,
         'user_status' => $userStatus,
@@ -397,7 +397,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? '');
+    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $requestFile = getRequestFilename($email, $requestId);
     if (!file_exists($requestFile)) {
@@ -407,11 +407,11 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     $requestData = explode(',', file_get_contents($requestFile));
     $requestData[2] = $requestStatus;
     file_put_contents($requestFile, implode(',', $requestData));
-    $out = ['success' => true];
+    return ['success' => true];
 }
 
 function registerMyEmail() {
-    $email = validateEmail($_GET['email'] ?? '');
+    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
     $userFile = getEmailFilename($email);
@@ -433,7 +433,7 @@ function registerMyEmail() {
     $registrationLink = "https://".APP_DOMAIN."/?login=".base64_encode("email=$email&token=$token&target=$target");
     $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
-    $out = ['success' => true];
+    return ['success' => true];
 }
 
 // Route requests with error handling
@@ -441,25 +441,25 @@ try {
     $action = $_GET['action'] ?? '';
     switch ($action) {
         case 'createScreenShareRoom':
-            createScreenShareRoom();
+            $out = createScreenShareRoom();
             break;
         case 'showMeYourScreen':
-            showMeYourScreen();
+            $out = showMeYourScreen();
             break;
         case 'iAmOnline':
-            iAmOnline();
+            $out = iAmOnline();
             break;
         case 'doesAnyoneWantToSeeMyScreen':
-            doesAnyoneWantToSeeMyScreen();
+            $out = doesAnyoneWantToSeeMyScreen();
             break;
         case 'youAreAllowedToSeeMyScreen':
-            handleIfAllowedToSeeMyScreen('request_accepted');
+            $out = handleIfAllowedToSeeMyScreen('request_accepted');
             break;
         case 'youAreNotAllowedToSeeMyScreen':
-            handleIfAllowedToSeeMyScreen('request_denied');
+            $out = handleIfAllowedToSeeMyScreen('request_denied');
             break;
         case 'registerMyEmail':
-            registerMyEmail();
+            $out = registerMyEmail();
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));
@@ -470,7 +470,7 @@ try {
     $out['error'] = $message;
 }
 
-register_shutdown_function(function() {
+register_shutdown_function(function($out, $log) {
     $out['log'] = $log;
     echo json_encode($out);
-});
+}, $out, $log);
