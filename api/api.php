@@ -35,6 +35,7 @@ define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
 
+$out = [];
 $log = [];
 
 // Input validation functions
@@ -187,12 +188,12 @@ function createScreenShareRoom() {
     
     $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
-    echo json_encode([
+    $out = [
         'videoServer' => $videoServer,
         'controlServer' => $controlServer,
         'turnCredentials' => $turnCredentials,
         'roomId' => $roomId
-    ]);
+    ];
 }
 
 function iAmOnline() {
@@ -201,8 +202,6 @@ function iAmOnline() {
 
     // Set user online
     touch($userFile, time());
-    
-    echo json_encode([]);
 }
 
 function doesAnyoneWantToSeeMyScreen() {
@@ -240,7 +239,7 @@ function doesAnyoneWantToSeeMyScreen() {
         unset($request['timestamp']);
     });
     
-    echo json_encode($requests);
+    $out = $requests;
 }
 
 function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
@@ -319,38 +318,38 @@ function showMeYourScreen() {
             
             // user seems to be offline
             if ($userStatus == 'offline') {
-                echo json_encode([
+                $out = [
                     'status' => 'request_notified',
                     'message' => "$email ist leider gerade offline<br>Wir haben den Benutzer per Email benachrichtigt",
                     'user_status' => $userStatus,
                     'last_seen' => $lastSeen,
-                ]);
+                ];
                 return;
             } else {
-                echo json_encode([
+                $out = [
                     'status' => 'request_not_answered',
                     'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
                     'user_status' => 'away',
                     'last_seen' => $lastSeen
-                ]);
+                ];
                 return;
             }
         }
 
         if ($status === 'request_denied') {
-            echo json_encode([
+            $out = [
                 'status' => 'request_denied',
                 'message' => "$email hat die Anfrage abgelehnt",
                 'user_status' => $userStatus,
                 'last_seen' => $lastSeen
-            ]);
+            ];
             return;
         }
         
         if ($status === 'request_accepted') {
             $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
 
-            echo json_encode([
+            $out = [
                 'status' => 'request_accepted',
                 //'jwt' => generateJWT($name, $userData[3]),
                 'roomId' => $userData[3],
@@ -359,17 +358,17 @@ function showMeYourScreen() {
                 'turnCredentials' => $turnCredentials,
                 'user_status' => $userStatus,
                 'last_seen' => $lastSeen
-            ]);
+            ];
             return;
         }
     }
     
-    echo json_encode([
+    $out = [
         'status' => 'request_open',
         'request_id' => $requestId,
         'user_status' => $userStatus,
         'last_seen' => $lastSeen,
-    ]);
+    ];
 }
 
 function getUserStatus($userFile) {
@@ -408,7 +407,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     $requestData = explode(',', file_get_contents($requestFile));
     $requestData[2] = $requestStatus;
     file_put_contents($requestFile, implode(',', $requestData));
-    echo json_encode(['success' => true]);
+    $out = ['success' => true];
 }
 
 function registerMyEmail() {
@@ -434,7 +433,7 @@ function registerMyEmail() {
     $registrationLink = "https://".APP_DOMAIN."/?login=".base64_encode("email=$email&token=$token&target=$target");
     $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
-    echo json_encode(['success' => true]);
+    $out = ['success' => true];
 }
 
 // Route requests with error handling
@@ -468,5 +467,10 @@ try {
 } catch (Exception $e) {
     $message = $e->getMessage();
     http_response_code($message === 'Unauthorized' ? 401 : 400);
-    echo json_encode(['error' => $message]);
+    $out['error'] = $message;
 }
+
+register_shutdown_function(function() {
+    $out['log'] = $log;
+    echo json_encode($out);
+});
