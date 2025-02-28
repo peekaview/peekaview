@@ -26,6 +26,7 @@ foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SM
     }
 }
 
+define('ENABLE_LOGGING', false);
 define('TURN_SHARED_SECRET', getenv('TURN_SHARED_SECRET'));
 define('TURN_EXPIRE', 8640000);
 define('APP_DOMAIN', getenv('APP_DOMAIN'));
@@ -471,6 +472,8 @@ try {
 }
 
 register_shutdown_function(function($out, $log) {
-    $out['log'] = $log;
+    if (ENABLE_LOGGING) {   
+        $out['log'] = $log;
+    }
     echo json_encode($out);
 }, $out, $log);

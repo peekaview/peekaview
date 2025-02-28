@@ -22,13 +22,13 @@ const urlBarHeight = 36 // TODO: as of now this is Chrome on KDE, check other OS
 
 const outerRef = useTemplateRef('outer')
 const toolbarRef = useTemplateRef('toolbar')
-const videoRef = useTemplateRef('video')
 const overlayRef = useTemplateRef('overlay')
 
 const presenter = ref<Presenter>()
 const lastWindowTransform = ref<Rectangle>()
 const streamSize = ref<Size>({ width: 0, height: 0 })
 const windowSizeFixed = ref(false)
+const stream = ref<MediaStream>()
 
 const pointerEnabled = ref(true)
 const showClipboard = ref(false)
@@ -56,19 +56,13 @@ async function start() {
   }, t, async (shareAudio) => {
     windowSizeFixed.value = true
     window.resizeTo(...windowSelectSize)
-    const stream = await getStreamInBrowser(shareAudio)
+    const s = await getStreamInBrowser(shareAudio)
     windowSizeFixed.value = false
     window.resizeTo(...windowDefaultSize)
 
-    videoRef.value!.srcObject = stream
-    setTimeout(() => {
-      videoRef.value!.play().catch(err => {
-        console.error('Error playing video:', err)
-      })
-      updateVideoTransform()
-    }, 2500)
+    stream.value = s
 
-    return stream
+    return s
   }, {
     onStream: () => {
       showInviteLink()
@@ -91,23 +85,6 @@ async function start() {
   })
   
   await presenter.value.startSession()
-}
-
-const videoTransform = ref<Rectangle>({ x: 0, y: 0, width: 0, height: 0 })
-
-function updateVideoTransform() {
-  if (!videoRef.value)
-    return
-
-  const rect = videoRef.value.getBoundingClientRect()
-  const x = Math.round(rect.left)
-  const y = Math.round(rect.top)
-  const width = Math.round(rect.right - rect.left)
-  const height = Math.round(rect.bottom - rect.top)
-  if (x === videoTransform.value.x && y === videoTransform.value.y && width === videoTransform.value.width && height === videoTransform.value.height)
-    return
-
-  videoTransform.value = { x, y, width, height }
 }
 
 type SendOptions = {
@@ -166,17 +143,15 @@ function onResize() {
     resizeDebounceTimeout = null
     fitPreview()
   }, 200)
-
-  updateVideoTransform()
 }
 
 function fitPreview() {
-  if (!videoRef.value || windowSizeFixed.value)
+  if (!overlayRef.value?.videoRef || windowSizeFixed.value)
     return
 
   const outerRect = outerRef.value!.getBoundingClientRect()
   const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
-  const videoRect = videoRef.value!.getBoundingClientRect()
+  const videoRect = overlayRef.value?.videoRef!.getBoundingClientRect()
 
   const deltaWidth = Math.round(outerRect.width - videoRect.width)
   const deltaHeight = Math.round(outerRect.height - videoRect.height - toolbarRect.height)
@@ -200,7 +175,7 @@ function freezeAndFocus() {
 
   shutterActive.value = true
   window.setTimeout(() => { // wait until shutter is streamed
-    videoRef.value?.pause()
+    overlayRef.value?.videoRef?.pause()
     shutterActive.value = false
     lastWindowTransform.value = {
       x: window.screenX,
@@ -216,7 +191,7 @@ function freezeAndFocus() {
       windowSizeFixed.value = false
       window.resizeTo(lastWindowTransform.value!.width, lastWindowTransform.value!.height)
       window.moveTo(lastWindowTransform.value!.x, lastWindowTransform.value!.y)
-      videoRef.value?.play()
+      overlayRef.value?.videoRef?.play()
     }, 3000)
   }, 150)
 }
@@ -289,16 +264,17 @@ function onResumeSharing() {
       @show-invite-link="showInviteLink"
     />
     <div class="preview-container">
-      <video ref="video" muted />
       <StreamOverlay
         v-if="presenter?.screenShareData"
         ref="overlay"
+        :stream="stream"
         :users="presenter.viewers"
         :user-id="presenter.screenShareData.user.id"
-        :video-transform="videoTransform"
         :input-enabled="false"
         :pointer-enabled="pointerEnabled"
         :shutter-active="shutterActive"
+        :video-options="{ muted: true }"
+        freeze-on-interaction
         use-veil
         @on-stream-size-change="streamSize = $event"
         @send="send($event.event, $event.data, $event.options)"

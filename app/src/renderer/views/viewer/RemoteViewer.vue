@@ -51,6 +51,7 @@ const containerRef = useTemplateRef('container')
 
 const receiveEvents: Partial<ReceiveEventHandlers> = {}
 
+const stream = ref<MediaStream>()
 const hidden = ref(false)
 const inputEnabled = computed(() => !hidden.value)
 const pointerEnabled = ref(true)
@@ -180,7 +181,6 @@ onReceive('reset', (data) => {
 
 const onResize = () => {
   hideOverflow.value = false
-  updateVideoTransform()
 }
 
 document.addEventListener('contextmenu', onContextMenu)
@@ -315,20 +315,6 @@ async function onPaste(e: ClipboardEvent) {
   }
 }
 
-let throttling = false
-function freezeVideo() {
-  if (throttling)
-    return
-
-  throttling = true
-  window.setTimeout(() => throttling = false, 5000)
-
-  videoRef.value?.pause()
-  window.setTimeout(() => {
-    videoRef.value?.play()
-  }, 3500)
-}
-
 function toggleMessage(message: Message) {
   activeMessage.value = activeMessage.value === message ? undefined : message
 }
@@ -387,11 +373,8 @@ function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T
 const inApp = ref(!!window.electronAPI)
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
-const videoRef = useTemplateRef('video')
-const videoStyle = ref<Record<string, string>>({
-})
+const videoFill = ref(false)
 const hideOverflow = ref(true)
-const videoTransform = ref<Rectangle>({ x: 0, y: 0, width: 0, height: 0 })
 
 watch(() => props.data, async (screenShareData) => {
   if (!screenShareData) {
@@ -401,18 +384,9 @@ watch(() => props.data, async (screenShareData) => {
   }
 
   screenView.value = await useScreenView(screenShareData, {
-    onStream: (stream) => {
-      if (!videoRef.value)
-        return
-      
-      videoRef.value.srcObject = stream
-      setTimeout(() => {
-        videoRef.value!.play().catch(err => {
-          console.error('Error playing video:', err)
-        })
-        hideMessage('init')
-        updateVideoTransform()
-      }, 2500)
+    onStream: (s) => {
+      stream.value = s
+      hideMessage('init')
     },
     onRemote: (event, data) => {
       if (event === 'browser')
@@ -446,24 +420,9 @@ watch(() => props.data, async (screenShareData) => {
 
 watch(scaleInfo, () => {
   const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
-  videoStyle.value['object-fit'] = participant?.user.platform === 'mac' ? 'fill' : 'cover'
+  videoFill.value = participant?.user.platform === 'mac'
   hideOverflow.value = false
 }, { immediate: true })
-
-function updateVideoTransform() {
-  if (!videoRef.value)
-    return
-
-  const rect = videoRef.value.getBoundingClientRect()
-  const x = Math.round(rect.left)
-  const y = Math.round(rect.top)
-  const width = Math.round(rect.right - rect.left)
-  const height = Math.round(rect.bottom - rect.top)
-  if (x === videoTransform.value.x && y === videoTransform.value.y && width === videoTransform.value.width && height === videoTransform.value.height)
-    return
-
-  videoTransform.value = { x, y, width, height }
-}
 
 function stop() {
   screenView.value?.leave()
@@ -500,23 +459,21 @@ function stop() {
       @panzoomchange="onPanzoomChange"
       @contextmenu="() => false"
     >
-      <video ref="video" playsinline autoplay :style="videoStyle" />
       <StreamOverlay
         v-if="data"
         ref="overlay"
+        :stream="stream"
         :users="[...users, data.user]"
         :user-id="data.user.id"
-        :video-transform="videoTransform"
         :input-enabled="!hidden"
         :pointer-enabled="pointerEnabled"
         :active-tool="activeTool"
         :zoom-scale="zoom?.scale"
-        @interacted="freezeVideo"
+        :video-options="{ playsinline: true, autoplay: true, fill: videoFill }"
         @mouse-inside="remoteClipboard = $event"
         @send="send($event.event, $event.data, $event.options)"
         @panzoom-toggle="panzoomActive = $event"
-      >
-      </StreamOverlay>
+      />
     </div>
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />

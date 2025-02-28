@@ -17,34 +17,57 @@ type SendOptions = {
   receiveSelf?: boolean
 }
 
+type VideoOptions = {
+  muted?: boolean
+  playsinline?: boolean
+  autoplay?: boolean
+  fill?: boolean
+}
+
 const props = withDefaults(defineProps<{
+  stream?: MediaStream
   inputEnabled?: boolean
   pointerEnabled: boolean
   activeTool?: ViewerTool | undefined
   users: UserData[]
   userId: string
-  videoTransform?: Rectangle
   zoomScale?: number
   shutterActive?: boolean
   useVeil?: boolean
+  videoOptions?: VideoOptions
+  freezeOnInteraction?: boolean
 }>(), {
   inputEnabled: true,
   activeTool: undefined,
   users: () => [],
-  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0 }),
   zoomScale: 1,
   shutterActive: false,
   useVeil: false,
+  videoOptions: undefined,
+  freezeOnInteraction: false,
 })
 
 const emit = defineEmits<{
-  (e: 'interacted'): void
   (e: 'mouse-inside', inside: boolean): void
   (e: 'on-stream-size-change', size: Size): void
   (e: 'panzoom-toggle', active: boolean): void
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, options: SendOptions }): void
 }>()
 
+watch(() => props.stream, (stream) => {
+  if (!stream || !videoRef.value)
+    return
+
+  videoRef.value.srcObject = stream
+  setTimeout(() => {
+    videoRef.value!.play().catch(err => {
+      console.error('Error playing video:', err)
+    })
+    updateVideoTransform()
+  }, 2500)
+})
+
+const videoTransform = ref<Rectangle>({ x: 0, y: 0, width: 0, height: 0 })
 const isSharingScreen = ref(true)
 const mappedUsers = computed(() => {
   const users: Record<string, UserData> = {}
@@ -61,24 +84,25 @@ const scale = computed(() => {
   if (!streamSize.value.height || !streamSize.value.width)
     return 1
 
-  const height = props.videoTransform.height / streamSize.value.height
-  const width = props.videoTransform.width / streamSize.value.width
+  const height = videoTransform.value.height / streamSize.value.height
+  const width = videoTransform.value.width / streamSize.value.width
   return height < width ? height : width
 })
 
 const overlayStyle = computed(() => ({
   cursor: isSharingScreen.value ? `url(${MiniCrosshairPng}) 5 5, auto` : 'default',
-  width: props.videoTransform?.width ?? '0px',
-  height: props.videoTransform?.height ?? '0px',
+  width: videoTransform.value?.width ?? '0px',
+  height: videoTransform.value?.height ?? '0px',
 }))
 
 const coverBounds = ref<Record<string, string>[]>()
 
 const overlayRef = useTemplateRef('overlay')
 const canvasRef = useTemplateRef('canvas')
+const videoRef = useTemplateRef('video')
 const drawOverlay = useDrawOverlay(canvasRef, {
   scale,
-  dimensions: computed(() => props.videoTransform ? [props.videoTransform!.width, props.videoTransform!.height] : undefined),
+  dimensions: computed(() => videoTransform.value ? [videoTransform.value.width, videoTransform.value.height] : undefined),
   users: mappedUsers
 })
 
@@ -109,11 +133,25 @@ watch(() => props.activeTool, () => {
 let isMouseDown = false
 let isMouseDragging = false
 
+let freezeThrottling = false
+function freezeVideo() {
+  if (freezeThrottling || !props.freezeOnInteraction)
+    return
+
+  freezeThrottling = true
+  window.setTimeout(() => freezeThrottling = false, 5000)
+
+  videoRef.value?.pause()
+  window.setTimeout(() => {
+    videoRef.value?.play()
+  }, 3500)
+}
+
 function receiveMouseLeftClick(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
   if (data.tool === 'pointer') {
     overlaySignals.send(data.userId, data.x, data.y)
-    emit('interacted')
+    freezeVideo()
   }
 }
 
@@ -134,7 +172,7 @@ function receiveMouseDown(data: RemoteMouseData) {
 
 function receiveMouseUp(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
-  emit('interacted')
+  freezeVideo()
 }
 
 let lastWheel = 0
@@ -283,6 +321,21 @@ function onMouseLeave() {
   }
 }
 
+function updateVideoTransform() {
+  if (!videoRef.value)
+    return
+
+  const rect = videoRef.value.getBoundingClientRect()
+  const x = Math.round(rect.left)
+  const y = Math.round(rect.top)
+  const width = Math.round(rect.right - rect.left)
+  const height = Math.round(rect.bottom - rect.top)
+  if (x === videoTransform.value.x && y === videoTransform.value.y && width === videoTransform.value.width && height === videoTransform.value.height)
+    return
+
+  videoTransform.value = { x, y, width, height }
+}
+
 function reset(data: RemoteResetData) {
   isSharingScreen.value = data.isScreen
 
@@ -303,15 +356,18 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onMouseLeave)
+  window.addEventListener('resize', updateVideoTransform)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
   window.removeEventListener('blur', onMouseLeave)
+  window.removeEventListener('resize', updateVideoTransform)
 })
 
 defineExpose({
+  videoRef,
   reset,
   receiveMouseLeftClick,
   receiveMouseMove,
@@ -321,6 +377,7 @@ defineExpose({
 </script>
 
 <template>
+  <video ref="video" :muted="videoOptions?.muted" :playsinline="videoOptions?.playsinline" :autoplay="videoOptions?.autoplay" :style="{ 'object-fit': videoOptions?.fill? 'fill' : 'cover' }"/>
   <div v-if="useVeil" class="veil" />
   <div
     ref="overlay"
