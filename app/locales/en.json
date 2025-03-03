@@ -8,6 +8,12 @@
     "areYouSure": "Are you sure?",
     "error": "Error"
   },
+  "update": {
+    "available": "A new version ({{version}}) is available and will be downloaded.",
+    "ready": "Version {{version}} has been downloaded and is ready to install.",
+    "restart": "Restart to Update",
+    "error": "An error occurred while checking for updates."
+  },
   "labels": {
     "yourEmail": "Your email address",
     "yourName": "Your Name",

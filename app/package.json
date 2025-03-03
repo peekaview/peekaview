@@ -2,7 +2,7 @@
   "name": "peekaview",
   "author": "Limtec GmbH <info@limtec.de>",
   "productName": "PeekaView",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Simple screen sharing application",
   "homepage": "https://peekaview.de",
   "license": "AGPL-3.0",

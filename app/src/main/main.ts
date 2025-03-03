@@ -58,7 +58,61 @@ declare const CSP_POLICY: string
   }
 
   log.info('Starting app update check')
-  autoUpdater.checkForUpdatesAndNotify()
+  
+  // Create notification icon once
+  const updateNotificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
+
+  // Configure auto updater events
+  autoUpdater.on('checking-for-update', () => {
+    log.info('Checking for updates...')
+  })
+
+  autoUpdater.on('update-available', (info) => {
+    log.info('Update available:', info)
+    new Notification({
+      title: 'PeekaView Update',
+      body: i18n.t('update.available', { version: info.version }),
+      icon: updateNotificationIcon
+    }).show()
+  })
+
+  autoUpdater.on('update-not-available', () => {
+    log.info('No updates available')
+  })
+
+  autoUpdater.on('error', (err) => {
+    log.error('Error in auto-updater:', err)
+    new Notification({
+      title: 'PeekaView Update Error',
+      body: i18n.t('update.error'),
+      icon: updateNotificationIcon
+    }).show()
+  })
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    log.info('Download progress:', progressObj)
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded:', info)
+    const notification = new Notification({
+      title: 'PeekaView Update Ready',
+      body: i18n.t('update.ready', { version: info.version }),
+      icon: updateNotificationIcon,
+      actions: [
+        { type: 'button', text: i18n.t('update.restart') }
+      ]
+    })
+
+    notification.on('action', () => {
+      isQuitting = true
+      autoUpdater.quitAndInstall()
+    })
+
+    notification.show()
+  })
+
+  autoUpdater.checkForUpdates()
   
   if (!app.isDefaultProtocolClient('peekaview')) {
     const success = app.setAsDefaultProtocolClient('peekaview')
@@ -183,8 +237,7 @@ declare const CSP_POLICY: string
     })
 
     log.info("App initialization complete")
-    const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
-    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()
+    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: updateNotificationIcon }).show()
   })
 
   const focusApp = () => {

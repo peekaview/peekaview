@@ -8,6 +8,12 @@
     "areYouSure": "Sind Sie sicher?",
     "error": "Fehler"
   },
+  "update": {
+    "available": "Eine neue Version ({{version}}) ist verfügbar und wird heruntergeladen.",
+    "ready": "Version {{version}} wurde heruntergeladen und ist bereit zu installieren.",
+    "restart": "Neustart zum Update",
+    "error": "Beim Überprüfen auf Updates ist ein Fehler aufgetreten."
+  },
   "labels": {
     "yourEmail": "Ihre E-Mail-Adresse",
     "yourName": "Ihr Name",
