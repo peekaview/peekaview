@@ -106,7 +106,7 @@
       "snap",
       "rpm"
     ],
-    "icon": "build-resources/AppIcon.icns",
+    "icon": "build-resources/icon-512.png",
     "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
     "category": "Utility"
   },
