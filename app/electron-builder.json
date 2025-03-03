@@ -103,9 +103,10 @@
     "target": [
       "AppImage",
       "deb",
+      "snap",
       "rpm"
     ],
-    "icon": "build-resources/icon-512.png",
+    "icon": "build-resources/AppIcon.icns",
     "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
     "category": "Utility"
   },
