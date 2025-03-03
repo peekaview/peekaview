@@ -25,9 +25,9 @@ declare global {
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
-  sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => Promise<void>,
+  sendRemote: SendRemote,
   onDialog: (callback: (options: DialogOptions) => void) => Electron.IpcRenderer,
-  onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => Electron.IpcRenderer,
+  onRemote: (callback: SendRemote) => Electron.IpcRenderer,
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => Electron.IpcRenderer,
   onChangeLanguage: (callback: (locale: string) => void) => Electron.IpcRenderer,
   replyDialog: (dialogId: number, result: string) => Promise<void>,
@@ -120,6 +120,13 @@ export type StreamerData = {
 }
 
 export type ViewerTool = 'pointer' | 'remoteControl'
+
+export type SendRemoteOptions = {
+  volatile?: boolean
+  socketIds?: string[]
+}
+
+export type SendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, options?: SendRemoteOptions) => Promise<void> | void
 
 export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
 

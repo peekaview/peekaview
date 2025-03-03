@@ -18,6 +18,8 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     if (!inputEnabled.value)
       return
 
+    console.log("keyUp", e.key)
+
     if (e.key == 'Control' || e.key == 'Meta') {
       setTimeout(() => {
         _control.value = false
@@ -26,7 +28,7 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     if (e.key == 'Shift') {
       _shift.value = false
     }
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    if (e.key == " " || e.code == "Space") {
       setTimeout(() => {
         _space.value = false
       }, 100)
@@ -45,11 +47,11 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     if (!inputEnabled.value)
       return
 
-    console.log(e.keyCode)
+    console.trace("keyDown", e.key)
 
     _skip.value = false
     let keyToSend = e.key
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    if (e.key == " " || e.code == "Space") {
       _space.value = true
     }
     if (e.key == 'Shift') {
@@ -81,11 +83,10 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
         if (e.key === 'Dead') {
           // This is ´ (acute accent)
           _skip.value = false
-          if (_shift.value) {
+          if (_shift.value)
             keyToSend = '`'
-          } else {
+          else
             keyToSend = '´'
-          }
         } else if (e.key === '+') {
           // This is the + key
           _skip.value = false
@@ -95,16 +96,14 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     }
     if (e.keyCode == 192) {
       _skip.value = false
-      if (_shift.value) {
+      if (_shift.value)
         keyToSend = '°'
-      }
-      else {
+      else
         keyToSend = '^'
-      }
     }
     
     if (!_skip.value) {
-      console.log(keyToSend)
+      console.log("keyToSend", keyToSend)
 
       send(keyToSend)
       e.preventDefault()

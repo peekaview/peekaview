@@ -1,7 +1,7 @@
 import { Platform } from 'src/interface'
 import Swal from 'sweetalert2'
 
-interface DialogOptions {
+export type DialogOptions = {
   type?: 'success' | 'info' | 'error' | 'question'
   title?: string
   text?: string
@@ -11,7 +11,7 @@ interface DialogOptions {
   sound?: string | null
 }
 
-interface NotifyOptions extends DialogOptions {
+export type NotifyOptions = DialogOptions & {
   showButtons?: boolean
 }
 
@@ -27,16 +27,15 @@ window.electronAPI?.onReplyDialog?.((dialogId, result) => {
   }
 })
 
-export async function notify({ type, title, text, html, confirmButtonText, cancelButtonText }: NotifyOptions) {
+export async function notify({ type, title, text, html, confirmButtonText }: NotifyOptions) {
   if (window.electronAPI) {
     const id = increment++
 
     const buttons: string[] = []
     if (confirmButtonText)
       buttons.push(confirmButtonText)
-    if (cancelButtonText)
-      buttons.push(cancelButtonText)
 
+    const promise = new Promise<string>((resolve, reject) => promiseHandlers[id] = [resolve, reject])
     window.electronAPI.dialog({
       id,
       type,
@@ -44,21 +43,24 @@ export async function notify({ type, title, text, html, confirmButtonText, cance
       message: text ?? html,
       buttons,
     })
-  } else {
-    Swal.fire({
-      icon: type,
-      title,
-      text,
-      html,
-      showCancelButton: !!cancelButtonText,
-      showConfirmButton: !!confirmButtonText,
-      confirmButtonText,
-      cancelButtonText,
-      customClass: {
-        popup: 'animate__animated animate__fadeIn'
-      }
-    });
+
+    return promise.then(() => {})
   }
+
+  const result = Swal.fire({
+    icon: type,
+    title,
+    text,
+    html,
+    showCancelButton: false,
+    showConfirmButton: !!confirmButtonText,
+    confirmButtonText,
+    customClass: {
+      popup: 'animate__animated animate__fadeIn'
+    }
+  });
+
+  return result.then(() => {})
 }
 
 export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, sound = null }: DialogOptions) {

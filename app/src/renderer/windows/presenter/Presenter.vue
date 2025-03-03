@@ -6,6 +6,8 @@ import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
+import { notify, prompt } from '../../util'
+import { UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
 
@@ -16,6 +18,7 @@ const pointerEnabled = ref(false)
 const remoteControlEnabled = ref(false)
 
 const presenter = ref<Presenter>()
+const unauthorized = ref(false)
 
 onMounted(() => present())
 
@@ -64,7 +67,7 @@ async function present() {
     token,
     pointerEnabled,
     remoteControlEnabled,
-  }, t, async (shareAudio) => {
+  }, async (shareAudio) => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {
       watch<[ScreenSource | undefined, boolean]>(() => [selectedSource.value, showSources.value], ([source, show]) => {
@@ -79,6 +82,30 @@ async function present() {
 
     window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, userName: email }))
     return getStreamFromSource(source, shareAudio)
+  }, {
+    onRequest: async (request) => {
+      const result = await prompt({
+        text: t('share.requestAccess.message', { name: request.name }),
+        confirmButtonText: t('share.requestAccess.accept'),
+        cancelButtonText: t('share.requestAccess.deny'),
+        sound: 'ringtone',
+      })
+          
+      return (result === '0')
+    },
+    onApiError: (error) => {
+      if (error instanceof UnauthorizedError) {
+        unauthorized.value = true
+        return
+      }
+
+      notify({
+        type: 'error',
+        title: t('general.error'),
+        text: t('share.requestError') + '\n\n' + error.message,
+        confirmButtonText: t('general.ok'),
+      })
+    }
   })
   presenter.value.startSession()
 }
@@ -94,8 +121,11 @@ function close() {
 </script>
 
 <template>
+  <div v-if="unauthorized" class="text-center text-danger">
+    <h2>{{ $t('sourcesWindow.unauthorized') }}</h2>
+  </div>
   <Sources
-    v-if="showSources"
+    v-else-if="showSources"
     @select="select"
     @cancel="close"
   />

@@ -2,13 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
 
-import { DialogOptions, RemoteData, RemoteEvent } from '../interface'
+import { DialogOptions, RemoteData, RemoteEvent, SendRemote } from '../interface'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
   dialog: (options: DialogOptions) => ipcRenderer.invoke('dialog', options),
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => ipcRenderer.invoke('on-remote', event, data),
-  onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
+  onRemote: (callback: SendRemote) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => ipcRenderer.on('reply-dialog', (_event, dialogId: number, result: string) => callback(dialogId, result)),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
   sharingActive: (viewCode: string, data: string) => ipcRenderer.invoke('sharing-active', viewCode, data),

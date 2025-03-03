@@ -348,6 +348,7 @@ declare const CSP_POLICY: string
     })
     windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
     loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+    //loginWindow.webContents.openDevTools()
   }
 
   function handleProtocol(url: string) {

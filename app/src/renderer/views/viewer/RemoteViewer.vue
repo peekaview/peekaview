@@ -2,16 +2,16 @@
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
 
-import { notify } from '../../util'
+import { notify, isTouchEnabled } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
+import { useRemoteHandlers } from "../../composables/useRemoteHandlers"
 
-import StreamOverlay from './StreamOverlay.vue'
+import StreamContainer from './StreamContainer.vue'
 import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
 import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
 import { uuidv4 } from "../../../util.js"
-import { isTouchEnabled } from "../../util.js"
 import { usePanzoom } from './usePanzoom'
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
@@ -21,16 +21,7 @@ import LogoutSvg from '../../../assets/icons/logout.svg'
 import MouseSvg from '../../../assets/icons/mouse.svg'
 import PencilSvg from '../../../assets/icons/pencil.svg'
 
-import type { RemoteData, RemoteEvent, File, ViewerTool, Rectangle } from '../../../interface'
-
-type ReceiveEventHandlers = {
-  [K in RemoteEvent]: (data: RemoteData<K>) => void
-}
-
-type SendOptions = {
-  volatile?: boolean
-  receiveSelf?: boolean
-}
+import type { File, ViewerTool } from '../../../interface'
 
 type Message = 'init' | 'sync' |'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
@@ -46,12 +37,12 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
-const containerRef = useTemplateRef('container')
+const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('container')
 
-const receiveEvents: Partial<ReceiveEventHandlers> = {}
-
+const screenView = ref<ScreenView>()
+const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const stream = ref<MediaStream>()
+
 const hidden = ref(false)
 const inputEnabled = computed(() => !hidden.value)
 const pointerEnabled = ref(true)
@@ -93,13 +84,15 @@ watch(remoteControlEnabled, (enabled) => {
 })
 
 const panzoomActive = ref(false)
-const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(containerRef, panzoomActive, inputEnabled)
-
-const scaleInfo = computed(() => ({
-  x: currentPan.x,
-  y: currentPan.y,
-  scale: currentPanScale.value,
-}))
+const videoFill = ref(false)
+const hideOverflow = ref(true)
+const presenterInBrowser = ref(false)
+const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(computed(() => containerRef.value?.$el), panzoomActive, inputEnabled)
+watch(() => [currentPan.x, currentPan.y, currentPanScale.value], () => {
+  const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
+  videoFill.value = participant?.user.platform === 'mac'
+  hideOverflow.value = false
+}, { immediate: true })
 
 const draggingOver = ref(false)
 const showClipboard = ref(true)
@@ -107,21 +100,27 @@ const clipboardFile = ref<File>()
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
+const { send, receive, onReceive } = useRemoteHandlers(screenView)
+
+onReceive("browser", () => {
+  presenterInBrowser.value = false
+})
+
 onReceive("mouse-leftclick", (data) => {
-  overlayRef.value?.receiveMouseLeftClick(data)
+  containerRef.value?.receiveMouseLeftClick(data)
 })
 
 onReceive("mouse-move", (data) => {
-  overlayRef.value?.receiveMouseMove(data)
+  containerRef.value?.receiveMouseMove(data)
 })
 
 onReceive("mouse-down", (data) => {
   if (!draggingOver.value)
-    overlayRef.value?.receiveMouseDown(data)
+    containerRef.value?.receiveMouseDown(data)
 })
 
 onReceive("mouse-up", (data) => {
-  overlayRef.value?.receiveMouseUp(data)
+  containerRef.value?.receiveMouseUp(data)
 })
 
 onReceive("paste", (data) => {
@@ -160,7 +159,6 @@ onReceive('pause', (data) => {
 
 let hiddenTimeout: number
 onReceive('hide', (data) => {
-  console.log('hide', data)
   hidden.value = data.hidden
   clearTimeout(hiddenTimeout)
   if (data.hidden) {
@@ -176,12 +174,47 @@ onReceive('reset', (data) => {
   console.log('reset', data)
   pointerEnabled.value = data.pointerEnabled
   remoteControlEnabled.value = data.remoteControlEnabled
-  overlayRef.value?.reset(data)
+  containerRef.value?.reset(data)
 })
 
-const onResize = () => {
+watch(() => props.data, async (screenShareData) => {
+  if (!screenShareData) {
+    hideOverflow.value = true
+    screenView.value = undefined
+    return
+  }
+
+  screenView.value = await useScreenView(screenShareData, {
+    onStream: (s) => {
+      stream.value = s
+      hideMessage('init')
+    },
+    onRemote: (event, data) => {
+      let parsedData = data
+      if (typeof data === 'string' && event !== 'reset') { //TODO: align data format of 'reset' with other events
+        try {
+          parsedData = JSON.parse(data)
+        } catch (err) {
+          console.error('Failed to parse remote data:', err)
+          return
+        }
+      }
+
+      receive(event, parsedData)
+    },
+    onEnding: () => {
+      notify({
+        type: 'info',
+        text: t('viewer.sharingEnded'),
+        confirmButtonText: t('general.ok'),
+      })
+      screenView.value = undefined
+
+      stop()
+    }
+  })
   hideOverflow.value = false
-}
+}, { flush: 'post', immediate: true })
 
 document.addEventListener('contextmenu', onContextMenu)
 document.addEventListener("wheel", onWheel)
@@ -204,6 +237,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('copy', onCopy)
   window.removeEventListener('cut', onCut)
 })
+
+function onResize() {
+  hideOverflow.value = false
+}
 
 function onContextMenu(e: MouseEvent) {
   // disable context menu
@@ -356,74 +393,6 @@ function sendFile(item: DataTransferItem, name?: string) {
   })
 }
 
-function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
-  screenView.value?.sendRemote(event, data)//, volatile: options.volatile ?? false)
-  if (options.receiveSelf)
-    receive(event, data)
-}
-
-function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
-  receiveEvents[event]?.(data)
-}
-
-function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
-  receiveEvents[event] = handler as ReceiveEventHandlers[T]
-}
-
-const inApp = ref(!!window.electronAPI)
-const screenView = ref<ScreenView>()
-const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
-const videoFill = ref(false)
-const hideOverflow = ref(true)
-
-watch(() => props.data, async (screenShareData) => {
-  if (!screenShareData) {
-    hideOverflow.value = true
-    screenView.value = undefined
-    return
-  }
-
-  screenView.value = await useScreenView(screenShareData, {
-    onStream: (s) => {
-      stream.value = s
-      hideMessage('init')
-    },
-    onRemote: (event, data) => {
-      if (event === 'browser')
-        inApp.value = false
-
-      let parsedData = data
-      if (typeof data === 'string' && event !== 'reset') {
-        try {
-          parsedData = JSON.parse(data)
-        } catch (err) {
-          console.error('Failed to parse remote data:', err)
-          return
-        }
-      }
-
-      receive(event, parsedData)
-    },
-    onEnding: () => {
-      notify({
-        type: 'info',
-        text: t('viewer.sharingEnded'),
-        confirmButtonText: t('general.ok'),
-      })
-      screenView.value = undefined
-
-      stop()
-    }
-  })
-  hideOverflow.value = false
-}, { flush: 'post', immediate: true })
-
-watch(scaleInfo, () => {
-  const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
-  videoFill.value = participant?.user.platform === 'mac'
-  hideOverflow.value = false
-}, { immediate: true })
-
 function stop() {
   screenView.value?.leave()
   screenView.value = undefined
@@ -452,29 +421,25 @@ function stop() {
       </div>
     </Toolbar>
     <div class="toolbar-spacer"></div>
-    <div
+    <StreamContainer
+      v-if="data"
       ref="container"
-      class="remote-container"
+      :stream="stream"
+      :users="[...users, data.user]"
+      :user-id="data.user.id"
+      :input-enabled="!hidden"
+      :pointer-enabled="pointerEnabled"
+      :active-tool="activeTool"
+      :zoom-scale="zoom?.scale"
+      :freeze-on-interaction="presenterInBrowser"
+      :video-options="{ playsinline: true, autoplay: true, fill: videoFill }"
       :style="{ overflow: hideOverflow ? 'hidden' : 'visible' }"
+      @send="send($event.event, $event.data, $event.options)"
+      @mouse-inside="remoteClipboard = $event"
+      @panzoom-toggle="panzoomActive = $event"
       @panzoomchange="onPanzoomChange"
       @contextmenu="() => false"
-    >
-      <StreamOverlay
-        v-if="data"
-        ref="overlay"
-        :stream="stream"
-        :users="[...users, data.user]"
-        :user-id="data.user.id"
-        :input-enabled="!hidden"
-        :pointer-enabled="pointerEnabled"
-        :active-tool="activeTool"
-        :zoom-scale="zoom?.scale"
-        :video-options="{ playsinline: true, autoplay: true, fill: videoFill }"
-        @mouse-inside="remoteClipboard = $event"
-        @send="send($event.event, $event.data, $event.options)"
-        @panzoom-toggle="panzoomActive = $event"
-      />
-    </div>
+    />
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
     </div>
@@ -532,12 +497,6 @@ function stop() {
     align-items: center;
     width: 100%;
     height: 100%;
-  }
-
-  .remote-viewer .remote-container {
-    position: relative;
-    flex-grow: 1;
-    min-height: 0;
   }
 
   .remote-viewer video {

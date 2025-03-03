@@ -1,12 +1,11 @@
 import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue'
-import { ComposerTranslation } from 'vue-i18n'
 
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform, notify, prompt } from '../util'
-import { RemoteData, RemoteEvent, ScreenSource } from '../../interface'
+import { getPlatform } from '../util'
+import { RemoteData, ScreenSource, SendRemote } from '../../interface'
 import { stringToColor, uuidv4 } from '../../util'
 
 interface Request {
@@ -24,13 +23,15 @@ type PresenterData = {
 }
 
 type PresenterOptions = {
+  onRequest?: (request: Request) => Promise<boolean>
   onStream?: (stream: MediaStream, shareAudio?: boolean) => void
-  onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
+  onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
   onStop?: () => void
+  onApiError?: (error: Error, requestData: any) => void
 }
 
-export function usePresenter(data: PresenterData, t: ComposerTranslation, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
+export function usePresenter(data: PresenterData, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
@@ -82,7 +83,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
         }
       } catch (error) {
         console.error('Error checking requests:', error);
-        handleError(error as Error, requestData)
+        handleApiError(error as Error, requestData)
       }
     }, 2000)
   })
@@ -90,18 +91,18 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
   watch(latestRequest, async (request) => {
     if (!request)
       return
-    
-    const result = await prompt({
-      text: t('share.requestAccess.message', { name: request.name }),
-      confirmButtonText: t('share.requestAccess.accept'),
-      cancelButtonText: t('share.requestAccess.deny'),
-      sound: 'ringtone',
-    })
-        
-    if (result === '0')
-      acceptRequest()
-    else
-      denyRequest()
+
+    if (!options?.onRequest) {
+      acceptRequest(request)
+    } else {
+      const response = await options.onRequest(request)
+      if (response)
+        acceptRequest(request)
+      else
+        denyRequest(request)
+    }
+
+    latestRequest.value = undefined
   })
 
   window.electronAPI?.onHidden((hidden) => {
@@ -217,7 +218,7 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
       presentSource()
     } catch (error) {
       console.error('Error creating room:', error);
-      handleError(error as Error, requestData)
+      handleApiError(error as Error, requestData)
     }
   }
 
@@ -258,52 +259,42 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
       lastPingTime.value = Date.now()
     } catch (error) {
       console.error('Error updating online status:', error)
-      handleError(error as Error, requestData)
+      handleApiError(error as Error, requestData)
     }
   }
 
-  async function acceptRequest() {
-    if (!latestRequest.value)
-      return
-
+  async function acceptRequest(request: Request) {
     const requestData = {
       action: 'youAreAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: latestRequest.value.request_id,
+      request_id: request.request_id,
     }
 
     try {
       await callApi(requestData)
-
-      latestRequest.value = undefined
     } catch (error) {
       console.error('Error accepting request:', error)
-      handleError(error as Error, requestData)
+      handleApiError(error as Error, requestData)
     }
   }
 
-  async function denyRequest() {
-    if (!latestRequest.value)
-      return
-
+  async function denyRequest(request: Request) {
     const requestData = {
       action: 'youAreNotAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: latestRequest.value.request_id,
+      request_id: request.request_id,
     }
     try {
       await callApi(requestData)
-
-      latestRequest.value = undefined
     } catch (error) {
       console.error('Error denying request:', error)
-      handleError(error as Error, requestData)
+      handleApiError(error as Error, requestData)
     }
   }
       
-  function handleError(error: Error, requestData: any) {
+  function handleApiError(error: Error, requestData: any) {
     window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
     if (!import.meta.env.DEV && error instanceof UnauthorizedError) {
       if (inApp)
@@ -312,13 +303,8 @@ export function usePresenter(data: PresenterData, t: ComposerTranslation, getStr
         window.location.href = `/?login=${btoa(`target=web&discardSession=true`)}`
       return
     }
-  
-    notify({
-      type: 'error',
-      title: t('general.error'),
-      text: t('share.requestError') + '\n\n' + error.message,
-      confirmButtonText: t('general.ok'),
-    })
+
+    options?.onApiError?.(error, requestData)
   }
   
   function pauseSharing() {

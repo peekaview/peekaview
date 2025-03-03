@@ -9,13 +9,9 @@ import { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, Vi
 import { useKeyListeners } from './useEventListeners'
 import { useOverlayCursors } from '../../composables/useOverlayCursors'
 import { useOverlaySignals } from '../../composables/useOverlaySignals'
+import { SendOptions } from '../../composables/useRemoteHandlers'
 
 import MiniCrosshairPng from '../../../assets/img/minicrosshair.png'
-
-type SendOptions = {
-  volatile?: boolean
-  receiveSelf?: boolean
-}
 
 type VideoOptions = {
   muted?: boolean
@@ -134,7 +130,7 @@ let isMouseDown = false
 let isMouseDragging = false
 
 let freezeThrottling = false
-function freezeVideo() {
+function freezeVideo() { // prevent viewer from seeing the maximized browser preventer
   if (freezeThrottling || !props.freezeOnInteraction)
     return
 
@@ -159,10 +155,8 @@ function receiveMouseMove(data: RemoteMouseData) {
   if (data.tool === 'pointer')
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
 
-  if (data.userId === props.userId)
-    return
-
-  overlayCursors.move(data.userId, data.x, data.y)
+  if (data.userId !== props.userId)
+    overlayCursors.move(data.userId, data.x, data.y)
 }
 
 function receiveMouseDown(data: RemoteMouseData) {
@@ -172,7 +166,8 @@ function receiveMouseDown(data: RemoteMouseData) {
 
 function receiveMouseUp(data: RemoteMouseData) {
   drawOverlay.endStroke(data.userId)
-  freezeVideo()
+  if (data.tool === 'pointer')
+    freezeVideo()
 }
 
 let lastWheel = 0
@@ -181,7 +176,6 @@ function onWheel(e: WheelEvent) {
     return
 
   if (lastWheel < (Date.now() - 200)) {
-    console.log(e)
     currentMouseData.delta = e.deltaY
     lastWheel = Date.now()
     emit('send', { event: "mouse-wheel", data: currentMouseData, options: { receiveSelf: true } })
@@ -377,37 +371,45 @@ defineExpose({
 </script>
 
 <template>
-  <video ref="video" :muted="videoOptions?.muted" :playsinline="videoOptions?.playsinline" :autoplay="videoOptions?.autoplay" :style="{ 'object-fit': videoOptions?.fill? 'fill' : 'cover' }"/>
-  <div v-if="useVeil" class="veil" />
-  <div
-    ref="overlay"
-    class="stream-overlay"
-    :style="overlayStyle"
-    @mouseenter="onMouseEnter"
-    @mouseleave="onMouseLeave"
-    @mousemove="onMouseMove"
-    @mouseup="onMouseUp"
-    @mousedown="onMouseDown"
-    @wheel="onWheel"
-  >
-    <canvas ref="canvas" />
-    <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="scale" />
-    <Cursor
-      v-for="(cursor, cursorId) in overlayCursors.cursors"
-      :key="cursorId"
-      v-bind="cursor"
-      :scale="scale"
-      :is-self="cursorId === userId"
-    />
-    <template v-if="isSharingScreen">
-      <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
-    </template>
+  <div class="stream-container">
+    <video ref="video" :muted="videoOptions?.muted" :playsinline="videoOptions?.playsinline" :autoplay="videoOptions?.autoplay" :style="{ 'object-fit': videoOptions?.fill? 'fill' : 'cover' }"/>
+    <div v-if="useVeil" class="veil" />
+    <div
+      ref="overlay"
+      class="overlay"
+      :style="overlayStyle"
+      @mouseenter="onMouseEnter"
+      @mouseleave="onMouseLeave"
+      @mousemove="onMouseMove"
+      @mouseup="onMouseUp"
+      @mousedown="onMouseDown"
+      @wheel="onWheel"
+    >
+      <canvas ref="canvas" />
+      <Signal v-for="(signal, signalId) in overlaySignals.signals" :key="signalId" v-bind="signal" :scale="scale" />
+      <Cursor
+        v-for="(cursor, cursorId) in overlayCursors.cursors"
+        :key="cursorId"
+        v-bind="cursor"
+        :scale="scale"
+        :is-self="cursorId === userId"
+      />
+      <template v-if="isSharingScreen">
+        <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
+      </template>
+    </div>
+    <div v-if="shutterActive" class="shutter" />
   </div>
-  <div v-if="shutterActive" class="shutter" />
 </template>
 
 <style>
-.veil {
+.stream-container {
+  position: relative;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.stream-container .veil {
   position: absolute;
   top: 0;
   left: 0;
@@ -417,7 +419,7 @@ defineExpose({
   z-index: 500;
 }
 
-.shutter {
+.stream-container .shutter {
   position: absolute;
   top: 0;
   left: 0;
@@ -427,14 +429,14 @@ defineExpose({
   z-index: 1500;
 }
 
-.stream-overlay {
+.stream-container .overlay {
   position: absolute;
   top: 0;
   left: 0;
   z-index: 1000;
 }
 
-.stream-overlay canvas {
+.stream-container .overlay canvas {
   position: absolute;
   top: 0;
   left: 0;
@@ -443,7 +445,7 @@ defineExpose({
   height: 100%;
 }
 
-.stream-overlay .cover-bounds {
+.stream-container .overlay .cover-bounds {
   position: absolute;
   z-index: 1100;
   background: repeating-linear-gradient(-45deg, #222, #333 15px, #884 15px, #aa4 20px);

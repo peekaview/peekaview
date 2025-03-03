@@ -195,14 +195,16 @@
     "waitForLogin": "Warte auf Anmeldung",
     "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
     "enterCode": "Code eingeben",
-    "loginWithCode": "Mit Code anmelden"
+    "loginWithCode": "Mit Code anmelden",
+    "invalidCode": "Ungültiger Code"
   },
   "sourcesWindow": {
     "type": {
       "windows": "Fenster",
       "screens": "Bilschirme"
     },
-    "share": "Teilen"
+    "share": "Teilen",
+    "unauthorized": "Nicht autorisiert!"
   },
   "sharingActive": {
     "title": "Bildschirmfreigabe aktiv",

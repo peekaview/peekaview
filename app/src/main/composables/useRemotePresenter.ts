@@ -13,7 +13,7 @@ import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
 import { SourceManager } from '../sources/SourceManager.js'
 import { createSourceManager } from '../sources/createSourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size, SendRemote } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 import { i18n } from '../i18n'
@@ -111,7 +111,7 @@ const KeyMap: Record<string, Key> = {
 
 export type RemotePresenter = ReturnType<typeof useRemotePresenter>
 
-export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void, newUsers: UserData[] = [], onHidden: (hidden: boolean) => void) {
+export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] = [], onHidden: (hidden: boolean) => void) {
   const mousePressed: Record<string, boolean> = {}
 
   let overlayWindow: BrowserWindow | undefined
@@ -749,44 +749,44 @@ export function useRemotePresenter(sendRemote: <T extends RemoteEvent>(event: T,
     } else if (key == 'NumLock') {
       // skip
     } else if (key.startsWith('_____strg+')) {
-      console.log(key)
-      console.log(key.replace('_____strg+', ''))
+      const strgKey = key.replace('_____strg+', '')
+      console.log(strgKey)
 
       // eslint-disable-next-line no-unexpected-multiline
       {(async () => {
         // alles markieren
-        if (key.replace('_____strg+', '') == 'a') {
+        if (strgKey == 'a') {
           keyboard
             .pressKey(controlkey, Key.A)
             .then(() => keyboard.releaseKey(controlkey, Key.A))
         }
         // safe
-        if (key.replace('_____strg+', '') == 's') {
+        if (strgKey == 's') {
           await keyboard.pressKey(controlkey, Key.S)
           await keyboard.releaseKey(controlkey, Key.S)
         }
         // search
-        if (key.replace('_____strg+', '') == 'f') {
+        if (strgKey == 'f') {
           await keyboard.pressKey(controlkey, Key.F)
           await keyboard.releaseKey(controlkey, Key.F)
         }
         // Zeilenumbruch
-        if (key.replace('_____strg+', '') == 'Enter') {
+        if (strgKey == 'Enter') {
           await keyboard.pressKey(controlkey, Key.Enter)
           await keyboard.releaseKey(controlkey, Key.Enter)
         }
         // rückgängig
-        if (key.replace('_____strg+', '') == 'y') {
+        if (strgKey == 'y') {
           await keyboard.pressKey(controlkey, Key.Y)
           await keyboard.releaseKey(controlkey, Key.Y)
         }
         // wiederholen
-        if (key.replace('_____strg+', '') == 'z') {
+        if (strgKey == 'z') {
           await keyboard.pressKey(controlkey, Key.Z)
           await keyboard.releaseKey(controlkey, Key.Z)
         }
         // quit
-        if (key.replace('_____strg+', '') == 'q') {
+        if (strgKey == 'q') {
           await keyboard.pressKey(controlkey, Key.Q)
           await keyboard.releaseKey(controlkey, Key.Q)
         }
