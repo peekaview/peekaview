@@ -20,6 +20,11 @@ import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
 
+// Hide dock icon on macOS
+if (process.platform === 'darwin') {
+  app.dock.hide()
+}
+
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
@@ -69,11 +74,12 @@ declare const CSP_POLICY: string
 
   autoUpdater.on('update-available', (info) => {
     log.info('Update available:', info)
-    new Notification({
+    dialog.showMessageBox({
       title: 'PeekaView Update',
-      body: i18n.t('update.available', { version: info.version }),
-      icon: updateNotificationIcon
-    }).show()
+      message: i18n.t('update.available', { version: info.version }),
+      type: 'info',
+      buttons: ['OK']
+    })
   })
 
   autoUpdater.on('update-not-available', () => {
@@ -82,11 +88,12 @@ declare const CSP_POLICY: string
 
   autoUpdater.on('error', (err) => {
     log.error('Error in auto-updater:', err)
-    new Notification({
+    dialog.showMessageBox({
       title: 'PeekaView Update Error',
-      body: i18n.t('update.error'),
-      icon: updateNotificationIcon
-    }).show()
+      message: i18n.t('update.error'),
+      type: 'error',
+      buttons: ['OK']
+    })
   })
 
   autoUpdater.on('download-progress', (progressObj) => {
@@ -95,21 +102,22 @@ declare const CSP_POLICY: string
 
   autoUpdater.on('update-downloaded', (info) => {
     log.info('Update downloaded:', info)
-    const notification = new Notification({
+    log.info('Attempting to show update notification for version:', info.version)
+    
+    dialog.showMessageBox({
       title: 'PeekaView Update Ready',
-      body: i18n.t('update.ready', { version: info.version }),
-      icon: updateNotificationIcon,
-      actions: [
-        { type: 'button', text: i18n.t('update.restart') }
-      ]
+      message: i18n.t('update.ready', { version: info.version }),
+      type: 'info',
+      buttons: [i18n.t('update.restart')],
+      defaultId: 0,
+      noLink: true
+    }).then(({ response }) => {
+      if (response === 0) {
+        log.info('Update dialog action clicked, preparing to quit and install')
+        isQuitting = true
+        autoUpdater.quitAndInstall()
+      }
     })
-
-    notification.on('action', () => {
-      isQuitting = true
-      autoUpdater.quitAndInstall()
-    })
-
-    notification.show()
   })
 
   autoUpdater.checkForUpdates()
@@ -144,6 +152,16 @@ declare const CSP_POLICY: string
 
   app.whenReady().then(() => {
     log.info('App is ready, initializing...')
+    
+    // Add notification permission check
+    /*if (process.platform === 'darwin') {
+      log.info('Checking notification permissions...')
+      if (!Notification.isSupported()) {
+        log.warn('Notifications are not supported on this system')
+      } else {
+        log.info('Notifications are supported')
+      }
+    }*/
     
     if (process.platform === 'linux') {
       exec(`xdg-mime default peekaview.desktop x-scheme-handler/peekaview`)

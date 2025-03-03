@@ -103,7 +103,6 @@
     "target": [
       "AppImage",
       "deb",
-      "snap",
       "rpm"
     ],
     "icon": "build-resources/icons",
