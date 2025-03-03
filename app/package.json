@@ -2,7 +2,7 @@
   "name": "peekaview",
   "author": "Limtec GmbH <info@limtec.de>",
   "productName": "PeekaView",
-  "version": "0.0.2",
+  "version": "v0.2",
   "description": "Simple screen sharing application",
   "homepage": "https://peekaview.de",
   "license": "AGPL-3.0",
@@ -24,9 +24,9 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux",
+    "build:win": "npm run build && electron-builder --win --publish always",
+    "build:mac": "npm run build && electron-builder --mac --publish always",
+    "build:linux": "npm run build && electron-builder --linux --publish always",
     "build:linux:deb": "npm run build && electron-builder --linux deb"
   },
   "dependencies": {
