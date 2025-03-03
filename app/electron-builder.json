@@ -105,7 +105,7 @@
       "deb",
       "rpm"
     ],
-    "icon": "build-resources/icons",
+    "icon": "build-resources/icon-512.png",
     "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
     "category": "Utility"
   },
