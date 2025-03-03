@@ -295,7 +295,7 @@ declare const CSP_POLICY: string
 
     windowLoad(presenterWindow, 'presenter', { data: code })
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
