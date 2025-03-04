@@ -1,13 +1,12 @@
 import {
   mouse,
   Point,
-  clipboard,
   keyboard,
   Key,
   Button,
 } from '@nut-tree-fork/nut-js'
 import path from 'path'
-import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
+import { ipcMain, app, dialog, BrowserWindow, screen, clipboard as electronClipboard } from 'electron'
 // import { fileTypeFromBlob } from 'file-type';
 
 import { SourceManager } from '../sources/SourceManager.js'
@@ -665,10 +664,10 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   async function copyToClipboard(data: RemoteCopyData) {
     localClipboardTime = Date.now()
 
-    const tmp = await clipboard.getContent()
+    const tmp = await electronClipboard.readText()
     await keyboard.pressKey(controlkey, Key.C)
     await keyboard.releaseKey(controlkey, Key.C)
-    const content = await clipboard.getContent()
+    const content = await electronClipboard.readText()
 
     if (data.cut)
       keyboard.type(Key.Delete)
@@ -678,16 +677,15 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       time: Date.now()
     })
 
-    // @ts-ignore: nut-js does not support clipboard.copy
-    await clipboard.copy(tmp)
+    await electronClipboard.writeText(tmp)
   }
 
   async function pasteFromClipboard(data: RemotePasteData) {
-    const tmp = await clipboard.getContent()
-    await clipboard.setContent(data.text)
+    const tmp = await electronClipboard.readText()
+    await electronClipboard.writeText(data.text)
     await keyboard.pressKey(controlkey, Key.V)
     await keyboard.releaseKey(controlkey, Key.V)
-    await clipboard.setContent(tmp)
+    await electronClipboard.writeText(tmp)
   }
 
   function toggleClipboard(toggle?: boolean) {
@@ -738,11 +736,11 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       }
     } else if (SpecialKeys.includes(key)) {
       (async () => {
-        const tmpclipboard = await clipboard.getContent()
-        await clipboard.setContent(key)
+        const tmpclipboard = await electronClipboard.readText()
+        await electronClipboard.writeText(key)
         await keyboard.pressKey(controlkey, Key.V)
         await keyboard.releaseKey(controlkey, Key.V)
-        await clipboard.setContent(tmpclipboard)
+        await electronClipboard.writeText(tmpclipboard)
       })()
     } else if (key == 'Dead') {
       lastKey = 'Dead'
