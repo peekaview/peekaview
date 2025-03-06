@@ -59,7 +59,13 @@
       }
     ],
     "icon": "build-resources/icon.ico",
-    "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+    "azureSignOptions": {
+      "publisherName": "LimTec GmbH",
+      "endpoint": "https://neu.codesigning.azure.net/",
+      "certificateProfileName": "CodeSigningCertificate",
+      "codeSigningAccountName": "limtec"
+    }
   },
   "nsis": {
     "oneClick": false,
