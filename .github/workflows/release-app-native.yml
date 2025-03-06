@@ -175,5 +175,8 @@ jobs:
         - name: Build Electron App
           working-directory: ./app
           env:
+            AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+            AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+            AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           run: pnpm run build:win
