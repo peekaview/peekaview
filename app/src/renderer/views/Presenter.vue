@@ -31,7 +31,7 @@ function present() {
     email: props.email,
     token: props.token,
   }).toString()))
-  presenterWindow.value = window.open(`browserPresenter/index.html?data=${data.value}`, '_blank', 'width=400,height=300,right=160,top=0,popup=true') ?? undefined
+  presenterWindow.value = window.open(`browserPresenter/index.html?data=${data.value}`, '_blank', `width=400,height=300,popup=true`) ?? undefined
   if (!presenterWindow.value) {
     throw new Error('Failed to open presenter window')
   }

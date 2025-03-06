@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, useTemplateRef, watch } from 'vue'
+import { ref, onBeforeUnmount, useTemplateRef, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamContainer from '../views/viewer/StreamContainer.vue'
@@ -19,7 +19,9 @@ const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
 const windowModalSize = [400, 550] as const
 
-const urlBarHeight = 36 // TODO: as of now this is Chrome on KDE, check other OS's / browsers
+ // TODO: as of now those are for Chrome on KDE, check other OS's / browsers
+const urlBarHeight = 36
+const titleBarHeight = 268
 
 const outerRef = useTemplateRef('outer')
 const toolbarRef = useTemplateRef('toolbar')
@@ -136,7 +138,10 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-window.addEventListener('resize', onResize)
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  window.moveTo(99999, 99999) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
+})
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
@@ -225,11 +230,11 @@ function fixSize(size: readonly [number, number]) {
   return (toPrevious = false) => {
     sizeFixed.value = false
     if (toPrevious) {
-      window.moveTo(x, y)
       window.resizeTo(width, height)
+      setTimeout(() => window.moveTo(x, Math.max(y, titleBarHeight)), 300)
     } else {
-      window.moveTo(0, 0)
       window.resizeTo(...windowDefaultSize)
+      setTimeout(() => window.moveTo(99999, 99999), 300) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
     }
   }
 }
