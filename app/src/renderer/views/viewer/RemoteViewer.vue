@@ -23,7 +23,7 @@ import PencilSvg from '../../../assets/icons/pencil.svg'
 
 import type { File, ViewerTool } from '../../../interface'
 
-type Message = 'init' | 'sync' |'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
+type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -43,7 +43,34 @@ const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const stream = ref<MediaStream>()
 
+let pauseTimeout: number
+const paused = ref(false)
+watch(paused, (paused) => {
+  clearTimeout(pauseTimeout)
+  if (paused) {
+    activeTool.value = undefined
+    activeMessage.value = 'paused'
+    pauseTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
+  } else {
+    activeTool.value = pointerEnabled.value ? 'pointer' : remoteControlEnabled.value ? 'remoteControl' : undefined
+    activeMessage.value = 'resumed'
+    pauseTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
+  }
+})
+
+let hiddenTimeout: number
 const hidden = ref(false)
+watch(hidden, (hidden) => {
+  clearTimeout(hiddenTimeout)
+  if (hidden) {
+    activeMessage.value = 'hidden'
+    hiddenTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
+  } else {
+    activeMessage.value = 'visible'
+    hiddenTimeout = window.setTimeout(() => hideMessage('visible'), 3000)
+  }
+})
+
 const inputEnabled = computed(() => !hidden.value)
 const pointerEnabled = ref(true)
 const remoteControlEnabled = ref(false)
@@ -102,10 +129,6 @@ watch(clipboardFile, () => showClipboard.value = true)
 
 const { send, receive, onReceive } = useRemoteHandlers(screenView)
 
-onReceive("browser", () => {
-  presenterInBrowser.value = false
-})
-
 onReceive("mouse-leftclick", (data) => {
   containerRef.value?.receiveMouseLeftClick(data)
 })
@@ -145,35 +168,15 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-let pauseTimeout: number
-onReceive('pause', (data) => {
-  clearTimeout(pauseTimeout)
-  if (data.enabled) {
-    activeMessage.value = 'paused'
-    pauseTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
-  } else {
-    activeMessage.value = 'resumed'
-    pauseTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
-  }
-})
-
-let hiddenTimeout: number
-onReceive('hide', (data) => {
-  hidden.value = data.hidden
-  clearTimeout(hiddenTimeout)
-  if (data.hidden) {
-    activeMessage.value = 'hidden'
-    hiddenTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
-  } else {
-    activeMessage.value = 'visible'
-    hiddenTimeout = window.setTimeout(() => hideMessage('visible'), 3000)
-  }
-})
-
 onReceive('reset', (data) => {
   console.log('reset', data)
+
+  presenterInBrowser.value = data.inBrowser
   pointerEnabled.value = data.pointerEnabled
   remoteControlEnabled.value = data.remoteControlEnabled
+  hidden.value = data.hidden
+  paused.value = data.paused
+
   containerRef.value?.reset(data)
 })
 
@@ -187,6 +190,9 @@ watch(() => props.data, async (screenShareData) => {
   screenView.value = await useScreenView(screenShareData, {
     onStream: (s) => {
       stream.value = s
+      stream.value.getVideoTracks()[0].onended = () => {
+        stop()
+      }
       hideMessage('init')
     },
     onRemote: (event, data) => {
@@ -404,10 +410,10 @@ function stop() {
 <template>
   <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled || paused }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && !paused && (activeTool = 'pointer')">
         <PencilSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled || paused }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && !paused && (activeTool = 'remoteControl')">
         <MouseSvg />
       </div>
       <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">

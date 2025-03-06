@@ -38,6 +38,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
   const latestRequest = ref<Request>()
+  const hidden = ref(false)
 
   const requestInterval = ref<number>()
   const pingInterval = ref<number>()
@@ -105,10 +106,9 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     latestRequest.value = undefined
   })
 
-  window.electronAPI?.onHidden((hidden) => {
-    if (screenPresent.value) {
-      screenPresent.value.sendRemote('hide', { hidden })
-    }
+  window.electronAPI?.onHidden((flag) => {
+    hidden.value = flag
+    sendReset()
   })
   
   window.electronAPI?.onRemote((event, data) => {
@@ -135,12 +135,17 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   //let lastResetHeight: number | undefined
   function sendReset(interval = false) {
     clearTimeout(resetTimeout)
-    if (inApp)
+    if (inApp || !screenPresent.value)
       return
 
-    const width = stream.value?.getVideoTracks()[0].getSettings().width ?? 0
-    const height = stream.value?.getVideoTracks()[0].getSettings().height ?? 0
+    const constraints = stream.value?.getVideoTracks()[0].getConstraints()
+    const maxWidth = typeof constraints?.width === 'number' ? constraints.width : constraints?.width?.max ?? 0
+    const maxHeight = typeof constraints?.height === 'number' ? constraints.height : constraints?.height?.max ?? 0
 
+    const settings = stream.value?.getVideoTracks()[0].getSettings()
+    const width = settings?.width || maxWidth
+    const height = settings?.height || maxHeight
+  
     // TODO: do send in case a new viewer joins somehow
     /*if (lastResetWidth === width && lastResetHeight === height)
       return
@@ -151,6 +156,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
 
     const resetData = {
       isScreen: true, // TODO
+      inBrowser: true,
       dimensions: {
         left: 0,
         top: 0,
@@ -160,6 +166,8 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       coverBounds: [],
       pointerEnabled: unref(data.pointerEnabled),
       remoteControlEnabled: unref(data.remoteControlEnabled),
+      paused: sessionState.value === 'paused',
+      hidden: hidden.value,
     }
     
     const json = JSON.stringify(resetData)
@@ -207,7 +215,6 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       updateOnlineStatus()
 
       screenPresent.value = await useScreenPresent(screenShareData.value, {
-        inApp,
         onRemote: (event, data) => {
           options?.onRemote?.(event, data)
           if (inApp)
@@ -235,6 +242,9 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       stream.value = s
       await screenPresent.value.addStream(stream.value, shareAudio)
       options?.onStream?.(stream.value, shareAudio)
+      stream.value.getVideoTracks()[0].onended = () => {
+        stopSharing()
+      }
       sessionState.value = 'active'
 
       source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, userName: unref(data.email) }))
@@ -311,14 +321,14 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     if (stream.value)
       stream.value.getTracks()[0].enabled = false
     sessionState.value = 'paused'
-    screenPresent.value?.sendRemote('pause', { enabled: true })
+    sendReset()
   }
   
   function resumeSharing() {
     if (stream.value)
       stream.value.getTracks()[0].enabled = true
     sessionState.value = 'active'
-    screenPresent.value?.sendRemote('pause', { enabled: false })
+    sendReset()
   }
   
   function stopSharing() {

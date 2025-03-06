@@ -80,9 +80,9 @@ const scale = computed(() => {
   if (!streamSize.value.height || !streamSize.value.width)
     return 1
 
-  const height = videoTransform.value.height / streamSize.value.height
-  const width = videoTransform.value.width / streamSize.value.width
-  return height < width ? height : width
+  const xScale = videoTransform.value.width / streamSize.value.width
+  const yScale = videoTransform.value.height / streamSize.value.height
+  return xScale < yScale ? xScale : yScale
 })
 
 const overlayStyle = computed(() => ({

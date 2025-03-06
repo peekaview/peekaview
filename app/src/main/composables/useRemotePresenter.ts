@@ -145,12 +145,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   // Intervals
   let checkWindowInterval: NodeJS.Timeout | undefined
   let resetInterval: NodeJS.Timeout | undefined
-  
-  // Last state for pause/resume
-  let pausedToggleState: {
-    pointer: boolean;
-    remoteControl: boolean;
-  } | undefined
 
   let hwnd: string | undefined
 
@@ -227,16 +221,10 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     streamingState = fromHidden ? 'hidden' : 'paused'
 
-    if (pausedToggleState === undefined) {
-      pausedToggleState = { ...toggles }
-      toggles.pointer = false
-      toggles.remoteControl = false
-      sendReset()
-    }
-
     console.log('pause')
     hideOverlayWindow()
     hideRemoteControl()
+    sendReset()
   }
 
   async function resumeStreamingIfPaused(fromHidden = false) {
@@ -245,11 +233,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     if (fromHidden)
       onHidden(false)
-
-    if (pausedToggleState !== undefined) {
-      toggles = { ...pausedToggleState }
-      pausedToggleState = undefined
-    }
     
     streamingState = 'stopped'
     console.log('resume')
@@ -279,10 +262,13 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     const toolbarBounds = getToolbarBounds()
     const data = {
       isScreen: sourceManager.isScreen(),
+      inBrowser: false,
       dimensions: sourceManager.getOuterDimensions(),
       coverBounds: toolbarBounds ? [toolbarBounds] : [],
       pointerEnabled: toggles.pointer,
       remoteControlEnabled: toggles.remoteControl,
+      paused: streamingState === 'paused',
+      hidden: streamingState === 'hidden',
     }
     
     const json = JSON.stringify(data)
@@ -459,7 +445,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     })
 
     clipboardWindow.removeMenu()
-    clipboardWindow.webContents.openDevTools()
+    //clipboardWindow.webContents.openDevTools()
 
     clipboardWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     clipboardWindow.setAlwaysOnTop(true)
@@ -503,7 +489,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       frame: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/toolbar.js'),
-        additionalArguments: [import.meta.env.VITE_APP_URL],
         nodeIntegration: true,
         contextIsolation: true,
         webSecurity: app.isPackaged,
@@ -523,6 +508,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     return new Promise<void>((resolve) => {
       toolbarWindow!.on('ready-to-show', () => {
         toolbarWindow!.moveTop()
+        toolbarWindow!.webContents.send('on-toggle-pointer', toggles.pointer)
+        toolbarWindow!.webContents.send('on-toggle-remote-control', toggles.remoteControl)
         resolve()
       })
     })
@@ -888,8 +875,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
   
   return {
-    toggles,
-
     start,
     stop,
     pauseStreaming,

@@ -128,20 +128,16 @@ export type SendRemoteOptions = {
 
 export type SendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, options?: SendRemoteOptions) => Promise<void> | void
 
-export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
+export type RemoteEvent = "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
 
 export type RemoteData<T extends RemoteEvent> = 
-  T extends "browser" ? { }
-  : T extends "mouse-click" ? RemoteMouseData
+  T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
   : T extends "mouse-leftclick" ? RemoteMouseData
   : T extends "mouse-move" ? RemoteMouseData
   : T extends "mouse-down" ? RemoteMouseData
   : T extends "mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
-  : T extends "toggle-freeze" ? { enabled: boolean }
-  : T extends "pause" ? { enabled: boolean }
-  : T extends "hide" ? { hidden: boolean }
   : T extends "key-down" ? RemoteKeyData
   : T extends "copy" ? RemoteCopyData
   : T extends "paste" ? RemotePasteData
@@ -193,10 +189,13 @@ export type RemoteData<T extends RemoteEvent> =
 
   export type RemoteResetData = {
     isScreen: boolean
+    inBrowser: boolean
     dimensions: Dimensions
     coverBounds: Rectangle[]
     pointerEnabled: boolean
     remoteControlEnabled: boolean
+    paused: boolean
+    hidden: boolean
   }
 
   export type OverlayData = {

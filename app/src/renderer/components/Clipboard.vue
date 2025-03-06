@@ -46,13 +46,13 @@ const fileSvg = computed(() => {
 
   if (clipboardFile.value.type !== 'binary')
     return clipboardFile.value.content
-
-  return `/assets/icons/ext/${clipboardFile.value.extension}.svg`
+  
+  const isStatic = window.electronAPI && process.env.NODE_ENV !== 'development'
+  return `${isStatic ? '/static' : ''}/assets/icons/ext/${clipboardFile.value.extension}.svg`
 })
 
 const collapsed = ref(false)
 const iconCollapsed  = computed(() => (collapsed.value && !props.invertCollapseIcons) || (!collapsed.value && props.invertCollapseIcons))
-
 watch(collapsed, value => emit('onCollapse', value))
 
 // virtuelles Clipboard, Filesharing via Websockets

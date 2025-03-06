@@ -499,7 +499,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('dialog', async (_event, options: DialogOptions) => {
-    customDialog.openDialog('dialog', options)
+    customDialog.openDialog(options)
   })
 
   ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
@@ -566,7 +566,7 @@ declare const CSP_POLICY: string
       return
     }
 
-    customDialog.openTrayDialog(import.meta.env.VITE_APP_URL, {
+    customDialog.openTrayDialog({
       title: i18n.t('sharingActive.title'),
       message: i18n.t('sharingActive.message'),
       copyText: `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`,

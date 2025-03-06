@@ -192,7 +192,7 @@ function freezeAndFocus() {
     containerRef.value?.videoRef?.pause()
     shutterActive.value = false
     
-    const unsize = fixSize([width, height])
+    const unsize = fixSize([width, height], [0, 0])
     window.focus()
     window.setTimeout(() => {
       unsize(true)
@@ -215,7 +215,7 @@ async function showInviteLink() {
     navigator.clipboard.writeText(url)
 }
 
-function fixSize(size: readonly [number, number]) {
+function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
   if (sizeFixed.value)
     throw new Error('Window size is already fixed!')
 
@@ -225,18 +225,21 @@ function fixSize(size: readonly [number, number]) {
   const height = window.outerHeight
 
   sizeFixed.value = true
-  window.resizeTo(...size)
+  transform(size, position)
 
   return (toPrevious = false) => {
     sizeFixed.value = false
-    if (toPrevious) {
-      window.resizeTo(width, height)
-      setTimeout(() => window.moveTo(x, Math.max(y, titleBarHeight)), 300)
-    } else {
-      window.resizeTo(...windowDefaultSize)
-      setTimeout(() => window.moveTo(99999, 99999), 300) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
-    }
+    if (toPrevious)
+      transform([width, height], [x, Math.max(y, titleBarHeight)]) // timeout required to let resize finish
+    else
+      transform(windowDefaultSize, [99999, 99999]) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
   }
+}
+
+function transform(size: readonly [number, number], position?: readonly [number, number]) {
+  window.resizeTo(...size)
+  if (position)
+    setTimeout(() => window.moveTo(...position), 300) // timeout required to let resize finish
 }
 
 let modalPromise: Promise<string> | Promise<void> | undefined
@@ -268,17 +271,14 @@ async function resizeAndNotify(options: NotifyOptions) {
 }
 
 function onStopSharing() {
-  window.electronAPI?.stopSharing()
   presenter.value?.stopSharing()
 }
 
 function onPauseSharing() {
-  window.electronAPI?.pauseSharing()
   presenter.value?.pauseSharing()
 }
 
 function onResumeSharing() {
-  window.electronAPI?.resumeSharing()
   presenter.value?.resumeSharing()
 }
 </script>

@@ -41,12 +41,12 @@ export function useCustomDialog() {
     sound = s
   }
 
-  function openTrayDialog(hostname: string, options: DialogOptions) {
+  function openTrayDialog(options: DialogOptions) {
     closeTrayDialogs()
-    openDialog(hostname, options, 'tray')
+    openDialog(options, 'tray')
   }
 
-  function openDialog(hostname: string, options: DialogOptions, type: 'tray' | 'dialog' = 'dialog') {
+  function openDialog(options: DialogOptions, type: 'tray' | 'dialog' = 'dialog') {
     let windowParams: {
       width: number
       height: number
@@ -117,7 +117,6 @@ export function useCustomDialog() {
       icon: path.join(__dirname, PeekaViewLogo),
       webPreferences: {
         preload: path.join(__dirname, '../preload/dialog.js'),
-        additionalArguments: [hostname],
         nodeIntegration: true,
         contextIsolation: true,
         sandbox: false,

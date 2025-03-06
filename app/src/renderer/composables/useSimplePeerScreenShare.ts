@@ -15,7 +15,6 @@ import { PeerData, RemoteData, RemoteEvent, SendRemote, SendRemoteOptions, TurnC
 
 interface ScreenPresentOptions {
   turnCredentials?: TurnCredentials
-  inApp?: boolean
   onRemote?: SendRemote
 }
 
@@ -234,7 +233,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
     stream,
     roleHandlers: {
       viewer: (socketId) => {
-        createParticipant(socketId, true, () => !options?.inApp && sendRemote("browser", {}, { socketIds: [socketId] }), () => dismiss(socketId))
+        createParticipant(socketId, true, () => {}, () => dismiss(socketId))
       }
     },
   })

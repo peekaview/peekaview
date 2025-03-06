@@ -1,12 +1,23 @@
 <script setup lang="ts">
+import { useTemplateRef } from 'vue'
 import PresenterToolbar from '../../components/PresenterToolbar.vue'
 
-function toggleRemoteControl(enabled: boolean) {
-  window.electronAPI!.toggleRemoteControl(enabled)
-}
+const toolbar = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
+
+window.electronAPI!.onTogglePointer((enabled?: boolean) => {
+  toolbar.value?.togglePointer(enabled)
+})
+
+window.electronAPI!.onToggleRemoteControl((enabled?: boolean) => {
+  toolbar.value?.toggleRemoteControl(enabled)
+})
 
 function togglePointer(enabled: boolean) {
   window.electronAPI!.togglePointer(enabled)
+}
+
+function toggleRemoteControl(enabled: boolean) {
+  window.electronAPI!.toggleRemoteControl(enabled)
 }
 
 function pauseSharing() {
@@ -36,6 +47,7 @@ function showInviteLink() {
 
 <template>
   <PresenterToolbar
+    ref="toolbar"
     draggable
     @toggle-remote-control="toggleRemoteControl"
     @toggle-pointer="togglePointer"

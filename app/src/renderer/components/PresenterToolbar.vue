@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
@@ -27,13 +27,28 @@ const emit = defineEmits<{
 }>()
 
 const inApp = !!window.electronAPI
-const remoteControlEnabled = ref(false)
-const pointerEnabled = ref(true)
-const isPaused = ref(false)
 const toolbarRef = useTemplateRef('toolbar')
 
-watch(remoteControlEnabled, (enabled) => emit('toggle-remote-control', enabled))
-watch(pointerEnabled, (enabled) => emit('toggle-pointer', enabled))
+const _pointerEnabled = ref(true)
+const pointerEnabled = computed({
+  get: () => _pointerEnabled.value,
+  set: (enabled) => {
+    emit('toggle-pointer', enabled)
+    _pointerEnabled.value = enabled
+  },
+})
+
+const _remoteControlEnabled = ref(false)
+const remoteControlEnabled = computed({
+  get: () => _remoteControlEnabled.value,
+  set: (enabled) => {
+    emit('toggle-remote-control', enabled)
+    _remoteControlEnabled.value = enabled
+  },
+})
+
+
+const isPaused = ref(false)
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
 
 setInterval(() => {
@@ -65,6 +80,25 @@ function resizeWindow() {
     minimumSize: { width: minimumWidth },
   })
 }
+
+function togglePointer(enabled?: boolean) {
+  if (enabled === undefined)
+    enabled = !_pointerEnabled.value
+
+  _pointerEnabled.value = enabled
+}
+
+function toggleRemoteControl(enabled?: boolean) {
+  if (enabled === undefined)
+    enabled = !_remoteControlEnabled.value
+
+  _remoteControlEnabled.value = enabled
+}
+
+defineExpose({
+  togglePointer,
+  toggleRemoteControl,
+})
 </script>
 
 <template>
