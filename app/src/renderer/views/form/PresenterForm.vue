@@ -88,13 +88,13 @@ function shareViaApp() {
 }
 
 .continue-in-browser {
-  color: var(--text-color);
-  border-color: var(--text-color);
+  color: var(--text-color) !important;
+  border-color: var(--text-color) !important;
 }
 
 .continue-in-browser:hover {
-  color: var(--link-color);
-  border-color: var(--link-color);
+  color: var(--link-color) !important;
+  border-color: var(--link-color) !important;
 }
 
 
