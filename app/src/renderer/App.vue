@@ -56,9 +56,9 @@ const locale = computed({
     <a class="header-content" href="/">
       <img :src="PeekaViewLogo" alt="Logo" class="logo">
       <h1 class="header-title">
-        <b>SHARE</b>YOUR<b>SCREEN</b>
+        <b>SHARE</b> YOUR <b>SCREEN</b>
       </h1>
-      <small class="header-subtitle">Screen Sharing, Simplified & Secure with Peer-to-Peer</small>
+      <small class="header-subtitle">Simplified & Secure with Peer-to-Peer</small>
     </a>
   </header>
 
@@ -124,8 +124,8 @@ const locale = computed({
     </div>
   </div>
 
-  <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
-  <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
+  <Imprint v-if="showInfo === 'imprint'" @close="showInfo = undefined"/>
+  <GDPR v-if="showInfo === 'gdpr'" @close="showInfo = undefined"/>
 
   <footer v-if="!activeViewerData" class="main-footer">
     <div class="footer-content">
@@ -214,9 +214,16 @@ body.view-active {
 }
 
 .header-subtitle {
-  font-size: 1.2em;
   margin: 0;
   color: #9d9d9d;
+}
+
+footer select {
+  color: gray;
+  background: #42403e;
+  border: 0px solid black;
+  border-radius: 5px;
+  padding: 5px;
 }
 
 .recent-contacts {
@@ -236,10 +243,9 @@ body.view-active {
 
 .footer-content {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;

@@ -73,6 +73,7 @@ function shareViaApp() {
   padding: 1.5rem;
   text-align: center;
   border: 2px solid var(--primary-color);
+  background: #154d97;
 }
 
 .open-in-app h3 {
@@ -90,6 +91,12 @@ function shareViaApp() {
   color: var(--text-color);
   border-color: var(--text-color);
 }
+
+.continue-in-browser:hover {
+  color: var(--link-color);
+  border-color: var(--link-color);
+}
+
 
 .divider {
   text-align: center;

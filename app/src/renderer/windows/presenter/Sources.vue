@@ -82,6 +82,7 @@ function share() {
   overflow-y: auto;
   background-color: #141414;
   border-radius: 5px;
+  min-height: calc(100vh - 155px);
 }
 
 .source-item {

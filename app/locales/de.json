@@ -27,8 +27,8 @@
     "imprint": "Impressum",
     "gdpr": "Datenschutzerklärung",
     "form": {
-      "likeToView": "An Freigabe teilnehmen",
-      "likeToShare": "Meinen Bildschirm freigeben",
+      "likeToView": "Bildschirm ansehen",
+      "likeToShare": "Bildschirm teilen",
       "recentContacts": "Letzte Kontakte"
     }
   },
