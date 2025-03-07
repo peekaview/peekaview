@@ -122,6 +122,11 @@ function parseYml($ymlContent) {
 function getDownloadLink() {
     $userSystem = detectUserSystem();
     
+    // For Linux with unknown distribution type, redirect to GitHub releases page
+    if ($userSystem['os'] === 'linux' && $userSystem['linux_type'] === 'other') {
+        return 'https://github.com/peekaview/peekaview/releases/latest';
+    }
+    
     // Determine which YML file to use based on detected OS
     $ymlFile = 'latest.yml'; // Default for Windows
     
@@ -135,6 +140,10 @@ function getDownloadLink() {
     $ymlContent = file_get_contents($ymlUrl);
     
     if (!$ymlContent) {
+        // If we can't get the YML file and it's Linux, redirect to GitHub releases
+        if ($userSystem['os'] === 'linux') {
+            return 'https://github.com/peekaview/peekaview/releases/latest';
+        }
         return null;
     }
     
@@ -146,48 +155,70 @@ function getDownloadLink() {
     // Find the best matching file for the user's system
     $bestMatch = null;
     $fallbackMatch = null;
+    $genericOsMatch = null;
     
     // First pass: find architecture matches with preferred file format
     foreach ($parsedYml['files'] as $file) {
         $fileUrl = $file['url'];
         
-        // Check if architecture matches
-        if ($file['arch'] === $userSystem['arch'] || $file['arch'] === null) {
+        // Perfect match (both OS and architecture)
+        if ($file['os'] === $userSystem['os'] && $file['arch'] === $userSystem['arch']) {
             // For Mac, prefer DMG
-            if ($userSystem['os'] === 'mac' && strpos($fileUrl, '.dmg') !== false) {
-                $bestMatch = $file;
-                break;
+            if ($userSystem['os'] === 'mac') {
+                if (strpos($fileUrl, '.dmg') !== false) {
+                    $bestMatch = $file;
+                    break;
+                } else if ($bestMatch === null) {
+                    $bestMatch = $file;
+                }
             }
-            
             // For Linux, check distribution type
-            if ($userSystem['os'] === 'linux') {
+            else if ($userSystem['os'] === 'linux') {
                 if ($userSystem['linux_type'] === 'debian' && strpos($fileUrl, '.deb') !== false) {
                     $bestMatch = $file;
                     break;
-                } elseif ($userSystem['linux_type'] === 'rpm' && strpos($fileUrl, '.rpm') !== false) {
+                } else if ($userSystem['linux_type'] === 'rpm' && strpos($fileUrl, '.rpm') !== false) {
                     $bestMatch = $file;
                     break;
-                } elseif ($userSystem['linux_type'] === 'other' && strpos($fileUrl, '.AppImage') !== false) {
+                } else if ($bestMatch === null) {
                     $bestMatch = $file;
-                    break;
                 }
             }
-            
-            // Save as fallback if no preferred format is found
-            if ($fallbackMatch === null) {
-                $fallbackMatch = $file;
+            // For Windows, just use the exact architecture match
+            else {
+                $bestMatch = $file;
+                break;
             }
+        }
+        
+        // OS and architecture match but not preferred format
+        else if ($file['os'] === $userSystem['os'] && $file['arch'] === $userSystem['arch'] && $fallbackMatch === null) {
+            $fallbackMatch = $file;
+        }
+        
+        // OS match but no specific architecture
+        else if ($file['os'] === $userSystem['os'] && $file['arch'] === null && $genericOsMatch === null) {
+            $genericOsMatch = $file;
         }
     }
     
-    // If no preferred format found, use fallback
+    // If no perfect match found, use fallback in this order:
+    // 1. OS and architecture match (but not preferred format)
+    // 2. OS match without specific architecture
+    // 3. First file in the list
     if ($bestMatch === null) {
-        $bestMatch = $fallbackMatch;
+        if ($fallbackMatch !== null) {
+            $bestMatch = $fallbackMatch;
+        } else if ($genericOsMatch !== null) {
+            $bestMatch = $genericOsMatch;
+        } else if (!empty($parsedYml['files'])) {
+            $bestMatch = $parsedYml['files'][0];
+        }
     }
     
-    // If still no match, use the first file as last resort
-    if ($bestMatch === null && !empty($parsedYml['files'])) {
-        $bestMatch = $parsedYml['files'][0];
+    // If we still couldn't find a match for Linux, redirect to GitHub releases
+    if ($bestMatch === null && $userSystem['os'] === 'linux') {
+        return 'https://github.com/peekaview/peekaview/releases/latest';
     }
     
     if ($bestMatch) {
