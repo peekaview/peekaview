@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { prompt } from '../../util'
@@ -15,10 +15,12 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const downloadLink = ref('downloads/PeekaView.exe')
+const downloadLink = process.env.VITE_DOWNLOAD_URL
+
+const code = computed(() => btoa(`email=${props.email}&token=${props.token}`))
 
 function shareViaApp() {
-  const protocolUrl = `peekaview://action=share&${new URLSearchParams({ email: props.email, token: props.token }).toString()}`
+  const protocolUrl = `peekaview://share/?code=${code.value}`
   window.location.href = protocolUrl
   
   setTimeout(async () => {
@@ -26,7 +28,7 @@ function shareViaApp() {
       title: t('share.appDialog.title'),
       html: 
         t('share.appDialog.message') + '<br><br>' +
-        t('share.appDialog.download', { link: downloadLink.value }),
+        t('share.appDialog.download', { link: downloadLink }),
       type: 'info',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
