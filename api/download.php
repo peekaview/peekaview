@@ -23,11 +23,19 @@ function detectUserSystem() {
         // Try to detect Linux distribution type
         if (strpos($userAgent, 'Ubuntu') !== false || 
             strpos($userAgent, 'Debian') !== false || 
-            strpos($userAgent, 'Mint') !== false) {
+            strpos($userAgent, 'Mint') !== false ||
+            strpos($userAgent, 'Pop!_OS') !== false ||
+            strpos($userAgent, 'Pop_OS') !== false ||
+            strpos($userAgent, 'Pop OS') !== false ||
+            strpos($userAgent, 'elementary OS') !== false) {
             $result['linux_type'] = 'debian';
         } elseif (strpos($userAgent, 'Fedora') !== false || 
                  strpos($userAgent, 'RHEL') !== false || 
-                 strpos($userAgent, 'CentOS') !== false) {
+                 strpos($userAgent, 'CentOS') !== false ||
+                 strpos($userAgent, 'Rocky Linux') !== false ||
+                 strpos($userAgent, 'Rocky') !== false ||
+                 strpos($userAgent, 'SUSE') !== false ||
+                 strpos($userAgent, 'openSUSE') !== false) {
             $result['linux_type'] = 'rpm';
         } else {
             $result['linux_type'] = 'other';
