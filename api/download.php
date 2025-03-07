@@ -98,7 +98,18 @@ function parseYml($ymlContent) {
  * @return string The download URL
  */
 function getDownloadLink() {
-    $ymlUrl = 'https://github.com/peekaview/peekaview/releases/latest/download/latest.yml';
+    $userSystem = detectUserSystem();
+    
+    // Determine which YML file to use based on detected OS
+    $ymlFile = 'latest.yml'; // Default for Windows
+    
+    if ($userSystem['os'] === 'mac') {
+        $ymlFile = 'latest-mac.yml';
+    } elseif ($userSystem['os'] === 'linux') {
+        $ymlFile = 'latest-linux.yml';
+    }
+    
+    $ymlUrl = 'https://github.com/peekaview/peekaview/releases/latest/download/' . $ymlFile;
     $ymlContent = file_get_contents($ymlUrl);
     
     if (!$ymlContent) {
@@ -106,7 +117,6 @@ function getDownloadLink() {
     }
     
     $parsedYml = parseYml($ymlContent);
-    $userSystem = detectUserSystem();
     
     // Base GitHub release URL
     $baseUrl = 'https://github.com/peekaview/peekaview/releases/latest/download/';
@@ -115,11 +125,6 @@ function getDownloadLink() {
     $bestMatch = null;
     
     foreach ($parsedYml['files'] as $file) {
-        // Skip if OS doesn't match
-        if ($file['os'] !== $userSystem['os']) {
-            continue;
-        }
-        
         // Perfect match (both OS and architecture)
         if ($file['arch'] === $userSystem['arch']) {
             $bestMatch = $file;
