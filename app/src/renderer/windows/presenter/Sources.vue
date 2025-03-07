@@ -37,8 +37,8 @@ function share() {
 
 <template>
   <div class="sources p-4 fade-in">
-    <div class="source-tabs">
-      <div v-for="(_group, type) in sourceGroups" class="source-tab" :class="{ active: activeTab === type }" @click="activeTab = type">
+    <div class="tabs">
+      <div v-for="(_group, type) in sourceGroups" class="tab" :class="{ active: activeTab === type }" @click="activeTab = type">
         <div class="p-2">{{ $t(`sourcesWindow.type.${type}`) }}</div>
       </div>
     </div>
@@ -69,19 +69,8 @@ function share() {
   min-height: 0;
 }
 
-.source-tabs {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 1rem;
-}
-
-.source-tab {
-  cursor: pointer;
-}
-
-.source-tab.active {
-  font-weight: bold;
-  border-bottom: 3px solid #224488;
+.sources .tab.active {
+  border-bottom-color: #224488;
 }
 
 .source-group {

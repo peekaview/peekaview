@@ -27,10 +27,9 @@
     "imprint": "Imprint",
     "gdpr": "GDPR",
     "form": {
-      "iWouldLikeTo": "I would like to",
-      "likeToView": "view a shared screen",
-      "likeToShare": "share my own screen",
-      "lastContacts": "Last contacts"
+      "likeToView": "View Shared Screen",
+      "likeToShare": "Share My Own Screen",
+      "recentContacts": "Recent contacts"
     }
   },
   "login": {

@@ -24,7 +24,7 @@ const { action, token, email, name, target, viewEmail } = useParamsData()
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
-const lastContacts = ref<string[]>(JSON.parse(localStorage.getItem('lastContacts') ?? '[]'))
+const recentContacts = ref<string[]>(JSON.parse(localStorage.getItem('recentContacts') ?? '[]'))
 const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
 const activeViewerData = ref<ViewerData | undefined>()
 const isViewFixed = computed(() => action === Action.View && !!formViewerData.value.email)
@@ -36,15 +36,15 @@ watch(activeViewerData, (data) => {
   }
   
   document.body.classList.add('view-active')
-  const index = lastContacts.value.findIndex(email => email === data.email)
-  let newContacts = lastContacts.value
+  const index = recentContacts.value.findIndex(email => email === data.email)
+  let newContacts = recentContacts.value
   if (index >= 0)
     newContacts.splice(index, 1)
-  lastContacts.value = [...newContacts, data.email]
+  recentContacts.value = [...newContacts, data.email]
 })
 
-watch(lastContacts, (value) => {
-  localStorage.setItem('lastContacts', JSON.stringify(value))
+watch(recentContacts, (value) => {
+  localStorage.setItem('recentContacts', JSON.stringify(value))
 })
 
 const locale = computed({
@@ -54,45 +54,19 @@ const locale = computed({
     localStorage.setItem('locale', value)
   }
 })
-
-async function handleLogout() {
-  const result = await prompt({
-    title: t("app.logout"),
-    text: t("app.confirmLogout"),
-    confirmButtonText: t("general.yes"),
-    cancelButtonText: t("general.cancel"),
-  })
-  
-  if (result === '0')
-    window.location.href = '/'
-}
 </script>
 
 <template>
-  <!-- Header -->
   <header v-if="!activeViewerData" class="main-header">
-    <div class="header-content">
-      <div class="logo-container">
-        <a href="/">
-          <img :src="PeekaViewLogo" alt="Logo" class="logo">
-        </a>
-      </div>
-      <a href="/" style="text-decoration:none;">
-        <h1 class="header-title">
-          <b>SHARE</b>YOUR<b>SCREEN</b>
-          <br>
-          <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
-        </h1>
-      </a>
-      <div class="header-actions">
-        <button v-if="action === 'share' && token" class="btn btn-outline-light" @click="handleLogout">
-          {{ $t('app.logout') }}
-        </button>
-      </div>
-    </div>
+    <a class="header-content" href="/">
+      <img :src="PeekaViewLogo" alt="Logo" class="logo">
+      <h1 class="header-title">
+        <b>SHARE</b>YOUR<b>SCREEN</b>
+      </h1>
+      <small class="header-subtitle">Screen Sharing, Simplified & Secure with Peer-to-Peer</small>
+    </a>
   </header>
 
-  <!-- Main Content -->
   <div class="main-container">
     <Viewer
       v-if="activeViewerData"
@@ -113,31 +87,14 @@ async function handleLogout() {
             @stop="presenterActive = false"
           />
           <template v-else>
-            <template v-if="!isViewFixed">
-              <div class="form-content">
-                <div class="d-flex gap-4 align-items-center">
-                  <div>
-                    <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
-                  </div>
-                  <div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
-                        {{ $t('app.form.likeToView') }}
-                      </label>
-                    </div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
-                        {{ $t('app.form.likeToShare') }}
-                      </label>
-                    </div>
-                  </div>
-                </div>
+            <div v-if="!isViewFixed" class="tabs mb-4">
+              <div class="tab" :class="{ active: plannedAction === 'view' }" @click="plannedAction = 'view'">
+                <div class="p-2">{{ $t('app.form.likeToView') }}</div>
               </div>
-
-              <hr>
-            </template>
+              <div class="tab" :class="{ active: plannedAction === 'share' }" @click="plannedAction = 'share'">
+                <div class="p-2">{{ $t('app.form.likeToShare') }}</div>
+              </div>
+            </div>
 
             <template v-if="plannedAction === 'view'">
               <ViewerForm
@@ -146,11 +103,13 @@ async function handleLogout() {
                 @submit="activeViewerData = formViewerData"
               />
 
-              <template v-if="!isViewFixed && lastContacts.length > 0">
+              <template v-if="!isViewFixed && recentContacts.length > 0">
                 <hr>
-                <h6>{{ $t('app.form.lastContacts') }}</h6>
-                <div v-for="email in lastContacts" :key="email">
-                  <a href="#" @click="formViewerData.email = email">{{ email }}</a>
+                <h6>{{ $t('app.form.recentContacts') }}:</h6>
+                <div class="recent-contacts">
+                  <div v-for="email in recentContacts" :key="email" class="pill-tag" @click="formViewerData.email = email">
+                    {{ email }}
+                  </div>
                 </div>
               </template>
             </template>
@@ -175,16 +134,18 @@ async function handleLogout() {
 
   <footer v-if="!activeViewerData" class="main-footer">
     <div class="footer-content">
-      <p>
+      <span>
         &copy; 2025 PeekaView | 
         <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | 
         <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | 
-        <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a> | 
+        <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a>
+      </span>
+      <span>
         <select v-model="locale">
           <option value="en">English</option>
           <option value="de">Deutsch</option>
         </select>
-      </p>
+      </span>
     </div>
   </footer>
 </template>
@@ -210,39 +171,34 @@ body.view-active {
   flex-direction: column;
 }
 
-.main-header,
-.main-footer {
-  background: rgba(255, 255, 255, 0.5);
-  color: #2c3e50;
-  padding: 0.75rem 0;
-  backdrop-filter: blur(5px);
+.main-header {
+  margin-top: 1rem;
 }
 
-/* Header Styles */
-.main-header {
-  height: 90px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+.main-footer {
+  color: var(--text-color);
+  background: var(--panel-bg-color);
+  padding: 0.75rem 0;
 }
 
 .main-container {
   flex-grow: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   max-height: 100%; /* required for viewer video to scale correctly */
 }
 
 .header-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0.5rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  text-decoration: none;
 }
 
 .logo-container {
@@ -260,15 +216,18 @@ body.view-active {
   margin: 0;
   font-weight: 500;
   color: #2c3e50;
-  text-align: center;
 }
 
-.header-actions {
-  min-width: 120px;
+.header-subtitle {
+  font-size: 1.2em;
+  margin: 0;
+  color: #9d9d9d;
 }
 
-.panel {
-  color: #64748b;
+.recent-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 /* Footer Styles */
@@ -282,25 +241,27 @@ body.view-active {
 
 .footer-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
 }
 
-.footer-content p {
+.footer-content span {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem
 }
 
 .footer-content a {
-  color: #2c3e50;
+  color: var(--link-color);
   text-decoration: none;
 }
 
 .footer-content a:hover {
-  color: #1a73e8;
+  color: var(--text-color);
 }
 
 /* Responsive Adjustments */

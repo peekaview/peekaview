@@ -15,7 +15,7 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const downloadLink = process.env.VITE_DOWNLOAD_URL
+const downloadLink = import.meta.env.VITE_DOWNLOAD_URL
 
 const code = computed(() => btoa(`email=${props.email}&token=${props.token}`))
 
@@ -41,7 +41,7 @@ function shareViaApp() {
 </script>
 
 <template>
-  <div class="share-option primary">
+  <div class="open-in-app">
     <div class="option-content">
       <h3>{{ $t('share.appOption.title') }}</h3>
       <p>{{ $t('share.appOption.description') }}</p>
@@ -55,12 +55,12 @@ function shareViaApp() {
     <span>{{ $t('share.or') }}</span>
   </div>
   
-    <button class="btn btn-outline-secondary btn-lg w-100" @click="$emit('present')">
-      {{ $t('share.browserOption.button') }}
-    </button>
+  <button class="continue-in-browser btn btn-lg w-100" @click="$emit('present')">
+    {{ $t('share.browserOption.button') }}
+  </button>
   
   <div class="download-option">
-    <span class="text-muted">{{ $t('share.download.prompt') }}</span>
+    <span>{{ $t('share.download.prompt') }}</span>
     <a :href="downloadLink" class="btn btn-link" download>
       {{ $t('share.download.button') }}
     </a>
@@ -68,28 +68,27 @@ function shareViaApp() {
 </template>
 
 <style>
-.share-option {
-  background: rgba(255, 255, 255, 0.9);
+.open-in-app {
   border-radius: 12px;
   padding: 1.5rem;
-  border: 1px solid rgba(0,0,0,0.08);
   text-align: center;
+  border: 2px solid var(--primary-color);
 }
 
-.share-option.primary {
-  border: 2px solid #1a73e8;
-}
-
-.share-option h3 {
+.open-in-app h3 {
   font-size: 1.25rem;
   margin-bottom: 0.5rem;
-  color: #2c3e50;
+  color: var(--header-color);
 }
 
-.share-option p {
-  color: #64748b;
+.open-in-app p {
   margin-bottom: 1.25rem;
   font-size: 0.95rem;
+}
+
+.continue-in-browser {
+  color: var(--text-color);
+  border-color: var(--text-color);
 }
 
 .divider {
@@ -105,7 +104,7 @@ function shareViaApp() {
   top: 50%;
   width: 45%;
   height: 1px;
-  background-color: rgba(0,0,0,0.1);
+  background-color: var(--text-color);
 }
 
 .divider::before {
@@ -117,9 +116,7 @@ function shareViaApp() {
 }
 
 .divider span {
-  background: rgba(255, 255, 255, 0.9);
   padding: 0 1rem;
-  color: #64748b;
   font-size: 0.9rem;
   position: relative;
   z-index: 1;
@@ -130,20 +127,16 @@ function shareViaApp() {
   padding: 1rem;
   border-top: 1px solid rgba(0,0,0,0.05);
   margin-top: 1rem;
-}
-
-.download-option span {
   font-size: 0.9rem;
-  color: #64748b;
 }
 
 .download-option a {
-  color: #1a73e8;
+  color: var(--primary-color);
   text-decoration: none;
   font-size: 0.9rem;
 }
 
-.download-option:hover {
+.download-option a:hover {
   text-decoration: underline;
 }
 </style>

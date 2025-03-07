@@ -1,6 +1,17 @@
 /* Global Styles */
 
 html {
+  --primary-color: hsl(214, 82%, 51%);
+  --text-color: #e0e0e0;
+  --header-color: #bbb;
+  --link-color: #bbb;
+  --panel-bg-color: #2226;
+  --input-bg-color: #0006;
+  --input-bg-focus-color: #000b;
+  --input-text-color: white;
+}
+
+html {
   height: 100vh;
 }
 body {
@@ -12,14 +23,14 @@ body {
 .content-wrapper {
   width: 100%;
   max-width: 600px;
-  margin: 2rem auto;
+  margin: 4rem auto;
   flex-shrink: 0;
 }
 
 /* Section Styles */
 .section-content h3 {
-  color: #998472;
-  text-shadow: #fff 1px 0 10px;
+  color: var(--header-color);
+  text-shadow: #0006 1px 0 10px;
 }
 
 .section-content {
@@ -29,12 +40,12 @@ body {
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.98);
+  color: var(--text-color);
+  background: var(--panel-bg-color);
   border-radius: 15px;
   padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px #0006;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.8);
 }
 
 /* Form Styles */
@@ -48,8 +59,7 @@ body {
 }
 
 .form-label {
-  font-weight: 500;
-  color: #374151;
+  font-weight: 700;
   margin-bottom: 0.5rem;
 }
 
@@ -58,18 +68,20 @@ body {
   font-size: 1rem;
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.1);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--input-bg-color);
+  color: var(--input-text-color);
   transition: all 0.2s ease;
 }
 
 .form-control-lg:focus {
-  border-color: #1a73e8;
+  color: var(--input-text-color);
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 4px rgba(26,115,232,0.1);
-  background: #ffffff;
+  background: var(--input-bg-focus-color);
 }
 
 .form-control-lg::placeholder {
-  color: #9ca3af;
+  color: #bbb;
 }
 
 /* Button Styles */
@@ -88,24 +100,24 @@ body {
 }
 
 .btn-primary {
-  background-color: #1a73e8;
-  border-color: #1a73e8;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .btn-primary:hover {
-  background-color: #1557b0;
-  border-color: #1557b0;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
   box-shadow: 0 2px 4px rgba(26,115,232,0.2);
 }
 
 .btn-outline-primary {
-  color: #1a73e8;
-  border-color: #1a73e8;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .btn-outline-primary:hover {
-  background-color: #1a73e8;
-  border-color: #1a73e8;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
   box-shadow: 0 2px 4px rgba(26,115,232,0.2);
 }
 
@@ -173,10 +185,43 @@ body {
   width: 48px;
   height: 48px;
   border: 4px solid rgba(26,115,232,0.1);
-  border-top: 4px solid #1a73e8;
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto;
+}
+
+.tabs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 1rem;
+}
+
+.tab {
+  cursor: pointer;
+}
+
+.tab.active {
+  font-weight: bold;
+  border-bottom: 3px solid black;
+}
+
+.panel .tab.active {
+  border-bottom-color: var(--text-color);
+}
+
+.pill-tag {
+  background-color: var(--input-bg-color);
+  border-radius: 5px;
+  padding: 0.5rem 1rem;
+  height: 2.5rem;
+  border-radius: 1.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.pill-tag:hover {
+  background-color: var(--input-bg-focus-color);
 }
 
 @keyframes spin {

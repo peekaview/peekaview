@@ -27,10 +27,9 @@
     "imprint": "Impressum",
     "gdpr": "Datenschutzerklärung",
     "form": {
-      "iWouldLikeTo": "Ich möchte",
-      "likeToView": "bei einer Freigabe teilnehmen",
-      "likeToShare": "meinen Bildschirm freigeben",
-      "lastContacts": "Letzte Kontakte"
+      "likeToView": "An Freigabe teilnehmen",
+      "likeToShare": "Meinen Bildschirm freigeben",
+      "recentContacts": "Letzte Kontakte"
     }
   },
   "login": {
