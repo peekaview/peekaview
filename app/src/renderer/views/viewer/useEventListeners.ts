@@ -1,4 +1,4 @@
-import { computed, reactive, Ref, ref } from "vue"
+import { computed, reactive, Ref, ref, watch } from "vue"
 
 export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<boolean>) {
   const _control = ref(false)
@@ -109,6 +109,17 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
       e.preventDefault()
     }
   }
+
+  // Reset state when inputEnabled changes to false
+  watch(inputEnabled, (enabled) => {
+    if (!enabled) {
+      _control.value = false
+      _alt.value = false
+      _shift.value = false
+      _space.value = false
+      _skip.value = false
+    }
+  })
 
   return { pressed: reactive({ control, alt, shift, space, skip }), onKeyDown, onKeyUp }
 }

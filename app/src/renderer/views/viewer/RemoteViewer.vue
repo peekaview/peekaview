@@ -224,22 +224,22 @@ watch(() => props.data, async (screenShareData) => {
 }, { flush: 'post', immediate: true })
 
 document.addEventListener('contextmenu', onContextMenu)
-document.addEventListener("wheel", onWheel)
+document.addEventListener("wheel", onWheel, { passive: false })
 document.addEventListener('keydown', onKeydown, false)
 window.addEventListener('resize', onResize)
 window.addEventListener('drop', onDrop)
-window.addEventListener('dragover', onDragOver)
+window.addEventListener('dragover', onDragOver, { passive: false })
 window.addEventListener('paste', onPaste)
 window.addEventListener('copy', onCopy)
 window.addEventListener('cut', onCut)
 
 onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', onContextMenu)
-  document.removeEventListener('wheel', onWheel)
+  document.removeEventListener('wheel', onWheel, { passive: false })
   document.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', onResize)
   window.removeEventListener('drop', onDrop)
-  window.removeEventListener('dragover', onDragOver)
+  window.removeEventListener('dragover', onDragOver, { passive: false })
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('copy', onCopy)
   window.removeEventListener('cut', onCut)
@@ -263,10 +263,21 @@ function onKeydown(e: KeyboardEvent) {
 
 function onWheel(e: WheelEvent) {
   // prevent browser zoom
-  if (e.ctrlKey || e.metaKey)
+  if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
-  else if (e.shiftKey && inputEnabled.value)
-    doZoom(e.deltaY)
+  } else if (e.shiftKey) {
+    // Use deltaY with normalization
+    // Different browsers and input devices may report different deltaY values
+    // Normalize to ensure consistent behavior
+    const delta = e.deltaY || e.detail || (e as any).wheelDelta
+    console.log("zoom delta:", delta)
+    
+    if (delta !== 0) {
+      e.preventDefault()
+      doZoom(-delta)
+      
+    }
+  }
 }
 
 async function onDrop(e: DragEvent) {
