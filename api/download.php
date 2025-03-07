@@ -2,13 +2,14 @@
 
 /**
  * Detects the user's operating system and architecture
- * @return array with 'os' and 'arch' keys
+ * @return array with 'os', 'arch', and 'linux_type' keys
  */
 function detectUserSystem() {
     $userAgent = $_SERVER['HTTP_USER_AGENT'];
     $result = [
         'os' => null,
-        'arch' => null
+        'arch' => null,
+        'linux_type' => null
     ];
     
     // Detect OS
@@ -18,6 +19,19 @@ function detectUserSystem() {
         $result['os'] = 'mac';
     } elseif (strpos($userAgent, 'Linux') !== false) {
         $result['os'] = 'linux';
+        
+        // Try to detect Linux distribution type
+        if (strpos($userAgent, 'Ubuntu') !== false || 
+            strpos($userAgent, 'Debian') !== false || 
+            strpos($userAgent, 'Mint') !== false) {
+            $result['linux_type'] = 'debian';
+        } elseif (strpos($userAgent, 'Fedora') !== false || 
+                 strpos($userAgent, 'RHEL') !== false || 
+                 strpos($userAgent, 'CentOS') !== false) {
+            $result['linux_type'] = 'rpm';
+        } else {
+            $result['linux_type'] = 'other';
+        }
     }
     
     // Detect architecture
@@ -123,21 +137,47 @@ function getDownloadLink() {
     
     // Find the best matching file for the user's system
     $bestMatch = null;
+    $fallbackMatch = null;
     
+    // First pass: find architecture matches with preferred file format
     foreach ($parsedYml['files'] as $file) {
-        // Perfect match (both OS and architecture)
-        if ($file['arch'] === $userSystem['arch']) {
-            $bestMatch = $file;
-            break;
-        }
+        $fileUrl = $file['url'];
         
-        // OS match but no specific architecture in file
-        if ($file['arch'] === null && $bestMatch === null) {
-            $bestMatch = $file;
+        // Check if architecture matches
+        if ($file['arch'] === $userSystem['arch'] || $file['arch'] === null) {
+            // For Mac, prefer DMG
+            if ($userSystem['os'] === 'mac' && strpos($fileUrl, '.dmg') !== false) {
+                $bestMatch = $file;
+                break;
+            }
+            
+            // For Linux, check distribution type
+            if ($userSystem['os'] === 'linux') {
+                if ($userSystem['linux_type'] === 'debian' && strpos($fileUrl, '.deb') !== false) {
+                    $bestMatch = $file;
+                    break;
+                } elseif ($userSystem['linux_type'] === 'rpm' && strpos($fileUrl, '.rpm') !== false) {
+                    $bestMatch = $file;
+                    break;
+                } elseif ($userSystem['linux_type'] === 'other' && strpos($fileUrl, '.AppImage') !== false) {
+                    $bestMatch = $file;
+                    break;
+                }
+            }
+            
+            // Save as fallback if no preferred format is found
+            if ($fallbackMatch === null) {
+                $fallbackMatch = $file;
+            }
         }
     }
     
-    // If no match found, use the first file as fallback
+    // If no preferred format found, use fallback
+    if ($bestMatch === null) {
+        $bestMatch = $fallbackMatch;
+    }
+    
+    // If still no match, use the first file as last resort
     if ($bestMatch === null && !empty($parsedYml['files'])) {
         $bestMatch = $parsedYml['files'][0];
     }
