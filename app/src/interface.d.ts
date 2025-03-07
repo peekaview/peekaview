@@ -25,6 +25,7 @@ declare global {
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
+  getResourcesPath: () => Promise<string>,
   sendRemote: SendRemote,
   onDialog: (callback: (options: DialogOptions) => void) => Electron.IpcRenderer,
   onRemote: (callback: SendRemote) => Electron.IpcRenderer,

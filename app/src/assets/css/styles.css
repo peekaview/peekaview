@@ -1,7 +1,8 @@
 /* Global Styles */
 
 html {
-  --primary-color: hsl(214, 82%, 51%);
+  --primary-color: #1a73e8;
+  --primary-hover-color: #1557b0;
   --text-color: #e0e0e0;
   --header-color: #bbb;
   --link-color: #bbb;
@@ -105,8 +106,8 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  background-color: var(--primary-hover-color);
+  border-color: var(--primary-hover-color);
   box-shadow: 0 2px 4px rgba(26,115,232,0.2);
 }
 

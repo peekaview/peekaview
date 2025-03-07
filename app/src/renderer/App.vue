@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
@@ -10,14 +9,10 @@ import PresenterForm from './views/form/PresenterForm.vue'
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
 
-import { prompt } from './util'
-
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData } from './types'
-
-const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, name, target, viewEmail } = useParamsData()

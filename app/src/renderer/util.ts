@@ -117,3 +117,11 @@ export function getPlatform(): Platform {
             ? 'ios'
             : 'other'
 }
+
+export async function getStaticResourcesPath() {
+  let prefix = ''
+  if (window.electronAPI && process.env.NODE_ENV !== 'development') {
+    prefix = await window.electronAPI.getResourcesPath()
+  }
+  return prefix ? `${prefix}/static` : ''
+}

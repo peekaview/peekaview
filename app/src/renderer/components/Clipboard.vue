@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
 import { File } from '../../interface.js'
+import { getStaticResourcesPath } from '../util.js'
 import { b64DecodeUnicode } from "../../util.js"
 
 import ChevronDownSvg from '../../assets/icons/chevron-down.svg'
@@ -37,9 +38,11 @@ const downloadRef = useTemplateRef('download')
 const downloadData = ref<File | undefined>()
 
 const clipboardFile = ref<ClipboardFile | undefined>()
-watch(clipboardFile, (file) => {
-  console.log('clipboardFile', file)
-})
+
+const resourcesPath = ref('')
+getStaticResourcesPath().then(path => resourcesPath.value = path)
+const extIconsPath = computed(() => `${resourcesPath.value}/assets/icons/ext`)
+
 const fileSvg = computed(() => {
   if (!clipboardFile.value)
     return
@@ -47,8 +50,7 @@ const fileSvg = computed(() => {
   if (clipboardFile.value.type !== 'binary')
     return clipboardFile.value.content
   
-  const isStatic = window.electronAPI && process.env.NODE_ENV !== 'development'
-  return `${isStatic ? '/static' : ''}/assets/icons/ext/${clipboardFile.value.extension}.svg`
+  return `${extIconsPath.value}/${clipboardFile.value.extension}.svg`
 })
 
 const collapsed = ref(false)
@@ -187,7 +189,7 @@ function close() {
       </div>
     </Toolbar>
     <template v-if="!collapsed">
-      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(/assets/icons/ext/${clipboardFile.extension}.svg)` }">
+      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(${extIconsPath}/${clipboardFile.extension}.svg)` }">
         <textarea :rows="initialRows">{{ clipboardFile.content }}</textarea>
       </div>
       <div v-else class="clipboard-content">

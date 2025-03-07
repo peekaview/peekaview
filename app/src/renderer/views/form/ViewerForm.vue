@@ -11,6 +11,14 @@ defineEmits<{
 }>()
 
 const model = defineModel<ViewerData>({ default: { email: '', name: '' } })
+
+function joinDifferentSession() {
+  window.location.href = '/?view'
+}
+
+function shareOwnScreen() {
+  window.location.href = '/?share'
+}
 </script>
 
 <template>
@@ -35,10 +43,23 @@ const model = defineModel<ViewerData>({ default: { email: '', name: '' } })
       <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('viewer.requestAccess') }}</button>
       <template v-if="isFixed">
         <hr>
-        <a href="/?view">{{ $t('viewer.joinDifferentSession') }}</a>
-        <br>
-        <a href="/?share">{{ $t('viewer.shareOwnScreen') }}</a>
+        <div class="alt-button-row">
+          <button class="btn btn-secondary" @click="joinDifferentSession">{{ $t('viewer.joinDifferentSession') }}</button>
+          <button class="btn btn-secondary" @click="shareOwnScreen">{{ $t('viewer.shareOwnScreen') }}</button>
+        </div>
       </template>
     </div>
   </form>
 </template>
+
+<style>
+.alt-button-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.alt-button-row button {
+  font-size: 0.8rem;
+  flex: 1;
+}
+</style>

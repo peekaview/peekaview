@@ -29,7 +29,7 @@ import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
 import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
-import { windowLoad } from './util'
+import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
@@ -541,6 +541,10 @@ declare const CSP_POLICY: string
     return sources
       .map(({ id, name, thumbnail }) => ({ id, name, thumbnail: thumbnail.toDataURL() }))
       .filter(({ id }) => id !== presenterWindow?.getMediaSourceId())
+  })
+
+  ipcMain.handle('get-resources-path', () => {
+    return resolvePath('')
   })
 
   let currentSource: ScreenSource | undefined
