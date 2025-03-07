@@ -5,7 +5,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { getPlatform } from '../util'
-import { RemoteData, ScreenSource, SendRemote } from '../../interface'
+import { RemoteData, ScreenSource, StreamState, SendRemote } from '../../interface'
 import { stringToColor, uuidv4 } from '../../util'
 
 interface Request {
@@ -37,14 +37,11 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
-  const latestRequest = ref<Request>()
-  const hidden = ref(false)
 
-  const requestInterval = ref<number>()
   const pingInterval = ref<number>()
   const lastPingTime = ref<number>()
   
-  const sessionState = ref<'stopped' | 'active' | 'paused'>('stopped')
+  const streamState = ref<StreamState>('stopped')
   const stream = shallowRef<MediaStream | undefined>()
 
   watch(viewers, (viewers) => {
@@ -52,69 +49,31 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     sendReset()
   })
 
-  watch(sessionState, (state) => {
-    if (state === 'paused')
+  let requestTimeout: number | undefined
+  watch(streamState, (state) => {
+    if (state === 'stopped')
       return
-  
-    if (state === 'stopped') {
-      clearInterval(requestInterval.value)
-      requestInterval.value = undefined
-      return
-    }
-  
-    if (requestInterval.value)
-      return
-  
-    requestInterval.value = window.setInterval(async () => {
-      console.log('Checking for requests')
-      if (latestRequest.value)
-        return
-  
-      const requestData = {
-        action: 'doesAnyoneWantToSeeMyScreen' as const,
-        email: unref(data.email),
-        token: unref(data.token),
-      }
-      
-      try {
-        const requests = await callApi<Request[]>(requestData)
-        
-        if (requests.length > 0) {
-          latestRequest.value = requests[0];
-        }
-      } catch (error) {
-        console.error('Error checking requests:', error);
-        handleApiError(error as Error, requestData)
-      }
-    }, 2000)
-  })
-  
-  watch(latestRequest, async (request) => {
-    if (!request)
-      return
+    
+    const interval = async () => {
+      clearTimeout(requestTimeout)
+      await checkRequests()
 
-    if (!options?.onRequest) {
-      acceptRequest(request)
-    } else {
-      const response = await options.onRequest(request)
-      if (response)
-        acceptRequest(request)
-      else
-        denyRequest(request)
+      requestTimeout = window.setTimeout(async () => {
+        await checkRequests()
+        interval()
+      }, 2000)
     }
 
-    latestRequest.value = undefined
+    interval()
   })
 
   window.electronAPI?.onHidden((flag) => {
-    hidden.value = flag
+    streamState.value = flag ? 'hidden' : 'active'
     sendReset()
   })
   
   window.electronAPI?.onRemote((event, data) => {
-    if (screenPresent.value) {
-      screenPresent.value.sendRemote(event, data)
-    }
+    screenPresent.value?.sendRemote(event, data)
   })
 
   let resetTimeout: number | undefined
@@ -166,8 +125,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       coverBounds: [],
       pointerEnabled: unref(data.pointerEnabled),
       remoteControlEnabled: unref(data.remoteControlEnabled),
-      paused: sessionState.value === 'paused',
-      hidden: hidden.value,
+      streamState: streamState.value,
     }
     
     const json = JSON.stringify(resetData)
@@ -245,7 +203,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       stream.value.getVideoTracks()[0].onended = () => {
         stopSharing()
       }
-      sessionState.value = 'active'
+      streamState.value = 'active'
 
       source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, userName: unref(data.email) }))
     } catch (error) {
@@ -257,7 +215,6 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     if (document.hidden)
       return
 
-    console.log('Updating online status')
     const requestData = {
       action: 'iAmOnline' as const,
       email: unref(data.email),
@@ -269,6 +226,32 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       lastPingTime.value = Date.now()
     } catch (error) {
       console.error('Error updating online status:', error)
+      handleApiError(error as Error, requestData)
+    }
+  }
+
+  async function checkRequests() {
+    const requestData = {
+      action: 'doesAnyoneWantToSeeMyScreen' as const,
+      email: unref(data.email),
+      token: unref(data.token),
+    }
+    
+    try {
+      const requests = await callApi<Request[]>(requestData)
+      for (const request of requests) {
+        if (!options?.onRequest) {
+          acceptRequest(request)
+        } else {
+          const response = await options.onRequest(request)
+          if (response)
+            acceptRequest(request)
+          else
+            denyRequest(request)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking requests:', error);
       handleApiError(error as Error, requestData)
     }
   }
@@ -320,14 +303,14 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   function pauseSharing() {
     if (stream.value)
       stream.value.getTracks()[0].enabled = false
-    sessionState.value = 'paused'
+    streamState.value = 'paused'
     sendReset()
   }
   
   function resumeSharing() {
     if (stream.value)
       stream.value.getTracks()[0].enabled = true
-    sessionState.value = 'active'
+    streamState.value = 'active'
     sendReset()
   }
   
@@ -339,7 +322,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   
     cleanUpCallbacks()
     
-    sessionState.value = 'stopped'
+    streamState.value = 'stopped'
     window.electronAPI?.stopSharing()
   
     options?.onStop?.()
@@ -354,8 +337,10 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   }
 
   function cleanUpCallbacks() {
-    clearInterval(requestInterval.value)
+    clearTimeout(requestTimeout)
+    requestTimeout = undefined
     clearInterval(pingInterval.value)
+    pingInterval.value = undefined
   }
 
   return reactive({

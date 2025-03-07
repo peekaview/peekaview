@@ -12,7 +12,7 @@ import { ipcMain, app, dialog, BrowserWindow, screen, clipboard as electronClipb
 import { SourceManager } from '../sources/SourceManager.js'
 import { createSourceManager } from '../sources/createSourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size, SendRemote } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size, StreamState, SendRemote } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 import { i18n } from '../i18n'
@@ -140,7 +140,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   let sourceManager: SourceManager
   
   // Streaming control flags
-  let streamingState: 'hidden' | 'paused' | 'active' | 'stopped' = 'stopped'
+  let streamState: StreamState = 'stopped'
   
   // Intervals
   let checkWindowInterval: NodeJS.Timeout | undefined
@@ -186,7 +186,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       resumeStreamingIfPaused(true)
     }
 
-    if (!sourceManager.isVisible() && streamingState !== 'hidden') {
+    if (!sourceManager.isVisible() && streamState !== 'hidden') {
       console.log('window is not visible')
       //stop()
       pauseStreaming(true)
@@ -208,18 +208,18 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     hideRemoteControl()
     deactivate()
 
-    streamingState = 'stopped'
+    streamState = 'stopped'
   }
 
   function pauseStreaming(fromHidden = false) {
-    if (streamingState === 'paused' || (streamingState === 'hidden' && fromHidden))
+    if (streamState === 'paused' || (streamState === 'hidden' && fromHidden))
       return
 
-    console.log('pauseStreaming', streamingState, fromHidden, streamingState === 'hidden' && !fromHidden)
+    console.log('pauseStreaming', streamState, fromHidden, streamState === 'hidden' && !fromHidden)
     if (fromHidden)
       onHidden(true)
 
-    streamingState = fromHidden ? 'hidden' : 'paused'
+    streamState = fromHidden ? 'hidden' : 'paused'
 
     console.log('pause')
     hideOverlayWindow()
@@ -228,22 +228,22 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   async function resumeStreamingIfPaused(fromHidden = false) {
-    if (streamingState !== 'hidden' && (streamingState !== 'paused' || fromHidden))
+    if (streamState !== 'hidden' && (streamState !== 'paused' || fromHidden))
       return
 
     if (fromHidden)
       onHidden(false)
     
-    streamingState = 'stopped'
+    streamState = 'stopped'
     console.log('resume')
     await startStreaming()
   }
 
   async function startStreaming() {
-    if (hwnd !== undefined && streamingState === 'stopped') {
+    if (hwnd !== undefined && streamState === 'stopped') {
       console.log("startStreaming")
 
-      streamingState = 'active'
+      streamState = 'active'
 
       sourceManager = createSourceManager(hwnd)
       await sourceManager.onInit()
@@ -267,8 +267,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       coverBounds: toolbarBounds ? [toolbarBounds] : [],
       pointerEnabled: toggles.pointer,
       remoteControlEnabled: toggles.remoteControl,
-      paused: streamingState === 'paused',
-      hidden: streamingState === 'hidden',
+      streamState,
     }
     
     const json = JSON.stringify(data)

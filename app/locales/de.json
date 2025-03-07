@@ -134,6 +134,11 @@
         "description": "Das freigegebene Fenster ist nun wieder sichtbar."
       }
     },
+    "streamState": {
+      "paused": "Bildschirmfreigabe pausiert",
+      "hidden": "Bildschirm versteckt",
+      "stopped": "Bildschirmfreigabe beendet"
+    },
     "stop": "Beenden",
     "sharingEnded": "Die Bildschirm-Freigabe wurde beendet.",
     "connectionErrorTitle": "Verbindungsfehler",
@@ -207,7 +212,7 @@
   "sourcesWindow": {
     "type": {
       "windows": "Fenster",
-      "screens": "Bilschirme"
+      "screens": "Bildschirme"
     },
     "share": "Teilen",
     "unauthorized": "Nicht autorisiert!"

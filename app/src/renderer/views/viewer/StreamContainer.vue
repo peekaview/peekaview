@@ -5,13 +5,15 @@ import Signal from "../../components/Signal.vue"
 import Cursor from "../../components/Cursor.vue"
 
 import { useDrawOverlay } from '../../composables/useDrawOverlay'
-import { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, ViewerTool, Rectangle, Size } from '../../../interface'
-import { useKeyListeners } from './useEventListeners'
 import { useOverlayCursors } from '../../composables/useOverlayCursors'
 import { useOverlaySignals } from '../../composables/useOverlaySignals'
 import { SendOptions } from '../../composables/useRemoteHandlers'
 
 import MiniCrosshairPng from '../../../assets/img/minicrosshair.png'
+
+import { useKeyListeners } from './useEventListeners'
+
+import { RemoteData, RemoteEvent, RemoteMouseData, RemoteResetData, UserData, ViewerTool, Rectangle, Size } from '../../../interface'
 
 type VideoOptions = {
   muted?: boolean
@@ -28,7 +30,6 @@ const props = withDefaults(defineProps<{
   users: UserData[]
   userId: string
   zoomScale?: number
-  shutterActive?: boolean
   useVeil?: boolean
   videoOptions?: VideoOptions
   freezeOnInteraction?: boolean
@@ -37,7 +38,6 @@ const props = withDefaults(defineProps<{
   activeTool: undefined,
   users: () => [],
   zoomScale: 1,
-  shutterActive: false,
   useVeil: false,
   videoOptions: undefined,
   freezeOnInteraction: false,
@@ -398,7 +398,7 @@ defineExpose({
         <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
       </template>
     </div>
-    <div v-if="shutterActive" class="shutter" />
+    <slot />
   </div>
 </template>
 
@@ -417,16 +417,6 @@ defineExpose({
   height: 100%;
   background-color: #8884;
   z-index: 500;
-}
-
-.stream-container .shutter {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: black;
-  z-index: 1500;
 }
 
 .stream-container .overlay {

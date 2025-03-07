@@ -121,6 +121,8 @@ export type StreamerData = {
 
 export type ViewerTool = 'pointer' | 'remoteControl'
 
+export type StreamState = 'hidden' | 'paused' | 'active' | 'stopped'
+
 export type SendRemoteOptions = {
   volatile?: boolean
   socketIds?: string[]
@@ -194,8 +196,7 @@ export type RemoteData<T extends RemoteEvent> =
     coverBounds: Rectangle[]
     pointerEnabled: boolean
     remoteControlEnabled: boolean
-    paused: boolean
-    hidden: boolean
+    streamState: StreamState
   }
 
   export type OverlayData = {

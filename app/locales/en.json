@@ -134,6 +134,11 @@
         "description": "The shared window is now visible again."
       }
     },
+    "streamState": {
+      "paused": "Screen sharing paused",
+      "hidden": "Screen hidden",
+      "stopped": "Screen sharing stopped"
+    },
     "stop": "Stop",
     "sharingEnded": "Screen sharing connection has been closed.",
     "connectionErrorTitle": "Connection Error",

@@ -309,12 +309,13 @@ function onResumeSharing() {
       :user-id="presenter.screenShareData.user.id"
       :input-enabled="false"
       :pointer-enabled="pointerEnabled"
-      :shutter-active="shutterActive"
       :video-options="{ muted: true }"
       use-veil
       @send="send($event.event, $event.data, $event.options)"
       @on-stream-size-change="streamSize = $event"
-    />
+    >
+      <div v-if="shutterActive" class="shutter" />
+    </StreamContainer>
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
@@ -344,6 +345,16 @@ html {
   border-radius: 0;
   border: none;
   align-self: stretch;
+}
+
+.presenter-container .shutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  z-index: 1500;
 }
 
 video {

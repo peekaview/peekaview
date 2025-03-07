@@ -21,7 +21,7 @@ import LogoutSvg from '../../../assets/icons/logout.svg'
 import MouseSvg from '../../../assets/icons/mouse.svg'
 import PencilSvg from '../../../assets/icons/pencil.svg'
 
-import type { File, ViewerTool } from '../../../interface'
+import type { File, StreamState, ViewerTool } from '../../../interface'
 
 type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
@@ -43,46 +43,48 @@ const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const stream = ref<MediaStream>()
 
-let pauseTimeout: number
-const paused = ref(false)
-watch(paused, (paused) => {
-  clearTimeout(pauseTimeout)
-  if (paused) {
-    activeTool.value = undefined
-    activeMessage.value = 'paused'
-    pauseTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
-  } else {
-    activeTool.value = pointerEnabled.value ? 'pointer' : remoteControlEnabled.value ? 'remoteControl' : undefined
-    activeMessage.value = 'resumed'
-    pauseTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
+const streamState = ref<StreamState>('stopped')
+let streamStateTimeout: number
+watch(streamState, (state) => {
+  switch (state) {
+    case 'hidden':
+      activeTool.value = undefined
+      activeMessage.value = 'hidden'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
+      break
+    case 'paused':
+      activeTool.value = undefined
+      activeMessage.value = 'paused'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
+      break
+    case 'active':
+      activeTool.value = _pointerEnabled.value ? 'pointer' : _remoteControlEnabled.value ? 'remoteControl' : undefined
+      activeMessage.value = 'resumed'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
+      break
+    case 'stopped':
+      activeTool.value = undefined
+      break
   }
 })
 
-let hiddenTimeout: number
-const hidden = ref(false)
-watch(hidden, (hidden) => {
-  clearTimeout(hiddenTimeout)
-  if (hidden) {
-    activeMessage.value = 'hidden'
-    hiddenTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
-  } else {
-    activeMessage.value = 'visible'
-    hiddenTimeout = window.setTimeout(() => hideMessage('visible'), 3000)
-  }
-})
-
-const inputEnabled = computed(() => !hidden.value)
-const pointerEnabled = ref(true)
-const remoteControlEnabled = ref(false)
+const inputEnabled = computed(() => streamState.value === 'active')
+const _pointerEnabled = ref(true)
+const pointerEnabled = computed(() => _pointerEnabled.value && inputEnabled.value)
+const _remoteControlEnabled = ref(false)
+const remoteControlEnabled = computed(() => _remoteControlEnabled.value && inputEnabled.value)
 const remoteClipboard = ref(false)
 const activeTool = ref<ViewerTool | undefined>('pointer')
 
 const activeMessage = ref<Message | undefined>('init')
 const remoteMessage = ref<string>()
 let remoteTimeout: number
-watch(pointerEnabled, (enabled) => {
+watch(_pointerEnabled, (enabled) => {
   if (!enabled)
-    activeTool.value = remoteControlEnabled.value ? 'remoteControl' : undefined
+    activeTool.value = _remoteControlEnabled.value ? 'remoteControl' : undefined
   else if (!activeTool.value)
     activeTool.value = 'pointer'
 
@@ -95,9 +97,9 @@ watch(pointerEnabled, (enabled) => {
   }, 3000)
 })
 
-watch(remoteControlEnabled, (enabled) => {
+watch(_remoteControlEnabled, (enabled) => {
   if (!enabled)
-    activeTool.value = pointerEnabled.value ? 'pointer' : undefined
+    activeTool.value = _pointerEnabled.value ? 'pointer' : undefined
   else if (!activeTool.value)
     activeTool.value = 'remoteControl'
   
@@ -172,10 +174,9 @@ onReceive('reset', (data) => {
   console.log('reset', data)
 
   presenterInBrowser.value = data.inBrowser
-  pointerEnabled.value = data.pointerEnabled
-  remoteControlEnabled.value = data.remoteControlEnabled
-  hidden.value = data.hidden
-  paused.value = data.paused
+  _pointerEnabled.value = data.pointerEnabled
+  _remoteControlEnabled.value = data.remoteControlEnabled
+  streamState.value = data.streamState
 
   containerRef.value?.reset(data)
 })
@@ -410,10 +411,10 @@ function stop() {
 <template>
   <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled || paused }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && !paused && (activeTool = 'pointer')">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
         <PencilSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled || paused }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && !paused && (activeTool = 'remoteControl')">
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
         <MouseSvg />
       </div>
       <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
@@ -433,7 +434,7 @@ function stop() {
       :stream="stream"
       :users="[...users, data.user]"
       :user-id="data.user.id"
-      :input-enabled="!hidden"
+      :input-enabled="inputEnabled"
       :pointer-enabled="pointerEnabled"
       :active-tool="activeTool"
       :zoom-scale="zoom?.scale"
@@ -445,7 +446,11 @@ function stop() {
       @panzoom-toggle="panzoomActive = $event"
       @panzoomchange="onPanzoomChange"
       @contextmenu="() => false"
-    />
+    >
+      <div v-if="streamState !== 'active'" class="text-overlay">
+        <span>{{ $t(`viewer.streamState.${streamState}`) }}</span>
+      </div>
+    </StreamContainer>
     <div class="clipboard-container">
       <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
     </div>
@@ -518,9 +523,28 @@ function stop() {
   }
 
   .remote-viewer .toolbar-spacer {
-    flex: 0 1 2.5rem;
+    flex: 0 99999999 2.5rem;
   }
-  
+
+  .remote-viewer .text-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0008;
+  }
+
+  .remote-viewer .text-overlay span {
+    color: #ddd;
+    background: #000;
+    padding: 0.25em 0.5em;
+    border-radius: 10px;
+  }
+
   .remote-viewer .message {
     position: absolute;
     bottom: 0px;
