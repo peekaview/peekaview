@@ -12,16 +12,21 @@ import {
   protocol,
   Tray,
   session,
-  shell
+  shell,
+  nativeTheme
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
-import fs from 'fs'
+
+// Hide dock icon on macOS
+if (process.platform === 'darwin') {
+  app.dock.hide()
+}
 
 import { useCustomDialog } from './composables/useCustomDialog'
-import { useStreamer, type Streamer } from './composables/useStreamer'
+import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
 import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
@@ -45,6 +50,7 @@ declare const APP_VERSION: string
 declare const CSP_POLICY: string
 
 (async () => {
+  let isQuitting = false
   const gotTheLock = app.requestSingleInstanceLock()
   if (!gotTheLock) {
     const protocolUrl = process.argv.find(arg => arg.startsWith('peekaview://'))
@@ -53,12 +59,70 @@ declare const CSP_POLICY: string
       app.emit('second-instance', null, [protocolUrl], null)
     }
     log.info('Another instance is running, quitting...')
+    isQuitting = true
     app.quit()
     return
   }
 
   log.info('Starting app update check')
-  autoUpdater.checkForUpdatesAndNotify()
+  
+  // Create notification icon once
+  const updateNotificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
+
+  // Configure auto updater events
+  autoUpdater.on('checking-for-update', () => {
+    log.info('Checking for updates...')
+  })
+
+  autoUpdater.on('update-available', (info) => {
+    log.info('Update available:', info)
+    dialog.showMessageBox({
+      title: 'PeekaView Update',
+      message: i18n.t('update.available', { version: info.version }),
+      type: 'info',
+      buttons: ['OK']
+    })
+  })
+
+  autoUpdater.on('update-not-available', () => {
+    log.info('No updates available')
+  })
+
+  autoUpdater.on('error', (err) => {
+    log.error('Error in auto-updater:', err)
+    dialog.showMessageBox({
+      title: 'PeekaView Update Error',
+      message: i18n.t('update.error'),
+      type: 'error',
+      buttons: ['OK']
+    })
+  })
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    log.info('Download progress:', progressObj)
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded:', info)
+    log.info('Attempting to show update notification for version:', info.version)
+    
+    dialog.showMessageBox({
+      title: 'PeekaView Update Ready',
+      message: i18n.t('update.ready', { version: info.version }),
+      type: 'info',
+      buttons: [i18n.t('update.restart')],
+      defaultId: 0,
+      noLink: true
+    }).then(({ response }) => {
+      if (response === 0) {
+        log.info('Update dialog action clicked, preparing to quit and install')
+        isQuitting = true
+        autoUpdater.quitAndInstall()
+      }
+    })
+  })
+
+  autoUpdater.checkForUpdates()
   
   if (!app.isDefaultProtocolClient('peekaview')) {
     const success = app.setAsDefaultProtocolClient('peekaview')
@@ -79,7 +143,7 @@ declare const CSP_POLICY: string
 
   let currentViewCode: string | undefined
 
-  let streamer: Streamer | undefined
+  let remotePresenter: RemotePresenter | undefined
   const customDialog = useCustomDialog()
 
   const store = await getStore()
@@ -91,6 +155,16 @@ declare const CSP_POLICY: string
   app.whenReady().then(() => {
     log.info('App is ready, initializing...')
     
+    // Add notification permission check
+    /*if (process.platform === 'darwin') {
+      log.info('Checking notification permissions...')
+      if (!Notification.isSupported()) {
+        log.warn('Notifications are not supported on this system')
+      } else {
+        log.info('Notifications are supported')
+      }
+    }*/
+    
     if (process.platform === 'linux') {
       exec(`xdg-mime default peekaview.desktop x-scheme-handler/peekaview`)
       log.info('Set xdg-mime defaults for Linux')
@@ -98,9 +172,25 @@ declare const CSP_POLICY: string
 
     const trayIconPath = path.join(__dirname, PeekaViewIcon)
     const trayIcon: Electron.NativeImage = nativeImage.createFromPath(trayIconPath).resize({ width: 16, height: 16 })
-    trayIcon.setTemplateImage(true)
+    
+    if (process.platform === 'darwin') {
+      trayIcon.setTemplateImage(true)
+    }
 
+    // Create tray first
     tray = new Tray(trayIcon)
+
+    if (process.platform === 'win32') {
+      // For Windows, listen to system theme changes
+      nativeTheme.on('updated', () => {
+        const isDark = nativeTheme.shouldUseDarkColors
+        tray.setImage(isDark ? invertIcon(trayIcon) : trayIcon)
+      })
+      // Set initial icon based on current theme
+      if (nativeTheme.shouldUseDarkColors) {
+        tray.setImage(invertIcon(trayIcon))
+      }
+    }
 
     tray.setToolTip('PeekaView')
 
@@ -161,13 +251,17 @@ declare const CSP_POLICY: string
       focusApp()
     })
 
+    app.on('will-quit', e => {
+      if (!isQuitting)
+        e.preventDefault()
+    })
+
     log.info("App initialization complete")
-    const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
-    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()
+    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: updateNotificationIcon }).show()
   })
 
   const focusApp = () => {
-    let currentWindow = loginWindow ?? viewerWindow ?? presenterWindow
+    let currentWindow = loginWindow ?? viewerWindow
     if (currentWindow) {
       if (currentWindow.isMinimized())
         currentWindow.restore()
@@ -234,19 +328,33 @@ declare const CSP_POLICY: string
     })
   }
 
+  const openPresenterWindow = (code: string) => {
+    if (!presenterWindow)
+      createPresenterWindow(code)
+    
+    presenterWindow?.show()
+    presenterWindow?.focus()
+    presenterWindow?.webContents.send('open-screen-source-selection')
+  }
+
   const createPresenterWindow = (code: string) => {
     presenterWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
       show: true,
-      width: 1280,
-      height: 720,
+      maxWidth: 1280,
+      maxHeight: 720,
+      minimizable: false,
+      maximizable: false,
       resizable: false,
-      autoHideMenuBar: true,
+      focusable: true,
+      transparent: true,
+      skipTaskbar: true,
+      frame: false,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        //webSecurity: false, // Make sure this is off only for development, adjust for production.
+        webSecurity: app.isPackaged,
         //allowRunningInsecureContent: true,
         preload: path.join(__dirname, '../preload/presenter.js'),
       }
@@ -261,10 +369,8 @@ declare const CSP_POLICY: string
     setupPushReceiver(presenterWindow.webContents);
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-
-    !app.isPackaged && presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
@@ -279,16 +385,14 @@ declare const CSP_POLICY: string
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
-        //webSecurity: false, // Make sure this is off only for development, adjust for production.
+        webSecurity: app.isPackaged,
         //allowRunningInsecureContent: true,
       }
     })
 
     windowLoad(viewerWindow, 'viewer')
-
     viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-
-    !app.isPackaged && viewerWindow.webContents.openDevTools()
+    //viewerWindow.webContents.openDevTools()
   }
 
   const createLoginWindow = (discardSession = false) => {
@@ -319,6 +423,7 @@ declare const CSP_POLICY: string
     })
     windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
     loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
+    //loginWindow.webContents.openDevTools()
   }
 
   function handleProtocol(url: string) {
@@ -340,7 +445,7 @@ declare const CSP_POLICY: string
       return
     }
 
-    createPresenterWindow(code)
+    openPresenterWindow(code)
   }
 
   function logout(discardSession = false) {
@@ -351,28 +456,27 @@ declare const CSP_POLICY: string
     createLoginWindow(discardSession)
   }
 
-  async function startRemoteControl(data: StreamerData) {
+  async function startPresenting(data: StreamerData) {
     if (!data.source) {
-      log.error('Invalid sourceId or name for remote control')
+      log.error('Invalid sourceId or name for presenting')
       return
     }
     let sourceId = data.source.id
-    log.info('Starting remote control with sourceId:', sourceId, 'and window name:', data.source.name)
     
-    streamer?.stopSharing()
+    remotePresenter?.stop()
 
-    //if (streamer === undefined) {
-      streamer = useStreamer((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
+    if (remotePresenter === undefined)
+      remotePresenter = useRemotePresenter((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
-    //}
-    streamer.startSharing(sourceId, data.roomId)
+  
+    remotePresenter.start(sourceId)
   }
 
   function stopSharing() {
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
-    streamer?.stopSharing()
+    remotePresenter?.stop()
     customDialog.closeTrayDialogs()
   }
 
@@ -385,6 +489,7 @@ declare const CSP_POLICY: string
 
   function quit() {
     log.info('Initiating app quit')
+    isQuitting = true
     app.quit()
   }
 
@@ -398,7 +503,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('dialog', async (_event, options: DialogOptions) => {
-    customDialog.openDialog('dialog', options)
+    customDialog.openDialog(options)
   })
 
   ipcMain.handle('reply-dialog', async (_event, id: number, result: string) => {
@@ -442,16 +547,24 @@ declare const CSP_POLICY: string
       .filter(({ id }) => id !== presenterWindow?.getMediaSourceId())
   })
 
+  ipcMain.handle('get-resources-path', () => {
+    return resolvePath('')
+  })
+
+  let currentSource: ScreenSource | undefined
   ipcMain.handle('source-selected', async (_event, source: string | undefined) => {
     const data = source ? JSON.parse(source) as ScreenSource : undefined
-    if (!data) {
+    if (!data && !currentSource) {
       presenterWindow?.close()
       presenterWindow = undefined
-      return
+    } else {
+      if (data)
+        log.info('Source selected:', data.id, data.name)
+  
+      presenterWindow?.hide()
     }
 
-    log.info('Source selected:', data)
-    presenterWindow?.hide()
+    currentSource = data
   })
 
   const openShareMessage = async () => {
@@ -461,19 +574,10 @@ declare const CSP_POLICY: string
       return
     }
 
-    const url = `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`
-    
-    // Load and process template
-    const templatePath = resolvePath('/static/templates/sharing-active.html')
-
-    let htmlContent = (await fs.promises.readFile(templatePath, 'utf8'))
-      .replace('{{message}}', i18n.t('sharingActive.message'))
-      .replaceAll('{{url}}', url)
-
-    
-    customDialog.openTrayDialog(import.meta.env.VITE_APP_URL, {
+    customDialog.openTrayDialog({
       title: i18n.t('sharingActive.title'),
-      detail: htmlContent,
+      message: i18n.t('sharingActive.message'),
+      copyText: `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`,
       timeout: 30000
     })
   }
@@ -484,7 +588,7 @@ declare const CSP_POLICY: string
     
     if (viewCode !== null) {
       currentViewCode = viewCode
-      startRemoteControl(streamerData)
+      startPresenting(streamerData)
     
       customDialog.playSoundOnOpen('ping')
       await openShareMessage()
@@ -504,63 +608,91 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('pause-sharing', async (_event) => {
-    streamer?.pauseStreaming()
+    remotePresenter?.pauseStreaming()
     presenterWindow?.webContents.send('on-pause-sharing')
   })
 
   ipcMain.handle('resume-sharing', async (_event) => {
-    streamer?.resumeStreamingIfPaused()
+    remotePresenter?.resumeStreamingIfPaused()
     presenterWindow?.webContents.send('on-resume-sharing')
   })
 
   ipcMain.handle('update-users', async (_event, newUsers: string) => {
     users = JSON.parse(newUsers) as UserData[]
-    streamer?.remotePresenter?.updateUsers(users)
+    remotePresenter?.updateUsers(users)
   })
 
   ipcMain.handle('on-remote', async <T extends RemoteEvent>(_event, event: T, data: RemoteData<T>) => {
-    streamer?.remotePresenter?.onRemote(event, data)
+    remotePresenter?.onRemote(event, data)
   })
 
   ipcMain.handle('set-toolbar-size', async (_event, width: number, height: number) => {
-    streamer?.remotePresenter?.setToolbarSize(width, height)
+    remotePresenter?.setToolbarSize(width, height)
   })
 
   ipcMain.handle('toggle-clipboard', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleClipboard(toggle)
+    remotePresenter?.toggleClipboard(toggle)
   })
 
-  ipcMain.handle('toggle-mouse', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleMouse(toggle)
+  ipcMain.handle('toggle-pointer', async (_event, toggle?: boolean) => {
+    presenterWindow?.webContents.send('on-toggle-pointer', toggle)
+    remotePresenter?.togglePointer(toggle)
+    remotePresenter?.sendReset()
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
-    streamer?.remotePresenter?.toggleRemoteControl(toggle)
+    presenterWindow?.webContents.send('on-toggle-remote-control', toggle)
+    remotePresenter?.toggleRemoteControl(toggle)
+    remotePresenter?.sendReset()
   })
 
   ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
-    streamer?.remotePresenter?.resizeWindow(windowName, dimensions)
+    remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
   // Create a helper function to create resized template menu icons
   const createMenuIcon = (iconPath: string): Electron.NativeImage => {
     const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
-      .resize({ width: 16, height: 16 })
     
-    // Get bitmap data
+    if (process.platform === 'darwin') {
+      const newIcon = invertIcon(icon)
+      newIcon.setTemplateImage(true)
+      return newIcon.resize({ width: 16, height: 16 })
+    }
+
+    // On Windows, invert for dark theme
+    if (process.platform === 'win32' && ! nativeTheme.shouldUseDarkColors) {
+      return invertIcon(icon).resize({ 
+        width: 16, 
+        height: 16,
+        quality: 'best'  // Use best quality to preserve transparency
+      })
+    }
+
+    return icon.resize({ 
+      width: 16, 
+      height: 16,
+      quality: 'best'  // Use best quality to preserve transparency
+    })
+  }
+
+  function invertIcon(icon: Electron.NativeImage): Electron.NativeImage {
+    // Get bitmap data and size
+    const size = icon.getSize()
     const bitmap = icon.getBitmap()
     
     // Invert colors (each pixel has 4 values: R,G,B,A)
     for (let i = 0; i < bitmap.length; i += 4) {
-      bitmap[i] = 255 - bitmap[i]     // R
-      bitmap[i + 1] = 255 - bitmap[i + 1] // G
-      bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      // Only invert if the pixel is not fully transparent
+      if (bitmap[i + 3] > 5) {
+        bitmap[i] = 255 - bitmap[i]     // R
+        bitmap[i + 1] = 255 - bitmap[i + 1] // G
+        bitmap[i + 2] = 255 - bitmap[i + 2] // B
+      }
       // Leave alpha channel (i + 3) unchanged
     }
     
-    // Create new image from inverted bitmap
-    const invertedIcon = nativeImage.createFromBitmap(bitmap, { width: 16, height: 16 })
-    invertedIcon.setTemplateImage(true)
-    return invertedIcon
+    // Create new image from inverted bitmap with correct dimensions
+    return nativeImage.createFromBitmap(bitmap, size)
   }
 })()

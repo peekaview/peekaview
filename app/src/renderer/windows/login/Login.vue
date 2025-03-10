@@ -8,6 +8,7 @@ const discardSession = params.get('discardSession') === 'true'
 
 const loggingIn = ref(false)
 const code = ref<string>()
+const invalid = ref(false)
 
 function login() {
   window.electronAPI!.loginViaBrowser(discardSession)
@@ -15,7 +16,22 @@ function login() {
 }
 
 function loginWithCode() {
-  code.value && window.electronAPI!.loginWithCode(code.value)
+  if (!code.value)
+    return
+
+  try {
+    const params = new URLSearchParams(atob(code.value))
+    const email = params.get('email')!
+    const token = params.get('token')!
+    if (!email || !token) {
+      invalid.value = true
+      return
+    }
+
+    window.electronAPI!.loginWithCode(code.value)
+  } catch (e) {
+    invalid.value = true
+  }
 }
 </script>
 
@@ -32,10 +48,11 @@ function loginWithCode() {
         </div>
 
         <div v-else class="text-center">
-          <h2 class="mb-3">{{ $t('loginWindow.waitForLogin') }}</h2>
-          <h3 class="text-secondary mb-3">{{ $t('loginWindow.orEnterCode') }}</h3>
-          <input v-model="code" class="form-control mb-3" type="text" :placeholder="$t('loginWindow.enterCode')">
-          <button class="btn btn-primary btn-lg w-100" :disabled="!code" @click="loginWithCode">{{ $t('loginWindow.loginWithCode') }}</button>
+          <h2>{{ $t('loginWindow.waitForLogin') }}</h2>
+          <h3 class="text-secondary mt-3">{{ $t('loginWindow.orEnterCode') }}</h3>
+          <input v-model="code" class="form-control mt-3" type="text" :placeholder="$t('loginWindow.enterCode')" @change="invalid = false">
+          <label v-if="invalid" class="text-danger mt-1">{{ $t('loginWindow.invalidCode') }}</label>
+          <button class="btn btn-primary btn-lg w-100 mt-3" :disabled="!code" @click="loginWithCode">{{ $t('loginWindow.loginWithCode') }}</button>
         </div>
       </div>
     </div>

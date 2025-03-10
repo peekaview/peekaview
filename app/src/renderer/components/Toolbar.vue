@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, useTemplateRef, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 import ChevronLeftSvg from '../../assets/icons/chevron-left.svg'
 import ChevronRightSvg from '../../assets/icons/chevron-right.svg'
@@ -8,37 +8,23 @@ import DragSvg from '../../assets/icons/drag.svg'
 const props = withDefaults(defineProps<{
   draggable?: boolean
   collapsible?: boolean
-  pollSize?: boolean
 }>(), {
   draggable: false,
   collapsible: false,
-  pollSize: false
 })
 
 const emit = defineEmits<{
   (e: 'onCollapse', collapsed: boolean): void
 }>()
 
-const toolbarRef = useTemplateRef('toolbar')
 const collapsed = ref(false)
 
 watch(collapsed, value => emit('onCollapse', value))
 watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
-
-setInterval(() => {
-  if (!props.pollSize)
-    return
-
-  const rect = toolbarRef.value?.getBoundingClientRect()
-  if (!rect)
-    return
-  
-  window.electronAPI?.setToolbarSize(rect.width + 10, rect.height)
-}, 500)
 </script>
 
 <template>
-  <div ref="toolbar" class="toolbar" :class="{ collapsed: collapsed }">
+  <div class="toolbar" :class="{ collapsed: collapsed }">
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>
@@ -74,23 +60,30 @@ setInterval(() => {
 
     /* Base button styles */
   .toolbar .button, .toolbar .btn.btn-secondary {
-      cursor: pointer;
-      text-align: center;
-      padding: 5px;
-      border: 1px solid #464646;
-      color: #aaa;
-      font-family: Verdana;
-      font-size: 10px;
-      background: #343434;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2rem;
-      --bs-btn-disabled-opacity: 0.5;
+    cursor: pointer;
+    text-align: center;
+    padding: 5px;
+    font-family: Verdana;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    --bs-btn-color: #aaa;
+    --bs-btn-bg: #343434;
+    --bs-btn-disabled-bg: #343434;
+    --bs-btn-border-color: #464646;
+    --bs-btn-disabled-border-color: #343434;
+    --bs-btn-disabled-opacity: 0.25;
+  }
+
+  .toolbar .button.disabled, .toolbar .btn.btn-secondary.disabled {
+    pointer-events: auto; 
+    cursor: not-allowed;
   }
 
   .toolbar .button:hover, .toolbar .btn.btn-secondary:hover {
-      background: #464646 !important;
+      background: #070707 !important;
       border-color: #565656;
       color: #ddd;
   }

@@ -1,69 +1,95 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue"
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
+import { useI18n } from 'vue-i18n'
 
-import StreamOverlay from './StreamOverlay.vue'
+import { notify, isTouchEnabled, getPlatform } from '../../util'
+import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
+import { useRemoteHandlers } from "../../composables/useRemoteHandlers"
+
+import StreamContainer from './StreamContainer.vue'
 import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
 import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
 import { uuidv4 } from "../../../util.js"
-import { isTouchEnabled } from "../../util.js"
+import { usePanzoom } from './usePanzoom'
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
 import ClipboardTextOutlineSvg from '../../../assets/icons/clipboard-text-outline.svg'
 import HelpSvg from '../../../assets/icons/help.svg'
 import LogoutSvg from '../../../assets/icons/logout.svg'
+import MouseSvg from '../../../assets/icons/mouse.svg'
+import PencilSvg from '../../../assets/icons/pencil.svg'
 
-import type { RemoteData, RemoteEvent, File, UserData } from '../../../interface'
-import type { ScaleInfo, VideoTransform } from "../../types.js"
-import { useI18n } from "vue-i18n"
+import type { File, StreamState, ViewerTool } from '../../../interface'
 
-type ReceiveEventHandlers = {
-  [K in RemoteEvent]: (data: RemoteData<K>) => void
-}
-
-type SendOptions = {
-  volatile?: boolean
-  receiveSelf?: boolean
-}
+type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
-  room: string
-  inApp: boolean
-  users: UserData[]
-  userId: string
-  videoTransform?: VideoTransform
+  data?: ScreenShareData
 }>(), {
-  users: () => [],
-  videoTransform: () => ({ x: 0, y: 0, width: 0, height: 0, fullwidth: 0, fullheight: 0 }),
+  data: undefined,
 })
 
 const emit = defineEmits<{
   (e: 'stop'): void
-  (e: 'rescale', scaleinfo: ScaleInfo): void
-  (e: 'freeze'): void
-  (e: 'unfreeze'): void
-  <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, volatile: boolean }): void
 }>()
 
 const { t } = useI18n()
 
-const overlayRef = useTemplateRef<InstanceType<typeof StreamOverlay>>('overlay')
+const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('container')
 
-const receiveEvents: Partial<ReceiveEventHandlers> = {}
+const screenView = ref<ScreenView>()
+const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
+const stream = ref<MediaStream>()
 
-const hidden = ref(false)
-const mouseEnabled = ref(true)
-const remoteControlActive = ref(false)
+const streamState = ref<StreamState>('stopped')
+let streamStateTimeout: number
+watch(streamState, (state) => {
+  switch (state) {
+    case 'hidden':
+      activeTool.value = undefined
+      activeMessage.value = 'hidden'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
+      break
+    case 'paused':
+      activeTool.value = undefined
+      activeMessage.value = 'paused'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
+      break
+    case 'active':
+      activeTool.value = _pointerEnabled.value ? 'pointer' : _remoteControlEnabled.value ? 'remoteControl' : undefined
+      activeMessage.value = 'resumed'
+      clearTimeout(streamStateTimeout)
+      streamStateTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
+      break
+    case 'stopped':
+      activeTool.value = undefined
+      break
+  }
+})
+
+const inputEnabled = computed(() => streamState.value === 'active')
+const _pointerEnabled = ref(true)
+const pointerEnabled = computed(() => _pointerEnabled.value && inputEnabled.value)
+const _remoteControlEnabled = ref(false)
+const remoteControlEnabled = computed(() => _remoteControlEnabled.value && inputEnabled.value)
 const remoteClipboard = ref(false)
+const activeTool = ref<ViewerTool | undefined>('pointer')
 
+const activeMessage = ref<Message | undefined>('init')
+const remoteMessage = ref<string>()
 let remoteTimeout: number
-watch(mouseEnabled, (enabled) => {
-  if (activeMessage.value === 'init')
-    return
+watch(_pointerEnabled, (enabled) => {
+  if (!enabled)
+    activeTool.value = _remoteControlEnabled.value ? 'remoteControl' : undefined
+  else if (!activeTool.value)
+    activeTool.value = 'pointer'
 
   activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.mouse${enabled ? 'En' : 'Dis'}abled`)
+  remoteMessage.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
   clearTimeout(remoteTimeout)
   remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
@@ -71,12 +97,14 @@ watch(mouseEnabled, (enabled) => {
   }, 3000)
 })
 
-watch(remoteControlActive, (active) => {
-  if (activeMessage.value === 'remote')
-    return
+watch(_remoteControlEnabled, (enabled) => {
+  if (!enabled)
+    activeTool.value = _pointerEnabled.value ? 'pointer' : undefined
+  else if (!activeTool.value)
+    activeTool.value = 'remoteControl'
   
   activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.remoteControl${active ? 'En' : 'Dis'}abled`)
+  remoteMessage.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
   clearTimeout(remoteTimeout)
   remoteTimeout = window.setTimeout(() => {
     hideMessage('remote')
@@ -84,36 +112,40 @@ watch(remoteControlActive, (active) => {
   }, 3000)
 })
 
-const sizeInfoStyle = computed(() => props.videoTransform ? {
-  width: props.videoTransform.fullwidth + "px",
-  height: props.videoTransform.fullheight + "px",
-  left: (props.videoTransform.x - 2) + "px",
-  top: (props.videoTransform.y - 2) + "px"
-}: {})
+const panzoomActive = ref(false)
+const videoFill = ref(false)
+const hideOverflow = ref(true)
+const presenterInBrowser = ref(false)
+const { currentPan, currentPanScale, zoom, doZoom, onPanzoomChange } = usePanzoom(computed(() => containerRef.value?.$el), panzoomActive, inputEnabled)
+watch(() => [currentPan.x, currentPan.y, currentPanScale.value], () => {
+  const participant = screenView.value?.presenterSocketId ? screenView.value.participants[screenView.value.presenterSocketId] : undefined
+  videoFill.value = participant?.user.platform === 'mac'
+  hideOverflow.value = false
+}, { immediate: true })
 
-const activeMessage = ref<string | undefined>('init')
-const remoteMessage = ref<string>()
 const draggingOver = ref(false)
-
 const showClipboard = ref(true)
 const clipboardFile = ref<File>()
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
+const { send, receive, onReceive } = useRemoteHandlers(screenView)
+
 onReceive("mouse-leftclick", (data) => {
-  overlayRef.value?.receiveMouseLeftClick(data)
+  containerRef.value?.receiveMouseLeftClick(data)
 })
 
 onReceive("mouse-move", (data) => {
-  overlayRef.value?.receiveMouseMove(data)
+  containerRef.value?.receiveMouseMove(data)
 })
 
 onReceive("mouse-down", (data) => {
-  overlayRef.value?.receiveMouseDown(data)
+  if (!draggingOver.value)
+    containerRef.value?.receiveMouseDown(data)
 })
 
 onReceive("mouse-up", (data) => {
-  overlayRef.value?.receiveMouseUp(data)
+  containerRef.value?.receiveMouseUp(data)
 })
 
 onReceive("paste", (data) => {
@@ -138,87 +170,119 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-onReceive('mouse-control', (data) => {
-  mouseEnabled.value = data.enabled
-})
-
-onReceive('remote-control', (data) => {
-  remoteControlActive.value = data.enabled
-})
-
-let pauseTimeout: number
-onReceive('pause', (data) => {
-  clearTimeout(pauseTimeout)
-  if (data.enabled) {
-    activeMessage.value = 'paused'
-    pauseTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
-  } else {
-    activeMessage.value = 'resumed'
-    pauseTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
-  }
-})
-
-let hiddenTimeout: number
-onReceive('hide', (data) => {
-  console.log('hide', data)
-  hidden.value = data.hidden
-  clearTimeout(hiddenTimeout)
-  if (data.hidden) {
-    activeMessage.value = 'hidden'
-    hiddenTimeout = window.setTimeout(() => hideMessage('hidden'), 5000)
-  } else {
-    activeMessage.value = 'visible'
-    hiddenTimeout = window.setTimeout(() => hideMessage('visible'), 3000)
-  }
-})
-
 onReceive('reset', (data) => {
-  overlayRef.value?.reset(data)
+  console.log('reset', data)
+
+  presenterInBrowser.value = data.inBrowser
+  _pointerEnabled.value = data.pointerEnabled
+  _remoteControlEnabled.value = data.remoteControlEnabled
+  streamState.value = data.streamState
+
+  containerRef.value?.reset(data)
 })
 
-onMounted(() => {
-  document.body.addEventListener('contextmenu', onContextMenu)
-  document.body.addEventListener('keydown', preventBrowserZoom)
-  document.body.addEventListener("wheel", onWheel)
-  window.addEventListener('drop', onDrop)
-  window.addEventListener('dragover', onDragOver)
-  window.addEventListener('paste', onPaste)
-  window.addEventListener('copy', onCopy)
-  window.addEventListener('cut', onCut)
-})
+watch(() => props.data, async (screenShareData) => {
+  if (!screenShareData) {
+    hideOverflow.value = true
+    screenView.value = undefined
+    return
+  }
+
+  screenView.value = await useScreenView(screenShareData, {
+    onStream: (s) => {
+      stream.value = s
+      stream.value.getVideoTracks()[0].onended = () => {
+        stop()
+      }
+      hideMessage('init')
+    },
+    onRemote: (event, data) => {
+      let parsedData = data
+      if (typeof data === 'string' && event !== 'reset') { //TODO: align data format of 'reset' with other events
+        try {
+          parsedData = JSON.parse(data)
+        } catch (err) {
+          console.error('Failed to parse remote data:', err)
+          return
+        }
+      }
+
+      receive(event, parsedData)
+    },
+    onEnding: () => {
+      notify({
+        type: 'info',
+        text: t('viewer.sharingEnded'),
+        confirmButtonText: t('general.ok'),
+      })
+      screenView.value = undefined
+
+      stop()
+    }
+  })
+  hideOverflow.value = false
+}, { flush: 'post', immediate: true })
+
+document.addEventListener('contextmenu', onContextMenu)
+document.addEventListener("wheel", onWheel as EventListener, false)
+document.addEventListener('keydown', onKeydown, false)
+window.addEventListener('resize', onResize)
+window.addEventListener('drop', onDrop)
+window.addEventListener('dragover', onDragOver as EventListener, false)
+window.addEventListener('paste', onPaste)
+window.addEventListener('copy', onCopy)
+window.addEventListener('cut', onCut)
 
 onBeforeUnmount(() => {
-  document.body.removeEventListener('contextmenu', onContextMenu)
-  document.body.removeEventListener('keydown', preventBrowserZoom)
-  document.body.removeEventListener('wheel', onWheel)
+  document.removeEventListener('contextmenu', onContextMenu)
+  document.removeEventListener('wheel', onWheel as EventListener, false)
+  document.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', onResize)
   window.removeEventListener('drop', onDrop)
-  window.removeEventListener('dragover', onDragOver)
+  window.removeEventListener('dragover', onDragOver as EventListener, false)
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('copy', onCopy)
   window.removeEventListener('cut', onCut)
 })
 
+function onResize() {
+  hideOverflow.value = false
+}
+
 function onContextMenu(e: MouseEvent) {
+  // disable context menu
   e.preventDefault()
 }
 
-// Disable Browser-Zoom
-function preventBrowserZoom(e: KeyboardEvent) {
+function onKeydown(e: KeyboardEvent) {
+  // prevent browser zoom
   if ((e.ctrlKey || e.metaKey) && (e.which === 61 || e.which === 107 || e.which === 173 || e.which === 109 || e.which === 187 || e.which === 189)) {
     e.preventDefault()
   }
 }
 
 function onWheel(e: WheelEvent) {
-  if (e.ctrlKey || e.metaKey)
+  // prevent browser zoom
+  if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
+  } else if (e.shiftKey) {
+    // Use deltaY with normalization
+    // Different browsers and input devices may report different deltaY values
+    // Normalize to ensure consistent behavior
+    const delta = e.deltaY || e.detail || (e as any).wheelDelta
+    console.log("zoom delta:", delta)
+    
+    if (delta !== 0) {
+      e.preventDefault()
+      doZoom(getPlatform() === 'mac' ? -delta : delta)
+    }
+  }
 }
 
 async function onDrop(e: DragEvent) {
-  // Prevent default behavior (Prevent file from being opened)
+  // prevent file from being opened
   e.preventDefault()
 
-  console.log('File(s) dropped')
   draggingOver.value = false
 
   const items = e.dataTransfer?.items
@@ -236,13 +300,12 @@ async function onDrop(e: DragEvent) {
 
 let fileDropTimeout: number
 function onDragOver(e: DragEvent) {
-  // Prevent default behavior (Prevent file from being opened)
+  // prevent file from being opened
   e.preventDefault()
 
   if (activeMessage.value === 'fileDrop')
     return
   
-  console.log('File(s) in drop zone')
   draggingOver.value = true
 
   activeMessage.value = 'fileDrop'
@@ -253,18 +316,20 @@ function onDragOver(e: DragEvent) {
   }, 5000)
 }
 
-function onCopy() {
+function sendCopy(cut = false) {
   if (remoteClipboard.value)
     send('copy', {
-      room: props.room,
+      cut,
+      tool: activeTool.value,
     }, { receiveSelf: true })
 }
 
+function onCopy() {
+  sendCopy(false)
+}
+
 function onCut() {
-  if (remoteClipboard.value)
-    send('cut', {
-      room: props.room,
-    }, { receiveSelf: true })
+  sendCopy(true)
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -304,25 +369,11 @@ async function onPaste(e: ClipboardEvent) {
   }
 }
 
-let throttling = false
-function freezeVideo() {
-  if (throttling)
-    return
-
-  throttling = true
-  window.setTimeout(() => throttling = false, 5000)
-
-  emit('freeze')
-  window.setTimeout(() => {
-    emit('unfreeze')
-  }, 3500)
-}
-
-function toggleMessage(message: string) {
+function toggleMessage(message: Message) {
   activeMessage.value = activeMessage.value === message ? undefined : message
 }
 
-function hideMessage(message: string) {
+function hideMessage(message: Message) {
   if (activeMessage.value === message)
     activeMessage.value = undefined
 }
@@ -359,118 +410,97 @@ function sendFile(item: DataTransferItem, name?: string) {
   })
 }
 
-function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
-  emit('send', { event, data, volatile: options.volatile ?? false })
-  if (options.receiveSelf)
-    receive(event, data)
-}
+function stop() {
+  screenView.value?.leave()
+  screenView.value = undefined
 
-function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
-  receiveEvents[event]?.(data)
+  emit('stop')
 }
-
-function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
-  receiveEvents[event] = handler as ReceiveEventHandlers[T]
-}
-
-defineExpose({
-  receive
-})
 </script>
 
 <template>
-  <div class="remote-viewer">
-    <StreamOverlay
-      ref="overlay"
-      :input-enabled="!hidden"
-      :users="users"
-      :user-id="userId"
-      :video-transform="videoTransform"
-      :mouse-enabled="mouseEnabled"
-      :remote-control-active="remoteControlActive"
-      :dragging-over="draggingOver"
-      @rescale="emit('rescale', $event)"
-      @synchronized="hideMessage('init')"
-      @interacted="freezeVideo"
-      @mouse-inside="remoteClipboard = $event"
+  <div ref="viewer" class="remote-viewer">
+    <Toolbar class="main-toolbar" collapsible>
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+        <PencilSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+        <MouseSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
+        <ClipboardTextOutlineSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :class="{ active: activeMessage === 'help' }" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
+        <HelpSvg />
+      </div>
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
+        <LogoutSvg />
+      </div>
+    </Toolbar>
+    <div class="toolbar-spacer"></div>
+    <StreamContainer
+      v-if="data"
+      ref="container"
+      :stream="stream"
+      :users="[...users, data.user]"
+      :user-id="data.user.id"
+      :input-enabled="inputEnabled"
+      :pointer-enabled="pointerEnabled"
+      :active-tool="activeTool"
+      :zoom-scale="zoom?.scale"
+      :freeze-on-interaction="presenterInBrowser"
+      :video-options="{ playsinline: true, autoplay: true, fill: videoFill }"
+      :style="{ overflow: hideOverflow ? 'hidden' : 'visible' }"
       @send="send($event.event, $event.data, $event.options)"
+      @mouse-inside="remoteClipboard = $event"
+      @panzoom-toggle="panzoomActive = $event"
+      @panzoomchange="onPanzoomChange"
+      @contextmenu="() => false"
     >
-    </StreamOverlay>
-    <div class="size-info" :style="sizeInfoStyle"></div>
+      <div v-if="streamState !== 'active'" class="text-overlay">
+        <span>{{ $t(`viewer.streamState.${streamState}`) }}</span>
+      </div>
+    </StreamContainer>
+    <div class="clipboard-container">
+      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
+    </div>
     <div v-if="activeMessage" class="message">
-      <template v-if="activeMessage === 'init' || activeMessage === 'mouseHelp'">
+      <template v-if="activeMessage === 'init' || activeMessage === 'help'">
         <template v-if="activeMessage === 'init'">
-          <b>{{ $t('viewer.messages.establishing') }}</b>
+          <b>{{ $t('viewer.messages.init') }}</b>
           <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
         </template>
-        <b v-else>{{ $t('viewer.messages.mouseHelp.title') }}</b>
-        <br>
-        <br>
-        <template v-if="!isTouchEnabled()">
-          {{ $t('viewer.messages.mouseHelp.zoom') }}
+        <template v-else-if="!isTouchEnabled()">
+          <h4>{{ $t('viewer.messages.help.title') }}</h4>
           <br>
-          {{ $t('viewer.messages.mouseHelp.move') }}
+          <b>{{ $t('viewer.messages.help.general.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.general.zoom') }}</li>
+            <li>{{ $t('viewer.messages.help.general.move') }}</li>
+            <li>{{ $t('viewer.messages.help.general.copy') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.pointer.title') }}</b>
+          <ul>
+            <li>{{ $t('viewer.messages.help.pointer.draw') }}</li>
+            <li>{{ $t('viewer.messages.help.pointer.signal') }}</li>
+          </ul>
+          <b>{{ $t('viewer.messages.help.remoteControl.title') }}</b>
           <br>
-          {{ $t('viewer.messages.mouseHelp.draw') }}
-          <br>
-          {{ $t('viewer.messages.mouseHelp.copy') }}
+          {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
-      </template>
-      <template v-else-if="activeMessage === 'paused'">>
-        <b>{{ $t('viewer.messages.paused.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.paused.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'resumed'">>
-        <b>{{ $t('viewer.messages.resumed.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.resumed.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'hidden'">>
-        <b>{{ $t('viewer.messages.hidden.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.hidden.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'visible'">>
-        <b>{{ $t('viewer.messages.visible.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.visible.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'fileDrop'">
-        <b>{{ $t('viewer.messages.fileDrop.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.fileDrop.description') }}
-      </template>
-      <template v-else-if="activeMessage === 'fileUpload'">
-        <b>{{ $t('viewer.messages.fileUpload.title') }}</b>
-        <br>
-        <br>
-        {{ $t('viewer.messages.fileUpload.description') }}
-        <img style="float: left; margin-right: 50px" :src="LoadingDarkGif">
       </template>
       <template v-else-if="activeMessage === 'remote' && remoteMessage">
         <b>{{ remoteMessage }}</b>
       </template>
+      <template v-else>
+        <b>{{ $t(`viewer.messages.${activeMessage}.title`) }}</b>
+        <br>
+        <br>
+        {{ $t(`viewer.messages.${activeMessage}.description`) }}
+        <img v-if="activeMessage === 'fileUpload'" style="float: left; margin-right: 50px" :src="LoadingDarkGif">
+      </template>
     </div>
-    <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardFile }" title="Show clipboard" @click="showClipboard = !showClipboard">
-        <ClipboardTextOutlineSvg />
-      </div>
-      <div class="btn btn-sm btn-secondary" title="Help" @click="toggleMessage('mouseHelp')">
-        <HelpSvg />
-      </div>
-      <div class="btn btn-sm btn-secondary" title="Leave" @click="$emit('stop')">
-        <LogoutSvg />
-      </div>
-    </Toolbar>
-    <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile" />
-    </div>
+    <slot />
   </div>
 </template>
 
@@ -482,41 +512,53 @@ defineExpose({
     src: local('Abel Regular'), local('Abel-Regular'), url('../../../assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
   }
 
-  .remote-viewer .clipboard-container {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    z-index: 300;
+  .remote-viewer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  .remote-viewer video {
+    max-width: 100%;
+    max-height: 100%;
   }
 
   .remote-viewer .main-toolbar {
-    z-index: 2000;
+    cursor: default;
     position: absolute;
-    top: 0px;
-    left: 50%;
+    top: 0.125rem;
+    z-index: 3000;
   }
 
-  .remote-viewer .size-info {
-    padding: 0px;
-    margin: 0px;
+  .remote-viewer .toolbar-spacer {
+    flex: 0 99999999 2.5rem;
+  }
+
+  .remote-viewer .text-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     position: absolute;
-    z-index: 2
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0008;
   }
 
-  .remote-viewer .item {
-    z-index: 100;
-    padding: 5px;
-  }
-
-  .remote-viewer .item img {
-    width: 150px;
+  .remote-viewer .text-overlay span {
+    color: #ddd;
+    background: #000;
+    padding: 0.25em 0.5em;
+    border-radius: 10px;
   }
 
   .remote-viewer .message {
-    padding-left: 100px;
     position: absolute;
     bottom: 0px;
-    z-index: 100;
+    z-index: 3000;
     color: white;
     background: #000;
     padding: 20px;
@@ -526,40 +568,15 @@ defineExpose({
     pointer-events: none;
   }
 
-  /* Common button styles */
-  .remote-viewer .button, .remote-viewer .recordoverlayclosebutton {
-    cursor: pointer;
-    line-height: 10px;
-    text-align: center;
-    padding: 5px 0;
-    border: 1px solid #404040;
-    color: #aaa;
-    font-family: Abel;
-    font-size: 10px;
-    background: #2a2a2a;
+  .remote-viewer .clipboard-container {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    z-index: 2000;
   }
 
-  .remote-viewer .button:hover, .remote-viewer .recordoverlayclosebutton:hover {
-    background: #404040 !important;
-    border-color: #505050;
-    color: #ddd;
-  }
-
-  /* Specialized buttons */
-  .remote-viewer .dragbutton {
-    float: right;
-    padding: 3px 0;
-    margin-right: 15px;
-    width: 20px;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-app-region: drag;
-  }
-
-  /* Textarea styles */
-  .remote-viewer .clipboard textarea {
-    max-height: 120px;
-    max-width: 170px;
+  .remote-viewer .clipboard {
+    min-width: 15rem;
   }
 
   .remote-viewer textarea::-webkit-scrollbar {
@@ -621,9 +638,5 @@ defineExpose({
     border: solid white;
     border-width: 0 3px 3px 0;
     transform: rotate(45deg);
-  }
-
-  .remote-viewer .main-toolbar {
-    cursor: default;
   }
 </style>

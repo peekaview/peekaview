@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
@@ -10,28 +9,37 @@ import PresenterForm from './views/form/PresenterForm.vue'
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
 
-import { prompt } from './util'
-
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
-import { ViewerContact } from './types'
-
-const { t } = useI18n()
+import { ViewerData } from './types'
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, name, target, viewEmail } = useParamsData()
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
-const lastContacts = ref<ViewerContact[]>([])
-const activeViewerContact = ref<ViewerContact | undefined>()
+const recentContacts = ref<string[]>(JSON.parse(localStorage.getItem('recentContacts') ?? '[]'))
+const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
+const activeViewerData = ref<ViewerData | undefined>()
+const isViewFixed = computed(() => action === Action.View && !!formViewerData.value.email)
 
-watch(activeViewerContact, (contact) => {
-  if (contact)
-    document.body.classList.add('view-active')
-  else
+watch(activeViewerData, (data) => {
+  if (!data) {
     document.body.classList.remove('view-active')
+    return
+  }
+  
+  document.body.classList.add('view-active')
+  const index = recentContacts.value.findIndex(email => email === data.email)
+  let newContacts = recentContacts.value
+  if (index >= 0)
+    newContacts.splice(index, 1)
+  recentContacts.value = [...newContacts, data.email]
+})
+
+watch(recentContacts, (value) => {
+  localStorage.setItem('recentContacts', JSON.stringify(value))
 })
 
 const locale = computed({
@@ -41,134 +49,98 @@ const locale = computed({
     localStorage.setItem('locale', value)
   }
 })
-
-async function handleLogout() {
-  const result = await prompt({
-    title: t("app.logout"),
-    text: t("app.confirmLogout"),
-    confirmButtonText: t("general.yes"),
-    cancelButtonText: t("general.cancel"),
-  })
-  
-  if (result === '0')
-    window.location.href = '/'
-}
 </script>
 
 <template>
-  <!-- Header -->
-  <header v-if="!activeViewerContact" class="main-header">
-    <div class="header-content">
-      <div class="logo-container">
-        <a href="/">
-          <img :src="PeekaViewLogo" alt="Logo" class="logo">
-        </a>
-      </div>
+  <header v-if="!activeViewerData" class="main-header">
+    <a class="header-content" href="/">
+      <img :src="PeekaViewLogo" alt="Logo" class="logo">
       <h1 class="header-title">
-        <b>SHARE</b>YOUR<b>SCREEN</b>
-        <br>
-        <small style="color: #9d9d9d;font-size: 1.2rem;">the simple way</small>
+        <b>SHARE</b> YOUR <b>SCREEN</b>
       </h1>
-      <div class="header-actions">
-        <button v-if="action === 'share' && token" class="btn btn-outline-light" @click="handleLogout">
-          {{ $t('app.logout') }}
-        </button>
-      </div>
-    </div>
+      <small class="header-subtitle">Simplified & Secure with Peer-to-Peer</small>
+    </a>
   </header>
 
-  <!-- Main Content -->
   <div class="main-container">
     <Viewer
-      v-if="activeViewerContact"
-      :contact="activeViewerContact"
-      @stop="activeViewerContact = undefined"
+      v-if="activeViewerData"
+      :contact="activeViewerData"
+      @stop="activeViewerData = undefined"
     />
     <div v-else class="content-wrapper">
       <div class="section-content">
-        <div class="text-center">
-          <div class="panel">
-            <Login
-              v-if="action === Action.Login"
-              :target="target"
-            />
-            <Presenter
-              v-else-if="presenterActive && email && token"
-              :email="email"
-              :token="token"
-              @stop="presenterActive = false"
-            />
-            <template v-else>
-              <div class="form-content">
-                <div class="d-flex gap-4 align-items-center">
-                  <div>
-                    <label class="form-main-label">{{ $t('app.form.iWouldLikeTo') }}</label>
-                  </div>
-                  <div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="view" required >
-                        {{ $t('app.form.likeToView') }}
-                      </label>
-                    </div>
-                    <div class="form-check">
-                      <label class="form-check-label">
-                        <input class="form-check-input" type="radio" v-model="plannedAction" value="share" required >
-                        {{ $t('app.form.likeToShare') }}
-                      </label>
-                    </div>
+        <div class="panel">
+          <Login
+            v-if="action === Action.Login"
+            :target="target"
+          />
+          <Presenter
+            v-else-if="presenterActive && email && token"
+            :email="email"
+            :token="token"
+            @stop="presenterActive = false"
+          />
+          <template v-else>
+            <div v-if="!isViewFixed" class="tabs mb-4">
+              <div class="tab" :class="{ active: plannedAction === 'view' }" @click="plannedAction = 'view'">
+                <div class="p-2">{{ $t('app.form.likeToView') }}</div>
+              </div>
+              <div class="tab" :class="{ active: plannedAction === 'share' }" @click="plannedAction = 'share'">
+                <div class="p-2">{{ $t('app.form.likeToShare') }}</div>
+              </div>
+            </div>
+
+            <template v-if="plannedAction === 'view'">
+              <ViewerForm
+                v-model="formViewerData"
+                :is-fixed="isViewFixed"
+                @submit="activeViewerData = formViewerData"
+              />
+
+              <template v-if="!isViewFixed && recentContacts.length > 0">
+                <hr>
+                <h6>{{ $t('app.form.recentContacts') }}:</h6>
+                <div class="recent-contacts">
+                  <div v-for="email in recentContacts" :key="email" class="pill-tag" @click="formViewerData.email = email">
+                    {{ email }}
                   </div>
                 </div>
-              </div>
-
-              <hr>
-
-              <template v-if="plannedAction === 'view'">
-                <ViewerForm
-                  :model-value="activeViewerContact ?? { email: viewEmail ?? '', name: name ?? '' }"
-                  @update:model-value="activeViewerContact = $event"
-                />
-
-                <template v-if="lastContacts.length > 0">
-                  <hr>
-                  <h4>{{ $t('app.form.lastContacts') }}</h4>
-                  <div v-for="contact in lastContacts" :key="contact.email">
-                    <p>{{ contact.name }} ({{ contact.email }})</p>
-                  </div>
-                </template>
-              </template>
-
-              <template v-else-if="plannedAction === 'share'">
-                <PresenterForm
-                  v-if="email && token"
-                  :email="email"
-                  :token="token"
-                  @present="presenterActive = true"
-                />
-                <Login v-else target="web" />
               </template>
             </template>
-          </div>
+
+            <template v-else-if="plannedAction === 'share'">
+              <PresenterForm
+                v-if="email && token"
+                :email="email"
+                :token="token"
+                @present="presenterActive = true"
+              />
+              <Login v-else target="web" />
+            </template>
+          </template>
         </div>
       </div>
     </div>
   </div>
 
-  <Imprint v-if="showInfo === 'imprint'" @click="showInfo = undefined"/>
-  <GDPR v-if="showInfo === 'gdpr'" @click="showInfo = undefined"/>
+  <Imprint v-if="showInfo === 'imprint'" @close="showInfo = undefined"/>
+  <GDPR v-if="showInfo === 'gdpr'" @close="showInfo = undefined"/>
 
-  <footer v-if="!activeViewerContact" class="main-footer">
+  <footer v-if="!activeViewerData" class="main-footer">
     <div class="footer-content">
-      <p>
+      <span>
         &copy; 2025 PeekaView | 
         <a href="#" @click="showInfo = 'imprint'">{{ $t('app.imprint') }}</a> | 
         <a href="#" @click="showInfo = 'gdpr'">{{ $t('app.gdpr') }}</a> | 
-        <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a> | 
+        <a href="https://github.com/peekaview/peekaview" target="_blank">GitHub</a>
+      </span>
+      <span>
         <select v-model="locale">
           <option value="en">English</option>
           <option value="de">Deutsch</option>
         </select>
-      </p>
+      </span>
     </div>
   </footer>
 </template>
@@ -185,34 +157,43 @@ body:not(.view-active) {
 }
 
 body.view-active {
-  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
 }
 
-.main-header,
-.main-footer {
-  background: rgba(255, 255, 255, 0.5);
-  color: #2c3e50;
-  padding: 0.75rem 0;
-  backdrop-filter: blur(5px);
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Header Styles */
 .main-header {
-  height: 90px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+  margin-top: 1rem;
+}
+
+.main-footer {
+  color: var(--text-color);
+  background: var(--panel-bg-color);
+  padding: 0.75rem 0;
+}
+
+.main-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-height: 100%; /* required for viewer video to scale correctly */
 }
 
 .header-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0.5rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  text-decoration: none;
 }
 
 .logo-container {
@@ -230,15 +211,25 @@ body.view-active {
   margin: 0;
   font-weight: 500;
   color: #2c3e50;
-  text-align: center;
 }
 
-.header-actions {
-  min-width: 120px;
+.header-subtitle {
+  margin: 0;
+  color: #9d9d9d;
 }
 
-.panel {
-  color: #64748b;
+footer select {
+  color: gray;
+  background: #42403e;
+  border: 0px solid black;
+  border-radius: 5px;
+  padding: 5px;
+}
+
+.recent-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 /* Footer Styles */
@@ -254,23 +245,15 @@ body.view-active {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
 }
 
-.footer-content p {
+.footer-content span {
   margin: 0;
-  font-size: 0.9rem;
-}
-
-.footer-content a {
-  color: #2c3e50;
-  text-decoration: none;
-}
-
-.footer-content a:hover {
-  color: #1a73e8;
+  font-size: 0.85rem
 }
 
 /* Responsive Adjustments */

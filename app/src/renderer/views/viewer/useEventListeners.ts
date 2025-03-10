@@ -1,4 +1,4 @@
-import { computed, reactive, Ref, ref } from "vue"
+import { computed, reactive, Ref, ref, watch } from "vue"
 
 export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<boolean>) {
   const _control = ref(false)
@@ -7,16 +7,22 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
   const _space = ref(false)
   const _skip = ref(false)
 
-  // readonly
-  const control = computed(() => _control.value)
-  const alt = computed(() => _alt.value)
-  const shift = computed(() => _shift.value)
-  const space = computed(() => _space.value)
-  const skip = computed(() => _skip.value)
+  watch(inputEnabled, (enabled) => {
+    if (enabled)
+      return
+    
+    _control.value = false
+    _alt.value = false
+    _shift.value = false
+    _space.value = false
+    _skip.value = false
+  })
 
   function onKeyUp(e: KeyboardEvent) {
     if (!inputEnabled.value)
       return
+
+    console.log("keyUp", e.key)
 
     if (e.key == 'Control' || e.key == 'Meta') {
       setTimeout(() => {
@@ -26,7 +32,7 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     if (e.key == 'Shift') {
       _shift.value = false
     }
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    if (e.key == " " || e.code == "Space") {
       setTimeout(() => {
         _space.value = false
       }, 100)
@@ -45,11 +51,11 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     if (!inputEnabled.value)
       return
 
-    console.log(e.keyCode)
+    console.trace("keyDown", e.key)
 
     _skip.value = false
     let keyToSend = e.key
-    if (e.key == " " || e.code == "Space" || e.keyCode == 32) {
+    if (e.key == " " || e.code == "Space") {
       _space.value = true
     }
     if (e.key == 'Shift') {
@@ -81,11 +87,10 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
         if (e.key === 'Dead') {
           // This is ´ (acute accent)
           _skip.value = false
-          if (_shift.value) {
+          if (_shift.value)
             keyToSend = '`'
-          } else {
+          else
             keyToSend = '´'
-          }
         } else if (e.key === '+') {
           // This is the + key
           _skip.value = false
@@ -95,21 +100,26 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     }
     if (e.keyCode == 192) {
       _skip.value = false
-      if (_shift.value) {
+      if (_shift.value)
         keyToSend = '°'
-      }
-      else {
+      else
         keyToSend = '^'
-      }
     }
     
-    if (!_skip) {
-      console.log(keyToSend)
+    if (!_skip.value) {
+      console.log("keyToSend", keyToSend)
 
       send(keyToSend)
       e.preventDefault()
     }
   }
+
+  // readonly
+  const control = computed(() => _control.value)
+  const alt = computed(() => _alt.value)
+  const shift = computed(() => _shift.value)
+  const space = computed(() => _space.value)
+  const skip = computed(() => _skip.value)
 
   return { pressed: reactive({ control, alt, shift, space, skip }), onKeyDown, onKeyUp }
 }

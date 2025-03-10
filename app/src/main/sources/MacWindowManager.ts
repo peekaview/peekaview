@@ -10,10 +10,6 @@ export class MacWindowManager extends WindowManager {
   constructor(hwnd: string) {
     super(hwnd)
     this.maxCacheAge = 1000
-    this.overlayPadding = {
-      x: 20,
-      y: 0,
-    }
     this.currentMonitorProcess = null
   }
 
@@ -66,6 +62,10 @@ export class MacWindowManager extends WindowManager {
         };
         return innerDimensions;
     }
+  }
+
+  isMaximized() {
+    return false
   }
 
   isMinimized() {

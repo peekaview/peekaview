@@ -3,7 +3,7 @@ import Panzoom, { PanzoomEventDetail, PanzoomObject, PanzoomOptions } from "@pan
 
 import { isTouchEnabled } from "../../util.js"
 
-export function usePanzoom(el: Readonly<ShallowRef<HTMLElement | null>>, active = ref(false), inputEnabled = ref(true)) {
+export function usePanzoom(el: Readonly<ShallowRef<HTMLElement | null | undefined>>, active = ref(false), inputEnabled = ref(true)) {
   const options: PanzoomOptions = { canvas: true, maxScale: 3, minScale: 1 }
   if (!isTouchEnabled())
     options.handleStartEvent = event => {

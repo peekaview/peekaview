@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { prompt } from '../../util'
@@ -15,10 +15,12 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const downloadLink = ref('downloads/PeekaView.exe')
+const downloadLink = import.meta.env.VITE_DOWNLOAD_URL
+
+const code = computed(() => btoa(`email=${props.email}&token=${props.token}`))
 
 function shareViaApp() {
-  const protocolUrl = `peekaview://action=share&${new URLSearchParams({ email: props.email, token: props.token }).toString()}`
+  const protocolUrl = `peekaview://share/?code=${code.value}`
   window.location.href = protocolUrl
   
   setTimeout(async () => {
@@ -26,7 +28,7 @@ function shareViaApp() {
       title: t('share.appDialog.title'),
       html: 
         t('share.appDialog.message') + '<br><br>' +
-        t('share.appDialog.download', { link: downloadLink.value }),
+        t('share.appDialog.download', { link: downloadLink }),
       type: 'info',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
@@ -39,7 +41,7 @@ function shareViaApp() {
 </script>
 
 <template>
-  <div class="share-option primary">
+  <div class="open-in-app">
     <div class="option-content">
       <h3>{{ $t('share.appOption.title') }}</h3>
       <p>{{ $t('share.appOption.description') }}</p>
@@ -53,40 +55,47 @@ function shareViaApp() {
     <span>{{ $t('share.or') }}</span>
   </div>
   
-    <button class="btn btn-outline-secondary btn-lg w-100" @click="$emit('present')">
-      {{ $t('share.browserOption.button') }}
-    </button>
+  <button class="continue-in-browser btn btn-lg w-100" @click="$emit('present')">
+    {{ $t('share.browserOption.button') }}
+  </button>
   
   <div class="download-option">
-    <span class="text-muted">{{ $t('share.download.prompt') }}</span>
-    <a :href="downloadLink" class="btn btn-link" download>
+    <span>{{ $t('share.download.prompt') }}</span>
+    <a :href="downloadLink" download>
       {{ $t('share.download.button') }}
     </a>
   </div>
 </template>
 
 <style>
-.share-option {
-  background: rgba(255, 255, 255, 0.9);
+.open-in-app {
   border-radius: 12px;
   padding: 1.5rem;
-  border: 1px solid rgba(0,0,0,0.08);
+  text-align: center;
+  border: 2px solid var(--primary-color);
+  background: #154d97;
 }
 
-.share-option.primary {
-  border: 2px solid #1a73e8;
-}
-
-.share-option h3 {
+.open-in-app h3 {
   font-size: 1.25rem;
   margin-bottom: 0.5rem;
-  color: #2c3e50;
+  color: var(--header-color);
 }
 
-.share-option p {
-  color: #64748b;
+.open-in-app p {
   margin-bottom: 1.25rem;
   font-size: 0.95rem;
+}
+
+.continue-in-browser {
+  color: var(--text-color) !important;
+  border-color: var(--text-color) !important;
+}
+
+.continue-in-browser:hover {
+  background-color: #0002;
+  color: var(--link-color) !important;
+  border-color: var(--link-color) !important;
 }
 
 .divider {
@@ -102,7 +111,7 @@ function shareViaApp() {
   top: 50%;
   width: 45%;
   height: 1px;
-  background-color: rgba(0,0,0,0.1);
+  background-color: var(--text-color);
 }
 
 .divider::before {
@@ -114,33 +123,22 @@ function shareViaApp() {
 }
 
 .divider span {
-  background: rgba(255, 255, 255, 0.9);
   padding: 0 1rem;
-  color: #64748b;
   font-size: 0.9rem;
   position: relative;
   z-index: 1;
 }
 
 .download-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  gap: 0.5rem;
   padding: 1rem;
   border-top: 1px solid rgba(0,0,0,0.05);
   margin-top: 1rem;
-}
-
-.download-option span {
   font-size: 0.9rem;
-  color: #64748b;
-}
-
-.download-option a {
-  color: #1a73e8;
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.download-option:hover {
-  text-decoration: underline;
 }
 </style>

@@ -132,7 +132,7 @@
 }
 
 .f-modal-alert .f-modal-icon.f-modal-warning {
-  margin-top: -20px;
+  margin-top: 0px;
   border-color: #F8BB86;
 }
 
@@ -187,7 +187,7 @@
 
 
 .f-modal-alert .f-modal-icon.f-modal-info {
-  margin-top: -20px;
+  margin-top: 0px;
   border-color: #1885d9;
 }
 

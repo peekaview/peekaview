@@ -56,6 +56,9 @@ defineExpose({
 
   /* Colors and Fonts */
   .modal-container .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     line-height: 20px;
     float: left;
     margin: 0px;

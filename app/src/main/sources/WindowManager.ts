@@ -1,18 +1,18 @@
 import { screen } from 'electron'
-import { Dimensions, Rectangle } from '../../interface'
+import { Dimensions, Rectangle, Size } from '../../interface'
 import { SourceManager } from './SourceManager'
 // import { getActiveWindow } from "@nut-tree/nut-js"
 
 export class WindowManager extends SourceManager {
   protected currentRectangle: Rectangle | undefined;
-  protected overlayPadding: { x: number, y: number };
+  protected cropSize: Size;
   protected areCoordinatesScaling: boolean;
   
   constructor(hwnd: string) {
     super(hwnd)
-    this.overlayPadding = {
-      x: 0,
-      y: 0,
+    this.cropSize = {
+      width: 0,
+      height: 0,
     }
     this.areCoordinatesScaling = false
   }
@@ -51,14 +51,15 @@ export class WindowManager extends SourceManager {
   getOverlayRectangle() {
     const dimensions = this.getOuterDimensions()
     // Get both screens that the window might span
+    const yPoint = (dimensions.top + dimensions.bottom) / 2
     const leftScreen = screen.getDisplayNearestPoint({
       x: dimensions.left,
-      y: (dimensions.top + dimensions.bottom) / 2
+      y: yPoint
     })
     
     const rightScreen = screen.getDisplayNearestPoint({
       x: dimensions.right,
-      y: (dimensions.top + dimensions.bottom) / 2
+      y: yPoint
     })
 
     // Calculate how much of the window is on each screen
@@ -93,16 +94,14 @@ export class WindowManager extends SourceManager {
       console.log('Right percentage:', rightPercentage)
     }
 
-    // Calculate dimensions using the chosen scale factor
-    const width = Math.round(rawWidth / scaleFactor) + this.overlayPadding.x
-    const height = Math.round(rawHeight / scaleFactor) + this.overlayPadding.y
-    
-    const x = Math.round(dimensions.left / (this.areCoordinatesScaling ? scaleFactor : 1))
-    const y = Math.round(dimensions.top / (this.areCoordinatesScaling ? scaleFactor : 1))
+    const maximized = this.isMaximized()
 
-    console.log('Left screen scale factor:', leftScreen.scaleFactor)
-    console.log('Right screen scale factor:', rightScreen.scaleFactor)
-    console.log('Chosen scale factor:', scaleFactor)
+    // Calculate dimensions using the chosen scale factor
+    const width = Math.ceil(rawWidth / scaleFactor) - (maximized ? 0 : this.cropSize.width * 2)
+    const height = Math.ceil(rawHeight / scaleFactor) - (maximized ? 0 : this.cropSize.height * 2)
+    
+    const x = Math.round(dimensions.left / (this.areCoordinatesScaling ? scaleFactor : 1)) + (maximized ? 0 : this.cropSize.width)
+    const y = Math.round(dimensions.top / (this.areCoordinatesScaling ? scaleFactor : 1)) + (maximized ? 0 : this.cropSize.height)
 
     console.log('Overlay rectangle:', { x, y, width, height })
     return { x, y, width, height }

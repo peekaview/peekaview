@@ -1,20 +1,25 @@
 <template>
-  <div class="info-container">
-    <div class="panel">
+  <div class="info-container" @click="$emit('close')">
+    <div class="panel" @click.stop>
+      <div class="close-button" @click="$emit('close')">×</div>
       <h1>Impressum</h1>
       
       <section>
         <h2>Angaben gemäß § 5 TMG</h2>
-        <p>Limtec GmbH</p>
-        <p>Halderstraße 16</p>
-        <p>86150 Augsburg</p>
-        <p>Deutschland</p>
+        <p>
+          Limtec GmbH<br>
+          Halderstraße 16<br>
+          86150 Augsburg<br>
+          Deutschland
+        </p>
       </section>
 
       <section>
-        <p>Registergericht Augsburg</p>
-        <p>HRB 30954</p>
-        <p>UstID: DE 236898869</p>
+        <p>
+          Registergericht Augsburg<br>
+          HRB 30954<br>
+          UstID: DE 236898869
+        </p>
       </section>
 
       <section>
@@ -24,8 +29,10 @@
 
       <section>
         <h2>Kontakt</h2>
-        <p>Telefon: +49 (0)821 - 32871103</p>
-        <p>E-Mail: info@limtec.de</p>
+        <p>
+          Telefon: +49 (0)821 - 32871103<br>
+          E-Mail: info@limtec.de
+        </p>
       </section>
 
       <section>

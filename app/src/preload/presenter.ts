@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
 
-import { DialogOptions, RemoteData, RemoteEvent } from '../interface'
+import { DialogOptions, RemoteData, RemoteEvent, SendRemote } from '../interface'
 
 import './firebase'
 
@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
   dialog: (options: DialogOptions) => ipcRenderer.invoke('dialog', options),
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => ipcRenderer.invoke('on-remote', event, data),
-  onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
+  onRemote: (callback: SendRemote) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => ipcRenderer.on('reply-dialog', (_event, dialogId: number, result: string) => callback(dialogId, result)),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
   sharingActive: (viewCode: string, data: string) => ipcRenderer.invoke('sharing-active', viewCode, data),
@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOpenScreenSourceSelection: (callback: () => void) => ipcRenderer.on('open-screen-source-selection', () => callback()),
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
   sourceSelected: (source: string | undefined) => ipcRenderer.invoke('source-selected', source),
+  onToggleRemoteControl: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-remote-control', (_event, toggle?: boolean) => callback(toggle)),
+  onTogglePointer: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-pointer', (_event, toggle?: boolean) => callback(toggle)),
 });
 
 console.log('Preload script has been loaded');

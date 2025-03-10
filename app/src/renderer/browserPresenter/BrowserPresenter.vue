@@ -1,42 +1,46 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
+import { ref, onBeforeUnmount, useTemplateRef, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import StreamOverlay from '../views/viewer/StreamOverlay.vue'
+import StreamContainer from '../views/viewer/StreamContainer.vue'
 import Clipboard from '../components/Clipboard.vue'
-import { ScaleInfo, VideoTransform } from '../types'
-import { File, RemoteEvent, RemoteData } from '../../interface'
+import { File, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
-import { usePresenter, getStream, type Presenter } from '../composables/usePresenter'
-import { prompt } from '../util'
+import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
+import { notify, prompt, DialogOptions, NotifyOptions } from '../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
 import LoadingDarkGif from '../../assets/img/loading_dark.gif'
+import { useRemoteHandlers } from '../composables/useRemoteHandlers'
 
 const { t } = useI18n()
 
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
-const windowModalSize = [400, 500] as const
+const windowModalSize = [400, 550] as const
 
-const videoRef = useTemplateRef('video')
+ // TODO: as of now those are for Chrome on KDE, check other OS's / browsers
+const urlBarHeight = 36
+const titleBarHeight = 268
+
+const outerRef = useTemplateRef('outer')
+const toolbarRef = useTemplateRef('toolbar')
 const containerRef = useTemplateRef('container')
-const overlayRef = useTemplateRef('overlay')
 
 const presenter = ref<Presenter>()
+const streamSize = ref<Size>({ width: 0, height: 0 })
+const sizeFixed = ref(false)
+const stream = ref<MediaStream>()
 
-const mouseEnabled = ref(true)
-watch(mouseEnabled, (enabled) => {
-  presenter.value?.sendRemote?.('mouse-control', { enabled })
-})
-
+const pointerEnabled = ref(true)
 const showClipboard = ref(false)
 const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 
 const userInputRequired = ref(true)
-//onMounted(() => start())
+
+const { send, receive, onReceive } = useRemoteHandlers(presenter)
 
 async function start() {
   userInputRequired.value = false
@@ -48,20 +52,33 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
-    window.resizeTo(...windowSelectSize)
-    const stream = await getStream(shareAudio)
-    window.resizeTo(...windowDefaultSize)
+  presenter.value = usePresenter({
+    email,
+    token,
+    pointerEnabled,
+    remoteControlEnabled: false
+  }, async (shareAudio) => {
+    const unsize = fixSize(windowSelectSize)
+    const s = await getStreamInBrowser(shareAudio)
+    unsize()
 
-    videoRef.value!.srcObject = stream
-    setTimeout(() => {
-      videoRef.value!.play().catch(err => {
-        console.error('Error playing video:', err)
-      })
-    }, 2500)
+    stream.value = s
 
-    return stream
+    return s
   }, {
+    onRequest: async (request) => {
+      const result = await resizeAndPrompt({
+        text: t('share.requestAccess.message', { name: request.name }),
+        confirmButtonText: t('share.requestAccess.accept'),
+        cancelButtonText: t('share.requestAccess.deny'),
+        sound: 'ringtone',
+      })
+
+      return (result === '0')
+    },
+    onStream: () => {
+      showInviteLink()
+    },
     onRemote: (event, data) => {
       let parsedData = data
       if (typeof data === 'string' && event !== 'reset') {
@@ -75,81 +92,41 @@ async function start() {
 
       receive(event, parsedData)
     },
-    onReset: (data) => overlayRef.value?.reset(data),
+    onReset: (data) => containerRef.value?.reset(data),
     onStop: () => window.close(),
+    onApiError: async (error) => {
+      await resizeAndNotify({
+        type: 'error',
+        title: t('general.error'),
+        text: t('share.requestError') + '\n\n' + error.message,
+        confirmButtonText: t('general.ok'),
+      })
+    }
   })
   
   await presenter.value.startSession()
 }
 
-const videoStyle = ref<Record<string, string>>({
-  transform: 'scale(1) translate(0px,0px)',
-})
-const containerStyle = ref<Record<string, string>>({
-  overflow: 'hidden',
-  width: '800px',
-  height: '600px',
-})
-const videoTransform = ref<VideoTransform>()
-
-function rescale(scaleInfo: ScaleInfo) {
-  const containerRect = containerRef.value!.getBoundingClientRect()
-  const currentHeight = Math.round(containerRect.height)
-  const currentWidth = Math.round(containerRect.width)
-
-  let scaleDownY = 1
-  let scaleDownX = 1
-  if (scaleInfo.height > window.innerHeight)
-    scaleDownY = window.innerHeight / scaleInfo.height
-  if (scaleInfo.width > window.innerWidth)
-    scaleDownX = window.innerWidth / scaleInfo.width
-
-  let scaleDown = scaleDownY < scaleDownX ? scaleDownY : scaleDownX
-  
-  if (scaleInfo.height != currentHeight || scaleInfo.width != currentWidth) {
-    containerStyle.value.height = scaleInfo.height * scaleDown + 'px'
-    containerStyle.value.width = scaleInfo.width * scaleDown + 'px'
-  }
-
-  containerStyle.value.overflow = 'visible'
-  videoStyle.value.transform = `scale(${scaleInfo.scale}) translate(${scaleInfo.x}px,${scaleInfo.y}px)`
-
-  nextTick(() => {  
-    const containerRect = containerRef.value!.getBoundingClientRect()
-    const videoRect = videoRef.value!.getBoundingClientRect()
-    videoTransform.value = {
-      x: Math.round(videoRect.left),
-      y: Math.round(videoRect.top),
-      fullwidth: Math.round(videoRect.right - videoRect.left),
-      fullheight: Math.round(videoRect.bottom - videoRect.top),
-      width: Math.round(containerRect.right - containerRect.left),
-      height: Math.round(containerRect.bottom - containerRect.top)
-    }
-  })
-}
-
-type SendOptions = {
-  volatile?: boolean
-  receiveSelf?: boolean
-}
-
-type ReceiveEventHandlers = {
-  [K in RemoteEvent]: (data: RemoteData<K>) => void
-}
-
-const receiveEvents: Partial<ReceiveEventHandlers> = {}
-
 onReceive("mouse-leftclick", (data) => {
-  overlayRef.value?.receiveMouseLeftClick(data)
-  freezeAndFocus()
+  containerRef.value?.receiveMouseLeftClick(data)
+  if (data.tool === 'pointer') {
+    freezeAndFocus()
+  }
 })
 
 onReceive("mouse-move", (data) => {
-  overlayRef.value?.receiveMouseMove(data)
+  containerRef.value?.receiveMouseMove(data)
 })
 
 onReceive("mouse-down", (data) => {
-  overlayRef.value?.receiveMouseDown(data)
+  containerRef.value?.receiveMouseDown(data)
+})
+
+onReceive("mouse-up", (data) => {
+  containerRef.value?.receiveMouseUp(data)
+  if (data.tool === 'pointer') {
+    freezeAndFocus()
+  }
 })
 
 onReceive("file", (data) => {
@@ -161,29 +138,50 @@ onReceive("file-chunk", (data) => {
   fileChunkRegistry.receiveChunk(data)
 })
 
-let throttling = false
-const shutterActive = ref(false)
-onReceive("mouse-up", (data) => {
-  overlayRef.value?.receiveMouseUp(data)
-  freezeAndFocus()
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  window.moveTo(99999, 99999) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
 })
 
-function send<T extends RemoteEvent>(event: T, data: RemoteData<T>, options: SendOptions = {}) {
-  presenter.value?.sendRemote?.(event, data)
-  if (options.receiveSelf)
-    receive(event, data)
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+})
+
+let resizeDebounceTimeout: number | null = null
+function onResize() {
+  if (resizeDebounceTimeout)
+    clearTimeout(resizeDebounceTimeout)
+
+  resizeDebounceTimeout = window.setTimeout(() => {
+    resizeDebounceTimeout = null
+    fitPreview()
+  }, 200)
 }
 
-function receive<T extends RemoteEvent>(event: T, data: RemoteData<T>) {
-  receiveEvents[event]?.(data)
+function fitPreview() {
+  if (!containerRef.value?.videoRef || sizeFixed.value)
+    return
+
+  const outerRect = outerRef.value!.getBoundingClientRect()
+  const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
+  const videoRect = containerRef.value?.videoRef!.getBoundingClientRect()
+
+  const deltaWidth = Math.round(outerRect.width - videoRect.width)
+  const deltaHeight = Math.round(outerRect.height - videoRect.height - toolbarRect.height)
+  if (deltaWidth > 0 || deltaHeight > 0)
+    window.resizeTo(window.outerWidth - deltaWidth, window.outerHeight - deltaHeight)
 }
 
-function onReceive<T extends RemoteEvent>(event: T, handler: (data: RemoteData<T>) => void) {
-  receiveEvents[event] = handler as ReceiveEventHandlers[T]
-}
-
+let throttling = false
+const shutterActive = ref(false)
 function freezeAndFocus() {
   if (throttling)
+    return
+
+  const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
+  const width = streamSize.value.width
+  const height = streamSize.value.height + toolbarRect.height + urlBarHeight
+  if (width <= window.innerWidth && height <= window.innerHeight)
     return
 
   throttling = true
@@ -191,21 +189,21 @@ function freezeAndFocus() {
 
   shutterActive.value = true
   window.setTimeout(() => { // wait until shutter is streamed
-    videoRef.value?.pause()
+    containerRef.value?.videoRef?.pause()
     shutterActive.value = false
-    window.resizeTo(window.screen.width, window.screen.height)
+    
+    const unsize = fixSize([width, height], [0, 0])
     window.focus()
     window.setTimeout(() => {
-      window.resizeTo(...windowDefaultSize)
-      videoRef.value?.play()
+      unsize(true)
+      containerRef.value?.videoRef?.play()
     }, 3000)
   }, 150)
 }
 
 async function showInviteLink() {
-  window.resizeTo(...windowModalSize)
   const url = `${import.meta.env.VITE_APP_URL}?view=${presenter.value?.viewCode}`
-  const result = await prompt({
+  const result = await resizeAndPrompt({
     type: 'info',
     title: t('toolbar.inviteLink'),
     html: `<code>${url}</code>`,
@@ -215,22 +213,72 @@ async function showInviteLink() {
 
   if (result === '0')
     navigator.clipboard.writeText(url)
+}
 
-  window.resizeTo(...windowDefaultSize)
+function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
+  if (sizeFixed.value)
+    throw new Error('Window size is already fixed!')
+
+  const x = window.screenX
+  const y = window.screenY
+  const width = window.outerWidth
+  const height = window.outerHeight
+
+  sizeFixed.value = true
+  transform(size, position)
+
+  return (toPrevious = false) => {
+    sizeFixed.value = false
+    if (toPrevious)
+      transform([width, height], [x, Math.max(y, titleBarHeight)]) // timeout required to let resize finish
+    else
+      transform(windowDefaultSize, [99999, 99999]) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
+  }
+}
+
+function transform(size: readonly [number, number], position?: readonly [number, number]) {
+  window.resizeTo(...size)
+  if (position)
+    setTimeout(() => window.moveTo(...position), 300) // timeout required to let resize finish
+}
+
+let modalPromise: Promise<string> | Promise<void> | undefined
+async function resizeAndPrompt(options: DialogOptions) {
+  if (modalPromise) // TODO: fix, not safe in case a third modal is opened!
+    await modalPromise
+
+  modalPromise = prompt(options)
+  const unsize = fixSize(windowModalSize)
+
+  const result = await modalPromise
+  modalPromise = undefined
+
+  unsize()
+  return result
+}
+
+async function resizeAndNotify(options: NotifyOptions) {
+  if (modalPromise)
+    await modalPromise
+
+  modalPromise = notify(options)
+  const unsize = fixSize(windowModalSize)
+
+  await modalPromise
+  modalPromise = undefined
+
+  unsize()
 }
 
 function onStopSharing() {
-  window.electronAPI?.stopSharing()
   presenter.value?.stopSharing()
 }
 
 function onPauseSharing() {
-  window.electronAPI?.pauseSharing()
   presenter.value?.pauseSharing()
 }
 
 function onResumeSharing() {
-  window.electronAPI?.resumeSharing()
   presenter.value?.resumeSharing()
 }
 </script>
@@ -242,9 +290,10 @@ function onResumeSharing() {
   <div v-else-if="!presenter" class="input-container">
     <img :src="LoadingDarkGif">
   </div>
-  <template v-else>
+  <div v-else ref="outer" class="presenter-container">
     <PresenterToolbar
-      @toggle-mouse="mouseEnabled = $event"
+      ref="toolbar"
+      @toggle-pointer="pointerEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"
       @pause-sharing="onPauseSharing()"
@@ -252,38 +301,60 @@ function onResumeSharing() {
       @share-different-screen="presenter.presentSource()"
       @show-invite-link="showInviteLink"
     />
-    <div ref="container" class="preview-container">
-      <video ref="video" muted />
-      <div class="veil" />
-      <StreamOverlay
-        v-if="presenter?.screenShareData"
-        ref="overlay"
-        :input-enabled="false"
-        :users="presenter.viewers"
-        :user-id="presenter.screenShareData.user.id"
-        :video-transform="videoTransform"
-        :mouse-enabled="mouseEnabled"
-        @rescale="rescale"
-        @send="send($event.event, $event.data, $event.options)"
-      />
-      <div class="clipboard-container">
-        <Clipboard v-if="showClipboard" :data="clipboardFile"/>
-      </div>
+    <StreamContainer
+      v-if="presenter?.screenShareData"
+      ref="container"
+      :stream="stream"
+      :users="presenter.viewers"
+      :user-id="presenter.screenShareData.user.id"
+      :input-enabled="false"
+      :pointer-enabled="pointerEnabled"
+      :video-options="{ muted: true }"
+      use-veil
+      @send="send($event.event, $event.data, $event.options)"
+      @on-stream-size-change="streamSize = $event"
+    >
       <div v-if="shutterActive" class="shutter" />
+    </StreamContainer>
+    <div class="clipboard-container">
+      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
     </div>
-  </template>
+  </div>
 </template>
 
 <style>
+html {
+  overflow: hidden;
+}
+
 #browser-presenter {
-  background: repeating-conic-gradient(#1a1a1a 0% 25%, #202020 0% 50%) 50% / 20px 20px;
+  background: repeating-conic-gradient(#b9b9b9 0% 25%, #acacac 0% 50%) 50% / 20px 20px;
   width: 100%;
   height: 100%;
 }
 
-#browser-presenter .toolbar {
+.presenter-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.presenter-container .toolbar {
   border-radius: 0;
   border: none;
+  align-self: stretch;
+}
+
+.presenter-container .shutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  z-index: 1500;
 }
 
 video {
@@ -300,36 +371,10 @@ video {
   height: 100%;
 }
 
-.veil {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #8886;
-  z-index: 1000;
-}
-
-.preview-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
 .clipboard-container {
   position: absolute;
-  z-index: 1002;
+  z-index: 2000;
   top: 50px;
   left: 50px;
-}
-
-.shutter {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: black;
-  z-index: 1001;
 }
 </style>

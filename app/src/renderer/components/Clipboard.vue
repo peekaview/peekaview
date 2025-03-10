@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useTemplateRef, watch, computed } from 'vue'
 import { File } from '../../interface.js'
+import { getStaticResourcesPath } from '../util.js'
 import { b64DecodeUnicode } from "../../util.js"
 
 import ChevronDownSvg from '../../assets/icons/chevron-down.svg'
@@ -18,9 +19,13 @@ type ClipboardFile = File & {
 const props = withDefaults(defineProps<{
   data: File | undefined
   draggable?: boolean
+  initialRows?: number
+  invertCollapseIcons?: boolean
 }>(), {
   data: undefined,
   draggable: false,
+  initialRows: 8,
+  invertCollapseIcons: false
 })
 
 const emit = defineEmits<{
@@ -33,18 +38,23 @@ const downloadRef = useTemplateRef('download')
 const downloadData = ref<File | undefined>()
 
 const clipboardFile = ref<ClipboardFile | undefined>()
+
+const resourcesPath = ref('')
+getStaticResourcesPath().then(path => resourcesPath.value = path)
+const extIconsPath = computed(() => `${resourcesPath.value}/assets/icons/ext`)
+
 const fileSvg = computed(() => {
   if (!clipboardFile.value)
     return
 
   if (clipboardFile.value.type !== 'binary')
     return clipboardFile.value.content
-
-  return `${window.electronAPI ? '../': ''}icons/${clipboardFile.value.extension}.svg`
+  
+  return `${extIconsPath.value}/${clipboardFile.value.extension}.svg`
 })
 
 const collapsed = ref(false)
-
+const iconCollapsed  = computed(() => (collapsed.value && !props.invertCollapseIcons) || (!collapsed.value && props.invertCollapseIcons))
 watch(collapsed, value => emit('onCollapse', value))
 
 // virtuelles Clipboard, Filesharing via Websockets
@@ -71,6 +81,8 @@ watch(() => props.data, (data) => {
 
   if (content.startsWith('data:application/octet-stream') || content.startsWith('data:text/') || content.startsWith('data:application/json')) {
     type = 'text'
+    extension = 'txt'
+    
     if (content.startsWith('data:application/octet-stream')) {
       content = b64DecodeUnicode(content.replace('data:application/octet-streambase64,', ''))
     } else {
@@ -82,36 +94,29 @@ watch(() => props.data, (data) => {
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'txt'
     }
-
-    if (name != undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
   else if (content.startsWith('data:image/')) {
     type = 'image'
+
     // Wenns ein Bild ist, aber mime-Extension Sonderzeichen enthält, dann ists irgendein komisches Format und wir nehmen png als Default
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'png'
     }
-
-    // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
-    if (name !== undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
   else {
     type = 'binary'
+
     extension = extension.replace('x-msdownload', 'exe')
     extension = extension.replace('x-zip-compressed', 'zip')
 
     if (extension.includes('.') || extension.includes('-')) {
       extension = 'bin'
     }
-
-    if (name != undefined) {
-      extension = name.split('.').pop() ?? extension
-    }
   }
+
+  // Wenn per Drag&Drop kommt, ist der Filename bekannt, dann darauf die Extension bestimmen
+  if (name)
+    extension = name.split('.').pop() || extension
 
   clipboardFile.value = {
     type,
@@ -173,19 +178,19 @@ function close() {
 
 <template>
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
-    <Toolbar :draggable="draggable">
+    <Toolbar>
       <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="flex:0 0 auto" @click="collapsed = !collapsed">
-        <ChevronDownSvg v-if="collapsed" />
+        <ChevronDownSvg v-if="iconCollapsed" />
         <ChevronUpSvg v-else />
       </div>
-      <div style="flex:1 1 auto"></div>
+      <div style="flex:1 1 auto;-webkit-app-region:drag"></div>
       <div class="btn btn-sm btn-secondary" :title="$t('general.close')" style="flex:0 0 auto" @click="close">
         <CloseSvg />
       </div>
     </Toolbar>
     <template v-if="!collapsed">
-      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(icons/${clipboardFile.extension}.svg)` }">
-        <textarea rows="8">{{ clipboardFile.content }}</textarea>
+      <div v-if="clipboardFile.type === 'text'" class="clipboard-content" :style="{ backgroundImage: `url(${extIconsPath}/${clipboardFile.extension}.svg)` }">
+        <textarea :rows="initialRows">{{ clipboardFile.content }}</textarea>
       </div>
       <div v-else class="clipboard-content">
         <img
@@ -194,6 +199,7 @@ function close() {
           :src="fileSvg"
           @click="downloadFile"
         />
+        <span>{{ clipboardFile.name }}</span>
       </div>
       <Toolbar>
         <div v-if="clipboardFile?.type === 'image' || clipboardFile?.type === 'text'" class="btn btn-sm btn-secondary" :title="$t('toolbar.copyToClipboard')" @click="copy">
@@ -220,9 +226,9 @@ function close() {
 .clipboard {
   display: flex;
   flex-direction: column;
-  min-width: 10rem;
   width: 100%;
   height: 100%;
+  max-width: 15rem;
   padding: 5px;
   background: #1a1a1a;
   border: 1px solid hsla(0, 0%, 25%, 0.75);
@@ -241,10 +247,12 @@ function close() {
 .clipboard .clipboard-content {
   flex-grow: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background-repeat: 'no-repeat';
   background-position-x: 'right';
+  color: #ddd;
 }
   
 .clipboard textarea {
@@ -272,8 +280,8 @@ function close() {
 }
 
 .clipboard img.image {
-  max-height: 120px;
-  max-width: 140px;
+  max-height: 100%;
+  max-width: 100%;
   opacity: 0.8;
 }
 

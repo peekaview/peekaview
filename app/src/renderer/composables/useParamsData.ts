@@ -7,7 +7,7 @@ export enum Action {
 }
 
 export function useParamsData() {
-  const action = ref<Action>(Action.View)
+  const action = ref<Action>()
   const token = ref<string | undefined>(localStorage.getItem('token') ?? undefined)
   const email = ref<string | undefined>(localStorage.getItem('email') ?? undefined)
   const name = ref<string | undefined>(localStorage.getItem('name') ?? undefined)

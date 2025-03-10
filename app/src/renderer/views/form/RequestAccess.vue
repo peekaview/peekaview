@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData, ViewerContact } from '../../types'
+import type { AcceptedRequestData, ViewerData } from '../../types'
 import { callApi } from '../../api'
 import { getPlatform, notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
@@ -38,33 +38,21 @@ type RequestParams = {
 }
 
 const props = defineProps<{
-  contact: ViewerContact
+  contact: ViewerData
 }>()
 
 const emit = defineEmits<{
-  (e: 'accept', data: ScreenShareData): void
+  (e: 'accepted', data: ScreenShareData): void
+  (e: 'denied'): void
+  (e: 'stop'): void
 }>()
 
 const { t } = useI18n()
 
+const waitingStatus = ref<WaitingStatus | undefined>('establishing')
 const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
-
-watch(requestStatus, (status) => {
-  if (status !== 'request_denied')
-    return
-
-  notify({
-    type: 'info',
-    text: t('viewer.requestDenied', { email: props.contact.email }),
-    confirmButtonText: t('general.ok'),
-  })
-
-  requestStatus.value = undefined
-})
-
-const waitingStatus = ref<WaitingStatus | undefined>()
 
 onMounted(() => {
   if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
@@ -78,9 +66,6 @@ onMounted(() => {
   }
 
   localStorage.setItem('name', props.contact.name)
-
-  waitingStatus.value = 'establishing'
-  requestStatus.value = undefined
 
   const params = {
     email: props.contact.email,
@@ -132,7 +117,7 @@ async function requestScreen(params: RequestParams, initial = false) {
           })
           return
         case 'request_denied':
-          waitingStatus.value = undefined
+          handleRequestDenied()
           return
         case 'request_notified':
           waitingStatus.value = 'notified'
@@ -156,7 +141,7 @@ function handleRequestAccepted(data: AcceptedRequestData) {
   waitingStatus.value = undefined
   requestStatus.value = undefined
 
-  emit('accept', {
+  emit('accepted', {
     user: {
       id: uuidv4(),
       name: props.contact.name,
@@ -170,6 +155,20 @@ function handleRequestAccepted(data: AcceptedRequestData) {
     controlServer: data.controlServer,
     turnCredentials: data.turnCredentials,
   })
+}
+
+function handleRequestDenied() {
+  console.log('handleRequestDenied called')
+  waitingStatus.value = undefined
+  requestStatus.value = undefined
+
+  notify({
+    type: 'info',
+    text: t('viewer.requestDenied', { email: props.contact.email }),
+    confirmButtonText: t('general.ok'),
+  })
+
+  emit('denied')
 }
 
 function handleError() {
@@ -209,7 +208,7 @@ function formatLastSeen(timestamp: number | undefined) {
 </script>
 
 <template>
-  <div class="form-content">
+  <div v-if="waitingStatus" class="form-content">
     <div class="text-center">
       <div class="waiting-spinner"></div>
       <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email: props.contact.email }) }}</h4>
@@ -221,7 +220,7 @@ function formatLastSeen(timestamp: number | undefined) {
       </p>
     </div>
     <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="waitingStatus = undefined">
+      <button type="button" class="btn btn-secondary" @click="$emit('stop')">
         {{ $t('general.cancel') }}
       </button>
     </div>

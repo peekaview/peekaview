@@ -7,7 +7,7 @@ export type ApiRequestParams = {
   request_id: string
   init: '1' | '0'
 } | {
-  action: "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
+  action: "iAmOnline" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
   email: string
   token: string
 } | {

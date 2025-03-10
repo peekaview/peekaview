@@ -6,25 +6,24 @@ import {
   Ref,
   ref,
   shallowRef,
-  watch,
 } from "vue"
 
 import SimplePeer from 'simple-peer'
 import { io, type Socket } from "socket.io-client"
 
-import { PeerData, RemoteData, RemoteEvent, TurnCredentials, UserData } from "src/interface"
+import { PeerData, RemoteData, RemoteEvent, SendRemote, SendRemoteOptions, TurnCredentials, UserData } from "src/interface"
 
 interface ScreenPresentOptions {
   turnCredentials?: TurnCredentials
-  inApp?: boolean
-  onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
+  onRemote?: SendRemote
 }
 
 interface ScreenViewOptions {
   turnCredentials?: TurnCredentials
-  videoElement?: HTMLVideoElement
   role?: PeerRole
-  onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
+  onConnected?: () => void
+  onStream?: (stream: MediaStream) => void
+  onRemote?: SendRemote
   onEnding?: () => void
 }
 
@@ -32,11 +31,12 @@ interface ScreenPeerOptions {
   wrtc?: SimplePeer.Options["wrtc"]
   stream?: Ref<MediaStream | undefined>
   roleHandlers?: Partial<Record<PeerRole, (socketId: string) => void>>
-  onRemote?: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void
+  onRemote?: SendRemote
 }
 
 export type ScreenPresent = Reactive<ScreenBase & {
   addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
+  cleanUpStream: () => Promise<void>
   leave: () => void
 }>
 
@@ -49,13 +49,13 @@ interface ScreenPeer extends ScreenBase {
   socket: Socket
   initPeer: (socketId: string, initiator: boolean) => SimplePeer.Instance
   createParticipant: (socketId: string, initiator: boolean, onConnect?: () => void, onLeave?: () => void) => SimplePeer.Instance
-  send: (data: any, socketId?: string) => void
+  send: (data: any, socketIds?: string[] | undefined) => void
   dismiss: (socketId: string) => void
 }
 
 interface ScreenBase {
   participants: ComputedRef<Record<string, ScreenParticipant>>
-  sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>, socketId?: string) => void
+  sendRemote: SendRemote
 }
 
 interface ScreenParticipant {
@@ -79,7 +79,10 @@ export type ScreenPeerData = {
 
 export type PeerRole = 'presenter' | 'viewer'
 
-const rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
+let rtcIceServer: RTCIceServer = { urls: [] }
+try {
+  rtcIceServer = JSON.parse(import.meta.env.VITE_RTC_ICE_SERVER) as RTCIceServer
+} catch (e) {}
 
 export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPeerData, role: PeerRole, options?: ScreenPeerOptions): Promise<ScreenPeer> {
   const socket = io(import.meta.env.VITE_RTC_CONTROL_SERVER)
@@ -192,14 +195,19 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
     return newPeer
   }
 
-  const send = (data: any, socketId?: string) => {
-    const sendTo = !socketId ? participants.value : participants.value[socketId] ? { [socketId]: participants.value[socketId] } : {}
+  const send = (data: any, socketIds?: string[] | undefined) => {
+    let sendTo: ScreenParticipant[]
+    if (!socketIds)
+      sendTo = Object.values(participants.value)
+    else
+      sendTo = socketIds.map(socketId => participants.value[socketId]).filter(p => p)
+
     for (const socketId in sendTo)
       sendTo[socketId].peer.send(JSON.stringify(data))
   }
 
-  const sendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, socketId?: string) => {
-    send({ type: 'remote', event, data }, socketId)
+  const sendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, options?: SendRemoteOptions) => {
+    send({ type: 'remote', event, data }, options?.socketIds)
   }
 
   const dismiss = (socketId: string) => {
@@ -225,7 +233,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
     stream,
     roleHandlers: {
       viewer: (socketId) => {
-        createParticipant(socketId, true, () => !options?.inApp && sendRemote("browser", {}, socketId), () => dismiss(socketId))
+        createParticipant(socketId, true, () => {}, () => dismiss(socketId))
       }
     },
   })
@@ -243,6 +251,14 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
     stream.value = s;
     for (const socketId in participants.value)
       participants.value[socketId].peer.addStream(stream.value);
+  }
+
+  const cleanUpStream = async () => {
+    if (stream.value) {
+      for (const socketId in participants.value)
+        participants.value[socketId].peer.removeStream(stream.value)
+      stream.value = undefined
+    }
   }
 
   const leave = () => {
@@ -264,6 +280,7 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
   return reactive({
     participants,
     addStream,
+    cleanUpStream,
     sendRemote,
     leave
   })
@@ -279,18 +296,6 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
         createParticipant(socketId, true, () => {}, () => dismiss(socketId))
       }
     },
-  })
-
-  watch(stream, (stream) => {
-    if (!stream || !options?.videoElement)
-      return
-
-    options.videoElement.srcObject = stream
-    setTimeout(() => {
-      options!.videoElement!.play().catch(err => {
-        console.error('Error playing video:', err)
-      })
-    }, 2500)
   })
 
   const leave = () => {
@@ -325,8 +330,10 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
 
     presenterPeer.on('stream', s => {
       stream.value = s
+      options?.onStream?.(s)
     })
 
+    options?.onConnected?.()
     resolve()
   }))
 

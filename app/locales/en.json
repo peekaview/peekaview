@@ -8,11 +8,18 @@
     "areYouSure": "Are you sure?",
     "error": "Error"
   },
+  "update": {
+    "available": "A new version ({{version}}) is available and will be downloaded.",
+    "ready": "Version {{version}} has been downloaded and is ready to install.",
+    "restart": "Restart to Update",
+    "error": "An error occurred while checking for updates."
+  },
   "labels": {
     "yourEmail": "Your email address",
     "yourName": "Your Name",
     "enterYourName": "Enter your name",
-    "connectToEmail": "Email address of user to connect with"
+    "connectToEmail": "Mail address of user to connect with",
+    "joinSession": "Join Screen Sharing Session of"
   },
   "app": {
     "logout": "Logout",
@@ -20,10 +27,9 @@
     "imprint": "Imprint",
     "gdpr": "GDPR",
     "form": {
-      "iWouldLikeTo": "I would like to",
-      "likeToView": "view a shared screen",
-      "likeToShare": "share my own screen",
-      "lastContacts": "Last contacts"
+      "likeToView": "View Shared Screen",
+      "likeToShare": "Share My Screen",
+      "recentContacts": "Recent contacts"
     }
   },
   "login": {
@@ -68,18 +74,39 @@
       "hoursAgo": "one hour ago | {n} hours ago",
       "daysAgo": "one day ago | {n} days ago"
     },
+    "toolbar": {
+      "pointer": "Draw / Point",
+      "pointerDisabled": "Draw / Point disabled",
+      "remoteControl": "Remote Control",
+      "remoteControlDisabled": "Remote Control disabled",
+      "showClipboard": "Show Clipboard",
+      "clipboardEmpty": "Clipboard is empty",
+      "help": "Help",
+      "leave": "Leave"
+    },
     "messages": {
-      "mouseEnabled": "Remote mouse is now enabled",
-      "mouseDisabled": "Remote mouse is now disabled",
+      "pointerEnabled": "Draw / Point tool is now enabled",
+      "pointerDisabled": "Draw / Point tool is now disabled",
       "remoteControlEnabled": "Remote control is now enabled",
       "remoteControlDisabled": "Remote control is now disabled",
-      "establishing": "Establishing connection...",
-      "mouseHelp": {
-        "title": "Mouse Help",
-        "zoom": "CTRL + Mouse wheel for zoom",
-        "move": "Middle mouse button or pressed space bar to move",
-        "draw": "Hold CTRL to draw",
-        "copy": "CTRL + C to copy and CTRL + V to paste text, images or files"
+      "init": "Establishing connection...",
+      "help": {
+        "title": "Help",
+        "general": {
+          "title": "General",
+          "zoom": "Hold SHIFT and scroll MOUSE WHEEL to zoom in / out of the shared window",
+          "move": "Hold SHIFT and drag with LEFT MOUSE BUTTON to move the shared window after zooming in",
+          "copy": "CTRL + C to copy and CTRL + V to share copied text, images or files"
+        },
+        "pointer": {
+          "title": "Draw / Point",
+          "draw": "Hold LEFT MOUSE BUTTON to draw",
+          "signal": "Click LEFT MOUSE BUTTON to set a pointer"
+        },
+        "remoteControl": {
+          "title": "Remote Control",
+          "desc": "The shared window can be fully controlled with mouse and keyboard. Copying and pasting text, images and files between your own and the shared window is also possible."
+        }
       },
       "fileDrop": {
         "title": "File per Drag-and-Drop to all participants... (max 10MB)",
@@ -106,12 +133,19 @@
         "description": "The shared window is now visible again."
       }
     },
+    "streamState": {
+      "paused": "Screen sharing paused",
+      "hidden": "Screen hidden",
+      "stopped": "Screen sharing stopped"
+    },
     "stop": "Stop",
     "sharingEnded": "Screen sharing connection has been closed.",
     "connectionErrorTitle": "Connection Error",
     "connectionError": "There was a problem connecting to the server. Please try again.",
     "sessionAlreadyActiveTitle": "Session Already Active",
-    "sessionAlreadyActive": "You are already connected to an active session."
+    "sessionAlreadyActive": "You are already connected to an active session.",
+    "joinDifferentSession": "Join a different session",
+    "shareOwnScreen": "Share your own screen"
   },
   "share": {
     "howToShare": "How would you like to share your screen?",
@@ -171,7 +205,8 @@
     "waitForLogin": "Wait for login",
     "orEnterCode": "or enter code from browser",
     "enterCode": "Enter code",
-    "loginWithCode": "Login with code"
+    "loginWithCode": "Login with code",
+    "invalidCode": "Invalid code"
   },
   "sourcesWindow": {
     "type": {
@@ -179,7 +214,7 @@
       "screens": "Screens"
     },
     "share": "Share",
-    "confirmCancel": "Are you sure you want to cancel the screen selection? A selection is required to share your screen."
+    "unauthorized": "Unauthorized!"
   },
   "sharingActive": {
     "title": "Sharing Session Active",
@@ -198,8 +233,8 @@
   "toolbar": {
     "collapse": "Collapse",
     "expand": "Expand",
+    "pointer": "Draw / Point",
     "remoteControl": "Remote Control",
-    "pointer": "Pointer",
     "openClipboard": "Open clipboard",
     "shareDifferentScreen": "Share different screen",
     "inviteLink": "Invite link",

@@ -19,10 +19,15 @@
     "!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}",
     "!{.env,.env.*,.npmrc,pnpm-lock.yaml}",
     "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}",
+    "!**/*.{map,md,ts,scss,sass,styl,less}",
     "out/**/*",
     "build/**/*",
     "node_modules/**/*",
-    "package.json"
+    "package.json",
+    "!**/node_modules/.bin",
+    "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+    "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,__pycache__,thumbs.db,.gitignore,.gitattributes}",
+    "!**/{__pycache__,*.pyc,*.pyo,*.pyd,*.so,*.dll,*.dylib}"
   ],
   "extraResources": [
     {
@@ -54,7 +59,13 @@
       }
     ],
     "icon": "build-resources/icon.ico",
-    "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+    "azureSignOptions": {
+      "publisherName": "LimTec GmbH",
+      "endpoint": "https://neu.codesigning.azure.net/",
+      "certificateProfileName": "CodeSigningCertificate",
+      "codeSigningAccountName": "limtec"
+    }
   },
   "nsis": {
     "oneClick": false,
@@ -66,7 +77,8 @@
   },
   "mac": {
     "target": [
-      "dmg"
+      "dmg",
+      "zip"
     ],
     "category": "public.app-category.utilities",
     "icon": "build-resources/AppIcon.icns",
@@ -100,7 +112,7 @@
       "snap",
       "rpm"
     ],
-    "icon": "build-resources/icons",
+    "icon": "build-resources/icon-512.png",
     "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
     "category": "Utility"
   },

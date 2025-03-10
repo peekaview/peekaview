@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, useTemplateRef, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
@@ -17,7 +17,7 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'toggle-remote-control', enabled: boolean): void
-  (e: 'toggle-mouse', enabled: boolean): void
+  (e: 'toggle-pointer', enabled: boolean): void
   (e: 'toggle-clipboard'): void
   (e: 'pause-sharing'): void
   (e: 'resume-sharing'): void
@@ -27,46 +27,91 @@ const emit = defineEmits<{
 }>()
 
 const inApp = !!window.electronAPI
-const remoteControlEnabled = ref(false)
-const mouseEnabled = ref(true)
-const isPaused = ref(false)
 const toolbarRef = useTemplateRef('toolbar')
 
-watch(remoteControlEnabled, (enabled) => emit('toggle-remote-control', enabled))
-watch(mouseEnabled, (enabled) => emit('toggle-mouse', enabled))
+const _pointerEnabled = ref(true)
+const pointerEnabled = computed({
+  get: () => _pointerEnabled.value,
+  set: (enabled) => {
+    emit('toggle-pointer', enabled)
+    _pointerEnabled.value = enabled
+  },
+})
+
+const _remoteControlEnabled = ref(false)
+const remoteControlEnabled = computed({
+  get: () => _remoteControlEnabled.value,
+  set: (enabled) => {
+    emit('toggle-remote-control', enabled)
+    _remoteControlEnabled.value = enabled
+  },
+})
+
+
+const isPaused = ref(false)
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
+
+setInterval(() => {
+  const rect = toolbarRef.value?.$el.getBoundingClientRect()
+  if (!rect)
+    return
+  
+  window.electronAPI?.setToolbarSize(Math.round(rect.width + 10), Math.round(rect.height + 10))
+}, 500)
+
+onMounted(() => resizeWindow())
 
 function onCollapse() {
   if (!inApp)
     return
 
-  nextTick(() => {
-    const rect = toolbarRef.value?.$el.getBoundingClientRect()
-    if (!rect)
-      return
+  nextTick(() => resizeWindow())
+}
 
-    const width = Math.round(rect.width) + 10
-    const minimumWidth = Math.min(width, 175) // mac requires a bit of minimum width for window to stay transparent
-    window.electronAPI!.resizeWindow('toolbar', {
-      size: { width },
-      minimumSize: { width: minimumWidth },
-    })
+function resizeWindow() {
+  const rect = toolbarRef.value?.$el.getBoundingClientRect()
+  if (!rect)
+    return
+
+  const width = Math.round(rect.width) + 10
+  const minimumWidth = Math.min(width, 200) // mac requires a bit of minimum width for window to stay transparent
+  window.electronAPI?.resizeWindow('toolbar', {
+    size: { width },
+    minimumSize: { width: minimumWidth },
   })
 }
+
+function togglePointer(enabled?: boolean) {
+  if (enabled === undefined)
+    enabled = !_pointerEnabled.value
+
+  _pointerEnabled.value = enabled
+}
+
+function toggleRemoteControl(enabled?: boolean) {
+  if (enabled === undefined)
+    enabled = !_remoteControlEnabled.value
+
+  _remoteControlEnabled.value = enabled
+}
+
+defineExpose({
+  togglePointer,
+  toggleRemoteControl,
+})
 </script>
 
 <template>
-  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" poll-size @on-collapse="onCollapse">
+  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" @on-collapse="onCollapse">
+    <label class="checkbox-container">
+      <input type="checkbox" v-model="pointerEnabled" />
+      <span class="checkmark"></span>
+      <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
+    </label>
     <label v-if="inApp" class="checkbox-container">
       <input type="checkbox" v-model="remoteControlEnabled" />
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
-    </label>
-    <label class="checkbox-container">
-      <input v-if="remoteControlEnabled" type="checkbox" checked disabled />
-      <input v-else type="checkbox" v-model="mouseEnabled" />
-      <span class="checkmark"></span>
-      <span class="checkbox-label">{{ $t('toolbar.pointer') }}</span>
     </label>
     <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />

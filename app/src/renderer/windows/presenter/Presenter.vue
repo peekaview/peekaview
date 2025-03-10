@@ -6,15 +6,21 @@ import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
+import { notify, prompt } from '../../util'
+import { UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
 
 const showSources = ref(false)
 const selectedSource = ref<ScreenSource>()
 
-const presenter = ref<Presenter>()
+const pointerEnabled = ref(false)
+const remoteControlEnabled = ref(false)
 
-onMounted(() => start())
+const presenter = ref<Presenter>()
+const unauthorized = ref(false)
+
+onMounted(() => present())
 
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
@@ -33,7 +39,21 @@ window.electronAPI?.onResumeSharing(() => {
   presenter.value?.resumeSharing()
 })
 
-async function start() {
+window.electronAPI?.onTogglePointer((toggle) => {
+  if (toggle === undefined)
+    pointerEnabled.value = !pointerEnabled.value
+  else
+    pointerEnabled.value = toggle
+})
+
+window.electronAPI?.onToggleRemoteControl((toggle) => {
+  if (toggle === undefined)
+    remoteControlEnabled.value = !remoteControlEnabled.value  
+  else
+    remoteControlEnabled.value = toggle
+})
+
+async function present() {
   let params = new URLSearchParams(window.location.search)
   const data = params.get('data')
   if (!data)
@@ -42,7 +62,12 @@ async function start() {
   params = new URLSearchParams(atob(data))
   const email = params.get('email')!
   const token = params.get('token')!
-  presenter.value = usePresenter(email, token, t, async (shareAudio) => {
+  presenter.value = usePresenter({
+    email,
+    token,
+    pointerEnabled,
+    remoteControlEnabled,
+  }, async (shareAudio) => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {
       watch<[ScreenSource | undefined, boolean]>(() => [selectedSource.value, showSources.value], ([source, show]) => {
@@ -55,8 +80,32 @@ async function start() {
     if (!source)
       return
 
-    window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, roomId: presenter.value!.screenShareData!.roomId, userName: email }))
+    window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, userName: email }))
     return getStreamFromSource(source, shareAudio)
+  }, {
+    onRequest: async (request) => {
+      const result = await prompt({
+        text: t('share.requestAccess.message', { name: request.name }),
+        confirmButtonText: t('share.requestAccess.accept'),
+        cancelButtonText: t('share.requestAccess.deny'),
+        sound: 'ringtone',
+      })
+          
+      return (result === '0')
+    },
+    onApiError: (error) => {
+      if (error instanceof UnauthorizedError) {
+        unauthorized.value = true
+        return
+      }
+
+      notify({
+        type: 'error',
+        title: t('general.error'),
+        text: t('share.requestError') + '\n\n' + error.message,
+        confirmButtonText: t('general.ok'),
+      })
+    }
   })
   presenter.value.startSession()
 }
@@ -72,12 +121,31 @@ function close() {
 </script>
 
 <template>
+  <div v-if="unauthorized" class="text-center text-danger">
+    <h2>{{ $t('sourcesWindow.unauthorized') }}</h2>
+  </div>
   <Sources
-    v-if="showSources"
+    v-else-if="showSources"
     @select="select"
     @cancel="close"
   />
 </template>
 
 <style>
+html {
+  background: transparent !important;
+}
+
+body {
+  padding: 5px;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+#presenter {
+  height: 100%;
+  color: #ddd;
+  background-color: #282828;
+  border-radius: 15px;
+}
 </style>

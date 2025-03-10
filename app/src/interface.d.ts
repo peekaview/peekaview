@@ -25,9 +25,10 @@ declare global {
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
-  sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => Promise<void>,
+  getResourcesPath: () => Promise<string>,
+  sendRemote: SendRemote,
   onDialog: (callback: (options: DialogOptions) => void) => Electron.IpcRenderer,
-  onRemote: (callback: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => void) => Electron.IpcRenderer,
+  onRemote: (callback: SendRemote) => Electron.IpcRenderer,
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => Electron.IpcRenderer,
   onChangeLanguage: (callback: (locale: string) => void) => Electron.IpcRenderer,
   replyDialog: (dialogId: number, result: string) => Promise<void>,
@@ -40,7 +41,9 @@ export interface IElectronAPI {
   sourceSelected: (source: string | undefined) => Promise<void>,
   sharingActive: (viewCode: string, data: string) => Promise<void>,
   toggleRemoteControl: (toggle?: boolean) => Promise<void>,
-  toggleMouse: (toggle?: boolean) => Promise<void>,
+  onToggleRemoteControl: (callback: (toggle?: boolean) => void) => void,
+  togglePointer: (toggle?: boolean) => Promise<void>,
+  onTogglePointer: (callback: (toggle?: boolean) => void) => void,
   toggleClipboard: (toggle?: boolean) => Promise<void>,
   clipboardReady: () => Promise<void>,
   dataToClipboard: (callback: (data: string) => void) => Electron.IpcRenderer,
@@ -74,7 +77,7 @@ export interface DialogOptions {
   id?: number
   title?: string
   message?: string
-  detail?: string
+  copyText?: string
   type?: DialogType
   windowType?: 'tray' | 'dialog'
   sound?: string | null
@@ -115,33 +118,36 @@ export type TurnCredentials = {
 
 export type StreamerData = {
   source: ScreenSource
-  roomId: string
 }
 
-export type RemoteEvent = "browser" | "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "toggle-freeze" | "pause" | "hide" | "type" | "copy" | "paste" | "text" | "cut" | "file" | "file-chunk" | "reset" | "mouse-control" | "remote-control"
+export type ViewerTool = 'pointer' | 'remoteControl'
+
+export type StreamState = 'hidden' | 'paused' | 'active' | 'stopped'
+
+export type SendRemoteOptions = {
+  volatile?: boolean
+  socketIds?: string[]
+}
+
+export type SendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, options?: SendRemoteOptions) => Promise<void> | void
+
+export type RemoteEvent = "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
 
 export type RemoteData<T extends RemoteEvent> = 
-  T extends "browser" ? { }
-  : T extends "mouse-click" ? RemoteMouseData
+  T extends "mouse-click" ? RemoteMouseData
   : T extends "mouse-dblclick" ? RemoteMouseData
   : T extends "mouse-leftclick" ? RemoteMouseData
   : T extends "mouse-move" ? RemoteMouseData
   : T extends "mouse-down" ? RemoteMouseData
   : T extends "mouse-up" ? RemoteMouseData
   : T extends "mouse-wheel" ? RemoteMouseData
-  : T extends "toggle-freeze" ? { enabled: boolean }
-  : T extends "pause" ? { enabled: boolean }
-  : T extends "hide" ? { hidden: boolean }
-  : T extends "type" ? { key: string }
-  : T extends "copy" ? {}
-  : T extends "cut" ? {}
-  : T extends "paste" ? { text: string }
+  : T extends "key-down" ? RemoteKeyData
+  : T extends "copy" ? RemoteCopyData
+  : T extends "paste" ? RemotePasteData
   : T extends "text" ? RemoteTextData
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
   : T extends "reset" ? RemoteResetData
-  : T extends "mouse-control" ? { enabled: boolean }
-  : T extends "remote-control" ? { enabled: boolean }
   : never
 
   export type RemoteMouseData = {
@@ -149,7 +155,22 @@ export type RemoteData<T extends RemoteEvent> =
     x: number
     y: number
     delta?: number
-    draw?: boolean
+    tool?: ViewerTool
+  }
+
+  export type RemoteKeyData = {
+    key: string
+    tool?: ViewerTool
+  }
+
+  export type RemoteCopyData = {
+    cut?: boolean
+    tool?: ViewerTool
+  }
+
+  export type RemotePasteData = {
+    text: string
+    tool?: ViewerTool
   }
 
   export type RemoteTextData = {
@@ -171,15 +192,19 @@ export type RemoteData<T extends RemoteEvent> =
 
   export type RemoteResetData = {
     isScreen: boolean
+    inBrowser: boolean
     dimensions: Dimensions
     coverBounds: Rectangle[]
+    pointerEnabled: boolean
+    remoteControlEnabled: boolean
+    streamState: StreamState
   }
 
   export type OverlayData = {
     users?: UserData[]
     scale?: number
-    mouseEnabled?: boolean
-    remoteControlActive?: boolean
+    pointerEnabled?: boolean
+    remoteControlEnabled?: boolean
   }
 
   export type Dimensions = {
@@ -189,23 +214,21 @@ export type RemoteData<T extends RemoteEvent> =
     bottom: number
   }
 
-  export type Rectangle = {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
-
   export type Point = {
     x: number
     y: number
   }
 
+  export type Size = {
+    width: number
+    height: number
+  }
+
+  export type Rectangle = Point & Size
+
   export type File = {
     content: string
     name?: string
   }
-
-  export type Size = { width: number, height: number }
 
   export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }
