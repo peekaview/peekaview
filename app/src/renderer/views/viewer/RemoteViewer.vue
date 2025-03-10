@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
 
-import { notify, isTouchEnabled } from '../../util'
+import { notify, isTouchEnabled, getPlatform } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { useRemoteHandlers } from "../../composables/useRemoteHandlers"
 
@@ -274,8 +274,7 @@ function onWheel(e: WheelEvent) {
     
     if (delta !== 0) {
       e.preventDefault()
-      doZoom(-delta)
-      
+      doZoom(getPlatform() === 'mac' ? -delta : delta)
     }
   }
 }

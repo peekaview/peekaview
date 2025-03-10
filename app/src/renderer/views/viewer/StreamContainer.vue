@@ -50,10 +50,6 @@ const emit = defineEmits<{
   <T extends RemoteEvent>(e: 'send', data: { event: T, data: RemoteData<T>, options: SendOptions }): void
 }>()
 
-// Create a reactive reference to inputEnabled
-const inputEnabled = toRef(props, 'inputEnabled')
-const freezeOnInteraction = toRef(props, 'freezeOnInteraction')
-
 watch(() => props.stream, (stream) => {
   if (!stream || !videoRef.value)
     return
@@ -114,7 +110,7 @@ watch(() => props.pointerEnabled, () => {
   overlaySignals.clear()
 })
 
-const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "key-down", data: { key, tool: props.activeTool }, options: { receiveSelf: true, volatile: true } }), inputEnabled)
+const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "key-down", data: { key, tool: props.activeTool }, options: { receiveSelf: true, volatile: true } }), computed(() => props.inputEnabled))
 watch(() => pressed.shift, (shift) => {
   emit('panzoom-toggle', shift)
 }, { immediate: true })
@@ -135,7 +131,7 @@ let isMouseDragging = false
 
 let freezeThrottling = false
 function freezeVideo() { // prevent viewer from seeing the maximized browser preventer
-  if (freezeThrottling || !freezeOnInteraction.value)
+  if (freezeThrottling || !props.freezeOnInteraction)
     return
 
   freezeThrottling = true
@@ -183,17 +179,15 @@ function onWheel(e: WheelEvent) {
     ctrlKey: e.ctrlKey,
     metaKey: e.metaKey,
     timestamp: Date.now()
-  })
+  }, props.inputEnabled, props.inputEnabled)
 
   // Prevent browser's default behavior (forward/backward navigation) when Shift+wheel is used
   if (e.shiftKey)
     e.preventDefault()
 
-  if (e.ctrlKey || e.metaKey || e.shiftKey || !inputEnabled.value)
+  if (e.ctrlKey || e.metaKey || e.shiftKey || !props.inputEnabled)
     return
-
   
-
   if (lastWheel < (Date.now() - 200)) {
     currentMouseData.delta = e.deltaY
     lastWheel = Date.now()
@@ -206,7 +200,7 @@ let eventToSend: number | undefined
 let lastMouseDown = 0
 let moveHandler: ((event: MouseEvent) => void) | undefined
 function onMouseUp() {
-  if (!inputEnabled.value)
+  if (!props.inputEnabled)
     return
 
   if (moveHandler !== undefined) {
@@ -231,7 +225,7 @@ function onMouseUp() {
 }
 
 function onMouseDown(e: MouseEvent) {
-  if (!inputEnabled.value)
+  if (!props.inputEnabled)
     return
 
   if (e.which == 3) {
@@ -284,7 +278,7 @@ let lastPosX = 0
 let lastPosY = 0
 let lastMove = 0
 function onMouseMove(e: MouseEvent) {
-  if (!inputEnabled.value)
+  if (!props.inputEnabled)
     return false
 
   emit('mouse-inside', true)
@@ -316,14 +310,14 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseEnter() {
-  if (!inputEnabled.value)
+  if (!props.inputEnabled)
     return
 
   emit('mouse-inside', true)
 }
 
 function onMouseLeave() {
-  if (!inputEnabled.value)
+  if (!props.inputEnabled)
     return
 
   emit('mouse-inside', false)
@@ -400,7 +394,7 @@ defineExpose({
       :style="overlayStyle"
       @mouseenter="onMouseEnter"
       @mouseleave="onMouseLeave"
-      @mousemove="onMouseMove"
+      @mousemove="onMouseMove" als Einheit
       @mouseup="onMouseUp"
       @mousedown="onMouseDown"
       @wheel="onWheel"

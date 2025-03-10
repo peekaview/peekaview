@@ -5,7 +5,8 @@ html {
   --primary-hover-color: #1557b0;
   --text-color: #cccccc;
   --header-color: #bbb;
-  --link-color: #bbb;
+  --link-color: #fff;
+  --button-text-color: #bbb;
   --panel-bg-color: #3333339e;
   --input-bg-color: #0006;
   --input-bg-focus-color: #000b;
@@ -15,10 +16,20 @@ html {
 html {
   height: 100vh;
 }
+
 body {
   margin: 0;
   padding: 0;
   height: 100vh;
+}
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 .content-wrapper {
@@ -26,10 +37,6 @@ body {
   max-width: 600px;
   margin: 4rem auto;
   flex-shrink: 0;
-}
-
-.btn-link {
-  color: white;
 }
 
 /* Section Styles */
@@ -200,41 +207,25 @@ body {
 .tabs {
   flex: 0 0 auto;
   display: flex;
-  gap: 0rem;
-  margin-left: -30px;
-  margin-right: -30px;
+  margin-left: -2rem;
+  margin-right: -2rem;
+  margin-top: -2rem;
 }
 
 .tab {
   cursor: pointer;
   /*background: #626262;*/
-  margin-top: -30px;
   width: 100%;
-  border-radius: 10px 10px 0px 0px;
   padding-right: 20px;
   padding: 5px;
   padding-left: 20px;
   text-align: center;
 }
 
-
-.tab:first-child {
-  border-radius: 10px 0px 0px 0px;
-}
-
-.tab:last-child {
-  border-radius: 0px 10px 0px 0px;
-}
-
 .tab.active {
   font-weight: bold;
   color: white;
   border-bottom: 3px solid var(--primary-color);
-  background: transparent;
-}
-
-.download-option a {
-  color: white;
 }
 
 .pill-tag {
@@ -249,6 +240,27 @@ body {
 
 .pill-tag:hover {
   background-color: var(--input-bg-focus-color);
+}
+
+.close-button {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--text-color);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 @keyframes spin {

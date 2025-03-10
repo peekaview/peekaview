@@ -7,12 +7,16 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
   const _space = ref(false)
   const _skip = ref(false)
 
-  // readonly
-  const control = computed(() => _control.value)
-  const alt = computed(() => _alt.value)
-  const shift = computed(() => _shift.value)
-  const space = computed(() => _space.value)
-  const skip = computed(() => _skip.value)
+  watch(inputEnabled, (enabled) => {
+    if (enabled)
+      return
+    
+    _control.value = false
+    _alt.value = false
+    _shift.value = false
+    _space.value = false
+    _skip.value = false
+  })
 
   function onKeyUp(e: KeyboardEvent) {
     if (!inputEnabled.value)
@@ -110,16 +114,12 @@ export function useKeyListeners(send: (key: string) => void, inputEnabled: Ref<b
     }
   }
 
-  // Reset state when inputEnabled changes to false
-  watch(inputEnabled, (enabled) => {
-    if (!enabled) {
-      _control.value = false
-      _alt.value = false
-      _shift.value = false
-      _space.value = false
-      _skip.value = false
-    }
-  })
+  // readonly
+  const control = computed(() => _control.value)
+  const alt = computed(() => _alt.value)
+  const shift = computed(() => _shift.value)
+  const space = computed(() => _space.value)
+  const skip = computed(() => _skip.value)
 
   return { pressed: reactive({ control, alt, shift, space, skip }), onKeyDown, onKeyUp }
 }

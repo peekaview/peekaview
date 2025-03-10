@@ -61,7 +61,7 @@ function shareViaApp() {
   
   <div class="download-option">
     <span>{{ $t('share.download.prompt') }}</span>
-    <a :href="downloadLink" class="btn btn-link" download>
+    <a :href="downloadLink" download>
       {{ $t('share.download.button') }}
     </a>
   </div>
@@ -93,10 +93,10 @@ function shareViaApp() {
 }
 
 .continue-in-browser:hover {
+  background-color: #0002;
   color: var(--link-color) !important;
   border-color: var(--link-color) !important;
 }
-
 
 .divider {
   text-align: center;
@@ -130,20 +130,15 @@ function shareViaApp() {
 }
 
 .download-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  gap: 0.5rem;
   padding: 1rem;
   border-top: 1px solid rgba(0,0,0,0.05);
   margin-top: 1rem;
   font-size: 0.9rem;
-}
-
-.download-option a {
-  color: var(--primary-color);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.download-option a:hover {
-  text-decoration: underline;
 }
 </style>

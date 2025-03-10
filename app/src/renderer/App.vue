@@ -256,15 +256,6 @@ footer select {
   font-size: 0.85rem
 }
 
-.footer-content a {
-  color: var(--link-color);
-  text-decoration: none;
-}
-
-.footer-content a:hover {
-  color: var(--text-color);
-}
-
 /* Responsive Adjustments */
 @media (max-width: 640px) {
   .main-container {

@@ -1,6 +1,6 @@
 <template>
-  <div class="info-container">
-    <div class="panel">
+  <div class="info-container" @click="$emit('close')">
+    <div class="panel" @click.stop>
       <div class="close-button" @click="$emit('close')">×</div>
       <h1>Datenschutzerklärung</h1>
       
@@ -62,26 +62,3 @@
     </div>
   </div>
 </template>
-
-<style scoped>
-.close-button {
-  position: absolute;
-  top: 15px;
-  right: 20px;
-  font-size: 24px;
-  font-weight: bold;
-  cursor: pointer;
-  color: var(--text-color);
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-}
-
-.close-button:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-</style>
