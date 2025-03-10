@@ -39,6 +39,8 @@ import RequestIcon from '../assets/img/request.png'
 import QuitIcon from '../assets/img/quit.png'
 import { getStore } from './store'
 
+import { setup as setupPushReceiver } from 'firebase-electron';
+
 declare const APP_VERSION: string
 declare const CSP_POLICY: string
 
@@ -254,7 +256,9 @@ declare const CSP_POLICY: string
       log.info('External URL requested:', url)
       shell.openExternal(url)
       return { action: 'deny' }
-    })
+    })    
+    
+    setupPushReceiver(presenterWindow.webContents);
 
     windowLoad(presenterWindow, 'presenter', { data: code })
 

@@ -10,6 +10,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/peekaview/peekaview.git"
+    
   },
   "main": "./out/main/main.js",
   "scripts": {
@@ -39,7 +40,7 @@
     "electron-store": "^10.0.1",
     "electron-updater": "^6.1.7",
     "engine.io-client": "^6.5.3",
-    "firebase": "^11.3.1",
+    "firebase-electron": "^1.1.0",
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
     "koffi": "^2.9.2",

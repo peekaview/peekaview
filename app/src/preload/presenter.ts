@@ -4,6 +4,8 @@ import { base } from './base'
 
 import { DialogOptions, RemoteData, RemoteEvent } from '../interface'
 
+import './firebase'
+
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
   dialog: (options: DialogOptions) => ipcRenderer.invoke('dialog', options),
