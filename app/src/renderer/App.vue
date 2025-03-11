@@ -32,18 +32,16 @@ if (!localStorage.getItem('uuid')) {
   localStorage.setItem('uuid', uuidv4())
 }
 
-if (!localStorage.getItem('pushToken')) {
-  getPushToken().then(async (token) => {
-    localStorage.setItem('pushToken', token)
-    
-    const uuid = await getUuid()
-    callApi({
-      action: 'registerPushToken',
-      uuid,
-      token,
-    })
+getPushToken().then(async (token) => {
+  const uuid = await getUuid()
+  callApi({
+    action: 'registerPushToken',
+    uuid,
+    token,
   })
-}
+}, (error) => {
+  console.error('error getting token', error)
+})
 
 watch(activeViewerData, (data) => {
   if (!data) {

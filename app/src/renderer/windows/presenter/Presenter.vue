@@ -6,7 +6,6 @@ import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
-import { getPushToken } from '../../firebase'
 import { getUuid, notify, prompt } from '../../util'
 import { callApi, UnauthorizedError } from '../../api'
 
@@ -21,30 +20,28 @@ const remoteControlEnabled = ref(false)
 const presenter = ref<Presenter>()
 const unauthorized = ref(false)
 
-/*window.electronAPI!.getPushToken().then(token => {
-  window.electronAPI!.log('token', token)
-  if (!token) {
-    getPushToken().then(async (token) => {
-      window.electronAPI!.log('new token', token)
-      window.electronAPI!.setPushToken(token)
-      
-      const uuid = await getUuid()
-      callApi({
-        action: 'registerPushToken',
-        uuid,
-        token,
-      })
-    }, (error) => {
-      window.electronAPI!.log('error getting token', error)
-    })
-  }
-})*/
-
 onMounted(() => present())
 
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
   presenter.value?.cleanUpCallbacks()
+})
+
+window.electronAPI?.onFirebaseStarted((token) => {
+  updatePushToken(token)
+})
+
+window.electronAPI?.onFirebaseError((error) => {
+  console.error('Firebase error:', error)
+  window.electronAPI?.log('Firebase error:', error)
+})
+
+window.electronAPI?.onFirebaseTokenUpdated((token) => {
+  updatePushToken(token)
+})
+
+window.electronAPI?.onFirebaseNotificationReceived((notification) => {
+  console.log('Firebase notification received:', notification)
 })
 
 window.electronAPI?.onOpenScreenSourceSelection(() => {
@@ -128,6 +125,16 @@ async function present() {
     }
   })
   presenter.value.startSession()
+}
+
+async function updatePushToken(token: string) {
+  console.log('updatePushToken', token)
+  const uuid = await getUuid()
+  callApi({
+    action: 'registerPushToken',
+    uuid,
+    token,
+  })
 }
 
 function select(source: ScreenSource) {

@@ -9,7 +9,7 @@
     "src/renderer/env.d.ts",
     "src/renderer/**/*",
     "src/renderer/**/*.vue",
-    "src/preload/*.d.ts",
+    "src/preload/**/*",
     "src/firebase.json",
     "src/interface.d.ts",
     "src/util.ts",

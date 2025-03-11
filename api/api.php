@@ -435,6 +435,9 @@ function registerMyEmail() {
 }
 
 function registerPushToken() {
+    $userFile = getUserFile();
+    authorizeUser($userFile);
+
     $uuid = $_GET['uuid'];
     $pushToken = $_GET['token'];
     $pushFile = getPushFilename($uuid);
@@ -443,6 +446,9 @@ function registerPushToken() {
 }
 
 function sendPushNotification() {
+    $userFile = getUserFile();
+    authorizeUser($userFile);
+    
     $uuid = $_GET['uuid'];
     $pushFile = getPushFilename($uuid);
     if (!file_exists($pushFile)) {

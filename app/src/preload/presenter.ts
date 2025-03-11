@@ -1,13 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
-
+import { firebase } from './firebase'
 import { DialogOptions, RemoteData, RemoteEvent, SendRemote } from '../interface'
-
-import './firebase'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
+  ...firebase,
   dialog: (options: DialogOptions) => ipcRenderer.invoke('dialog', options),
   sendRemote: <T extends RemoteEvent>(event: T, data: RemoteData<T>) => ipcRenderer.invoke('on-remote', event, data),
   onRemote: (callback: SendRemote) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
