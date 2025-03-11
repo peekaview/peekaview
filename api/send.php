@@ -33,10 +33,3 @@ function sendMessage($title, $message, $token) {
         echo "Error sending message to " . $token . " " . $e->getMessage() . "\n";
     }
 }
-
-// Example usage
-$token = 'dxpfjEr6QVTyuC74hMjl9t:APA91bFTfeX2zUCjTpSTLGx3xh_NOTXCOuUgPhs1zd6JswjsmDYN0y5oUP6sWPa06ldPKDz3nc1iwKOyDihlyQMy42cCBxBiC4tOs0UU_cjxKnfqC-9VC0Q';
-sendMessage('hi', 'how are you', $token);
-
-
-// composer require kreait/firebase-php
