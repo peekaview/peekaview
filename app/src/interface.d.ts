@@ -24,6 +24,9 @@ declare global {
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
+  getUuid: () => Promise<string>,
+  getPushToken: () => Promise<string | undefined>,
+  setPushToken: (token: string) => Promise<void>,
   dialog: (options: DialogOptions) => Promise<void>,
   getResourcesPath: () => Promise<string>,
   sendRemote: SendRemote,

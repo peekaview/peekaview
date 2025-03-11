@@ -11,7 +11,6 @@ import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
 import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
-import { uuidv4 } from "../../../util.js"
 import { usePanzoom } from './usePanzoom'
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
@@ -385,7 +384,7 @@ function sendFile(item: DataTransferItem, name?: string) {
     reader.onload = (event) => {
       const chunks = chunkFile(event.target!.result as string)
 
-      const id = uuidv4()
+      const id = localStorage.getItem('uuid')!
       send('file', {
         id,
         name: name ?? blob.name,

@@ -125,3 +125,10 @@ export async function getStaticResourcesPath() {
   }
   return prefix ? `${prefix}/static` : ''
 }
+
+export async function getUuid() {
+  if (window.electronAPI)
+    return window.electronAPI.getUuid()
+
+  return localStorage.getItem('uuid')!
+}

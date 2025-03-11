@@ -17,6 +17,7 @@ import {
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
+import { uuidv4 } from '../util'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
 
@@ -148,6 +149,10 @@ declare const CSP_POLICY: string
 
   const store = await getStore()
   let users: UserData[] = []
+
+  if (!store.get('uuid')) {
+    store.set('uuid', uuidv4())
+  }
 
   if (process.platform === 'win32')
     app.setAppUserModelId(app.name)
@@ -364,13 +369,13 @@ declare const CSP_POLICY: string
       log.info('External URL requested:', url)
       shell.openExternal(url)
       return { action: 'deny' }
-    })    
+    })
     
     setupPushReceiver(presenterWindow.webContents);
 
     windowLoad(presenterWindow, 'presenter', { data: code })
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    //presenterWindow.webContents.openDevTools()
+    presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
@@ -648,6 +653,18 @@ declare const CSP_POLICY: string
 
   ipcMain.handle('resize-window', async (_event, windowName: string, dimensions: ElectronWindowDimensions) => {
     remotePresenter?.resizeWindow(windowName, dimensions)
+  })
+
+  ipcMain.handle('get-uuid', async (_event) => {
+    return store.get('uuid')
+  })
+
+  ipcMain.handle('get-push-token', async (_event) => {
+    return store.get('pushToken')
+  })
+
+  ipcMain.handle('set-push-token', async (_event, token: string) => {
+    store.set('pushToken', token)
   })
 
   // Create a helper function to create resized template menu icons

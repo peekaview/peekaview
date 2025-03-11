@@ -13,6 +13,10 @@ import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData } from './types'
+import { uuidv4 } from '../util'
+import { getPushToken } from './firebase'
+import { callApi } from './api'
+import { getUuid } from './util'
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, name, target, viewEmail } = useParamsData()
@@ -23,6 +27,23 @@ const recentContacts = ref<string[]>(JSON.parse(localStorage.getItem('recentCont
 const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
 const activeViewerData = ref<ViewerData | undefined>()
 const isViewFixed = computed(() => action === Action.View && !!formViewerData.value.email)
+
+if (!localStorage.getItem('uuid')) {
+  localStorage.setItem('uuid', uuidv4())
+}
+
+if (!localStorage.getItem('pushToken')) {
+  getPushToken().then(async (token) => {
+    localStorage.setItem('pushToken', token)
+    
+    const uuid = await getUuid()
+    callApi({
+      action: 'registerPushToken',
+      uuid,
+      token,
+    })
+  })
+}
 
 watch(activeViewerData, (data) => {
   if (!data) {

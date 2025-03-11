@@ -10,6 +10,7 @@
     "src/renderer/**/*",
     "src/renderer/**/*.vue",
     "src/preload/*.d.ts",
+    "src/firebase.json",
     "src/interface.d.ts",
     "src/util.ts",
     "src/composables/**/*"

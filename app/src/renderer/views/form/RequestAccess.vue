@@ -4,9 +4,9 @@ import { useI18n } from 'vue-i18n'
 
 import type { AcceptedRequestData, ViewerData } from '../../types'
 import { callApi } from '../../api'
-import { getPlatform, notify } from '../../util'
+import { getPlatform, getUuid, notify } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
-import { stringToColor, uuidv4 } from '../../../util'
+import { stringToColor } from '../../../util'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -135,15 +135,25 @@ async function requestScreen(params: RequestParams, initial = false) {
     handleError()
   }
 }
-    
-function handleRequestAccepted(data: AcceptedRequestData) {
+
+async function sendPushNotification(title: string, message: string) {
+  const data = await callApi<Response>({
+    action: 'sendPushNotification',
+    uuid: props.contact.uuid,
+    title,
+    message,
+  })
+}
+
+async function handleRequestAccepted(data: AcceptedRequestData) {
   console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined
   requestStatus.value = undefined
 
+  const id = await getUuid()
   emit('accepted', {
     user: {
-      id: uuidv4(),
+      id,
       name: props.contact.name,
       color: stringToColor(props.contact.name ?? 'Anonymous'),
       platform: getPlatform(),

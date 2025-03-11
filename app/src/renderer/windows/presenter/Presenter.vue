@@ -6,8 +6,9 @@ import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
-import { notify, prompt } from '../../util'
-import { UnauthorizedError } from '../../api'
+import { getPushToken } from '../../firebase'
+import { getUuid, notify, prompt } from '../../util'
+import { callApi, UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
 
@@ -19,6 +20,25 @@ const remoteControlEnabled = ref(false)
 
 const presenter = ref<Presenter>()
 const unauthorized = ref(false)
+
+/*window.electronAPI!.getPushToken().then(token => {
+  window.electronAPI!.log('token', token)
+  if (!token) {
+    getPushToken().then(async (token) => {
+      window.electronAPI!.log('new token', token)
+      window.electronAPI!.setPushToken(token)
+      
+      const uuid = await getUuid()
+      callApi({
+        action: 'registerPushToken',
+        uuid,
+        token,
+      })
+    }, (error) => {
+      window.electronAPI!.log('error getting token', error)
+    })
+  }
+})*/
 
 onMounted(() => present())
 

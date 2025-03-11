@@ -19,6 +19,15 @@ export type ApiRequestParams = {
   action: "registerMyEmail"
   email: string
   target: 'web' | 'app'
+} | {
+  action: "registerPushToken"
+  uuid: string
+  token: string
+} | {
+  action: "sendPushNotification"
+  uuid: string
+  title: string
+  message: string
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {

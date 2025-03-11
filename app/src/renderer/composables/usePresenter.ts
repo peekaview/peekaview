@@ -4,9 +4,9 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform } from '../util'
+import { getPlatform, getUuid } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote } from '../../interface'
-import { stringToColor, uuidv4 } from '../../util'
+import { stringToColor } from '../../util'
 
 interface Request {
   request_id: string
@@ -152,9 +152,10 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     try {
       const acceptedData = await callApi<AcceptedRequestData>(requestData)
 
+      const id = await getUuid()
       screenShareData.value = {
         user: {
-          id: uuidv4(),
+          id,
           name: unref(data.email),
           color: stringToColor(unref(data.email)),
           platform: getPlatform(),
