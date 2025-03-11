@@ -1,4 +1,4 @@
-import { Platform } from 'src/interface'
+import { Platform, UserData } from 'src/interface'
 import Swal from 'sweetalert2'
 
 export type DialogOptions = {
@@ -126,9 +126,35 @@ export async function getStaticResourcesPath() {
   return prefix ? `${prefix}/static` : ''
 }
 
-export async function getUuid() {
+export function getStoredItem(key: string) {
   if (window.electronAPI)
-    return window.electronAPI.getUuid()
+    return window.electronAPI.getStoredItem(key)
 
-  return localStorage.getItem('uuid')!
+  return Promise.resolve(localStorage.getItem(key))
+}
+
+export function setStoredItem(key: string, value: string) {
+  if (window.electronAPI) {
+    window.electronAPI.setStoredItem(key, value)
+    return
+  }
+
+  localStorage.setItem(key, value)
+}
+
+export function removeStoredItem(key: string) {
+  if (window.electronAPI) {
+    window.electronAPI.removeStoredItem(key)
+    return
+  }
+
+  localStorage.removeItem(key)
+}
+
+export async function incrementRecentContacts(contacts: UserData[]) {
+  const recentContacts = JSON.parse(await getStoredItem('recentContacts') ?? '{}')
+  for (const contact of contacts) {
+    recentContacts[contact.id] = { name: contact.name, email: contact.email }
+  }
+  setStoredItem('recentContacts', JSON.stringify(recentContacts))
 }

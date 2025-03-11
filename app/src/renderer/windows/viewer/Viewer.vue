@@ -3,9 +3,15 @@ import { ref } from 'vue'
 import { ViewerData } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
+import { getStoredItem } from '../../util'
 
 const formViewerData = ref<ViewerData>({ email: '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
+
+getStoredItem('name').then(value => {
+  if (value)
+    formViewerData.value.name = value
+})
 </script>
 
 <template>

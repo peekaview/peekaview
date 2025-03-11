@@ -1,3 +1,5 @@
+import { UserData } from "./interface";
+
 export function stringToColor(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -31,4 +33,26 @@ export function hexToRgb(hex: string) {
     g: parseInt(result[2], 16),
     b: parseInt(result[3], 16)
   } : null
+}
+
+export function parseCode(code: string | undefined) {
+  if (!code)
+    return { email: undefined, token: undefined }
+
+  const params = new URLSearchParams(atob(code))
+  console.log("parseCode", params.toString())
+  return {
+    email: params.get('email') ?? undefined,
+    token: params.get('token') ?? undefined,
+  }
+}
+
+export function displayContact(contact: UserData) {
+  if (!contact.email)
+    return contact.name
+  
+  if (!contact.name)
+    return contact.email
+
+  return `${contact.name} (${contact.email})`
 }

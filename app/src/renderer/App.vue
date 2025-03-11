@@ -13,34 +13,48 @@ import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData } from './types'
-import { uuidv4 } from '../util'
+import { uuidv4, displayContact } from '../util'
 import { getPushToken } from './firebase'
 import { callApi } from './api'
-import { getUuid } from './util'
+import { getStoredItem, setStoredItem } from './util'
+import { UserData } from '../interface'
 
 const showInfo = ref<"imprint" | "gdpr">()
-const { action, token, email, name, target, viewEmail } = useParamsData()
+const { action, token, email, target, viewEmail } = useParamsData()
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
-const recentContacts = ref<string[]>(JSON.parse(localStorage.getItem('recentContacts') ?? '[]'))
-const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: name ?? '' })
+const recentContacts = ref<Record<string, UserData>>({})
+const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
-const isViewFixed = computed(() => action === Action.View && !!formViewerData.value.email)
+const isViewFixed = computed(() => action === Action.View && viewEmail)
 
-if (!localStorage.getItem('uuid')) {
-  localStorage.setItem('uuid', uuidv4())
-}
+getStoredItem('name').then(value => {
+  if (value)
+    formViewerData.value.name = value
+})
 
-getPushToken().then(async (token) => {
-  const uuid = await getUuid()
-  callApi({
-    action: 'registerPushToken',
-    uuid,
-    token,
+getStoredItem('recentContacts').then(value => {
+  if (value)
+    recentContacts.value = JSON.parse(value)
+})
+
+const uuidPromise = getStoredItem('uuid')
+uuidPromise.then(uuid => {
+  if (!uuid) {
+    uuid = uuidv4()
+    setStoredItem('uuid', uuid)
+  }
+
+  getPushToken().then(async (token) => {
+    callApi({
+      action: 'registerPushToken',
+      uuid,
+      token,
+    })
+  }, (error) => {
+    console.error('error getting token', error)
   })
-}, (error) => {
-  console.error('error getting token', error)
 })
 
 watch(activeViewerData, (data) => {
@@ -50,15 +64,6 @@ watch(activeViewerData, (data) => {
   }
   
   document.body.classList.add('view-active')
-  const index = recentContacts.value.findIndex(email => email === data.email)
-  let newContacts = recentContacts.value
-  if (index >= 0)
-    newContacts.splice(index, 1)
-  recentContacts.value = [...newContacts, data.email]
-})
-
-watch(recentContacts, (value) => {
-  localStorage.setItem('recentContacts', JSON.stringify(value))
 })
 
 const locale = computed({
@@ -117,13 +122,15 @@ const locale = computed({
                 @submit="activeViewerData = formViewerData"
               />
 
-              <template v-if="!isViewFixed && recentContacts.length > 0">
+              <template v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
                 <hr>
                 <h6>{{ $t('app.form.recentContacts') }}:</h6>
                 <div class="recent-contacts">
-                  <div v-for="email in recentContacts" :key="email" class="pill-tag" @click="formViewerData.email = email">
-                    {{ email }}
-                  </div>
+                  <template v-for="(contact, id) in recentContacts" :key="id">
+                    <div v-if="contact.email" class="pill-tag" @click="formViewerData.email = contact.email">
+                      {{ displayContact(contact) }}
+                    </div>
+                  </template>
                 </div>
               </template>
             </template>

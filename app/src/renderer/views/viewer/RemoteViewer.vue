@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
 
-import { notify, isTouchEnabled, getPlatform } from '../../util'
+import { notify, isTouchEnabled, getPlatform, getStoredItem, incrementRecentContacts } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { useRemoteHandlers } from "../../composables/useRemoteHandlers"
 
@@ -40,7 +40,18 @@ const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('conta
 
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
+const users2 = computed(() => Object.values(screenView.value?.participants ?? {}))
 const stream = ref<MediaStream>()
+
+watch(() => screenView.value?.participants, async (participants) => {
+  const socketId = screenView.value?.presenterSocketId
+  if (!participants || !socketId)
+    return
+
+  const presenter = participants[socketId]
+  if (presenter)
+    incrementRecentContacts([presenter.user])
+}, { deep: true })
 
 const streamState = ref<StreamState>('stopped')
 let streamStateTimeout: number
@@ -381,10 +392,10 @@ function sendFile(item: DataTransferItem, name?: string) {
   return new Promise<globalThis.File>((resolve, reject) => {
     const blob = item.getAsFile()!
     const reader = new FileReader()
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const chunks = chunkFile(event.target!.result as string)
 
-      const id = localStorage.getItem('uuid')!
+      const id = (await getStoredItem('uuid'))!
       send('file', {
         id,
         name: name ?? blob.name,

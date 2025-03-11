@@ -24,9 +24,9 @@ declare global {
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
-  getUuid: () => Promise<string>,
-  getPushToken: () => Promise<string | undefined>,
-  setPushToken: (token: string) => Promise<void>,
+  getStoredItem: (key: string) => Promise<string>,
+  setStoredItem: (key: string, value: string) => Promise<void>,
+  removeStoredItem: (key: string) => Promise<void>,
   onFirebaseStarted: (callback: (token: string) => void) => void,
   onFirebaseError: (callback: (error: string) => void) => void,
   onFirebaseTokenUpdated: (callback: (token: string) => void) => void,
@@ -100,11 +100,16 @@ export type Platform = 'mac' | 'win' | 'linux' | 'android' | 'ios' | 'other'
 
 export type UserData = {
   id: string
-  name: string
   color: string
   platform: Platform
   inApp: boolean
-}
+} & ({
+  name: string
+  email?: string
+} | {
+  name?: string
+  email: string
+})
 
 export type PeerData = {
   type: 'identity'

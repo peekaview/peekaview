@@ -6,7 +6,8 @@ import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
 import { ScreenSource } from '../../../interface'
-import { getUuid, notify, prompt } from '../../util'
+import { getStoredItem, notify, prompt } from '../../util'
+import { parseCode } from '../../../util'
 import { callApi, UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
@@ -71,17 +72,14 @@ window.electronAPI?.onToggleRemoteControl((toggle) => {
 })
 
 async function present() {
-  let params = new URLSearchParams(window.location.search)
-  const data = params.get('data')
-  if (!data)
+  const code = new URLSearchParams(window.location.search).get('data')
+  if (!code)
     throw new Error('')
 
-  params = new URLSearchParams(atob(data))
-  const email = params.get('email')!
-  const token = params.get('token')!
+  const { email, token } = parseCode(code)
   presenter.value = usePresenter({
-    email,
-    token,
+    email: email!,
+    token: token!,
     pointerEnabled,
     remoteControlEnabled,
   }, async (shareAudio) => {
@@ -129,7 +127,7 @@ async function present() {
 
 async function updatePushToken(token: string) {
   console.log('updatePushToken', token)
-  const uuid = await getUuid()
+  const uuid = (await getStoredItem('uuid'))!
   callApi({
     action: 'registerPushToken',
     uuid,

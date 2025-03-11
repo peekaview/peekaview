@@ -4,7 +4,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform, getUuid } from '../util'
+import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote } from '../../interface'
 import { stringToColor } from '../../util'
 
@@ -37,6 +37,10 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
+
+  watch(viewers, async (viewers) => {
+    incrementRecentContacts(viewers)
+  })
 
   const pingInterval = ref<number>()
   const lastPingTime = ref<number>()
@@ -152,11 +156,11 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     try {
       const acceptedData = await callApi<AcceptedRequestData>(requestData)
 
-      const id = await getUuid()
+      const id = (await getStoredItem('uuid'))!
       screenShareData.value = {
         user: {
           id,
-          name: unref(data.email),
+          email: unref(data.email),
           color: stringToColor(unref(data.email)),
           platform: getPlatform(),
           inApp,

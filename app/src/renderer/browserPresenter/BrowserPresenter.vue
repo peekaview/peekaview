@@ -8,6 +8,7 @@ import { File, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
 import { notify, prompt, DialogOptions, NotifyOptions } from '../util'
+import { parseCode } from '../../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
 import LoadingDarkGif from '../../assets/img/loading_dark.gif'
@@ -44,17 +45,14 @@ const { send, receive, onReceive } = useRemoteHandlers(presenter)
 
 async function start() {
   userInputRequired.value = false
-  let params = new URLSearchParams(window.location.search)
-  const data = params.get('data')
-  if (!data)
+  const code = new URLSearchParams(window.location.search).get('data')
+  if (!code)
     throw new Error('')
   
-  params = new URLSearchParams(atob(data))
-  const email = params.get('email')!
-  const token = params.get('token')!
+  const { email, token } = parseCode(code)
   presenter.value = usePresenter({
-    email,
-    token,
+    email: email!,
+    token: token!,
     pointerEnabled,
     remoteControlEnabled: false
   }, async (shareAudio) => {

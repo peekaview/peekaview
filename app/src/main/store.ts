@@ -7,8 +7,11 @@ interface MacWindowList {
 
 interface StoreSchema {
   uuid: string
+  name: string | undefined
   pushToken: string | undefined
   code: string | undefined
+  recentContacts: string | undefined
+  lastViewActive: string | undefined
   macWindowList: MacWindowList | undefined
 }
 
@@ -21,11 +24,23 @@ export async function getStore(): Promise<any> {
         uuid: {
           type: 'string',
         },
+        name: {
+          type: 'string',
+          default: undefined,
+        },
         pushToken: {
           type: 'string',
           default: undefined,
         },
         code: {
+          type: 'string',
+          default: undefined,
+        },
+        recentContacts: {
+          type: 'string',
+          default: '{}',
+        },
+        lastViewActive: {
           type: 'string',
           default: undefined,
         },

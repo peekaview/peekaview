@@ -375,7 +375,7 @@ declare const CSP_POLICY: string
 
     windowLoad(presenterWindow, 'presenter', { data: code })
     presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
   }
 
   const createViewerWindow = () => {
@@ -655,16 +655,16 @@ declare const CSP_POLICY: string
     remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
-  ipcMain.handle('get-uuid', async (_event) => {
-    return store.get('uuid')
+  ipcMain.handle('get-stored-item', async (_event, key: string) => {
+    return store.get(key)
   })
 
-  ipcMain.handle('get-push-token', async (_event) => {
-    return store.get('pushToken')
+  ipcMain.handle('set-stored-item', async (_event, key: string, value: string) => {
+    store.set(key, value)
   })
 
-  ipcMain.handle('set-push-token', async (_event, token: string) => {
-    store.set('pushToken', token)
+  ipcMain.handle('remove-stored-item', async (_event, key: string) => {
+    store.delete(key)
   })
 
   // Create a helper function to create resized template menu icons
