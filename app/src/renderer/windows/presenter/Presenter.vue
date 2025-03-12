@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
-import { ScreenSource } from '../../../interface'
-import { getStoredItem, notify, prompt } from '../../util'
+import { ContactData, ScreenSource } from '../../../interface'
+import { notify, prompt } from '../../util'
 import { parseCode } from '../../../util'
 import { callApi, UnauthorizedError } from '../../api'
 
@@ -26,23 +26,6 @@ onMounted(() => present())
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
   presenter.value?.cleanUpCallbacks()
-})
-
-window.electronAPI?.onFirebaseStarted((token) => {
-  updatePushToken(token)
-})
-
-window.electronAPI?.onFirebaseError((error) => {
-  console.error('Firebase error:', error)
-  window.electronAPI?.log('Firebase error:', error)
-})
-
-window.electronAPI?.onFirebaseTokenUpdated((token) => {
-  updatePushToken(token)
-})
-
-window.electronAPI?.onFirebaseNotificationReceived((notification) => {
-  console.log('Firebase notification received:', notification)
 })
 
 window.electronAPI?.onOpenScreenSourceSelection(() => {
@@ -69,6 +52,16 @@ window.electronAPI?.onToggleRemoteControl((toggle) => {
     remoteControlEnabled.value = !remoteControlEnabled.value  
   else
     remoteControlEnabled.value = toggle
+})
+
+window.electronAPI?.onNotifyContact((contact: ContactData) => {
+  window.electronAPI?.log('Notify contact:', contact)
+  callApi<Response>({
+    action: 'sendPushNotification',
+    uuid: contact.id,
+    title: 'PeekaView',
+    message: 'Someone wants share their screen with you!',
+  })
 })
 
 async function present() {
@@ -123,16 +116,6 @@ async function present() {
     }
   })
   presenter.value.startSession()
-}
-
-async function updatePushToken(token: string) {
-  console.log('updatePushToken', token)
-  const uuid = (await getStoredItem('uuid'))!
-  callApi({
-    action: 'registerPushToken',
-    uuid,
-    token,
-  })
 }
 
 function select(source: ScreenSource) {

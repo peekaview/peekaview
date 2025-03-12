@@ -40,7 +40,6 @@ const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('conta
 
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
-const users2 = computed(() => Object.values(screenView.value?.participants ?? {}))
 const stream = ref<MediaStream>()
 
 watch(() => screenView.value?.participants, async (participants) => {

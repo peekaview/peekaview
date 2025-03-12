@@ -224,6 +224,8 @@
     "running": "PeekaView is running",
     "shareMyScreen": "Share my screen",
     "requestScreenShare": "Request screen share",
+    "recentContacts": "Recent contacts",
+    "deleteContact": "Delete contact",
     "help": "Help",
     "about": "About PeekaView...",
     "changeLanguage": "Change language",

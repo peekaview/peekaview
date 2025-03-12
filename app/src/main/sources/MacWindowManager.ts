@@ -1,6 +1,7 @@
 import { WindowManager } from "./WindowManager"
 import { getStore } from '../store'
 import { executeCmd, resolvePath } from '../util'
+import { Rectangle } from "../../interface";
 // import focusWindow from 'mac-focus-window'
 // import { getWindows } from 'mac-windows'
 
@@ -21,7 +22,7 @@ export class MacWindowManager extends WindowManager {
     const store = await getStore()
     const windowList = store.get('macWindowList')
 
-    if (windowList?.timestamp >= Date.now() - 3000)
+    if (windowList && windowList.timestamp >= Date.now() - 3000)
       return windowList.data
 
     const regex = /\,(?=\s*?[\}\]])/g
@@ -29,7 +30,7 @@ export class MacWindowManager extends WindowManager {
 
     console.log('mac-windowlist', res)
 
-    const processlist = JSON.parse(res.replace(regex, ''))
+    const processlist = JSON.parse<string>(res.replace(regex, ''))
     console.log(processlist)
     store.set('macWindowList', { timestamp: Date.now(), data: processlist })
     return processlist
@@ -44,7 +45,7 @@ export class MacWindowManager extends WindowManager {
     try {
         // Read from the temp file instead of executing the Swift script
         const windowInfo = require('fs').readFileSync('/tmp/.peekaview_windowinfo', 'utf8').trim();
-        const info = JSON.parse(windowInfo);
+        const info = JSON.parse<Rectangle>(windowInfo);
         const innerDimensions = {
             left: info.x,
             top: info.y,

@@ -17,7 +17,7 @@ import {
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
-import { uuidv4 } from '../util'
+import { displayNameMail, uuidv4 } from '../util'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
 
@@ -29,13 +29,14 @@ if (process.platform === 'darwin') {
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
-import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData } from '../interface.js'
+import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StorageSchema, StreamerData, UserData, ContactData } from '../interface.js'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import PeekaViewIcon from '../assets/img/peekaviewicon_mono3.png'
 
+import AccountGroupIcon from '../assets/img/account-group.png'
 import HelpIcon from '../assets/img/help.png'
 import InfoIcon from '../assets/img/info.png'
 import LanguageIcon from '../assets/img/language.png'
@@ -43,6 +44,7 @@ import LogoutIcon from '../assets/img/logout.png'
 import PresentIcon from '../assets/img/present.png'
 import RequestIcon from '../assets/img/request.png'
 import QuitIcon from '../assets/img/quit.png'
+import TrashCanIcon from '../assets/img/trash-can.png'
 import { getStore } from './store'
 
 import { setup as setupPushReceiver } from 'firebase-electron';
@@ -136,6 +138,7 @@ declare const CSP_POLICY: string
   // allow superhigh cpu usage for faster video-encoding
   app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
+  let notifierWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let viewerWindow: BrowserWindow | undefined
   let presenterWindow: BrowserWindow | undefined
@@ -236,6 +239,7 @@ declare const CSP_POLICY: string
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         log.info('No windows found, creating new window on activate')
+        notifierWindow?.webContents.send('change-language', i18n.resolvedLanguage)
         loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
         viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
         presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
@@ -263,6 +267,8 @@ declare const CSP_POLICY: string
 
     log.info("App initialization complete")
     new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: updateNotificationIcon }).show()
+
+    createNotifierWindow()
   })
 
   const focusApp = () => {
@@ -306,6 +312,27 @@ declare const CSP_POLICY: string
         { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
         { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
         { type: 'separator' },
+      )
+
+      const recentContacts = JSON.parse(store.get('recentContacts') ?? '{}') as Record<string, ContactData>
+      if (recentContacts && Object.keys(recentContacts).length > 0) {
+        const submenu: Array<(Electron.MenuItemConstructorOptions)> = []
+        for (const id in recentContacts) {
+          submenu.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
+            { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
+            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(recentContacts[id]) },
+            { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
+              delete recentContacts[id]
+              store.set('recentContacts', JSON.stringify(recentContacts))
+              updateContextMenu()
+            } },
+          ] })
+        }
+        menuItems.push({ icon: createMenuIcon(AccountGroupIcon), label: i18n.t('trayMenu.recentContacts'), type: 'submenu', submenu })
+        menuItems.push({ type: 'separator' })
+      }
+
+      menuItems.push(
         { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
@@ -333,13 +360,46 @@ declare const CSP_POLICY: string
     })
   }
 
-  const openPresenterWindow = (code: string) => {
-    if (!presenterWindow)
-      createPresenterWindow(code)
+  const createNotifierWindow = () => {
+    notifierWindow = new BrowserWindow({
+      title: 'PeekaView',
+      icon: path.join(__dirname, PeekaViewLogo),
+      show: true,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      minimizable: false,
+      maximizable: false,
+      resizable: false,
+      focusable: false,
+      alwaysOnTop: false,
+      transparent: true,
+      skipTaskbar: true,
+      frame: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: true,
+        webSecurity: app.isPackaged,
+        //allowRunningInsecureContent: true,
+        preload: path.join(__dirname, '../preload/notifier.js'),
+      }
+    })
     
-    presenterWindow?.show()
-    presenterWindow?.focus()
-    presenterWindow?.webContents.send('open-screen-source-selection')
+    setupPushReceiver(notifierWindow.webContents);
+
+    windowLoad(notifierWindow, 'notifier')
+
+    notifierWindow.removeMenu()
+    notifierWindow.setIgnoreMouseEvents(true)
+    //notifierWindow.webContents.openDevTools()
+
+    return new Promise((resolve) => {
+      notifierWindow!.on('ready-to-show', () => {
+        notifierWindow!.webContents.send('change-language', i18n.resolvedLanguage)
+        resolve(true)
+      })
+    })
   }
 
   const createPresenterWindow = (code: string) => {
@@ -370,15 +430,19 @@ declare const CSP_POLICY: string
       shell.openExternal(url)
       return { action: 'deny' }
     })
-    
-    setupPushReceiver(presenterWindow.webContents);
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    presenterWindow?.webContents.send('change-language', i18n.resolvedLanguage)
     //presenterWindow.webContents.openDevTools()
+
+    return new Promise((resolve) => {
+      presenterWindow!.on('ready-to-show', () => {
+        presenterWindow!.webContents.send('change-language', i18n.resolvedLanguage)
+        resolve(true)
+      })
+    })
   }
 
-  const createViewerWindow = () => {
+  const createViewerWindow = (contactToNotify?: ContactData) => {
     viewerWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
@@ -392,12 +456,21 @@ declare const CSP_POLICY: string
         contextIsolation: true,
         webSecurity: app.isPackaged,
         //allowRunningInsecureContent: true,
+        preload: path.join(__dirname, '../preload/viewer.js'),
       }
     })
 
     windowLoad(viewerWindow, 'viewer')
-    viewerWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    //viewerWindow.webContents.openDevTools()
+    viewerWindow.webContents.openDevTools()
+
+    return new Promise((resolve) => {
+      viewerWindow!.on('ready-to-show', () => {
+        viewerWindow!.webContents.send('change-language', i18n.resolvedLanguage)
+        if (contactToNotify)
+          viewerWindow!.webContents.send('on-notify-contact', contactToNotify)
+        resolve(true)
+      })
+    })
   }
 
   const createLoginWindow = (discardSession = false) => {
@@ -423,12 +496,16 @@ declare const CSP_POLICY: string
       }
     })
 
+    windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
+    //loginWindow.webContents.openDevTools()
+
+    loginWindow.on('ready-to-show', () => {
+      loginWindow!.webContents.send('change-language', i18n.resolvedLanguage)
+    })
+
     loginWindow.on('close', () => {
       loginWindow = undefined
     })
-    windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
-    loginWindow?.webContents.send('change-language', i18n.resolvedLanguage)
-    //loginWindow.webContents.openDevTools()
   }
 
   function handleProtocol(url: string) {
@@ -443,14 +520,21 @@ declare const CSP_POLICY: string
     tryPresenting()
   }
 
-  function tryPresenting() {
+  async function tryPresenting(contactToNotify?: ContactData) {
     const code = store.get('code')
     if (!code) {
       createLoginWindow()
       return
     }
 
-    openPresenterWindow(code)
+    if (!presenterWindow)
+      await createPresenterWindow(code)
+    
+    presenterWindow?.show()
+    presenterWindow?.focus()
+    presenterWindow?.webContents.send('open-screen-source-selection')
+    if (contactToNotify)
+      presenterWindow!.webContents.send('on-notify-contact', contactToNotify)
   }
 
   function logout(discardSession = false) {
@@ -655,16 +739,20 @@ declare const CSP_POLICY: string
     remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
-  ipcMain.handle('get-stored-item', async (_event, key: string) => {
+  ipcMain.handle('get-stored-item', async <K extends keyof StorageSchema>(_event, key: K) => {
     return store.get(key)
   })
 
-  ipcMain.handle('set-stored-item', async (_event, key: string, value: string) => {
+  ipcMain.handle('set-stored-item', async <K extends keyof StorageSchema>(_event, key: K, value: StorageSchema[K]) => {
     store.set(key, value)
   })
 
-  ipcMain.handle('remove-stored-item', async (_event, key: string) => {
+  ipcMain.handle('remove-stored-item', async <K extends keyof StorageSchema>(_event, key: K) => {
     store.delete(key)
+  })
+
+  ipcMain.handle('notify', async (_event, title: string, body: string) => {
+    new Notification({ title, body, icon: updateNotificationIcon }).show()
   })
 
   // Create a helper function to create resized template menu icons

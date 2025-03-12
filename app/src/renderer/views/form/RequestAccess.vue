@@ -124,15 +124,6 @@ async function requestScreen(params: RequestParams, initial = false) {
   }
 }
 
-/*async function sendPushNotification(title: string, message: string) {
-  const data = await callApi<Response>({
-    action: 'sendPushNotification',
-    uuid: props.contact.uuid,
-    title,
-    message,
-  })
-}*/
-
 async function handleRequestAccepted(data: AcceptedRequestData) {
   console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined

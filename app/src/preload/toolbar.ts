@@ -18,5 +18,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showSharingActive: () => ipcRenderer.invoke('show-sharing-active'),
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => ipcRenderer.invoke('resize-window', windowName, dimensions),
 })
-
-console.log('Preload script has been loaded');

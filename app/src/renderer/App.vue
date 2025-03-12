@@ -13,21 +13,21 @@ import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData } from './types'
-import { uuidv4, displayContact } from '../util'
+import { uuidv4, displayNameMail } from '../util'
 import { getPushToken } from './firebase'
 import { callApi } from './api'
 import { getStoredItem, setStoredItem } from './util'
-import { UserData } from '../interface'
+import { ContactData } from '../interface'
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, target, viewEmail } = useParamsData()
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
-const recentContacts = ref<Record<string, UserData>>({})
+const recentContacts = ref<Record<string, ContactData>>({})
 const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
-const isViewFixed = computed(() => action === Action.View && viewEmail)
+const isViewFixed = computed(() => action === Action.View && !!viewEmail)
 
 getStoredItem('name').then(value => {
   if (value)
@@ -128,7 +128,7 @@ const locale = computed({
                 <div class="recent-contacts">
                   <template v-for="(contact, id) in recentContacts" :key="id">
                     <div v-if="contact.email" class="pill-tag" @click="formViewerData.email = contact.email">
-                      {{ displayContact(contact) }}
+                      {{ displayNameMail(contact) }}
                     </div>
                   </template>
                 </div>
@@ -200,14 +200,6 @@ body.view-active {
   color: var(--text-color);
   background: var(--panel-bg-color);
   padding: 0.75rem 0;
-}
-
-.main-container {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  max-height: 100%; /* required for viewer video to scale correctly */
 }
 
 .header-content {

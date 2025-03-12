@@ -1,4 +1,4 @@
-import { UserData } from "./interface";
+import { AtLeastNameOrEmail } from "./interface";
 
 export function stringToColor(str: string): string {
   let hash = 0;
@@ -47,12 +47,12 @@ export function parseCode(code: string | undefined) {
   }
 }
 
-export function displayContact(contact: UserData) {
-  if (!contact.email)
-    return contact.name
+export function displayNameMail(data: AtLeastNameOrEmail) {
+  if (!data.email)
+    return data.name
   
-  if (!contact.name)
-    return contact.email
+  if (!data.name)
+    return data.email
 
-  return `${contact.name} (${contact.email})`
+  return `${data.name} (${data.email})`
 }

@@ -9,6 +9,32 @@ declare global {
     }
   }
 
+  type JsonString<T> = string
+
+  interface JSON {
+    /**
+     * Converts a JavaScript Object Notation (JSON) string into an object.
+     * @param text A valid JSON string.
+     * @param reviver A function that transforms the results. This function is called for each member of the object.
+     * If a member contains nested objects, the nested objects are transformed before the parent object is.
+     */
+    parse<T>(text: JsonString<T>, reviver?: (this: any, key: string, value: keyof T) => any): T;
+    /**
+     * Converts a JavaScript value to a JavaScript Object Notation (JSON) string.
+     * @param value A JavaScript value, usually an object or array, to be converted.
+     * @param replacer A function that transforms the results.
+     * @param space Adds indentation, white space, and line break characters to the return-value JSON text to make it easier to read.
+     */
+    stringify<T>(value: T, replacer?: (this: any, key: string, value: keyof T) => any, space?: string | number): JsonString<T>;
+    /**
+     * Converts a JavaScript value to a JavaScript Object Notation (JSON) string.
+     * @param value A JavaScript value, usually an object or array, to be converted.
+     * @param replacer An array of strings and numbers that acts as an approved list for selecting the object properties that will be stringified.
+     * @param space Adds indentation, white space, and line break characters to the return-value JSON text to make it easier to read.
+     */
+    stringify<T>(value: T, replacer?: (number | string)[] | null, space?: string | number): JsonString<T>;
+  }
+
   interface MediaTrackConstraints {
     mandatory?: any
   }
@@ -24,9 +50,9 @@ declare global {
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
-  getStoredItem: (key: string) => Promise<string>,
-  setStoredItem: (key: string, value: string) => Promise<void>,
-  removeStoredItem: (key: string) => Promise<void>,
+  getStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<StorageSchema[K]>,
+  setStoredItem: <K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) => Promise<void>,
+  removeStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<void>,
   onFirebaseStarted: (callback: (token: string) => void) => void,
   onFirebaseError: (callback: (error: string) => void) => void,
   onFirebaseTokenUpdated: (callback: (token: string) => void) => void,
@@ -70,6 +96,21 @@ export interface IElectronAPI {
   onMouseClick: (callback: (data: RemoteMouseData) => void) => void,
   onUpdateOverlayData: (callback: (data: OverlayData) => void) => void,
   updateUsers: (users: string) => Promise<void>,
+  onNotifyContact: (callback: (contact: ContactData) => void) => void,
+  notify: (title: string, body: string) => Promise<void>,
+}
+
+interface StorageSchema {
+  uuid: string
+  name: string | undefined
+  pushToken: string | undefined
+  code: string | undefined
+  recentContacts: string | undefined
+  lastViewActive: string | undefined
+  macWindowList: {
+    timestamp: number
+    data: string
+  } | undefined
 }
 
 export interface ScreenSource {
@@ -98,18 +139,25 @@ export interface DialogOptions {
 
 export type Platform = 'mac' | 'win' | 'linux' | 'android' | 'ios' | 'other'
 
-export type UserData = {
-  id: string
-  color: string
-  platform: Platform
-  inApp: boolean
-} & ({
+export type AtLeastNameOrEmail = {
   name: string
   email?: string
 } | {
   name?: string
   email: string
-})
+}
+
+export type UserData = {
+  id: string
+  color: string
+  platform: Platform
+  inApp: boolean
+} & AtLeastNameOrEmail
+
+export type ContactData = {
+  id: string
+  lastActive: number
+} & AtLeastNameOrEmail
 
 export type PeerData = {
   type: 'identity'

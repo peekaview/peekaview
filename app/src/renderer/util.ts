@@ -1,4 +1,4 @@
-import { Platform, UserData } from 'src/interface'
+import { Platform, StorageSchema, ContactData, UserData } from 'src/interface'
 import Swal from 'sweetalert2'
 
 export type DialogOptions = {
@@ -126,23 +126,23 @@ export async function getStaticResourcesPath() {
   return prefix ? `${prefix}/static` : ''
 }
 
-export function getStoredItem(key: string) {
+export function getStoredItem<K extends keyof StorageSchema>(key: K) {
   if (window.electronAPI)
     return window.electronAPI.getStoredItem(key)
 
-  return Promise.resolve(localStorage.getItem(key))
+  return Promise.resolve(JSON.parse<StorageSchema[K]>(localStorage.getItem(key) ?? '{}'))
 }
 
-export function setStoredItem(key: string, value: string) {
+export function setStoredItem<K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) {
   if (window.electronAPI) {
     window.electronAPI.setStoredItem(key, value)
     return
   }
 
-  localStorage.setItem(key, value)
+  localStorage.setItem(key, JSON.stringify(value))
 }
 
-export function removeStoredItem(key: string) {
+export function removeStoredItem<K extends keyof StorageSchema>(key: K) {
   if (window.electronAPI) {
     window.electronAPI.removeStoredItem(key)
     return
@@ -151,10 +151,16 @@ export function removeStoredItem(key: string) {
   localStorage.removeItem(key)
 }
 
-export async function incrementRecentContacts(contacts: UserData[]) {
-  const recentContacts = JSON.parse(await getStoredItem('recentContacts') ?? '{}')
-  for (const contact of contacts) {
-    recentContacts[contact.id] = { name: contact.name, email: contact.email }
+export async function incrementRecentContacts(users: UserData[]) {
+  const recentContacts = JSON.parse<Record<string, ContactData>>(await getStoredItem('recentContacts') ?? '{}')
+  for (const user of users) {
+    if (user.name)
+      recentContacts[user.id].name = user.name
+    
+    if (user.email)
+      recentContacts[user.id].email = user.email
+
+    recentContacts[user.id].lastActive = Date.now()
   }
   setStoredItem('recentContacts', JSON.stringify(recentContacts))
 }
