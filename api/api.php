@@ -89,6 +89,9 @@ if (!file_exists(STORAGE_PATH . '/users')) {
 if (!file_exists(STORAGE_PATH . '/requests')) {
     mkdir(STORAGE_PATH . '/requests', 0777, true);
 }
+if (!file_exists(STORAGE_PATH . '/tempdata')) {
+    mkdir(STORAGE_PATH . '/tempdata', 0777, true);
+}
 
 function generateJWT($email, $roomId) {
     // Header
@@ -129,6 +132,19 @@ function generateRandomString($length = 10) {
         ceil($length/strlen($x)))), 1, $length);
 }
 
+function generateSafeRandomCode($length = 8) {
+    // Exclude easily confused characters: O, 0, l, I, 1
+    $chars = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+    $code = '';
+    $max = strlen($chars) - 1;
+    
+    for ($i = 0; $i < $length; $i++) {
+        $code .= $chars[random_int(0, $max)];
+    }
+    
+    return $code;
+}
+
 function getPushFilename($uuid) {
     return STORAGE_PATH . '/push/' . $uuid . '.txt';
 }
@@ -141,9 +157,13 @@ function getRequestFilename($email, $requestId) {
     return STORAGE_PATH . '/requests/' . str_replace(['@', '.'], ['_', '_'], $email) . '.' . $requestId . '.txt';
 }
 
+function getTempDataFilename($code) {
+    return STORAGE_PATH . '/tempdata/' . $code . '.txt';
+}
+
 function getUserFile() {
     global $log;
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $log[] = "Looking for user file for $email";
     
     $userFile = getUserFilename($email);
@@ -158,7 +178,7 @@ function getUserFile() {
 
 function authorizeUser($userFile) {
     global $log;
-    $token = $_GET['token'] ?? FALLBACK_TOKEN;
+    $token = $_GET['token'];
     $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
     $log[] = "User data: " . json_encode($userData);
@@ -210,7 +230,7 @@ function doesAnyoneWantToSeeMyScreen() {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $requests = [];
     $currentTime = time();
     $thirtyMinutesAgo = $currentTime - (30 * 60);
@@ -256,7 +276,7 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $lang = validateLang($_GET['lang'] ?? '');
@@ -395,7 +415,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $requestFile = getRequestFilename($email, $requestId);
     if (!file_exists($requestFile)) {
@@ -409,7 +429,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
 }
 
 function registerMyEmail() {
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
     $userFile = getUserFilename($email);
@@ -435,9 +455,6 @@ function registerMyEmail() {
 }
 
 function registerPushToken() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
-
     $uuid = $_GET['uuid'];
     $pushToken = $_GET['token'];
     $pushFile = getPushFilename($uuid);
@@ -463,6 +480,66 @@ function sendPushNotification() {
     sendMessage($title, $message, $pushToken);
 
     return ['success' => true];
+}
+
+function saveTempData() {
+    $dataToSave = $_POST['data'] ?? $_GET['data'] ?? '';
+    if (empty($dataToSave)) {
+        throw new Exception('No data provided');
+    }
+    
+    // Check data size limit (100KB)
+    if (strlen($dataToSave) > 102400) {
+        throw new Exception('Data exceeds maximum size limit of 100KB');
+    }
+    
+    // Clean up old temp files
+    $oneDayAgo = time() - (24 * 60 * 60);
+    $pattern = STORAGE_PATH . '/tempdata/*.txt';
+    foreach (glob($pattern) as $tempFile) {
+        if (filemtime($tempFile) < $oneDayAgo) {
+            unlink($tempFile);
+        }
+    }
+    
+    // Generate a unique code
+    $attempts = 0;
+    $maxAttempts = 10;
+    $code = '';
+    
+    do {
+        $code = generateSafeRandomCode(8);
+        $tempFile = getTempDataFilename($code);
+        $attempts++;
+    } while (file_exists($tempFile) && $attempts < $maxAttempts);
+    
+    if ($attempts >= $maxAttempts) {
+        throw new Exception('Failed to generate a unique code');
+    }
+    
+    // Save the data
+    file_put_contents($tempFile, $dataToSave);
+    
+    return ['code' => $code];
+}
+
+function getTempData() {
+    $code = $_GET['code'] ?? '';
+    if (empty($code) || !preg_match('/^[a-zA-Z0-9]{8}$/', $code)) {
+        throw new Exception('Invalid code format');
+    }
+    
+    $tempFile = getTempDataFilename($code);
+    if (!file_exists($tempFile)) {
+        throw new Exception('Code not found or expired');
+    }
+    
+    $data = file_get_contents($tempFile);
+    
+    // Delete the file after successful retrieval
+    unlink($tempFile);
+    
+    return ['data' => $data];
 }
 
 // Route requests with error handling
@@ -495,6 +572,12 @@ try {
             break;
         case 'sendPushNotification':
             $out = sendPushNotification();
+            break;
+        case 'saveTempData':
+            $out = saveTempData();
+            break;
+        case 'getTempData':
+            $out = getTempData();
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));
