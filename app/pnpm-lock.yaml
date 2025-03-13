@@ -14,6 +14,9 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^3.0.0
         version: 3.0.0(electron@31.7.7)
+      '@nut-tree-fork/node-mac-permissions':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@nut-tree-fork/nut-js':
         specifier: 4.2.4
         version: 4.2.4(encoding@0.1.13)
@@ -1032,19 +1035,16 @@ packages:
   '@nut-tree-fork/libnut-darwin@2.7.4':
     resolution: {integrity: sha512-ynJhXbTCEyNJP5za3tstFz5ZgGfyYYAGohC+hGiRERWsZEkIrRvZ6db4rX1awka6Q9J5tb0wO3LD53WpHsIrGA==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-linux@2.7.4':
     resolution: {integrity: sha512-XeCif5SQEV1SafiVlwt0E0sHpG1HIyaqi1Ut8NNBOWdKG5c+D7znjMcQ0WlhFGrLhaWq4E5RMaspD8aK3TXwbQ==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut-win32@2.7.4':
     resolution: {integrity: sha512-LsGSXlzahZDvKR4jQLL+aQlUzrLND392ShET9m8RGvEWuL0Sbh4T4EqTKOKvNRrqk4mt4PivivQ6QKa2YEZ6qA==}
     engines: {node: '>=10.15.3'}
-    cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
   '@nut-tree-fork/libnut@4.2.4':
@@ -1058,7 +1058,6 @@ packages:
   '@nut-tree-fork/nut-js@4.2.4':
     resolution: {integrity: sha512-PusAi1WzwatJOzwBOs/bH83gX+dim8px3egNSVg/6H798Ux4ptpNsu5U0EPxSU1Q3XAaDWjG2TRAoyNoD+lGxA==}
     engines: {node: '>=16'}
-    cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
   '@nut-tree-fork/provider-interfaces@4.2.4':
@@ -5260,7 +5259,6 @@ snapshots:
     dependencies:
       bindings: 1.5.0
       node-addon-api: 5.0.0
-    optional: true
 
   '@nut-tree-fork/nut-js@4.2.4(encoding@0.1.13)':
     dependencies:
@@ -7566,8 +7564,7 @@ snapshots:
   node-addon-api@1.7.2:
     optional: true
 
-  node-addon-api@5.0.0:
-    optional: true
+  node-addon-api@5.0.0: {}
 
   node-api-version@0.2.0:
     dependencies:
