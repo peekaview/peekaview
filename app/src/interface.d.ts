@@ -55,6 +55,7 @@ export interface IElectronAPI {
   getStoredItem: <K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) => Promise<StorageSchema[K]>,
   setStoredItem: <K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) => Promise<void>,
   removeStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<void>,
+  clearStore: () => Promise<void>,
   onFirebaseStarted: (callback: (token: string) => void) => void,
   onFirebaseError: (callback: (error: string) => void) => void,
   onFirebaseTokenUpdated: (callback: (token: string) => void) => void,

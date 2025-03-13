@@ -754,6 +754,10 @@ declare const CSP_POLICY: string
     store.delete(key)
   })
 
+  ipcMain.handle('clear-store', async () => {
+    store.clear()
+  })
+
   ipcMain.handle('notify', async (_event, title: string, body: string) => {
     new Notification({ title, body, icon: updateNotificationIcon }).show()
   })

@@ -6,6 +6,7 @@ type Store<Schema extends Object> = {
   set<K extends keyof Schema>(key: K, value: Schema[K]): void
   delete<K extends keyof Schema>(key: K): void
   has<K extends keyof Schema>(key: K): boolean
+  clear(): void
   onDidChange<K extends keyof Schema>(key: K, callback: () => void): void
 }
 

@@ -1,0 +1,7 @@
+@import 'bootstrap/dist/css/bootstrap.css';
+@import 'floating-vue/dist/style.css';
+
+@import './loading.css';
+@import './alerts.css';
+@import './remoteviewer.css';
+@import './styles.css'; 
