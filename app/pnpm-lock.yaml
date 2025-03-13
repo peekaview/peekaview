@@ -15,8 +15,8 @@ importers:
         specifier: ^3.0.0
         version: 3.0.0(electron@31.7.7)
       '@nut-tree-fork/nut-js':
-        specifier: 4.2.2
-        version: 4.2.2(encoding@0.1.13)
+        specifier: 4.2.4
+        version: 4.2.4(encoding@0.1.13)
       '@panzoom/panzoom':
         specifier: ^4.5.1
         version: 4.6.0
@@ -1026,46 +1026,46 @@ packages:
     engines: {node: ^12.13.0 || ^14.15.0 || >=16.0.0}
     deprecated: This functionality has been moved to @npmcli/fs
 
-  '@nut-tree-fork/default-clipboard-provider@4.2.2':
-    resolution: {integrity: sha512-3eb6rUknqypXQKzZjwq0Uc+fIrg63Ts7MSisCcz/Q6EcQtJOTLiKoOLV/3RsmyLNPmJTfTGJTziY52AfDAKFIg==}
+  '@nut-tree-fork/default-clipboard-provider@4.2.4':
+    resolution: {integrity: sha512-byOmZD1ryqPImYa2VBJld2ZTa7LuVkao1sAKPN2chTDUa4YT//jZ51TVGzrDfIDiqngcdrJTqpBHkfeCUj46ew==}
 
-  '@nut-tree-fork/libnut-darwin@2.7.3':
-    resolution: {integrity: sha512-9Cigcyl1285uJtQ3srt2eJQB6+yF16Bu/BN6szmP7GG/K3JZeNOR5g2SYzS0jPuFUe1uY6MMuW5m+HSps4R3RQ==}
+  '@nut-tree-fork/libnut-darwin@2.7.4':
+    resolution: {integrity: sha512-ynJhXbTCEyNJP5za3tstFz5ZgGfyYYAGohC+hGiRERWsZEkIrRvZ6db4rX1awka6Q9J5tb0wO3LD53WpHsIrGA==}
     engines: {node: '>=10.15.3'}
     cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
-  '@nut-tree-fork/libnut-linux@2.7.3':
-    resolution: {integrity: sha512-6Sb5CVee+Av+8JtHOmn0+xlS8czivSt/ZVGttErondobBLTbrUZcVg/OEcxTMGWq5tM4hIYYsYlqEOSj3hapQw==}
+  '@nut-tree-fork/libnut-linux@2.7.4':
+    resolution: {integrity: sha512-XeCif5SQEV1SafiVlwt0E0sHpG1HIyaqi1Ut8NNBOWdKG5c+D7znjMcQ0WlhFGrLhaWq4E5RMaspD8aK3TXwbQ==}
     engines: {node: '>=10.15.3'}
     cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
-  '@nut-tree-fork/libnut-win32@2.7.3':
-    resolution: {integrity: sha512-3HDHgX6IuZ8vYJYocvYQiHrsiAFInVl6ad7/I7Woy43on67UGVX0jrCPxUqzNqcAcnPga0oJJ7Ktjjj9jqb3Dg==}
+  '@nut-tree-fork/libnut-win32@2.7.4':
+    resolution: {integrity: sha512-LsGSXlzahZDvKR4jQLL+aQlUzrLND392ShET9m8RGvEWuL0Sbh4T4EqTKOKvNRrqk4mt4PivivQ6QKa2YEZ6qA==}
     engines: {node: '>=10.15.3'}
     cpu: [x64, arm64]
     os: [darwin, linux, win32]
 
-  '@nut-tree-fork/libnut@4.2.2':
-    resolution: {integrity: sha512-jxfTrVXXxanABCBcxkWxlvHqI9J5YKXLBw11v7qaqLbYXMMVMBWwif0wychgkMdere6or2g5q8Vg9R8NxdYrSg==}
+  '@nut-tree-fork/libnut@4.2.4':
+    resolution: {integrity: sha512-DvExUF47rOizYzcK/ISBoXADEIgdzcnY4eAtRjlw2ehNta8O5GbunQqmabHy74WgobFqj2Be4+n437Xy/nr9vg==}
     engines: {node: '>=10.15.3'}
 
   '@nut-tree-fork/node-mac-permissions@2.2.1':
     resolution: {integrity: sha512-iSfOTDiBZ7VDa17PoQje5rUaZSvSAaq+XEyXCmhPuQwV5XuNU02Grv6oFhsdpz89w7+UvB/8KX/cX5IYQ5o2Bw==}
     os: [darwin]
 
-  '@nut-tree-fork/nut-js@4.2.2':
-    resolution: {integrity: sha512-QA3UM47/XI7CWhR03MtZ93QPdO0GQRa3DbqfRF+3PcO8rrEk29lmC+c9BDf8X8uK4D+SVJUEF5VEbYwDeV55qA==}
+  '@nut-tree-fork/nut-js@4.2.4':
+    resolution: {integrity: sha512-PusAi1WzwatJOzwBOs/bH83gX+dim8px3egNSVg/6H798Ux4ptpNsu5U0EPxSU1Q3XAaDWjG2TRAoyNoD+lGxA==}
     engines: {node: '>=16'}
     cpu: [x64, arm64]
     os: [linux, darwin, win32]
 
-  '@nut-tree-fork/provider-interfaces@4.2.2':
-    resolution: {integrity: sha512-QNFYmVdA1NdHvJlH2u8nFEqxg8MF+6jYvZwOgg0Z+AlUjSIUTp76FvItSXyJ442xfZGVXOQLch5SRa7ixGdjCQ==}
+  '@nut-tree-fork/provider-interfaces@4.2.4':
+    resolution: {integrity: sha512-puFBaqAwiTSX+QfDn/uXC00PqPdPsjDboz4CGUfPc8JAnybPWPF51c/PxgVsoxCXGjwGtRzPDQsjhNvqUOd46w==}
 
-  '@nut-tree-fork/shared@4.2.2':
-    resolution: {integrity: sha512-SOIDs4H+rIh+IdXzS1KocMzjsMNqihMVB3mOaEo0lAycempKh/44XXktXUkjeJOwlYyL4Ugxed+SOrob5tTM5g==}
+  '@nut-tree-fork/shared@4.2.4':
+    resolution: {integrity: sha512-PSd5dRLxLP4m+2ouQ014i4I/QyPppLfn9oJQg9m3AkwCOtS6qG/eeP5vmyo/dff9YS1BNM5YUrWtgwm/2bRezw==}
 
   '@panzoom/panzoom@4.6.0':
     resolution: {integrity: sha512-3KxkY1lNKFn98fW5ZFR6vV0YzsXj3I4EQDyFWSXME6/cic86eSS7VjuqIjrA3PEpySo0r5fFtlX8eYCt4JPUFQ==}
@@ -5228,33 +5228,33 @@ snapshots:
       mkdirp: 1.0.4
       rimraf: 3.0.2
 
-  '@nut-tree-fork/default-clipboard-provider@4.2.2':
+  '@nut-tree-fork/default-clipboard-provider@4.2.4':
     dependencies:
       clipboardy: 2.3.0
 
-  '@nut-tree-fork/libnut-darwin@2.7.3':
+  '@nut-tree-fork/libnut-darwin@2.7.4':
     dependencies:
       bindings: 1.5.0
     optionalDependencies:
       '@nut-tree-fork/node-mac-permissions': 2.2.1
 
-  '@nut-tree-fork/libnut-linux@2.7.3':
+  '@nut-tree-fork/libnut-linux@2.7.4':
     dependencies:
       bindings: 1.5.0
     optionalDependencies:
       '@nut-tree-fork/node-mac-permissions': 2.2.1
 
-  '@nut-tree-fork/libnut-win32@2.7.3':
+  '@nut-tree-fork/libnut-win32@2.7.4':
     dependencies:
       bindings: 1.5.0
     optionalDependencies:
       '@nut-tree-fork/node-mac-permissions': 2.2.1
 
-  '@nut-tree-fork/libnut@4.2.2':
+  '@nut-tree-fork/libnut@4.2.4':
     dependencies:
-      '@nut-tree-fork/libnut-darwin': 2.7.3
-      '@nut-tree-fork/libnut-linux': 2.7.3
-      '@nut-tree-fork/libnut-win32': 2.7.3
+      '@nut-tree-fork/libnut-darwin': 2.7.4
+      '@nut-tree-fork/libnut-linux': 2.7.4
+      '@nut-tree-fork/libnut-win32': 2.7.4
 
   '@nut-tree-fork/node-mac-permissions@2.2.1':
     dependencies:
@@ -5262,26 +5262,26 @@ snapshots:
       node-addon-api: 5.0.0
     optional: true
 
-  '@nut-tree-fork/nut-js@4.2.2(encoding@0.1.13)':
+  '@nut-tree-fork/nut-js@4.2.4(encoding@0.1.13)':
     dependencies:
-      '@nut-tree-fork/default-clipboard-provider': 4.2.2
-      '@nut-tree-fork/libnut': 4.2.2
-      '@nut-tree-fork/provider-interfaces': 4.2.2(encoding@0.1.13)
-      '@nut-tree-fork/shared': 4.2.2(encoding@0.1.13)
+      '@nut-tree-fork/default-clipboard-provider': 4.2.4
+      '@nut-tree-fork/libnut': 4.2.4
+      '@nut-tree-fork/provider-interfaces': 4.2.4(encoding@0.1.13)
+      '@nut-tree-fork/shared': 4.2.4(encoding@0.1.13)
       jimp: 0.22.10(encoding@0.1.13)
       node-abort-controller: 3.1.1
     transitivePeerDependencies:
       - debug
       - encoding
 
-  '@nut-tree-fork/provider-interfaces@4.2.2(encoding@0.1.13)':
+  '@nut-tree-fork/provider-interfaces@4.2.4(encoding@0.1.13)':
     dependencies:
-      '@nut-tree-fork/shared': 4.2.2(encoding@0.1.13)
+      '@nut-tree-fork/shared': 4.2.4(encoding@0.1.13)
     transitivePeerDependencies:
       - debug
       - encoding
 
-  '@nut-tree-fork/shared@4.2.2(encoding@0.1.13)':
+  '@nut-tree-fork/shared@4.2.4(encoding@0.1.13)':
     dependencies:
       jimp: 0.22.10(encoding@0.1.13)
       node-abort-controller: 3.1.1

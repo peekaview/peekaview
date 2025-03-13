@@ -1,7 +1,7 @@
 {
   "name": "peekaview",
   "author": "Limtec GmbH <info@limtec.de>",
-  "productName": "PeekaView",
+  "productName": "peekaview",
   "version": "0.0.10",
   "description": "Simple screen sharing application",
   "homepage": "https://peekaview.de",
@@ -32,8 +32,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
-
-    "@nut-tree-fork/nut-js": "4.2.2",
+    "@nut-tree-fork/nut-js": "4.2.4",
     "@panzoom/panzoom": "^4.5.1",
     "bootstrap": "^5.3.3",
     "electron-log": "^5.2.2",
