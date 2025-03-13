@@ -36,7 +36,7 @@ getStoredItem('name').then(value => {
 
 getStoredItem('recentContacts').then(value => {
   if (value)
-    recentContacts.value = JSON.parse(value)
+    recentContacts.value = value
 })
 
 const uuidPromise = getStoredItem('uuid')

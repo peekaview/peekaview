@@ -1,5 +1,5 @@
 import ElectronStore from 'electron-store'
-import { StorageSchema } from '../interface'
+import { StorageSchema, schema } from '../store'
 
 type Store<Schema extends Object> = {
   get<K extends keyof Schema>(key: K): Schema[K]
@@ -13,37 +13,7 @@ let store: ElectronStore<StorageSchema> | undefined
 export async function getStore(): Promise<Store<StorageSchema>> {
   if (!store) {
     const Store = (await import('electron-store')).default
-    store = new Store<StorageSchema>({
-      schema: {
-        uuid: {
-          type: 'string',
-        },
-        name: {
-          type: 'string',
-          default: undefined,
-        },
-        pushToken: {
-          type: 'string',
-          default: undefined,
-        },
-        code: {
-          type: 'string',
-          default: undefined,
-        },
-        recentContacts: {
-          type: 'string',
-          default: '{}',
-        },
-        lastViewActive: {
-          type: 'string',
-          default: undefined,
-        },
-        macWindowList: {
-          type: 'object',
-          default: undefined,
-        }
-      }
-    })
+    store = new Store<StorageSchema>({ schema })
   }
   return store as unknown as Store<StorageSchema>
 }

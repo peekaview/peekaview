@@ -39,13 +39,13 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
 
-  watch(viewers, async (viewers) => {
+  watch(viewers, async (viewers, oldViewers) => {
     window.electronAPI?.updateUsers(JSON.stringify(viewers))
     incrementRecentContacts(viewers)
 
     if (viewers.length > 0)
       sendReset()
-    else {
+    else if (oldViewers.length > 0) {
       const result = await options?.onAllViewersLeft?.()
       if (result)
         stopSharing()

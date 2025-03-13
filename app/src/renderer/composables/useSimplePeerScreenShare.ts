@@ -228,7 +228,7 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
 
 export async function useScreenPresent(screenShareData: ScreenShareData, options?: ScreenPresentOptions): Promise<ScreenPresent> {
   const stream = shallowRef<MediaStream>()
-  const { participants, createParticipant, sendRemote, dismiss } = await useScreenPeer(screenShareData, 'presenter', {
+  const { socket, participants, createParticipant, sendRemote, dismiss } = await useScreenPeer(screenShareData, 'presenter', {
     onRemote: options?.onRemote,
     stream,
     roleHandlers: {
@@ -269,11 +269,12 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
       try { 
         participants.value[socketId].peer.send(JSON.stringify({ type: 'leave' }))
       } catch (err) {
-        console.error('Error sending close signal:', err)
+        console.error('Error sending leave signal:', err)
       }
       dismiss(socketId)
     }
 
+    socket.disconnect()
     stream.value = undefined
   }
 
@@ -303,7 +304,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
       try { 
         participants.value[socketId].peer.send(JSON.stringify({ type: 'leave' }))
       } catch (err) {
-        console.error('Error sending close signal:', err)
+        console.error('Error sending leave signal:', err)
       }
     }
 
@@ -314,6 +315,7 @@ export async function useScreenView(screenShareData: ScreenShareData, options?: 
     for (const socketId in participants.value)
       dismiss(socketId)
 
+    socket.disconnect()
     stream.value = undefined
     options?.onEnding?.()
   }

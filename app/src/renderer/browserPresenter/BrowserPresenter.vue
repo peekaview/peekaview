@@ -7,7 +7,7 @@ import Clipboard from '../components/Clipboard.vue'
 import { File, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
-import { notify, prompt, DialogOptions, NotifyOptions } from '../util'
+import { notify, prompt, PromptOptions, NotifyOptions } from '../util'
 import { parseCode } from '../../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
@@ -42,18 +42,6 @@ watch(clipboardFile, () => showClipboard.value = true)
 const userInputRequired = ref(true)
 
 const { send, receive, onReceive } = useRemoteHandlers(presenter)
-
-watch(() => presenter.value?.viewers.length, async (count) => {
-  if (!count || count > 0)
-    return
-
-  const result = await resizeAndPrompt({
-    text: t('share.allViewersLeft'),
-  })
-
-  if (result === '0')
-    presenter.value?.stopSharing()
-})
 
 async function start() {
   userInputRequired.value = false
@@ -107,6 +95,8 @@ async function start() {
     onAllViewersLeft: async() => {
       const result = await resizeAndPrompt({
         text: t('share.allViewersLeft'),
+        confirmButtonText: t('general.yes'),
+        cancelButtonText: t('general.no'),
       })
 
       return (result === '0')
@@ -260,7 +250,7 @@ function transform(size: readonly [number, number], position?: readonly [number,
 }
 
 let modalPromise: Promise<string> | Promise<void> | undefined
-async function resizeAndPrompt(options: DialogOptions) {
+async function resizeAndPrompt(options: PromptOptions) {
   if (modalPromise) // TODO: fix, not safe in case a third modal is opened!
     await modalPromise
 

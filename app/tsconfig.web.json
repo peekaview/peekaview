@@ -11,6 +11,7 @@
     "src/renderer/**/*.vue",
     "src/preload/**/*",
     "src/firebase.json",
+    "src/store.ts",
     "src/interface.d.ts",
     "src/util.ts",
     "src/composables/**/*"

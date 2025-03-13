@@ -29,7 +29,8 @@ if (process.platform === 'darwin') {
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
-import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StorageSchema, StreamerData, UserData, ContactData } from '../interface.js'
+import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData, ContactData } from '../interface.js'
+import { StorageSchema } from '../store'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
 
@@ -314,7 +315,7 @@ declare const CSP_POLICY: string
         { type: 'separator' },
       )
 
-      const recentContacts = JSON.parse(store.get('recentContacts') ?? '{}') as Record<string, ContactData>
+      const recentContacts = store.get('recentContacts')
       if (recentContacts && Object.keys(recentContacts).length > 0) {
         const submenu: Array<(Electron.MenuItemConstructorOptions)> = []
         for (const id in recentContacts) {
@@ -323,7 +324,7 @@ declare const CSP_POLICY: string
             { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
-              store.set('recentContacts', JSON.stringify(recentContacts))
+              store.set('recentContacts', recentContacts)
               updateContextMenu()
             } },
           ] })
@@ -739,11 +740,12 @@ declare const CSP_POLICY: string
     remotePresenter?.resizeWindow(windowName, dimensions)
   })
 
-  ipcMain.handle('get-stored-item', async <K extends keyof StorageSchema>(_event, key: K) => {
-    return store.get(key)
+  ipcMain.handle('get-stored-item', async <K extends keyof StorageSchema>(_event, key: K, defaultValue?: StorageSchema[K]) => {
+    return store.get(key) ?? defaultValue
   })
 
   ipcMain.handle('set-stored-item', async <K extends keyof StorageSchema>(_event, key: K, value: StorageSchema[K]) => {
+    console.log('set-stored-item', key, value)
     store.set(key, value)
   })
 

@@ -1,4 +1,5 @@
-import { Platform, StorageSchema, ContactData, UserData } from 'src/interface'
+import { Platform, UserData } from '../interface'
+import { StorageSchema, schema } from '../store'
 import Swal from 'sweetalert2'
 
 export type DialogOptions = {
@@ -6,13 +7,16 @@ export type DialogOptions = {
   title?: string
   text?: string
   html?: string
-  confirmButtonText?: string
-  cancelButtonText?: string
+  confirmButtonText: string
   sound?: string | null
 }
 
 export type NotifyOptions = DialogOptions & {
   showButtons?: boolean
+}
+
+export type PromptOptions = DialogOptions & {
+  cancelButtonText: string
 }
 
 let increment = 0
@@ -63,7 +67,7 @@ export async function notify({ type, title, text, html, confirmButtonText }: Not
   return result.then(() => {})
 }
 
-export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, sound = null }: DialogOptions) {
+export async function prompt({ type, title, text, html, confirmButtonText, cancelButtonText, sound = null }: PromptOptions) {
   if (window.electronAPI) {
     const id = increment++
 
@@ -75,8 +79,8 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
       sound,
       message: text ?? html,
       buttons: [
-        confirmButtonText ?? 'Yes', // result === '0'
-        cancelButtonText ?? 'No', // result === '1'
+        confirmButtonText, // result === '0'
+        cancelButtonText, // result === '1'
       ],
     })
 
@@ -126,16 +130,25 @@ export async function getStaticResourcesPath() {
   return prefix ? `${prefix}/static` : ''
 }
 
-export function getStoredItem<K extends keyof StorageSchema>(key: K) {
+export function getStoredItem<K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) {
   if (window.electronAPI)
-    return window.electronAPI.getStoredItem(key)
+    return window.electronAPI.getStoredItem(key, defaultValue)
 
-  return Promise.resolve(JSON.parse<StorageSchema[K]>(localStorage.getItem(key) ?? '{}'))
+  const item = localStorage.getItem(key)
+  return Promise.resolve(item ? JSON.parse<StorageSchema[K]>(item) : defaultValue)
 }
 
 export function setStoredItem<K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) {
+  if (!schema[key])
+    throw new Error(`Key ${key} is not defined in schema`)
+
   if (window.electronAPI) {
     window.electronAPI.setStoredItem(key, value)
+    return
+  }
+
+  if (value === undefined) {
+    removeStoredItem(key)
     return
   }
 
@@ -152,15 +165,19 @@ export function removeStoredItem<K extends keyof StorageSchema>(key: K) {
 }
 
 export async function incrementRecentContacts(users: UserData[]) {
-  const recentContacts = JSON.parse<Record<string, ContactData>>(await getStoredItem('recentContacts') ?? '{}')
+  const recentContacts = (await getStoredItem('recentContacts') ?? {})
   for (const user of users) {
+    const contact = recentContacts[user.id] ?? {}
+
     if (user.name)
-      recentContacts[user.id].name = user.name
+      contact.name = user.name
     
     if (user.email)
-      recentContacts[user.id].email = user.email
+      contact.email = user.email
 
-    recentContacts[user.id].lastActive = Date.now()
+    contact.lastActive = Date.now()
+
+    recentContacts[user.id] = contact
   }
-  setStoredItem('recentContacts', JSON.stringify(recentContacts))
+  setStoredItem('recentContacts', recentContacts)
 }

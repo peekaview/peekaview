@@ -1,5 +1,7 @@
-import { PanzoomEvent } from '@panzoom/panzoom';
+import { PanzoomEvent } from '@panzoom/panzoom'
 import { type DialogOptions } from './main/composables/useCustomDialog'
+
+import { StorageSchema } from './store'
 
 declare global {
   interface Window {
@@ -50,7 +52,7 @@ declare global {
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
-  getStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<StorageSchema[K]>,
+  getStoredItem: <K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) => Promise<StorageSchema[K]>,
   setStoredItem: <K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) => Promise<void>,
   removeStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<void>,
   onFirebaseStarted: (callback: (token: string) => void) => void,
@@ -98,19 +100,6 @@ export interface IElectronAPI {
   updateUsers: (users: string) => Promise<void>,
   onNotifyContact: (callback: (contact: ContactData) => void) => void,
   notify: (title: string, body: string) => Promise<void>,
-}
-
-interface StorageSchema {
-  uuid: string
-  name: string | undefined
-  pushToken: string | undefined
-  code: string | undefined
-  recentContacts: string | undefined
-  lastViewActive: string | undefined
-  macWindowList: {
-    timestamp: number
-    data: string
-  } | undefined
 }
 
 export interface ScreenSource {

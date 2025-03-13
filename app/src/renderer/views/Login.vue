@@ -30,8 +30,7 @@ const code = computed({
 })
 
 onMounted(async () => {
-  code.value = (await getStoredItem('code')) ?? undefined
-  console.log("code", code.value)
+  code.value = await getStoredItem('code')
 })
 
 function handleOpenApp() {
@@ -67,6 +66,7 @@ function handleJustRegistered() {
   notify({
     type: 'success',
     text: t('login.justRegistered'),
+    confirmButtonText: t('general.ok'),
   })
 }
 

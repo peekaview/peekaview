@@ -1,5 +1,6 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { parseCode } from '../../util'
+import { setStoredItem } from '../util'
 
 export enum Action {
   Login = 'login',
@@ -10,7 +11,7 @@ export enum Action {
 export function useParamsData() {
   const action = ref<Action>()
   const code = localStorage.getItem('code')
-  const { email: e, token: t } = parseCode(code ?? undefined)
+  const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
 
   const email = ref<string | undefined>(e)
   const token = ref<string | undefined>(t)
@@ -53,7 +54,7 @@ export function useParamsData() {
     
     if (email.value && token.value) {
       const code = btoa(`email=${email.value}&token=${token.value}`)
-      localStorage.setItem('code', code)
+      setStoredItem('code', code)
     }
   }
 

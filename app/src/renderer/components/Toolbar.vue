@@ -42,11 +42,12 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
   .toolbar {
     display: flex;
     flex-wrap: nowrap;
-    gap: 0.5em;
+    gap: 0.5rem;
+    font-size: 10px;
     height: 2.25rem;
     user-select: none;
     background: #1a1a1a;
-    color: #EEE;
+    color: #eee;
     padding: 4px;
     min-width: 0;
     border-radius: 5px;
@@ -55,6 +56,10 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
   }
 
   .toolbar svg {
+    fill: #eee;
+  }
+
+  .toolbar .btn svg {
     fill: #666;
   }
 
@@ -99,7 +104,6 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
       -moz-user-select: none;
       -ms-user-select: none;
       user-select: none;
-      font-size: 10px;
   }
 
   .toolbar .checkbox-container input {

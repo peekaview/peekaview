@@ -442,7 +442,7 @@ function stop() {
       <div class="btn btn-sm btn-secondary" :class="{ active: activeMessage === 'help' }" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
         <HelpSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="stop">
         <LogoutSvg />
       </div>
     </Toolbar>
@@ -590,62 +590,5 @@ function stop() {
 
   .remote-viewer textarea::-webkit-scrollbar {
     display: none;
-  }
-
-  /* Checkbox styles */
-  .remote-viewer .checkbox-container {
-    display: block;
-    position: relative;
-    padding-left: 5px;
-    cursor: pointer;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  .remote-viewer .checkbox-container input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-  }
-
-  .remote-viewer .checkmark {
-    position: absolute;
-    top: 2px;
-    left: 0;
-    height: 15px;
-    width: 15px;
-    background-color: #eee;
-  }
-
-  .remote-viewer .checkbox-container:hover input ~ .checkmark {
-    background-color: #ccc;
-  }
-
-  .remote-viewer .checkbox-container input:checked ~ .checkmark {
-    background-color: #2196F3;
-  }
-
-  .remote-viewer .checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-  }
-
-  .remote-viewer .checkbox-container input:checked ~ .checkmark:after {
-    display: block;
-  }
-
-  .remote-viewer .checkbox-container .checkmark:after {
-    left: 3px;
-    top: 0;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
   }
 </style>

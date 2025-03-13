@@ -55,9 +55,8 @@ const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
 onMounted(async () => {
-  const uuid = (await getStoredItem('uuid'))!
-  const lastViewActive = await getStoredItem('lastViewActive') ?? '0'
-  if (Date.now() - Number(lastViewActive) < 2000) {
+  const lastViewActive = await getStoredItem('lastViewActive') ?? 0
+  if (Date.now() - lastViewActive < 2000) {
     notify({
       type: 'error',
       title: t('viewer.sessionAlreadyActiveTitle'),
@@ -69,6 +68,7 @@ onMounted(async () => {
 
   setStoredItem('name', props.contact.name)
 
+  const uuid = (await getStoredItem('uuid'))!
   const params = {
     email: props.contact.email,
     name: props.contact.name,

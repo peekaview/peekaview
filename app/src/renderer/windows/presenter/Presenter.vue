@@ -104,6 +104,8 @@ async function present() {
     onAllViewersLeft: async () => {
       const result = await prompt({
         text: t('share.allViewersLeft'),
+        confirmButtonText: t('general.yes'),
+        cancelButtonText: t('general.no'),
       })
           
       return (result === '0')

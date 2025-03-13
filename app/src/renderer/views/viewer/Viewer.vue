@@ -22,7 +22,7 @@ let lastViewActiveInterval = window.setInterval(() => {
   if (!screenShareData.value)
     return
 
-  setStoredItem('lastViewActive', Date.now().toString())
+  setStoredItem('lastViewActive', Date.now())
 }, 1000)
 
 onBeforeUnmount(cleanUp)

@@ -40,7 +40,6 @@ export function parseCode(code: string | undefined) {
     return { email: undefined, token: undefined }
 
   const params = new URLSearchParams(atob(code))
-  console.log("parseCode", params.toString())
   return {
     email: params.get('email') ?? undefined,
     token: params.get('token') ?? undefined,
