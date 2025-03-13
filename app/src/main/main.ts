@@ -731,6 +731,7 @@ declare const CSP_POLICY: string
   })
   
   ipcMain.handle('toggle-remote-control', async (_event, toggle?: boolean) => {
+    console.log('toggle-remote-control', toggle)
     presenterWindow?.webContents.send('on-toggle-remote-control', toggle)
     remotePresenter?.toggleRemoteControl(toggle)
     remotePresenter?.sendReset()

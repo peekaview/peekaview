@@ -144,8 +144,6 @@ defineExpose({
   align-items: center;
   padding: 0.5rem;
   gap: 0.5rem;
-  border: 1px solid #eeeb;
-  border-radius: 0.25rem;
 }
 
 .viewer-count svg {
@@ -158,7 +156,6 @@ defineExpose({
 
 .viewer-count-none {
   color: #f00;
-  border-color: #f00b;
 }
 
 .viewer-count-none svg {

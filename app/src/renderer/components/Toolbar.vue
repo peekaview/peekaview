@@ -63,6 +63,10 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     fill: #666;
   }
 
+  .toolbar .v-popper .btn {
+    max-height: 100%
+  }
+
     /* Base button styles */
   .toolbar .button, .toolbar .btn.btn-secondary {
     cursor: pointer;

@@ -7,15 +7,7 @@ const toolbar = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
 
 const users = ref<UserData[]>([])
 
-window.electronAPI!.onTogglePointer((enabled?: boolean) => {
-  toolbar.value?.togglePointer(enabled)
-})
-
-window.electronAPI!.onToggleRemoteControl((enabled?: boolean) => {
-  toolbar.value?.toggleRemoteControl(enabled)
-})
-
-window.electronAPI!.onUpdateOverlayData((data) => {
+window.electronAPI?.onUpdateOverlayData((data) => {
   data.users !== undefined && (users.value = data.users)
   data.pointerEnabled !== undefined && toolbar.value?.togglePointer(data.pointerEnabled)
   data.remoteControlEnabled !== undefined && toolbar.value?.toggleRemoteControl(data.remoteControlEnabled)

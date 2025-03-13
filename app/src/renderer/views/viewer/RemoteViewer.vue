@@ -22,7 +22,7 @@ import PencilSvg from '../../../assets/icons/pencil.svg'
 
 import type { File, StreamState, ViewerTool } from '../../../interface'
 
-type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
+type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -89,36 +89,36 @@ const remoteClipboard = ref(false)
 const activeTool = ref<ViewerTool | undefined>('pointer')
 
 const activeMessage = ref<Message | undefined>('init')
-const remoteMessage = ref<string>()
-let remoteTimeout: number
+let tooltipTimeout: number
+
+const pointerTooltipContent = ref<string>()
 watch(_pointerEnabled, (enabled) => {
   if (!enabled)
     activeTool.value = _remoteControlEnabled.value ? 'remoteControl' : undefined
   else if (!activeTool.value)
     activeTool.value = 'pointer'
 
-  activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
-  clearTimeout(remoteTimeout)
-  remoteTimeout = window.setTimeout(() => {
-    hideMessage('remote')
-    remoteMessage.value = undefined
-  }, 3000)
+  pointerTooltipContent.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
+  clearTimeout(tooltipTimeout)
+  remoteControlTooltipContent.value = undefined
+  tooltipTimeout = window.setTimeout(() => {
+    pointerTooltipContent.value = undefined
+  }, 10000)
 })
 
+const remoteControlTooltipContent = ref<string>()
 watch(_remoteControlEnabled, (enabled) => {
   if (!enabled)
     activeTool.value = _pointerEnabled.value ? 'pointer' : undefined
   else if (!activeTool.value)
     activeTool.value = 'remoteControl'
   
-  activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
-  clearTimeout(remoteTimeout)
-  remoteTimeout = window.setTimeout(() => {
-    hideMessage('remote')
-    remoteMessage.value = undefined
-  }, 3000)
+  remoteControlTooltipContent.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
+  clearTimeout(tooltipTimeout)
+  pointerTooltipContent.value = undefined
+  tooltipTimeout = window.setTimeout(() => {
+    remoteControlTooltipContent.value = undefined
+  }, 10000)
 })
 
 const panzoomActive = ref(false)
@@ -430,12 +430,28 @@ function stop() {
 <template>
   <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
-        <PencilSvg />
-      </div>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
-        <MouseSvg />
-      </div>
+      <Tooltip
+        :triggers="[]"
+        :shown="!!pointerTooltipContent"
+      >
+        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+          <PencilSvg />
+        </div>
+        <template #popper>
+          {{ pointerTooltipContent }}
+        </template>
+      </Tooltip>
+      <Tooltip
+        :triggers="[]"
+        :shown="!!remoteControlTooltipContent"
+      >
+        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+          <MouseSvg />
+        </div>
+        <template #popper>
+          {{ remoteControlTooltipContent }}
+        </template>
+      </Tooltip>
       <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
@@ -497,9 +513,6 @@ function stop() {
           <br>
           {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
-      </template>
-      <template v-else-if="activeMessage === 'remote' && remoteMessage">
-        <b>{{ remoteMessage }}</b>
       </template>
       <template v-else>
         <b>{{ $t(`viewer.messages.${activeMessage}.title`) }}</b>
