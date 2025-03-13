@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@nut-tree-fork/node-mac-permissions": "^2.2.1"
+	}
+}
