@@ -1,6 +1,6 @@
 {
   "appId": "com.limtec.peekaview",
-  "productName": "PeekaView",
+  "productName": "peekaview",
   "directories": {
     "buildResources": "build-resources",
     "output": "dist"
