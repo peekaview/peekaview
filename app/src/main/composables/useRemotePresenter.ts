@@ -546,8 +546,13 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     let size = window?.getMinimumSize()
     window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
 
+    if (isMac && windowName === 'toolbar')
+      window?.setMinimumSize(160, dimensions.size.height ?? size[1])
+
     size = window?.getSize()
     window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
+
+    
   }
 
   function hideRemoteControl() {
