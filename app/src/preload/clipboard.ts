@@ -10,5 +10,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizeWindow: (windowName: string, dimensions: ElectronWindowDimensions) => ipcRenderer.invoke('resize-window', windowName, dimensions),
   toggleClipboard: (toggle: boolean) => ipcRenderer.invoke('toggle-clipboard', toggle),
 })
-
-console.log('Preload script has been loaded');

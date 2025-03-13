@@ -11,5 +11,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMouseClick: (callback: (data: RemoteMouseData) => void) => ipcRenderer.on('on-mouse-click', (_event, data) => callback(data)),
   onUpdateOverlayData: (callback: (data: OverlayData) => void) => ipcRenderer.on('on-update-overlay-data', (_event, data) => callback(data)),
 })
-
-console.log('Preload script has been loaded');

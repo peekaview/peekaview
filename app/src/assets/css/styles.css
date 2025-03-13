@@ -32,10 +32,19 @@ a:hover {
   text-decoration: underline;
 }
 
+.main-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-height: 100%; /* required for viewer video to scale correctly */
+}
+
 .content-wrapper {
   width: 100%;
   max-width: 600px;
-  margin: 4rem auto;
+  margin: 0 auto;
+  padding: 4rem 0;
   flex-shrink: 0;
 }
 

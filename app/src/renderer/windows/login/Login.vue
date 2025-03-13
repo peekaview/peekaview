@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
+import { parseCode } from '../../../util'
+
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
 
 const params = new URLSearchParams(window.location.search)
@@ -20,9 +22,7 @@ function loginWithCode() {
     return
 
   try {
-    const params = new URLSearchParams(atob(code.value))
-    const email = params.get('email')!
-    const token = params.get('token')!
+    const { email, token } = parseCode(code.value)
     if (!email || !token) {
       invalid.value = true
       return

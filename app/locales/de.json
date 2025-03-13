@@ -193,6 +193,7 @@
       "title": "Fenster nicht gefunden",
       "content": "{hwnd} existiert nicht"
     },
+    "allViewersLeft": "Es sind keine Teilnehmer mehr im Raum. Wollen Sie die Freigabe beenden?",
     "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
   },
   "browserPresenter": {
@@ -224,6 +225,8 @@
     "running": "PeekaView läuft",
     "shareMyScreen": "Meinen Bildschirm teilen",
     "requestScreenShare": "Bildschirmfreigabe anfordern",
+    "recentContacts": "Letzte Kontakte",
+    "deleteContact": "Kontakt entfernen",
     "help": "Hilfe",
     "about": "Über PeekaView...",
     "changeLanguage": "Sprache ändern",
@@ -236,6 +239,7 @@
     "pointer": "Zeichnen / Zeiger",
     "remoteControl": "Fernsteuerung",
     "openClipboard": "Zwischenablage öffnen",
+    "currentViewers": "Teilnehmer",
     "shareDifferentScreen": "Anderen Bildschirm teilen",
     "inviteLink": "Einladungslink",
     "showInviteLink": "Einladungslink anzeigen",

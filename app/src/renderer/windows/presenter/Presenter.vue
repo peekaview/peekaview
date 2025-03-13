@@ -5,9 +5,10 @@ import { useI18n } from 'vue-i18n'
 import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
-import { ScreenSource } from '../../../interface'
+import { ContactData, ScreenSource } from '../../../interface'
 import { notify, prompt } from '../../util'
-import { UnauthorizedError } from '../../api'
+import { parseCode } from '../../../util'
+import { callApi, UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
 
@@ -53,18 +54,25 @@ window.electronAPI?.onToggleRemoteControl((toggle) => {
     remoteControlEnabled.value = toggle
 })
 
+window.electronAPI?.onNotifyContact((contact: ContactData) => {
+  window.electronAPI?.log('Notify contact:', contact)
+  callApi<Response>({
+    action: 'sendPushNotification',
+    uuid: contact.id,
+    title: 'PeekaView',
+    message: 'Someone wants share their screen with you!',
+  })
+})
+
 async function present() {
-  let params = new URLSearchParams(window.location.search)
-  const data = params.get('data')
-  if (!data)
+  const code = new URLSearchParams(window.location.search).get('data')
+  if (!code)
     throw new Error('')
 
-  params = new URLSearchParams(atob(data))
-  const email = params.get('email')!
-  const token = params.get('token')!
+  const { email, token } = parseCode(code)
   presenter.value = usePresenter({
-    email,
-    token,
+    email: email!,
+    token: token!,
     pointerEnabled,
     remoteControlEnabled,
   }, async (shareAudio) => {
@@ -89,6 +97,15 @@ async function present() {
         confirmButtonText: t('share.requestAccess.accept'),
         cancelButtonText: t('share.requestAccess.deny'),
         sound: 'ringtone',
+      })
+          
+      return (result === '0')
+    },
+    onAllViewersLeft: async () => {
+      const result = await prompt({
+        text: t('share.allViewersLeft'),
+        confirmButtonText: t('general.yes'),
+        cancelButtonText: t('general.no'),
       })
           
       return (result === '0')

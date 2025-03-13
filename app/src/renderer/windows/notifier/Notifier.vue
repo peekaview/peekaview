@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import { getStoredItem } from '../../util'
+import { callApi } from '../../api'
+
+window.electronAPI?.log("Notifier started")
+
+window.electronAPI?.onFirebaseStarted((token) => {
+  updatePushToken(token)
+})
+
+window.electronAPI?.onFirebaseError((error) => {
+  window.electronAPI?.log('Firebase error:', error)
+})
+
+window.electronAPI?.onFirebaseTokenUpdated((token) => {
+  updatePushToken(token)
+})
+
+window.electronAPI?.onFirebaseNotificationReceived((notification) => {
+  window.electronAPI?.log('Firebase notification received:', notification)
+})
+
+async function updatePushToken(token: string) {
+  window.electronAPI?.log('Updated push token:', token)
+  const uuid = (await getStoredItem('uuid'))!
+  callApi({
+    action: 'registerPushToken',
+    uuid,
+    token,
+  })
+}
+</script>
+
+<template>
+</template>
+
+<style>
+html, body {
+  background-color: transparent !important;
+}
+</style>

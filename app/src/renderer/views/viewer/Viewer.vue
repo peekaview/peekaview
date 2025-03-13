@@ -6,6 +6,7 @@ import RequestAccess from '../form/RequestAccess.vue'
 
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { ViewerData } from '../../types'
+import { removeStoredItem, setStoredItem } from '../../util'
 
 defineProps<{
   contact: ViewerData
@@ -21,7 +22,7 @@ let lastViewActiveInterval = window.setInterval(() => {
   if (!screenShareData.value)
     return
 
-  localStorage.setItem('lastViewActive', Date.now().toString())
+  setStoredItem('lastViewActive', Date.now())
 }, 1000)
 
 onBeforeUnmount(cleanUp)
@@ -29,7 +30,7 @@ window.addEventListener('beforeunload', cleanUp)
 
 function cleanUp() {
   clearInterval(lastViewActiveInterval)
-  localStorage.removeItem('lastViewActive')
+  removeStoredItem('lastViewActive')
 }
 
 function stop() {

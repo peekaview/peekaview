@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { callApi } from '../api'
-import { notify } from '../util'
+import { getStoredItem, notify } from '../util'
+import { parseCode } from '../../util'
 
 type Response = {
   success: boolean
@@ -16,20 +17,20 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const registered = ref(false)
-
 const email = ref<string>()
 const token = ref<string>()
 
-const code = computed(() => 
-  (email.value && token.value) ? btoa(`email=${email.value}&token=${token.value}`) : undefined
-)
+const code = computed({
+  get: () => (email.value && token.value) ? btoa(`email=${email.value}&token=${token.value}`) : undefined,
+  set: (value) => {
+    const { email: e, token: t } = parseCode(value)
+    email.value = e ?? email.value
+    token.value = t ?? token.value
+  },
+})
 
-onMounted(() => {
-  email.value = localStorage.getItem('email') ?? undefined
-  token.value = localStorage.getItem('token') ?? undefined
-
-  registered.value = !!email.value && !!token.value
+onMounted(async () => {
+  code.value = await getStoredItem('code')
 })
 
 function handleOpenApp() {
@@ -65,6 +66,7 @@ function handleJustRegistered() {
   notify({
     type: 'success',
     text: t('login.justRegistered'),
+    confirmButtonText: t('general.ok'),
   })
 }
 
@@ -79,7 +81,7 @@ function handleError() {
 </script>
 
 <template>
-  <form v-if="!registered" @submit="handleRegister">
+  <form v-if="!code" @submit="handleRegister">
     <div class="form-content">
       <div class="mb-4">
         <p>{{ $t('login.notLoggedIn') }}</p>
@@ -96,7 +98,7 @@ function handleError() {
   <div v-else-if="target === 'app'">
     <div class="form-content">
       <h2 class="mb-3">{{ $t('login.successful') }}</h2>
-      <p class="text-secondary mb-4">{{ $t('login.successMessageApp') }}</p>
+      <p class="mb-4">{{ $t('login.successMessageApp') }}</p>
       
       <button class="btn btn-primary btn-lg w-100 mb-4" @click="handleOpenApp">
         {{ $t('login.openApp') }}

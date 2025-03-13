@@ -1,3 +1,5 @@
+import { AtLeastNameOrEmail } from "./interface";
+
 export function stringToColor(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -31,4 +33,25 @@ export function hexToRgb(hex: string) {
     g: parseInt(result[2], 16),
     b: parseInt(result[3], 16)
   } : null
+}
+
+export function parseCode(code: string | undefined) {
+  if (!code)
+    return { email: undefined, token: undefined }
+
+  const params = new URLSearchParams(atob(code))
+  return {
+    email: params.get('email') ?? undefined,
+    token: params.get('token') ?? undefined,
+  }
+}
+
+export function displayNameMail(data: AtLeastNameOrEmail) {
+  if (!data.email)
+    return data.name
+  
+  if (!data.name)
+    return data.email
+
+  return `${data.name} (${data.email})`
 }

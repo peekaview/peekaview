@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
 
-import { notify, isTouchEnabled, getPlatform } from '../../util'
+import { notify, isTouchEnabled, getPlatform, getStoredItem, incrementRecentContacts } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { useRemoteHandlers } from "../../composables/useRemoteHandlers"
 
@@ -11,7 +11,6 @@ import Clipboard from '../../components/Clipboard.vue'
 import Toolbar from "../../components/Toolbar.vue"
 
 import { useFileChunkRegistry, chunkFile } from "../../../composables/useFileChunking"
-import { uuidv4 } from "../../../util.js"
 import { usePanzoom } from './usePanzoom'
 
 import LoadingDarkGif from '../../../assets/img/loading_dark.gif'
@@ -23,7 +22,7 @@ import PencilSvg from '../../../assets/icons/pencil.svg'
 
 import type { File, StreamState, ViewerTool } from '../../../interface'
 
-type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'remote' | 'fileUpload' | 'fileDrop'
+type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'fileUpload' | 'fileDrop'
 
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
@@ -42,6 +41,16 @@ const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('conta
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const stream = ref<MediaStream>()
+
+watch(() => screenView.value?.participants, async (participants) => {
+  const socketId = screenView.value?.presenterSocketId
+  if (!participants || !socketId)
+    return
+
+  const presenter = participants[socketId]
+  if (presenter)
+    incrementRecentContacts([presenter.user])
+}, { deep: true })
 
 const streamState = ref<StreamState>('stopped')
 let streamStateTimeout: number
@@ -80,36 +89,36 @@ const remoteClipboard = ref(false)
 const activeTool = ref<ViewerTool | undefined>('pointer')
 
 const activeMessage = ref<Message | undefined>('init')
-const remoteMessage = ref<string>()
-let remoteTimeout: number
+let tooltipTimeout: number
+
+const pointerTooltipContent = ref<string>()
 watch(_pointerEnabled, (enabled) => {
   if (!enabled)
     activeTool.value = _remoteControlEnabled.value ? 'remoteControl' : undefined
   else if (!activeTool.value)
     activeTool.value = 'pointer'
 
-  activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
-  clearTimeout(remoteTimeout)
-  remoteTimeout = window.setTimeout(() => {
-    hideMessage('remote')
-    remoteMessage.value = undefined
-  }, 3000)
+  pointerTooltipContent.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
+  clearTimeout(tooltipTimeout)
+  remoteControlTooltipContent.value = undefined
+  tooltipTimeout = window.setTimeout(() => {
+    pointerTooltipContent.value = undefined
+  }, 10000)
 })
 
+const remoteControlTooltipContent = ref<string>()
 watch(_remoteControlEnabled, (enabled) => {
   if (!enabled)
     activeTool.value = _pointerEnabled.value ? 'pointer' : undefined
   else if (!activeTool.value)
     activeTool.value = 'remoteControl'
   
-  activeMessage.value = 'remote'
-  remoteMessage.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
-  clearTimeout(remoteTimeout)
-  remoteTimeout = window.setTimeout(() => {
-    hideMessage('remote')
-    remoteMessage.value = undefined
-  }, 3000)
+  remoteControlTooltipContent.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
+  clearTimeout(tooltipTimeout)
+  pointerTooltipContent.value = undefined
+  tooltipTimeout = window.setTimeout(() => {
+    remoteControlTooltipContent.value = undefined
+  }, 10000)
 })
 
 const panzoomActive = ref(false)
@@ -382,10 +391,10 @@ function sendFile(item: DataTransferItem, name?: string) {
   return new Promise<globalThis.File>((resolve, reject) => {
     const blob = item.getAsFile()!
     const reader = new FileReader()
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const chunks = chunkFile(event.target!.result as string)
 
-      const id = uuidv4()
+      const id = (await getStoredItem('uuid'))!
       send('file', {
         id,
         name: name ?? blob.name,
@@ -421,19 +430,35 @@ function stop() {
 <template>
   <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
-        <PencilSvg />
-      </div>
-      <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
-        <MouseSvg />
-      </div>
+      <Tooltip
+        :triggers="[]"
+        :shown="!!pointerTooltipContent"
+      >
+        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
+          <PencilSvg />
+        </div>
+        <template #popper>
+          {{ pointerTooltipContent }}
+        </template>
+      </Tooltip>
+      <Tooltip
+        :triggers="[]"
+        :shown="!!remoteControlTooltipContent"
+      >
+        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
+          <MouseSvg />
+        </div>
+        <template #popper>
+          {{ remoteControlTooltipContent }}
+        </template>
+      </Tooltip>
       <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
         <ClipboardTextOutlineSvg />
       </div>
       <div class="btn btn-sm btn-secondary" :class="{ active: activeMessage === 'help' }" :title="$t('viewer.toolbar.help')" @click="toggleMessage('help')">
         <HelpSvg />
       </div>
-      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="$emit('stop')">
+      <div class="btn btn-sm btn-secondary" :title="$t('viewer.toolbar.leave')" @click="stop">
         <LogoutSvg />
       </div>
     </Toolbar>
@@ -488,9 +513,6 @@ function stop() {
           <br>
           {{ $t('viewer.messages.help.remoteControl.desc') }}
         </template>
-      </template>
-      <template v-else-if="activeMessage === 'remote' && remoteMessage">
-        <b>{{ remoteMessage }}</b>
       </template>
       <template v-else>
         <b>{{ $t(`viewer.messages.${activeMessage}.title`) }}</b>
@@ -581,62 +603,5 @@ function stop() {
 
   .remote-viewer textarea::-webkit-scrollbar {
     display: none;
-  }
-
-  /* Checkbox styles */
-  .remote-viewer .checkbox-container {
-    display: block;
-    position: relative;
-    padding-left: 5px;
-    cursor: pointer;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  .remote-viewer .checkbox-container input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-  }
-
-  .remote-viewer .checkmark {
-    position: absolute;
-    top: 2px;
-    left: 0;
-    height: 15px;
-    width: 15px;
-    background-color: #eee;
-  }
-
-  .remote-viewer .checkbox-container:hover input ~ .checkmark {
-    background-color: #ccc;
-  }
-
-  .remote-viewer .checkbox-container input:checked ~ .checkmark {
-    background-color: #2196F3;
-  }
-
-  .remote-viewer .checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-  }
-
-  .remote-viewer .checkbox-container input:checked ~ .checkmark:after {
-    display: block;
-  }
-
-  .remote-viewer .checkbox-container .checkmark:after {
-    left: 3px;
-    top: 0;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
   }
 </style>

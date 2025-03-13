@@ -67,3 +67,5 @@ logs/
 todo.txt
 mkcert
 private
+
+serviceAccountKey.json

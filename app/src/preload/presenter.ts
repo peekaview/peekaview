@@ -1,8 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
-
-import { DialogOptions, RemoteData, RemoteEvent, SendRemote } from '../interface'
+import { DialogOptions, RemoteData, RemoteEvent, SendRemote, ContactData } from '../interface'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
@@ -24,6 +23,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sourceSelected: (source: string | undefined) => ipcRenderer.invoke('source-selected', source),
   onToggleRemoteControl: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-remote-control', (_event, toggle?: boolean) => callback(toggle)),
   onTogglePointer: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-pointer', (_event, toggle?: boolean) => callback(toggle)),
+  onNotifyContact: (callback: (contact: ContactData) => void) => ipcRenderer.on('on-notify-contact', (_event, contact: ContactData) => callback(contact)),
 });
-
-console.log('Preload script has been loaded');

@@ -8,6 +8,9 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/composables/**/*",
+    "src/firebase.json",
+    "src/store.ts",
+    "src/util.ts",
     "./package.json"
   ],
   "compilerOptions": {

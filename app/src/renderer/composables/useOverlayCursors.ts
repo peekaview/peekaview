@@ -23,7 +23,7 @@ export function useOverlayCursors(users: Ref<Record<string, UserData>>) {
     const user = users.value[userId]
     if (!cursors[userId]) {
       cursors[userId] = {
-        name: user.name,
+        name: user.name ?? user.email,
         color: user.color,
         left: 0,
         top: 0,

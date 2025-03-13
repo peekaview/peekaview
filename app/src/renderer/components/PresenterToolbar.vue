@@ -4,12 +4,14 @@ import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
 import LogoutSvg from '../../assets/icons/logout.svg'
+import AccountGroupSvg from '../../assets/icons/account-group.svg'
 import AccountPlusOutlineSvg from '../../assets/icons/account-plus-outline.svg'
 import MonitorSvg from '../../assets/icons/monitor.svg'
 import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
 
 withDefaults(defineProps<{
+  viewerCount: number
   draggable?: boolean
 }>(), {
   draggable: false,
@@ -113,6 +115,10 @@ defineExpose({
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
+    <div class="viewer-count" :class="{ 'viewer-count-none': viewerCount === 0 }">
+      <AccountGroupSvg />
+      <span>{{ viewerCount }}</span>
+    </div>
     <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
@@ -131,3 +137,28 @@ defineExpose({
     </div>
   </Toolbar>
 </template>
+
+<style>
+.viewer-count {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  gap: 0.5rem;
+}
+
+.viewer-count svg {
+  width: 1rem;
+}
+
+.viewer-count span:first-child {
+  font-weight: bold; 
+}
+
+.viewer-count-none {
+  color: #f00;
+}
+
+.viewer-count-none svg {
+  fill: #f00;
+}
+</style>

@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { useTemplateRef } from 'vue'
+import { ref, useTemplateRef } from 'vue'
 import PresenterToolbar from '../../components/PresenterToolbar.vue'
+import { UserData } from '../../../interface'
 
 const toolbar = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
 
-window.electronAPI!.onTogglePointer((enabled?: boolean) => {
-  toolbar.value?.togglePointer(enabled)
-})
+const users = ref<UserData[]>([])
 
-window.electronAPI!.onToggleRemoteControl((enabled?: boolean) => {
-  toolbar.value?.toggleRemoteControl(enabled)
+window.electronAPI?.onUpdateOverlayData((data) => {
+  data.users !== undefined && (users.value = data.users)
+  data.pointerEnabled !== undefined && toolbar.value?.togglePointer(data.pointerEnabled)
+  data.remoteControlEnabled !== undefined && toolbar.value?.toggleRemoteControl(data.remoteControlEnabled)
 })
 
 function togglePointer(enabled: boolean) {
@@ -48,6 +49,7 @@ function showInviteLink() {
 <template>
   <PresenterToolbar
     ref="toolbar"
+    :viewer-count="users.length"
     draggable
     @toggle-remote-control="toggleRemoteControl"
     @toggle-pointer="togglePointer"

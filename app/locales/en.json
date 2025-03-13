@@ -193,6 +193,7 @@
       "title": "Window not found",
       "content": "{hwnd} does not exist"
     },
+    "allViewersLeft": "There are no viewers left in the room. Do you want to stop sharing?",
     "requestError": "There was a problem processing your request. Please try again."
   },
   "browserPresenter": {
@@ -224,6 +225,8 @@
     "running": "PeekaView is running",
     "shareMyScreen": "Share my screen",
     "requestScreenShare": "Request screen share",
+    "recentContacts": "Recent contacts",
+    "deleteContact": "Delete contact",
     "help": "Help",
     "about": "About PeekaView...",
     "changeLanguage": "Change language",
@@ -236,6 +239,7 @@
     "pointer": "Draw / Point",
     "remoteControl": "Remote Control",
     "openClipboard": "Open clipboard",
+    "currentViewers": "Viewers",
     "shareDifferentScreen": "Share different screen",
     "inviteLink": "Invite link",
     "showInviteLink": "Show invite link",

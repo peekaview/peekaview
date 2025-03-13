@@ -4,9 +4,9 @@ import { useI18n } from 'vue-i18n'
 
 import type { AcceptedRequestData, ViewerData } from '../../types'
 import { callApi } from '../../api'
-import { getPlatform, notify } from '../../util'
+import { getPlatform, getStoredItem, notify, setStoredItem } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
-import { stringToColor, uuidv4 } from '../../../util'
+import { stringToColor } from '../../../util'
 
 type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
 type RequestUserStatus = "online" | "away" | "offline" | "unknown"
@@ -54,8 +54,9 @@ const requestStatus = ref<RequestStatus>()
 const requestUserStatus = ref<RequestUserStatus>()
 const requestLastSeen = ref<number>()
 
-onMounted(() => {
-  if (Date.now() - Number(localStorage.getItem('lastViewActive') ?? '0') < 2000) {
+onMounted(async () => {
+  const lastViewActive = await getStoredItem('lastViewActive') ?? 0
+  if (Date.now() - lastViewActive < 2000) {
     notify({
       type: 'error',
       title: t('viewer.sessionAlreadyActiveTitle'),
@@ -65,29 +66,16 @@ onMounted(() => {
     return
   }
 
-  localStorage.setItem('name', props.contact.name)
+  setStoredItem('name', props.contact.name)
 
+  const uuid = (await getStoredItem('uuid'))!
   const params = {
     email: props.contact.email,
     name: props.contact.name,
-    request_id: getRequestId(),
+    request_id: uuid.replace(/-/g, '').substring(0, 8), // uuid,
   }
   requestScreen(params, true)
 })
-
-function getRequestId(length = 8) {
-  const requestId = localStorage.getItem('requestId')
-  if (requestId)
-    return requestId
-
-  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length))
-  }
-  localStorage.setItem('requestId', result)
-  return result
-}
 
 async function requestScreen(params: RequestParams, initial = false) {
   try {
@@ -135,15 +123,16 @@ async function requestScreen(params: RequestParams, initial = false) {
     handleError()
   }
 }
-    
-function handleRequestAccepted(data: AcceptedRequestData) {
+
+async function handleRequestAccepted(data: AcceptedRequestData) {
   console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined
   requestStatus.value = undefined
 
+  const id = (await getStoredItem('uuid'))!
   emit('accepted', {
     user: {
-      id: uuidv4(),
+      id,
       name: props.contact.name,
       color: stringToColor(props.contact.name ?? 'Anonymous'),
       platform: getPlatform(),

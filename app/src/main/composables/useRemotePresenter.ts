@@ -507,8 +507,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     return new Promise<void>((resolve) => {
       toolbarWindow!.on('ready-to-show', () => {
         toolbarWindow!.moveTop()
-        toolbarWindow!.webContents.send('on-toggle-pointer', toggles.pointer)
-        toolbarWindow!.webContents.send('on-toggle-remote-control', toggles.remoteControl)
+        toolbarWindow!.webContents.send('on-update-overlay-data', { users, pointerEnabled: toggles.pointer, remoteControlEnabled: toggles.remoteControl })
         resolve()
       })
     })
@@ -559,6 +558,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   function updateUsers(newUsers: UserData[]) {
     users = newUsers
     overlayWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
+    toolbarWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     sendReset()
   }
 

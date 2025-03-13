@@ -58,9 +58,11 @@ export default defineConfig({
           clipboard: resolve('src/preload/clipboard.ts'),
           dialog: resolve('src/preload/dialog.ts'),
           login: resolve('src/preload/login.ts'),
+          notifier: resolve('src/preload/notifier.ts'),
           overlay: resolve('src/preload/overlay.ts'),
           presenter: resolve('src/preload/presenter.ts'),
           toolbar: resolve('src/preload/toolbar.ts'),
+          viewer: resolve('src/preload/viewer.ts'),
         },
         output: {
           preserveModules: false

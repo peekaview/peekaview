@@ -4,9 +4,9 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform } from '../util'
+import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote } from '../../interface'
-import { stringToColor, uuidv4 } from '../../util'
+import { stringToColor } from '../../util'
 
 interface Request {
   request_id: string
@@ -28,6 +28,7 @@ type PresenterOptions = {
   onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
   onStop?: () => void
+  onAllViewersLeft?: () => Promise<boolean>
   onApiError?: (error: Error, requestData: any) => void
 }
 
@@ -38,16 +39,24 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
 
+  watch(viewers, async (viewers, oldViewers) => {
+    window.electronAPI?.updateUsers(JSON.stringify(viewers))
+    incrementRecentContacts(viewers)
+
+    if (viewers.length > 0)
+      sendReset()
+    else if (oldViewers.length > 0) {
+      const result = await options?.onAllViewersLeft?.()
+      if (result)
+        stopSharing()
+    }
+  })
+
   const pingInterval = ref<number>()
   const lastPingTime = ref<number>()
   
   const streamState = ref<StreamState>('stopped')
   const stream = shallowRef<MediaStream | undefined>()
-
-  watch(viewers, (viewers) => {
-    window.electronAPI?.updateUsers(JSON.stringify(viewers))
-    sendReset()
-  })
 
   let requestTimeout: number | undefined
   watch(streamState, (state) => {
@@ -152,10 +161,11 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     try {
       const acceptedData = await callApi<AcceptedRequestData>(requestData)
 
+      const id = (await getStoredItem('uuid'))!
       screenShareData.value = {
         user: {
-          id: uuidv4(),
-          name: unref(data.email),
+          id,
+          email: unref(data.email),
           color: stringToColor(unref(data.email)),
           platform: getPlatform(),
           inApp,
