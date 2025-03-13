@@ -129,7 +129,11 @@ function generateRandomString($length = 10) {
         ceil($length/strlen($x)))), 1, $length);
 }
 
-function getEmailFilename($email) {
+function getPushFilename($uuid) {
+    return STORAGE_PATH . '/push/' . $uuid . '.txt';
+}
+
+function getUserFilename($email) {
     return STORAGE_PATH . '/users/' . str_replace(['@', '.'], ['_', '_'], $email) . '.txt';
 }
 
@@ -142,7 +146,7 @@ function getUserFile() {
     $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $log[] = "Looking for user file for $email";
     
-    $userFile = getEmailFilename($email);
+    $userFile = getUserFilename($email);
     $log[] = "User file: $userFile";
     if (!file_exists($userFile)) {
         throw new Exception('User not found');
@@ -258,7 +262,7 @@ function showMeYourScreen() {
     $lang = validateLang($_GET['lang'] ?? '');
     $init = isset($_GET['init']) && $_GET['init'] === '1';
     
-    $userFile = getEmailFilename($email);
+    $userFile = getUserFilename($email);
     if (!file_exists($userFile)) {
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
@@ -408,7 +412,7 @@ function registerMyEmail() {
     $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
-    $userFile = getEmailFilename($email);
+    $userFile = getUserFilename($email);
     
     if (file_exists($userFile)) {
         // User already exists, get existing token
@@ -426,6 +430,37 @@ function registerMyEmail() {
     $emailHelper = new EmailHelper();
     $registrationLink = "https://".APP_DOMAIN."/?login=".base64_encode("email=$email&token=$token&target=$target");
     $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
+
+    return ['success' => true];
+}
+
+function registerPushToken() {
+    $userFile = getUserFile();
+    authorizeUser($userFile);
+
+    $uuid = $_GET['uuid'];
+    $pushToken = $_GET['token'];
+    $pushFile = getPushFilename($uuid);
+    file_put_contents($pushFile, $pushToken);
+    return ['success' => true];
+}
+
+function sendPushNotification() {
+    $userFile = getUserFile();
+    authorizeUser($userFile);
+    
+    $uuid = $_GET['uuid'];
+    $pushFile = getPushFilename($uuid);
+    if (!file_exists($pushFile)) {
+        throw new Exception('Push token not found');
+    }
+
+    require_once __DIR__.'/send.php';
+
+    $title = $_GET['title'];
+    $message = $_GET['message'];
+    $pushToken = file_get_contents($pushFile);
+    sendMessage($title, $message, $pushToken);
 
     return ['success' => true];
 }
@@ -454,6 +489,12 @@ try {
             break;
         case 'registerMyEmail':
             $out = registerMyEmail();
+            break;
+        case 'registerPushToken':
+            $out = registerPushToken();
+            break;
+        case 'sendPushNotification':
+            $out = sendPushNotification();
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));
