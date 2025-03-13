@@ -143,7 +143,7 @@ function getRequestFilename($email, $requestId) {
 
 function getUserFile() {
     global $log;
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $log[] = "Looking for user file for $email";
     
     $userFile = getUserFilename($email);
@@ -158,7 +158,7 @@ function getUserFile() {
 
 function authorizeUser($userFile) {
     global $log;
-    $token = $_GET['token'] ?? FALLBACK_TOKEN;
+    $token = $_GET['token'];
     $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
     $log[] = "User data: " . json_encode($userData);
@@ -210,7 +210,7 @@ function doesAnyoneWantToSeeMyScreen() {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $requests = [];
     $currentTime = time();
     $thirtyMinutesAgo = $currentTime - (30 * 60);
@@ -256,7 +256,7 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $lang = validateLang($_GET['lang'] ?? '');
@@ -395,7 +395,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     $userFile = getUserFile();
     authorizeUser($userFile);
     
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $requestFile = getRequestFilename($email, $requestId);
     if (!file_exists($requestFile)) {
@@ -409,7 +409,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
 }
 
 function registerMyEmail() {
-    $email = validateEmail($_GET['email'] ?? FALLBACK_EMAIL);
+    $email = validateEmail($_GET['email']);
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
     $userFile = getUserFilename($email);
@@ -435,9 +435,6 @@ function registerMyEmail() {
 }
 
 function registerPushToken() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
-
     $uuid = $_GET['uuid'];
     $pushToken = $_GET['token'];
     $pushFile = getPushFilename($uuid);
