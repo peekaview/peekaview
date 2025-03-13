@@ -193,6 +193,7 @@
       "title": "Fenster nicht gefunden",
       "content": "{hwnd} existiert nicht"
     },
+    "allViewersLeft": "Es sind keine Teilnehmer mehr im Raum. Wollen Sie die Freigabe beenden?",
     "requestError": "Beim Senden der Anfrage ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."
   },
   "browserPresenter": {

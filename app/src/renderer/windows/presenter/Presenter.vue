@@ -101,6 +101,13 @@ async function present() {
           
       return (result === '0')
     },
+    onAllViewersLeft: async () => {
+      const result = await prompt({
+        text: t('share.allViewersLeft'),
+      })
+          
+      return (result === '0')
+    },
     onApiError: (error) => {
       if (error instanceof UnauthorizedError) {
         unauthorized.value = true

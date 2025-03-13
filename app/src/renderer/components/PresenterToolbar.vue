@@ -10,6 +10,7 @@ import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
 
 withDefaults(defineProps<{
+  viewerCount: number
   draggable?: boolean
 }>(), {
   draggable: false,
@@ -113,6 +114,10 @@ defineExpose({
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
+    <span class="viewer-count" :class="{ 'viewer-count-none': viewerCount === 0 }">
+      <span>{{ $t('toolbar.currentViewers') }}</span>
+      <span>{{ viewerCount }}</span>
+    </span>
     <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
@@ -131,3 +136,9 @@ defineExpose({
     </div>
   </Toolbar>
 </template>
+
+<style>
+.viewer-count-none {
+  color: red;
+}
+</style>

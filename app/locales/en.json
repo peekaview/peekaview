@@ -193,6 +193,7 @@
       "title": "Window not found",
       "content": "{hwnd} does not exist"
     },
+    "allViewersLeft": "There are no viewers left in the room. Do you want to stop sharing?",
     "requestError": "There was a problem processing your request. Please try again."
   },
   "browserPresenter": {

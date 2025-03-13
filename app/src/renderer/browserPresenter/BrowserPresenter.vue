@@ -43,6 +43,18 @@ const userInputRequired = ref(true)
 
 const { send, receive, onReceive } = useRemoteHandlers(presenter)
 
+watch(() => presenter.value?.viewers.length, async (count) => {
+  if (!count || count > 0)
+    return
+
+  const result = await resizeAndPrompt({
+    text: t('share.allViewersLeft'),
+  })
+
+  if (result === '0')
+    presenter.value?.stopSharing()
+})
+
 async function start() {
   userInputRequired.value = false
   const code = new URLSearchParams(window.location.search).get('data')
@@ -92,6 +104,13 @@ async function start() {
     },
     onReset: (data) => containerRef.value?.reset(data),
     onStop: () => window.close(),
+    onAllViewersLeft: async() => {
+      const result = await resizeAndPrompt({
+        text: t('share.allViewersLeft'),
+      })
+
+      return (result === '0')
+    },
     onApiError: async (error) => {
       await resizeAndNotify({
         type: 'error',
@@ -291,6 +310,7 @@ function onResumeSharing() {
   <div v-else ref="outer" class="presenter-container">
     <PresenterToolbar
       ref="toolbar"
+      :viewer-count="presenter.viewers.length"
       @toggle-pointer="pointerEnabled = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"

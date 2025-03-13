@@ -1,13 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
-import { ElectronWindowDimensions } from '../interface';
+import { ElectronWindowDimensions, OverlayData } from '../interface';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
-  toggleRemoteControl: (toggle?: boolean) => ipcRenderer.invoke('toggle-remote-control', toggle),
-  togglePointer: (toggle?: boolean) => ipcRenderer.invoke('toggle-pointer', toggle),
   toggleClipboard: (toggle?: boolean) => ipcRenderer.invoke('toggle-clipboard', toggle),
+  onUpdateOverlayData: (callback: (data: OverlayData) => void) => ipcRenderer.on('on-update-overlay-data', (_event, data) => callback(data)),
   onToggleRemoteControl: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-remote-control', (_event, toggle?: boolean) => callback(toggle)),
   onTogglePointer: (callback: (toggle?: boolean) => void) => ipcRenderer.on('on-toggle-pointer', (_event, toggle?: boolean) => callback(toggle)),
   setToolbarSize: (width: number, height: number) => ipcRenderer.invoke('set-toolbar-size', width, height),

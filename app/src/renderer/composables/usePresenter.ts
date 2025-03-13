@@ -28,6 +28,7 @@ type PresenterOptions = {
   onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
   onStop?: () => void
+  onAllViewersLeft?: () => Promise<boolean>
   onApiError?: (error: Error, requestData: any) => void
 }
 
@@ -39,7 +40,16 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
 
   watch(viewers, async (viewers) => {
+    window.electronAPI?.updateUsers(JSON.stringify(viewers))
     incrementRecentContacts(viewers)
+
+    if (viewers.length > 0)
+      sendReset()
+    else {
+      const result = await options?.onAllViewersLeft?.()
+      if (result)
+        stopSharing()
+    }
   })
 
   const pingInterval = ref<number>()
@@ -47,11 +57,6 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   
   const streamState = ref<StreamState>('stopped')
   const stream = shallowRef<MediaStream | undefined>()
-
-  watch(viewers, (viewers) => {
-    window.electronAPI?.updateUsers(JSON.stringify(viewers))
-    sendReset()
-  })
 
   let requestTimeout: number | undefined
   watch(streamState, (state) => {
