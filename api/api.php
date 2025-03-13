@@ -483,7 +483,7 @@ function sendPushNotification() {
 }
 
 function saveTempData() {
-    $dataToSave = $_POST['data'] ?? '';
+    $dataToSave = $_POST['data'] ?? $_GET['data'] ?? '';
     if (empty($dataToSave)) {
         throw new Exception('No data provided');
     }
