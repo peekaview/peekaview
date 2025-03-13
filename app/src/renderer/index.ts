@@ -3,13 +3,10 @@ import { Tooltip } from 'floating-vue'
 
 import i18n from './i18n'
 
-import 'bootstrap/dist/css/bootstrap.css'
-import 'floating-vue/dist/style.css'
-import '../assets/css/loading.css'
-// IMPORTANT: load bootstrap styles before Vue components for correct styling order
-import App from './App.vue'
+// Import a single CSS file that manages the import order
+import '../assets/css/main.css'
 
-import '../assets/css/styles.css'
+import App from './App.vue'
 
 const app = createApp(App)
 
