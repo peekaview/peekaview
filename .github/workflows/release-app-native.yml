@@ -66,15 +66,13 @@ jobs:
             cache: 'pnpm'
             cache-dependency-path: 'app/'
 
+        - name: Remove pnpm-lock.yaml
+          working-directory: ./app
+          run: rm -f pnpm-lock.yaml
+
         - name: Install Dependencies
           working-directory: ./app
           run: pnpm install            
-
-        - name: Remove Mac-specific dependencies from pnpm.lock
-          working-directory: ./app
-          run: |
-            sed -i '/nut-tree-fork+node-mac-permissions/,/^$/d' pnpm-lock.yaml
-            echo "Removed Mac-specific dependencies from pnpm.lock"
 
         - name: Setup Environment
           working-directory: ./app
@@ -114,6 +112,10 @@ jobs:
             node-version: 20
             cache: 'pnpm'
             cache-dependency-path: 'app/'
+
+        - name: Remove pnpm-lock.yaml
+          working-directory: ./app
+          run: rm -f pnpm-lock.yaml
 
         - name: Install Dependencies
           working-directory: ./app
@@ -165,15 +167,13 @@ jobs:
             cache: 'pnpm'
             cache-dependency-path: 'app/'
 
+        - name: Remove pnpm-lock.yaml
+          working-directory: ./app
+          run: if exist pnpm-lock.yaml del pnpm-lock.yaml
+
         - name: Install Dependencies
           working-directory: ./app
           run: pnpm install && pnpm install --global clean-modules && pnpm clean-modules -y             
-
-        - name: Remove Mac-specific dependencies from pnpm.lock
-          working-directory: ./app
-          run: |
-             (Get-Content pnpm-lock.yaml) -replace '(?s)nut-tree-fork\+node-mac-permissions.*?(?=\r?\n\r?\n)', '' | Set-Content pnpm-lock.yaml
-             echo "Removed Mac-specific dependencies from pnpm.lock"
 
         - name: Setup Environment
           working-directory: ./app
