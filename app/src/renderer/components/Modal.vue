@@ -48,6 +48,8 @@ defineExpose({
     -webkit-user-select: none;
     background: #1a1a1a;
     color: #EEE;
+    border-radius: 0.5rem;
+    overflow-y: hidden;
   }
 
   .modal-container .modal-header {

@@ -115,6 +115,7 @@ export interface DialogOptions {
   id?: number
   title?: string
   message?: string
+  message2?: string
   copyText?: string
   type?: DialogType
   windowType?: 'tray' | 'dialog'

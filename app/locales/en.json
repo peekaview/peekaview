@@ -219,7 +219,8 @@
   },
   "sharingActive": {
     "title": "Sharing Session Active",
-    "message": "You can invite someone to view your screen with this link"
+    "message": "You can invite someone to view your screen with this link",
+    "message2": "Or you can tell this code: {code}"
   },
   "trayMenu": {
     "running": "PeekaView is running",

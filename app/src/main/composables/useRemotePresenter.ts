@@ -467,11 +467,11 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (toolbarWindow)
       return
 
-    const width = 500
-    const height = 50
+    const width = 600
+    const height = 60
 
     const display = sourceManager.getCurrentScreen()
-    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width) / 2)
+    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width))
     const y = display.bounds.y
     toolbarWindow = new BrowserWindow({
       x,
@@ -544,15 +544,35 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       return
 
     let size = window?.getMinimumSize()
-    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])
+    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])  
 
-    if (isMac && windowName === 'toolbar')
-      window?.setMinimumSize(160, dimensions.size.height ?? size[1])
+    // For toolbar window, keep the right border in the same place
+    if (windowName === 'toolbar' && dimensions.size.width) {
+      window?.setMinimumSize(160, 60)
 
-    size = window?.getSize()
-    window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
-
-    
+      // on the window needs to be 20px wider to avoid cutting off the borders or shadows
+      // on mac the window needs to be at least 160px wide
+      const currentBounds = window.getBounds()
+      let newWidth = dimensions.size.width + 20
+      if (newWidth < 160) {
+        newWidth = 160
+      }
+      let newHeight = dimensions.size.height ?? currentBounds.height
+      if (newHeight < 60) {
+        newHeight = 60
+      }
+      const newX = currentBounds.x + currentBounds.width - newWidth
+      
+      // First adjust position to keep right border in place
+      window.setPosition(newX, currentBounds.y)
+      
+      // Then set the new size
+      window.setSize(newWidth, newHeight)
+    } else {
+      // For other windows, just resize normally
+      size = window?.getSize()
+      window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
+    }
   }
 
   function hideRemoteControl() {

@@ -29,8 +29,8 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
       <DragSvg />
     </div>
     <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" @click="collapsed = !collapsed">
-      <ChevronRightSvg v-if="collapsed" />
-      <ChevronLeftSvg v-else />
+      <ChevronLeftSvg v-if="collapsed" />
+      <ChevronRightSvg v-else />
     </div>
     <template v-if="!collapsed">
       <slot />
@@ -53,6 +53,11 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     border-radius: 5px;
     border: 1px solid hsla(0, 0%, 25%, 0.75);
     box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+
+
+    position: absolute;
+    right: 10px;
+    top: 0px;
   }
 
   .toolbar svg {
@@ -60,7 +65,7 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
   }
 
   .toolbar .btn svg {
-    fill: #666;
+    fill: #ccc;
   }
 
   .toolbar .v-popper .btn {
@@ -81,7 +86,7 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     --bs-btn-color: #aaa;
     --bs-btn-bg: #343434;
     --bs-btn-disabled-bg: #343434;
-    --bs-btn-border-color: #464646;
+    --bs-btn-border-color: #444;
     --bs-btn-disabled-border-color: #343434;
     --bs-btn-disabled-opacity: 0.25;
   }
@@ -121,7 +126,7 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
   .toolbar .checkmark {
       height: 15px;
       width: 15px;
-      background-color: #eee;
+      background-color: #666;
   }
 
   .toolbar .checkbox-container:hover input ~ .checkmark {

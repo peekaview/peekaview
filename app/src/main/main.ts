@@ -667,8 +667,9 @@ declare const CSP_POLICY: string
     customDialog.openTrayDialog({
       title: i18n.t('sharingActive.title'),
       message: i18n.t('sharingActive.message'),
+      message2: i18n.t('sharingActive.message2'),
       copyText: `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`,
-      timeout: 30000
+      timeout: 15000
     })
   }
 

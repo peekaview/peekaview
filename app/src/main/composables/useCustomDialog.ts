@@ -91,6 +91,7 @@ export function useCustomDialog() {
       cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
       windowType: type,
       message: '',
+      message2: '',
       timeout: (type === 'tray' ? 8000 : 0),
       copyText: '',
       sound,

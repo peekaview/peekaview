@@ -75,9 +75,10 @@ function showInviteLink() {
   }
 
   body {
-    padding: 5px;
+    padding: 0px;
     overflow: hidden;
     background: transparent !important;
+    height: 60px;
   }
 
   #toolbar {

@@ -25,6 +25,7 @@ const modalRef = useTemplateRef<InstanceType<typeof Modal>>('modal')
 const id = ref<number>()
 const title = ref<string>()
 const message = ref<string>()
+const message2 = ref<string>()
 const copyText = ref<string>()
 const type = ref<DialogType>()
 const buttons = ref<DialogButton[]>([])
@@ -36,6 +37,7 @@ window.electronAPI!.onDialog((options: DialogOptions) => {
   id.value = options.id
   title.value = options.title
   message.value = options.message
+  message2.value = options.message2
   copyText.value = options.copyText
   type.value = options.type
   defaultId.value = options.defaultId
@@ -153,24 +155,26 @@ async function select(e: MouseEvent) {
         <p>
           <b v-if="message">{{ message }}</b>
           <br v-if="message && copyText">
-          <div v-if="copyText" class="copy-text-wrapper">
-            <div class="copy-text-container">
-              <input
-                v-model="copyText"
-                type="text"
-                readonly
-                @click="select"
-              >
-              <button
-                class="btn btn-sm btn-secondary" 
-                @click="copy"
-              >
-                <CheckSvg v-if="copied" />
-                <ContentCopySvg v-else />
-              </button>
-            </div>
-          </div>
         </p>
+        <div v-if="copyText" class="copy-text-wrapper">
+          <div class="copy-text-container">
+            <input
+              v-model="copyText"
+              type="text"
+              readonly
+              @click="select"
+            >
+            <button
+              class="btn btn-sm btn-secondary" 
+              @click="copy"
+            >
+              <CheckSvg v-if="copied" />
+              <ContentCopySvg v-else />
+            </button>
+          </div>
+        </div>
+        <p v-if="message2"><b>{{ message2 }}</b></p>
+        
 
         <div class="modal-buttons">
           <button
@@ -202,6 +206,11 @@ async function select(e: MouseEvent) {
 
   .modal-body .content .f-modal-alert {
     margin-top: -40px;
+  }
+
+  .modal-body .content p {
+    margin: 0px;
+    margin-left: 90px;
   }
 
   .modal-body .content.tray .f-modal-alert {
