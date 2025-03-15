@@ -79,8 +79,7 @@ const SpecialKeys = [
   'ň', 'Ň'
 ]
 
-const KeyMap: Record<string, Key> = {
-  'Escape': Key.Escape,
+const KeyTypeMap: Record<string, Key> = {
   'Tab': Key.Tab,
   'Grave': Key.Grave,
   'Minus': Key.Minus,
@@ -108,6 +107,30 @@ const KeyMap: Record<string, Key> = {
   'NumLock': Key.NumLock,
 }
 
+const KeyPressMap: Record<string, Key> = {
+  'Escape': Key.Escape,
+  'F1': Key.F1,
+  'F2': Key.F2,
+  'F3': Key.F3,
+  'F4': Key.F4,
+  'F5': Key.F5,
+  'F6': Key.F6,
+  'F7': Key.F7,
+  'F8': Key.F8,
+  'F9': Key.F9,
+  'F10': Key.F10,
+  'F11': Key.F11,
+  'F12': Key.F12,
+  'Home': Key.Home,
+  'End': Key.End,
+  'PageUp': Key.PageUp,
+  'PageDown': Key.PageDown,
+  'Insert': Key.Insert,
+  'Delete': Key.Delete,
+  'Backspace': Key.Backspace,
+  'Enter': Key.Enter,
+}
+
 export type RemotePresenter = ReturnType<typeof useRemotePresenter>
 
 export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] = [], onHidden: (hidden: boolean) => void) {
@@ -123,7 +146,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
   let lastKey: string
   let active = false
-  let toggles = {
+  let toolsEnabled = {
     pointer: true,
     remoteControl: false,
   }
@@ -265,8 +288,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       inBrowser: false,
       dimensions: sourceManager.getOuterDimensions(),
       coverBounds: toolbarBounds ? [toolbarBounds] : [],
-      pointerEnabled: toggles.pointer,
-      remoteControlEnabled: toggles.remoteControl,
+      toolsEnabled,
       streamState,
     }
     
@@ -300,27 +322,27 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   function toggleRemoteControl(toggle?: boolean) {
-    if (toggles.remoteControl === toggle)
+    if (toolsEnabled.remoteControl === toggle)
       return
 
     if (toggle === undefined)
-      toggle = !toggles.remoteControl
+      toggle = !toolsEnabled.remoteControl
 
-    toggles.remoteControl = toggle
+    toolsEnabled.remoteControl = toggle
 
-    overlayWindow?.webContents.send('on-update-overlay-data', { remoteControlEnabled: toggles.remoteControl })
+    overlayWindow?.webContents.send('on-update-overlay-data', { toolsEnabled })
   }
 
   function togglePointer(toggle?: boolean) {
-    if (toggles.pointer === toggle)
+    if (toolsEnabled.pointer === toggle)
       return
 
     if (toggle === undefined)
-      toggle = !toggles.pointer
+      toggle = !toolsEnabled.pointer
 
-    toggles.pointer = toggle
+    toolsEnabled.pointer = toggle
 
-    overlayWindow?.webContents.send('on-update-overlay-data', { pointerEnabled: toggles.pointer })
+    overlayWindow?.webContents.send('on-update-overlay-data', { toolsEnabled })
   }
 
   function createOverlayWindow() {
@@ -507,7 +529,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     return new Promise<void>((resolve) => {
       toolbarWindow!.on('ready-to-show', () => {
         toolbarWindow!.moveTop()
-        toolbarWindow!.webContents.send('on-update-overlay-data', { users, pointerEnabled: toggles.pointer, remoteControlEnabled: toggles.remoteControl })
+        toolbarWindow!.webContents.send('on-update-overlay-data', { users, toolsEnabled })
         resolve()
       })
     })
@@ -563,13 +585,10 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       }
       const newX = currentBounds.x + currentBounds.width - newWidth
       
-      // First adjust position to keep right border in place
       window.setPosition(newX, currentBounds.y)
       
-      // Then set the new size
       window.setSize(newWidth, newHeight)
     } else {
-      // For other windows, just resize normally
       size = window?.getSize()
       window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
     }
@@ -718,7 +737,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   function textToClipboard(data: RemoteTextData) {
-    if (!active || !toggles.remoteControl) {
+    if (!active || !toolsEnabled.remoteControl) {
       dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
     else {
@@ -733,20 +752,26 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (!data.key)
       return
 
-    console.log(data.key)
     const key = data.key
+    console.log('key', key)
 
-    if (KeyMap[key]) {
-      keyboard.type(KeyMap[key])
+    if (KeyTypeMap.hasOwnProperty(key)) {
+      console.log('type map', KeyTypeMap[key])
+      keyboard.type(KeyTypeMap[key])
+    } else if (KeyPressMap.hasOwnProperty(key)) {
+      (async () => {
+        console.log('press map', KeyPressMap[key])
+        await keyboard.pressKey(KeyPressMap[key])
+        await keyboard.releaseKey(KeyPressMap[key])
+      })()
     } else if (key == 'Space') {
-      if (lastKey == 'Dead') {
+      if (lastKey == 'Dead')
         keyboard.type('^')
-      }
-      else {
+      else
         keyboard.type(Key.Space)
-      }
     } else if (SpecialKeys.includes(key)) {
       (async () => {
+        console.log('special', key)
         const tmpclipboard = await electronClipboard.readText()
         await electronClipboard.writeText(key)
         await keyboard.pressKey(controlkey, Key.V)
@@ -802,6 +827,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       })()}
     }
     else {
+      console.log('type', key)
       keyboard.type(key)
     }
   }
@@ -839,60 +865,60 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
         break
       case 'copy':
         const copyData = data as RemoteCopyData
-        if (toggles.remoteControl && copyData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && copyData.tool == 'remoteControl')
           copyToClipboard(copyData)
         break
       case 'paste':
         const pasteData = data as RemotePasteData
-        if (toggles.remoteControl && pasteData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && pasteData.tool == 'remoteControl')
           pasteFromClipboard(pasteData)
         break
       case 'mouse-move':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseMove(mouseData)
         
         sendToOverlayWindow('on-mouse-move', mouseData)
         break
       case 'mouse-click':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseClick(mouseData)
         break
       case 'mouse-dblclick':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseDblClick(mouseData)
         break
       case 'mouse-leftclick':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseLeftClick(mouseData)
         
         sendToOverlayWindow('on-mouse-click', mouseData)
         break
       case 'mouse-down':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseDown(mouseData)
         
         sendToOverlayWindow('on-mouse-down', mouseData)
         break;
       case 'mouse-wheel':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseWheel(mouseData)
         break;
       case 'mouse-up':
         mouseData = data as RemoteMouseData
-        if (toggles.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
           mouseUp(mouseData)
         
         sendToOverlayWindow('on-mouse-up', mouseData)
         break;
       case 'key-down':
         const keyData = data as RemoteKeyData
-        if (toggles.remoteControl && keyData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && keyData.tool == 'remoteControl')
           keyDown(keyData)
         break;
     }

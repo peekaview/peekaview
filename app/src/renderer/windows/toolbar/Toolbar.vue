@@ -9,8 +9,8 @@ const users = ref<UserData[]>([])
 
 window.electronAPI?.onUpdateOverlayData((data) => {
   data.users !== undefined && (users.value = data.users)
-  data.pointerEnabled !== undefined && toolbar.value?.togglePointer(data.pointerEnabled)
-  data.remoteControlEnabled !== undefined && toolbar.value?.toggleRemoteControl(data.remoteControlEnabled)
+  data.toolsEnabled !== undefined && toolbar.value?.togglePointer(data.toolsEnabled.pointer)
+  data.toolsEnabled !== undefined && toolbar.value?.toggleRemoteControl(data.toolsEnabled.remoteControl)
 })
 
 function togglePointer(enabled: boolean) {

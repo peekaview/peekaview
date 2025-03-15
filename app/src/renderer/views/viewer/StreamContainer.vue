@@ -25,7 +25,6 @@ type VideoOptions = {
 const props = withDefaults(defineProps<{
   stream?: MediaStream
   inputEnabled?: boolean
-  pointerEnabled: boolean
   activeTool?: ViewerTool | undefined
   users: UserData[]
   userId: string
@@ -105,10 +104,6 @@ const drawOverlay = useDrawOverlay(canvasRef, {
 const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
 window.setInterval(() => overlayCursors.clear(), 1000)
-watch(() => props.pointerEnabled, () => {
-  //overlayCursors.clear(true)
-  overlaySignals.clear()
-})
 
 const { pressed, onKeyDown, onKeyUp } = useKeyListeners(key => emit('send', { event: "key-down", data: { key, tool: props.activeTool }, options: { receiveSelf: true, volatile: true } }), computed(() => props.inputEnabled))
 watch(() => pressed.shift, (shift) => {
@@ -360,6 +355,12 @@ function reset(data: RemoteResetData) {
   }))
 }
 
+function clear() {
+  //drawOverlay.clear()
+  //overlayCursors.clear()
+  overlaySignals.clear()
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
@@ -381,6 +382,7 @@ defineExpose({
   receiveMouseMove,
   receiveMouseDown,
   receiveMouseUp,
+  clear,
 })
 </script>
 
@@ -394,7 +396,7 @@ defineExpose({
       :style="overlayStyle"
       @mouseenter="onMouseEnter"
       @mouseleave="onMouseLeave"
-      @mousemove="onMouseMove" als Einheit
+      @mousemove="onMouseMove"
       @mouseup="onMouseUp"
       @mousedown="onMouseDown"
       @wheel="onWheel"

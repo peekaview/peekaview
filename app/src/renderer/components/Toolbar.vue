@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import ChevronLeftSvg from '../../assets/icons/chevron-left.svg'
 import ChevronRightSvg from '../../assets/icons/chevron-right.svg'
@@ -8,9 +8,11 @@ import DragSvg from '../../assets/icons/drag.svg'
 const props = withDefaults(defineProps<{
   draggable?: boolean
   collapsible?: boolean
+  invertCollapseIcons?: boolean
 }>(), {
   draggable: false,
   collapsible: false,
+  invertCollapseIcons: false
 })
 
 const emit = defineEmits<{
@@ -18,19 +20,20 @@ const emit = defineEmits<{
 }>()
 
 const collapsed = ref(false)
+const iconCollapsed  = computed(() => (collapsed.value && !props.invertCollapseIcons) || (!collapsed.value && props.invertCollapseIcons))
 
 watch(collapsed, value => emit('onCollapse', value))
 watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
 </script>
 
 <template>
-  <div class="toolbar" :class="{ collapsed: collapsed }">
+  <div class="toolbar" :class="{ collapsed }">
     <div v-if="draggable" class="draggable">
       <DragSvg />
     </div>
     <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" @click="collapsed = !collapsed">
-      <ChevronLeftSvg v-if="collapsed" />
-      <ChevronRightSvg v-else />
+      <ChevronRightSvg v-if="iconCollapsed" />
+      <ChevronLeftSvg v-else />
     </div>
     <template v-if="!collapsed">
       <slot />

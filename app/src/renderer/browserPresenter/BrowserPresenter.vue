@@ -33,11 +33,14 @@ const streamSize = ref<Size>({ width: 0, height: 0 })
 const sizeFixed = ref(false)
 const stream = ref<MediaStream>()
 
-const pointerEnabled = ref(true)
+const toolsEnabled = ref({ pointer: true, remoteControl: false })
 const showClipboard = ref(false)
 const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
+watch(() => toolsEnabled.value.pointer, () => {
+  containerRef.value?.clear()
+})
 
 const userInputRequired = ref(true)
 
@@ -53,8 +56,7 @@ async function start() {
   presenter.value = usePresenter({
     email: email!,
     token: token!,
-    pointerEnabled,
-    remoteControlEnabled: false
+    toolsEnabled,
   }, async (shareAudio) => {
     const unsize = fixSize(windowSelectSize)
     const s = await getStreamInBrowser(shareAudio)
@@ -301,7 +303,7 @@ function onResumeSharing() {
     <PresenterToolbar
       ref="toolbar"
       :viewer-count="presenter.viewers.length"
-      @toggle-pointer="pointerEnabled = $event"
+      @toggle-pointer="toolsEnabled.pointer = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"
       @pause-sharing="onPauseSharing()"
@@ -316,7 +318,6 @@ function onResumeSharing() {
       :users="presenter.viewers"
       :user-id="presenter.screenShareData.user.id"
       :input-enabled="false"
-      :pointer-enabled="pointerEnabled"
       :video-options="{ muted: true }"
       use-veil
       @send="send($event.event, $event.data, $event.options)"

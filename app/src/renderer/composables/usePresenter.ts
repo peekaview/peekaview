@@ -5,7 +5,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
-import { RemoteData, ScreenSource, StreamState, SendRemote } from '../../interface'
+import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool } from '../../interface'
 import { stringToColor } from '../../util'
 
 interface Request {
@@ -18,8 +18,7 @@ export type Presenter = ReturnType<typeof usePresenter>
 type PresenterData = {
   email: MaybeRef<string>
   token: MaybeRef<string>
-  pointerEnabled: MaybeRef<boolean>
-  remoteControlEnabled: MaybeRef<boolean>
+  toolsEnabled: MaybeRef<Record<ViewerTool, boolean>>
 }
 
 type PresenterOptions = {
@@ -95,7 +94,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     sendReset()
   })
 
-  watch(() => [unref(data.pointerEnabled), unref(data.remoteControlEnabled)], () => {
+  watch(data.toolsEnabled, () => {
     sendReset()
   })
 
@@ -132,8 +131,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
         bottom: height,
       },
       coverBounds: [],
-      pointerEnabled: unref(data.pointerEnabled),
-      remoteControlEnabled: unref(data.remoteControlEnabled),
+      toolsEnabled: unref(data.toolsEnabled),
       streamState: streamState.value,
     }
     

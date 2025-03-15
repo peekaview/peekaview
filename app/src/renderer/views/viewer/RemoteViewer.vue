@@ -24,6 +24,11 @@ import type { File, StreamState, ViewerTool } from '../../../interface'
 
 type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'fileUpload' | 'fileDrop'
 
+const ToolIcons: Record<ViewerTool, string> = {
+  pointer: PencilSvg,
+  remoteControl: MouseSvg,
+}
+
 const props = withDefaults(defineProps<{
   data?: ScreenShareData
 }>(), {
@@ -69,7 +74,7 @@ watch(streamState, (state) => {
       streamStateTimeout = window.setTimeout(() => hideMessage('paused'), 5000)
       break
     case 'active':
-      activeTool.value = _pointerEnabled.value ? 'pointer' : _remoteControlEnabled.value ? 'remoteControl' : undefined
+      activeTool.value = toolsEnabled.value[lastActiveTool.value] ? lastActiveTool.value : getNextEnabledTool()
       activeMessage.value = 'resumed'
       clearTimeout(streamStateTimeout)
       streamStateTimeout = window.setTimeout(() => hideMessage('resumed'), 3000)
@@ -81,45 +86,56 @@ watch(streamState, (state) => {
 })
 
 const inputEnabled = computed(() => streamState.value === 'active')
-const _pointerEnabled = ref(true)
-const pointerEnabled = computed(() => _pointerEnabled.value && inputEnabled.value)
-const _remoteControlEnabled = ref(false)
-const remoteControlEnabled = computed(() => _remoteControlEnabled.value && inputEnabled.value)
+const toolsEnabled = ref({
+  pointer: true,
+  remoteControl: false,
+})
 const remoteClipboard = ref(false)
 const activeTool = ref<ViewerTool | undefined>('pointer')
+const lastActiveTool = ref<ViewerTool>('pointer')
+watch(activeTool, (tool) => {
+  if (tool)
+    lastActiveTool.value = tool
+})
 
 const activeMessage = ref<Message | undefined>('init')
+
+watch(() => toolsEnabled.value.pointer, (enabled) => {
+  toggleTool('pointer', enabled)
+  if (!enabled)
+    containerRef.value?.clear()
+})
+
+watch(() => toolsEnabled.value.remoteControl, (enabled) => {
+  toggleTool('remoteControl', enabled)
+})
+
 let tooltipTimeout: number
-
-const pointerTooltipContent = ref<string>()
-watch(_pointerEnabled, (enabled) => {
-  if (!enabled)
-    activeTool.value = _remoteControlEnabled.value ? 'remoteControl' : undefined
+const tooltipContent = ref<string | undefined>()
+const tooltipTool = ref<ViewerTool | undefined>()
+function toggleTool(tool: ViewerTool, enabled: boolean) {
+  if (!enabled) {
+    activeTool.value = getNextEnabledTool()
+  }
   else if (!activeTool.value)
-    activeTool.value = 'pointer'
-
-  pointerTooltipContent.value = t(`viewer.messages.pointer${enabled ? 'En' : 'Dis'}abled`)
-  clearTimeout(tooltipTimeout)
-  remoteControlTooltipContent.value = undefined
-  tooltipTimeout = window.setTimeout(() => {
-    pointerTooltipContent.value = undefined
-  }, 10000)
-})
-
-const remoteControlTooltipContent = ref<string>()
-watch(_remoteControlEnabled, (enabled) => {
-  if (!enabled)
-    activeTool.value = _pointerEnabled.value ? 'pointer' : undefined
-  else if (!activeTool.value)
-    activeTool.value = 'remoteControl'
+    activeTool.value = tool
   
-  remoteControlTooltipContent.value = t(`viewer.messages.remoteControl${enabled ? 'En' : 'Dis'}abled`)
+  tooltipContent.value = t(`viewer.messages.${tool}${enabled ? 'En' : 'Dis'}abled`)
+  tooltipTool.value = tool
   clearTimeout(tooltipTimeout)
-  pointerTooltipContent.value = undefined
   tooltipTimeout = window.setTimeout(() => {
-    remoteControlTooltipContent.value = undefined
+    tooltipContent.value = undefined
+    tooltipTool.value = undefined
   }, 10000)
-})
+}
+
+function getNextEnabledTool() {
+  for (let key in toolsEnabled.value) {
+    if (toolsEnabled.value[key as ViewerTool])
+      return key as ViewerTool
+  }
+  return undefined
+}
 
 const panzoomActive = ref(false)
 const videoFill = ref(false)
@@ -183,8 +199,7 @@ onReceive('reset', (data) => {
   console.log('reset', data)
 
   presenterInBrowser.value = data.inBrowser
-  _pointerEnabled.value = data.pointerEnabled
-  _remoteControlEnabled.value = data.remoteControlEnabled
+  toolsEnabled.value = data.toolsEnabled
   streamState.value = data.streamState
 
   containerRef.value?.reset(data)
@@ -431,25 +446,16 @@ function stop() {
   <div ref="viewer" class="remote-viewer">
     <Toolbar class="main-toolbar" collapsible>
       <Tooltip
+        v-for="(enabled, tool) in toolsEnabled"
+        :key="tool"
         :triggers="[]"
-        :shown="!!pointerTooltipContent"
+        :shown="!!tooltipContent && tooltipTool === tool"
       >
-        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'pointer', disabled: !pointerEnabled }" :title="$t(`viewer.toolbar.${pointerEnabled ? 'pointer' : 'pointerDisabled'}`)" @click="pointerEnabled && (activeTool = 'pointer')">
-          <PencilSvg />
+        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === tool, disabled: !enabled || !inputEnabled }" :title="$t(`viewer.toolbar.${enabled && inputEnabled ? tool : `${tool}Disabled`}`)" @click="enabled && inputEnabled && (activeTool = tool)">
+          <component :is="ToolIcons[tool]" />
         </div>
         <template #popper>
-          {{ pointerTooltipContent }}
-        </template>
-      </Tooltip>
-      <Tooltip
-        :triggers="[]"
-        :shown="!!remoteControlTooltipContent"
-      >
-        <div class="btn btn-sm btn-secondary" :class="{ active: activeTool === 'remoteControl', disabled: !remoteControlEnabled }" :title="$t(`viewer.toolbar.${remoteControlEnabled ? 'remoteControl' : 'remoteControlDisabled'}`)" @click="remoteControlEnabled && (activeTool = 'remoteControl')">
-          <MouseSvg />
-        </div>
-        <template #popper>
-          {{ remoteControlTooltipContent }}
+          {{ tooltipContent }}
         </template>
       </Tooltip>
       <div class="btn btn-sm btn-secondary" :class="{ active: showClipboard, disabled: !clipboardFile }" :title="$t(`viewer.toolbar.${clipboardFile ? 'showClipboard' : 'clipboardEmpty'}`)" @click="showClipboard = !showClipboard">
@@ -462,7 +468,6 @@ function stop() {
         <LogoutSvg />
       </div>
     </Toolbar>
-    <div class="toolbar-spacer"></div>
     <StreamContainer
       v-if="data"
       ref="container"
@@ -470,7 +475,6 @@ function stop() {
       :users="[...users, data.user]"
       :user-id="data.user.id"
       :input-enabled="inputEnabled"
-      :pointer-enabled="pointerEnabled"
       :active-tool="activeTool"
       :zoom-scale="zoom?.scale"
       :freeze-on-interaction="presenterInBrowser"
@@ -552,10 +556,6 @@ function stop() {
     position: absolute;
     top: 0.125rem;
     z-index: 3000;
-  }
-
-  .remote-viewer .toolbar-spacer {
-    flex: 0 99999999 2.5rem;
   }
 
   .remote-viewer .text-overlay {

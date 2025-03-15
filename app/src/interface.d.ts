@@ -246,16 +246,14 @@ export type RemoteData<T extends RemoteEvent> =
     inBrowser: boolean
     dimensions: Dimensions
     coverBounds: Rectangle[]
-    pointerEnabled: boolean
-    remoteControlEnabled: boolean
+    toolsEnabled: Record<ViewerTool, boolean>
     streamState: StreamState
   }
 
   export type OverlayData = {
     users?: UserData[]
     scale?: number
-    pointerEnabled?: boolean
-    remoteControlEnabled?: boolean
+    toolsEnabled: Record<ViewerTool, boolean>
   }
 
   export type Dimensions = {

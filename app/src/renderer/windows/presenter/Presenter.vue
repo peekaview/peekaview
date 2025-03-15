@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import Sources from './Sources.vue'
 
 import { usePresenter, getStreamFromSource, Presenter } from '../../composables/usePresenter'
-import { ContactData, ScreenSource } from '../../../interface'
+import { ContactData, ScreenSource, ViewerTool } from '../../../interface'
 import { notify, prompt } from '../../util'
 import { parseCode } from '../../../util'
 import { callApi, UnauthorizedError } from '../../api'
@@ -15,8 +15,10 @@ const { t } = useI18n()
 const showSources = ref(false)
 const selectedSource = ref<ScreenSource>()
 
-const pointerEnabled = ref(false)
-const remoteControlEnabled = ref(false)
+const toolsEnabled = ref<Record<ViewerTool, boolean>>({
+  pointer: false,
+  remoteControl: false,
+})
 
 const presenter = ref<Presenter>()
 const unauthorized = ref(false)
@@ -42,16 +44,16 @@ window.electronAPI?.onResumeSharing(() => {
 
 window.electronAPI?.onTogglePointer((toggle) => {
   if (toggle === undefined)
-    pointerEnabled.value = !pointerEnabled.value
+    toolsEnabled.value.pointer = !toolsEnabled.value.pointer
   else
-    pointerEnabled.value = toggle
+    toolsEnabled.value.pointer = toggle
 })
 
 window.electronAPI?.onToggleRemoteControl((toggle) => {
   if (toggle === undefined)
-    remoteControlEnabled.value = !remoteControlEnabled.value  
+    toolsEnabled.value.remoteControl = !toolsEnabled.value.remoteControl
   else
-    remoteControlEnabled.value = toggle
+    toolsEnabled.value.remoteControl = toggle
 })
 
 window.electronAPI?.onNotifyContact((contact: ContactData) => {
@@ -73,8 +75,7 @@ async function present() {
   presenter.value = usePresenter({
     email: email!,
     token: token!,
-    pointerEnabled,
-    remoteControlEnabled,
+    toolsEnabled,
   }, async (shareAudio) => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {

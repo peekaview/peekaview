@@ -194,6 +194,13 @@ function formatLastSeen(timestamp: number | undefined) {
   const days = Math.floor(seconds / 86400)
   return t('viewer.lastSeen.daysAgo', days)
 }
+
+function stop() {
+  waitingStatus.value = undefined
+  requestStatus.value = undefined
+  
+  emit('stop')
+}
 </script>
 
 <template>
@@ -209,7 +216,7 @@ function formatLastSeen(timestamp: number | undefined) {
       </p>
     </div>
     <div class="btn-row">
-      <button type="button" class="btn btn-secondary" @click="$emit('stop')">
+      <button type="button" class="btn btn-secondary" @click="stop">
         {{ $t('general.cancel') }}
       </button>
     </div>

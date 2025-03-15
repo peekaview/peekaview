@@ -101,44 +101,41 @@ export class Win32WindowManager extends WindowManager {
   }
 
   getOuterDimensions() {
-    const rectPointer = Buffer.alloc(16);
-    const hwnd = parseInt(this.hwnd);
+    const rectPointer = Buffer.alloc(16)
+    const hwnd = parseInt(this.hwnd)
     
     // Call GetWindowRect with hwnd and rectPointer as separate arguments
     if (!this.user32.GetWindowRect(hwnd, rectPointer))
       throw new Error('Failed to get window rect')
     
-    const dimensions = this.pointerToRect(rectPointer);
+    const dimensions = this.pointerToRect(rectPointer)
     const display = screen.getDisplayNearestPoint({
       x: (dimensions.right + dimensions.left) / 2,
       y: (dimensions.top + dimensions.bottom) / 2
-    });
-    const scalefactor = display.scaleFactor;
+    })
+    const scalefactor = display.scaleFactor
 
     // Remove shadow from dimensions // todo: only if not maximized
-    dimensions.left = dimensions.left + 7;
-    dimensions.right = dimensions.right - 7;
-    dimensions.bottom = dimensions.bottom - 7;
+    dimensions.left = dimensions.left + 7
+    dimensions.right = dimensions.right - 7
+    dimensions.bottom = dimensions.bottom - 7
 
     if (display.bounds.x >= 0) {
-      dimensions.left = Math.round((dimensions.left - display.bounds.x) / scalefactor + display.bounds.x);
-      dimensions.right = Math.round((dimensions.right - display.bounds.x) / scalefactor + display.bounds.x);
+      dimensions.left = Math.round((dimensions.left - display.bounds.x) / scalefactor + display.bounds.x)
+      dimensions.right = Math.round((dimensions.right - display.bounds.x) / scalefactor + display.bounds.x)
     } else {
-      dimensions.left = Math.round(dimensions.left / scalefactor);
-      dimensions.right = Math.round(dimensions.right / scalefactor);
+      dimensions.left = Math.round(dimensions.left / scalefactor)
+      dimensions.right = Math.round(dimensions.right / scalefactor)
     }
     
     if (display.bounds.y >= 0) {
-      dimensions.top = Math.round((dimensions.top - display.bounds.y) / scalefactor + display.bounds.y);
-      dimensions.bottom = Math.round((dimensions.bottom - display.bounds.y) / scalefactor + display.bounds.y);
+      dimensions.top = Math.round((dimensions.top - display.bounds.y) / scalefactor + display.bounds.y)
+      dimensions.bottom = Math.round((dimensions.bottom - display.bounds.y) / scalefactor + display.bounds.y)
     } else {
-      dimensions.top = Math.round(dimensions.top / scalefactor);
-      dimensions.bottom = Math.round(dimensions.bottom / scalefactor);
+      dimensions.top = Math.round(dimensions.top / scalefactor)
+      dimensions.bottom = Math.round(dimensions.bottom / scalefactor)
     }
-
-    console.log("current display", display)
-    console.log("current dimensions", dimensions)
-    return dimensions;
+    return dimensions
   }
 
   getInnerDimensions() {

@@ -12,8 +12,7 @@ import { UserData } from '../../../interface'
 
 const canvasRef = useTemplateRef('canvas')
 const scale = ref(1)
-const pointerEnabled = ref(true)
-const remoteControlEnabled = ref(false)
+const toolsEnabled = ref({ pointer: true, remoteControl: false })
 const users = ref<UserData[]>([])
 const mappedUsers = computed(() => {
   const mappedUsers: Record<string, UserData> = {}
@@ -26,7 +25,7 @@ const mappedUsers = computed(() => {
 const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers, scale })
 const overlayCursors = useOverlayCursors(mappedUsers)
 const overlaySignals = useOverlaySignals(mappedUsers)
-watch(pointerEnabled, () => {
+watch(() => toolsEnabled.value.pointer, () => {
   //overlayCursors.clear(true)
   overlaySignals.clear()
 })
@@ -34,29 +33,28 @@ watch(pointerEnabled, () => {
 window.electronAPI!.onUpdateOverlayData((data) => {
   data.users !== undefined && (users.value = data.users)
   data.scale !== undefined && (scale.value = data.scale)
-  data.pointerEnabled !== undefined && (pointerEnabled.value = data.pointerEnabled)
-  data.remoteControlEnabled !== undefined && (remoteControlEnabled.value = data.remoteControlEnabled)
+  data.toolsEnabled !== undefined && (toolsEnabled.value = data.toolsEnabled)
 })
 
 window.electronAPI!.onMouseClick((data) => {
-  if (pointerEnabled.value && data.tool == 'pointer')
+  if (toolsEnabled.value.pointer && data.tool == 'pointer')
     overlaySignals.send(data.userId, data.x, data.y)
 })
 
 window.electronAPI!.onMouseDown((data) => {
-  if (pointerEnabled.value && data.tool == 'pointer')
+  if (toolsEnabled.value.pointer && data.tool == 'pointer')
     drawOverlay.startStroke(data.userId, [data.x, data.y])
 })
 
 window.electronAPI!.onMouseMove((data) => {
-  if (pointerEnabled.value && data.tool == 'pointer')
+  if (toolsEnabled.value.pointer && data.tool == 'pointer')
     drawOverlay.continueStroke(data.userId, [data.x, data.y])
 
   overlayCursors.move(data.userId, data.x, data.y)
 })
 
 window.electronAPI!.onMouseUp((data) => {
-  if (pointerEnabled.value && data.tool == 'pointer')
+  if (toolsEnabled.value.pointer && data.tool == 'pointer')
     drawOverlay.endStroke(data.userId)
 })
 </script>

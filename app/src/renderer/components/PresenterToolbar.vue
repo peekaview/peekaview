@@ -9,6 +9,7 @@ import AccountPlusOutlineSvg from '../../assets/icons/account-plus-outline.svg'
 import MonitorSvg from '../../assets/icons/monitor.svg'
 import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
+import { getPlatform } from '../util'
 
 withDefaults(defineProps<{
   viewerCount: number
@@ -28,6 +29,9 @@ const emit = defineEmits<{
   (e: 'show-invite-link'): void
 }>()
 
+const macMinimumWidth = 160
+
+const isMac = getPlatform() === 'mac'
 const inApp = !!window.electronAPI
 const toolbarRef = useTemplateRef('toolbar')
 
@@ -76,7 +80,7 @@ function resizeWindow() {
     return
 
   const width = Math.round(rect.width) + 10
-  const minimumWidth = Math.min(width, 200) // mac requires a bit of minimum width for window to stay transparent
+  const minimumWidth = Math.min(width, isMac ? macMinimumWidth : width) // mac requires a specific minimum width for the window to stay transparent
   window.electronAPI?.resizeWindow('toolbar', {
     size: { width },
     minimumSize: { width: minimumWidth },
