@@ -15,6 +15,7 @@ header('Content-Type: application/json');
 
 // Add a custom error handler
 function handleError($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
     die(json_encode(['error' => $errstr]));
 }
 set_error_handler('handleError');
@@ -85,6 +86,9 @@ function validateName($name) {
 // Ensure storage directories exist
 if (!file_exists(STORAGE_PATH . '/users')) {
     mkdir(STORAGE_PATH . '/users', 0777, true);
+}
+if (!file_exists(STORAGE_PATH . '/push')) {
+    mkdir(STORAGE_PATH . '/push', 0777, true);
 }
 if (!file_exists(STORAGE_PATH . '/requests')) {
     mkdir(STORAGE_PATH . '/requests', 0777, true);
