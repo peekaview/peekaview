@@ -73,6 +73,45 @@ const locale = computed({
     localStorage.setItem('locale', value)
   }
 })
+
+function connectToRecentContact(id: string) {
+  const contact = recentContacts.value[id]
+  switch (plannedAction.value) {
+    case 'view':
+      const name = formViewerData.value.name
+      if (!name)
+        break
+
+      activeViewerData.value = {
+        name,
+        email: contact.email!,
+      }
+
+      if (email && token)
+        callApi({
+          action: 'sendPushNotification',
+          email,
+          token,
+          uuid: contact.id,
+          title: 'PeekaView',
+          message: 'Someone wants to view your screen!',
+        })
+      break
+    case 'share':
+      if (!email || !token)
+        break
+
+      callApi({
+        action: 'sendPushNotification',
+        email,
+        token,
+        uuid: contact.id,
+        title: 'PeekaView',
+        message: 'Someone wants to share their screen!',
+      })
+      break
+  }
+}
 </script>
 
 <template>
@@ -121,18 +160,6 @@ const locale = computed({
                 :is-fixed="isViewFixed"
                 @submit="activeViewerData = formViewerData"
               />
-
-              <template v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
-                <hr>
-                <h6>{{ $t('app.form.recentContacts') }}:</h6>
-                <div class="recent-contacts">
-                  <template v-for="(contact, id) in recentContacts" :key="id">
-                    <div v-if="contact.email" class="pill-tag" @click="formViewerData.email = contact.email">
-                      {{ displayNameMail(contact) }}
-                    </div>
-                  </template>
-                </div>
-              </template>
             </template>
 
             <template v-else-if="plannedAction === 'share'">
@@ -145,6 +172,16 @@ const locale = computed({
               <Login v-else target="web" />
             </template>
           </template>
+        </div>
+        <div v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
+          <h6>{{ $t('app.form.recentContacts') }}:</h6>
+          <div class="recent-contacts">
+            <template v-for="(contact, id) in recentContacts" :key="id">
+              <div v-if="contact.email" class="pill-tag" @click="connectToRecentContact(id)">
+                {{ displayNameMail(contact) }}
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </div>

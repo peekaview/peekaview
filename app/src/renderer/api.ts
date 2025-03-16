@@ -25,6 +25,8 @@ export type ApiRequestParams = {
   token: string
 } | {
   action: "sendPushNotification"
+  email: string
+  token: string
   uuid: string
   title: string
   message: string

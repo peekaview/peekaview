@@ -178,6 +178,7 @@ export async function incrementRecentContacts(users: UserData[]) {
   const recentContacts = (await getStoredItem('recentContacts') ?? {})
   for (const user of users) {
     const contact = recentContacts[user.id] ?? {}
+    contact.id = user.id
 
     if (user.name)
       contact.name = user.name

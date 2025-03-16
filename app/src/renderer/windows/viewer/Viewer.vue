@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ViewerData } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
 import { getStoredItem } from '../../util'
 import { ContactData } from '../../../interface'
 import { callApi } from '../../api'
+import { parseCode } from '../../../util'
 
 const formViewerData = ref<ViewerData>({ email: '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
@@ -15,17 +16,29 @@ getStoredItem('name').then(value => {
     formViewerData.value.name = value
 })
 
-window.electronAPI?.onNotifyContact((contact: ContactData) => {
-  window.electronAPI?.log('Notify contact:', contact)
-  callApi<Response>({
-    action: 'sendPushNotification',
-    uuid: contact.id,
-    title: 'PeekaView',
-    message: 'Someone wants to view your screen!',
+onMounted(() => {
+  const code = new URLSearchParams(window.location.search).get('data')
+  if (!code)
+    throw new Error('')
+
+  const { email, token } = parseCode(code)
+
+  window.electronAPI?.onNotifyContact((contact: ContactData) => {
+    if (email && token) {
+      window.electronAPI?.log('Notify contact:', contact)
+      callApi<Response>({
+        action: 'sendPushNotification',
+        email: email!,
+        token: token!,
+        uuid: contact.id,
+        title: 'PeekaView',
+        message: 'Someone wants to view your screen!',
+      })
+    }
+
+    if (contact.email)
+      formViewerData.value.email = contact.email
   })
-  
-  if (contact.email)
-    formViewerData.value.email = contact.email
 })
 </script>
 

@@ -23,7 +23,27 @@ const toolsEnabled = ref<Record<ViewerTool, boolean>>({
 const presenter = ref<Presenter>()
 const unauthorized = ref(false)
 
-onMounted(() => present())
+onMounted(() => {
+  const code = new URLSearchParams(window.location.search).get('data')
+  if (!code)
+    throw new Error('')
+
+  const { email, token } = parseCode(code)
+
+  window.electronAPI?.onNotifyContact((contact: ContactData) => {
+    window.electronAPI?.log('Notify contact:', contact)
+    callApi<Response>({
+      action: 'sendPushNotification',
+      email: email!,
+      token: token!,
+      uuid: contact.id,
+      title: 'PeekaView',
+      message: 'Someone wants share their screen with you!',
+    })
+  })
+
+  present(email!, token!)
+})
 
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
@@ -56,25 +76,10 @@ window.electronAPI?.onToggleRemoteControl((toggle) => {
     toolsEnabled.value.remoteControl = toggle
 })
 
-window.electronAPI?.onNotifyContact((contact: ContactData) => {
-  window.electronAPI?.log('Notify contact:', contact)
-  callApi<Response>({
-    action: 'sendPushNotification',
-    uuid: contact.id,
-    title: 'PeekaView',
-    message: 'Someone wants share their screen with you!',
-  })
-})
-
-async function present() {
-  const code = new URLSearchParams(window.location.search).get('data')
-  if (!code)
-    throw new Error('')
-
-  const { email, token } = parseCode(code)
+async function present(email: string, token: string) {
   presenter.value = usePresenter({
-    email: email!,
-    token: token!,
+    email,
+    token,
     toolsEnabled,
   }, async (shareAudio) => {
     showSources.value = true
