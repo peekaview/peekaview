@@ -14,6 +14,11 @@ export type RemoteControlData = {
 }
 
 export type ViewerData = {
-  email: string
   name: string
-}
+} & ({
+  email: string
+  code?: undefined
+} | {
+  email?: undefined
+  code: string
+})

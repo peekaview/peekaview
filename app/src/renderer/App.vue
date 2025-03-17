@@ -117,7 +117,7 @@ const locale = computed({
 
             <template v-if="plannedAction === 'view'">
               <ViewerForm
-                v-model="formViewerData"
+                v-bind="formViewerData"
                 :is-fixed="isViewFixed"
                 @submit="activeViewerData = formViewerData"
               />

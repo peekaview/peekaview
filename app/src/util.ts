@@ -55,3 +55,23 @@ export function displayNameMail(data: AtLeastNameOrEmail) {
 
   return `${data.name} (${data.email})`
 }
+
+export function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export function validateEmail(email: string) {
+  return String(email)
+    .toLowerCase()
+    .match(
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+    );
+}
+
+export function validateCode(code: string) {
+  return String(code)
+    .toLowerCase()
+    .match(
+      /^[a-z0-9]{5,8}$/
+    );
+}

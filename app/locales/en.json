@@ -6,7 +6,10 @@
     "cancel": "Cancel",
     "close": "Close",
     "areYouSure": "Are you sure?",
-    "error": "Error"
+    "error": "Error",
+    "copy": "Copy",
+    "copied": "Copied",
+    "required": "Required"
   },
   "update": {
     "available": "A new version ({{version}}) is available and will be downloaded.",
@@ -18,8 +21,9 @@
     "yourEmail": "Your email address",
     "yourName": "Your Name",
     "enterYourName": "Enter your name",
-    "connectToEmail": "Mail address of user to connect with",
-    "joinSession": "Join Screen Sharing Session of"
+    "connectTo": "Connect to",
+    "joinSession": "Join Screen Sharing Session of",
+    "invitationCode": "Invitation Code"
   },
   "app": {
     "logout": "Logout",
@@ -52,6 +56,8 @@
     }
   },
   "viewer": {
+    "exampleMail": "example{'@'}email.com",
+    "emailOrCodeInvalid": "Invalid email or code",
     "requestScreenShare": "Request Screen Share Access",
     "requestFrom": "From {email}",
     "requestAccess": "Request Access",
@@ -162,7 +168,7 @@
     },
     "download": {
       "prompt": "Don't have the PeekaView App yet?",
-      "button": "Download PeekaView for Windows"
+      "button": "Download PeekaView"
     },
     "openSession": {
       "title": "Share Your Screen",

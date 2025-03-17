@@ -44,6 +44,16 @@ function present() {
     return 'onbeforeunload'
   }
 }
+
+const copied = ref(false)
+function copyCode() {
+  navigator.clipboard.writeText(inviteUrl.value)
+  if (copied.value)
+    return
+  
+  copied.value = true
+  setTimeout(() => copied.value = false, 5000)
+}
 </script>
 
 <template>
@@ -54,6 +64,9 @@ function present() {
   <hr />
   <div class="text-center">
     <p>{{ $t('share.activeSession.invite') }}</p>
-    <code>{{ inviteUrl }}</code>
+    <div class="copy-text" @click="copyCode">
+      <code>{{ inviteUrl }}</code>
+    </div>
+    <div class="mt-2" v-if="copied">{{ $t('general.copied') }}!</div>
   </div>
 </template>

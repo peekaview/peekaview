@@ -7,8 +7,8 @@ import Clipboard from '../components/Clipboard.vue'
 import { File, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
-import { notify, prompt, PromptOptions, NotifyOptions } from '../util'
-import { parseCode } from '../../util'
+import { notify, prompt, PromptOptions, NotifyOptions, getPlatform } from '../util'
+import { parseCode, sleep } from '../../util'
 import { useFileChunkRegistry } from '../../composables/useFileChunking'
 
 import LoadingDarkGif from '../../assets/img/loading_dark.gif'
@@ -16,6 +16,7 @@ import { useRemoteHandlers } from '../composables/useRemoteHandlers'
 
 const { t } = useI18n()
 
+const platform = getPlatform()
 const windowDefaultSize = [400, 400] as const
 const windowSelectSize = [720, 600] as const
 const windowModalSize = [400, 550] as const
@@ -58,7 +59,7 @@ async function start() {
     token: token!,
     toolsEnabled,
   }, async (shareAudio) => {
-    const unsize = fixSize(windowSelectSize)
+    const unsize = await fixSize(windowSelectSize)
     const s = await getStreamInBrowser(shareAudio)
     unsize()
 
@@ -197,11 +198,11 @@ function freezeAndFocus() {
   window.setTimeout(() => throttling = false, 5000)
 
   shutterActive.value = true
-  window.setTimeout(() => { // wait until shutter is streamed
+  window.setTimeout(async () => { // wait until shutter is streamed
     containerRef.value?.videoRef?.pause()
     shutterActive.value = false
     
-    const unsize = fixSize([width, height], [0, 0])
+    const unsize = await fixSize([width, height], [0, 0])
     window.focus()
     window.setTimeout(() => {
       unsize(true)
@@ -224,7 +225,7 @@ async function showInviteLink() {
     navigator.clipboard.writeText(url)
 }
 
-function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
+async function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
   if (sizeFixed.value)
     throw new Error('Window size is already fixed!')
 
@@ -234,21 +235,29 @@ function fixSize(size: readonly [number, number], position?: readonly [number, n
   const height = window.outerHeight
 
   sizeFixed.value = true
-  transform(size, position)
+  await transform(size, position)
 
-  return (toPrevious = false) => {
+  return async (toPrevious = false) => {
     sizeFixed.value = false
     if (toPrevious)
-      transform([width, height], [x, Math.max(y, titleBarHeight)]) // timeout required to let resize finish
+      await transform([width, height], [x, Math.max(y, titleBarHeight)]) // timeout required to let resize finish
     else
-      transform(windowDefaultSize, [99999, 99999]) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
+      await transform(windowDefaultSize, [99999, 99999]) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
   }
 }
 
-function transform(size: readonly [number, number], position?: readonly [number, number]) {
+async function transform(size: readonly [number, number], position?: readonly [number, number]) {
+  // on macOS, when the window is resized is first, it might mainly overlap into another window, thus move it to the top left corner beforehand
+  if (position && platform === 'mac') { 
+    window.moveTo(0, 0)
+    await sleep(300) // let moving finish
+  }
+
   window.resizeTo(...size)
-  if (position)
-    setTimeout(() => window.moveTo(...position), 300) // timeout required to let resize finish
+  if (position) {
+    await sleep(300) // let resize finish
+    window.moveTo(...position)
+  }
 }
 
 let modalPromise: Promise<string> | Promise<void> | undefined
@@ -257,7 +266,7 @@ async function resizeAndPrompt(options: PromptOptions) {
     await modalPromise
 
   modalPromise = prompt(options)
-  const unsize = fixSize(windowModalSize)
+  const unsize = await fixSize(windowModalSize)
 
   const result = await modalPromise
   modalPromise = undefined
@@ -271,7 +280,7 @@ async function resizeAndNotify(options: NotifyOptions) {
     await modalPromise
 
   modalPromise = notify(options)
-  const unsize = fixSize(windowModalSize)
+  const unsize = await fixSize(windowModalSize)
 
   await modalPromise
   modalPromise = undefined
