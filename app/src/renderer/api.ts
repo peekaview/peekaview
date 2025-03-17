@@ -1,12 +1,15 @@
 import i18n from "./i18n"
+import { EitherEmailOrCode } from "./types"
+import { notify } from "./util"
 
-export type ApiRequestParams = {
+export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"
-  email: string
   name: string
   request_id: string
   init: '1' | '0'
-} | {
+} & EitherEmailOrCode
+
+export type ApiRequestParams = ShowMeYourScreenParams | {
   action: "iAmOnline" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
   email: string
   token: string
@@ -28,15 +31,30 @@ export type ApiRequestParams = {
   uuid: string
   title: string
   message: string
+} | {
+  action: "saveTempData"
+  data: string
+} | {
+  action: "getTempData"
+  code: string
 }
 
 export async function callApi<TResponse = void>(params: ApiRequestParams) {
+  const filteredParams = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined))
   const response = await fetch(`${import.meta.env.VITE_API_URL}?${new URLSearchParams({
     lang: i18n.global.locale.value,
-    ...params,
+    ...filteredParams,
   }).toString()}`)
   if (response.status === 401)
     throw new UnauthorizedError(`${response.status} ${response.statusText}`)
+
+  if (response.status === 500)
+    notify({
+      title: 'Server Error',
+      text: `${response.status} ${response.statusText}`,
+      confirmButtonText: 'OK',
+      type: 'error',
+    })
 
   if (!response.ok)
     throw new Error(`${response.status} ${response.statusText}`)

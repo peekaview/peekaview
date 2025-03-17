@@ -8,9 +8,13 @@ html {
   --link-color: #fff;
   --button-text-color: #bbb;
   --panel-bg-color: #3333339e;
+  --input-text-color: white;
   --input-bg-color: #0006;
   --input-bg-focus-color: #000b;
-  --input-text-color: white;
+  --dropdown-text-color: white;
+  --dropdown-bg-color: #666;
+  --dropdown-bg-hover-color: #888;
+  --shadow-color: #0006;
 }
 
 html {
@@ -30,6 +34,23 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+select {
+  color: var(--input-color);
+  background: var(--input-bg-color);
+  border: none;
+  border-radius: 0.33rem;
+  padding: 0.33rem 0.5rem;
+}
+
+select option {
+  background: var(--dropdown-bg-color);
+  color: var(--dropdown-text-color);
+}
+
+select option:hover {
+  background: var(--dropdown-bg-hover-color);
 }
 
 .main-container {
@@ -72,6 +93,11 @@ a:hover {
 /* Form Styles */
 .form-content {
   text-align: left;
+}
+
+.form-content .error {
+  color: hsl(0, 100%, 68%);
+  margin-top: 0.5rem;
 }
 
 .form-main-label {

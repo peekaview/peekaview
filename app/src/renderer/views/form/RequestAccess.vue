@@ -31,12 +31,6 @@ type AcceptedRequestResponse = {
 
 type Response = UnacceptedRequestResponse | AcceptedRequestResponse
 
-type RequestParams = {
-  email: string
-  name: string
-  request_id: string
-}
-
 const props = defineProps<{
   contact: ViewerData
 }>()
@@ -69,23 +63,27 @@ onMounted(async () => {
   setStoredItem('name', props.contact.name)
 
   const uuid = (await getStoredItem('uuid'))!
-  const params = {
-    email: props.contact.email,
-    name: props.contact.name,
-    request_id: uuid.replace(/-/g, '').substring(0, 8), // uuid,
-  }
-  requestScreen(params, true)
+  requestScreen(uuid, true)
 })
 
-async function requestScreen(params: RequestParams, initial = false) {
+async function requestScreen(uuid: string, initial = false) {
   try {
     if (waitingStatus.value === undefined)
       return
 
-    const data = await callApi<Response>({
-      action: 'showMeYourScreen',
-      init: initial ? '1' : '0',
+    const params = {
+      action: 'showMeYourScreen' as const,
+      init: initial ? '1' as const : '0' as const,
+      name: props.contact.name,
+      request_id: uuid.replace(/-/g, '').substring(0, 8), // uuid,
+    }
+
+    const data = await callApi<Response>(props.contact.email ? {
       ...params,
+      email: props.contact.email,
+    } : {
+      ...params,
+      code: props.contact.code!,
     })
     
     if (initial) {
@@ -117,7 +115,7 @@ async function requestScreen(params: RequestParams, initial = false) {
       }
     }
 
-    window.setTimeout(() => requestScreen(params), 1000)
+    window.setTimeout(() => requestScreen(uuid), 1000)
   } catch (error) {
     console.error('Error during polling:', error)
     handleError()

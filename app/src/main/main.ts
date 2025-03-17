@@ -433,7 +433,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    //presenterWindow.webContents.openDevTools()
+    presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -651,7 +651,7 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      presenterWindow?.hide()
+      //presenterWindow?.hide()
     }
 
     currentSource = data
