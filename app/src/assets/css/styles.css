@@ -182,7 +182,7 @@ select option:hover {
 }
 
 .copy-text {
-  --bs-code-color: hsl(330, 75%, 64%);
+  --bs-code-color: white;
   cursor: pointer;
   border: 1px solid var(--bs-code-color);
   border-radius: 0.25rem;
