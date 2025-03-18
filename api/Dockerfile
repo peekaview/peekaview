@@ -10,6 +10,16 @@ COPY ./helper /app/public/helper
 COPY ./composer.json /app/public/composer.json
 COPY ./composer.lock /app/public/composer.lock
 
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Set working directory to public for composer install
+WORKDIR /app/public
+RUN composer install --no-dev --no-interaction --optimize-autoloader
+
+# Reset working directory
+WORKDIR /app
+
 # Copy and set up entrypoint script
 COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
