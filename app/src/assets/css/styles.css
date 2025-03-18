@@ -169,6 +169,10 @@ select option:hover {
   box-shadow: 0 2px 4px rgba(26,115,232,0.2);
 }
 
+.btn-secondary {
+  --bs-btn-active-bg: #6e7c87;
+}
+
 .btn-row {
   flex: 0 0 auto;
   display: flex;
