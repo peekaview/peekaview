@@ -41,8 +41,8 @@ function sendMessage($title, $message, $token) {
             ->withNotification($notification);
             
         $response = $messaging->send($message);
-        echo "Message sent to " . $token . " " . json_encode($response) . "\n";
+        error_log("Message sent to " . $token . " " . json_encode($response) . "\n");
     } catch (Exception $e) {
-        echo "Error sending message to " . $token . " " . $e->getMessage() . "\n";
+        error_log("Error sending message to " . $token . " " . $e->getMessage() . "\n");
     }
 }
