@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:builder-php8.2-alpine
+FROM dunglas/frankenphp:latest
 
 # Set working directory in container
 WORKDIR /app
@@ -8,7 +8,6 @@ COPY ./download.php /app/public/download.php
 COPY ./send.php /app/public/send.php
 COPY ./helper /app/public/helper
 COPY ./composer.json /app/public/composer.json
-COPY ./composer.lock /app/public/composer.lock
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
