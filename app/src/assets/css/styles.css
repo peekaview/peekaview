@@ -36,6 +36,23 @@ a:hover {
   text-decoration: underline;
 }
 
+select {
+  color: var(--input-color);
+  background: var(--input-bg-color);
+  border: none;
+  border-radius: 0.33rem;
+  padding: 0.33rem 0.5rem;
+}
+
+select option {
+  background: var(--dropdown-bg-color);
+  color: var(--dropdown-text-color);
+}
+
+select option:hover {
+  background: var(--dropdown-bg-hover-color);
+}
+
 .main-container {
   flex-grow: 1;
   display: flex;
@@ -77,6 +94,11 @@ a:hover {
 /* Form Styles */
 .form-content {
   text-align: left;
+}
+
+.form-content .error {
+  color: hsl(0, 100%, 68%);
+  margin-top: 0.5rem;
 }
 
 .form-main-label {
@@ -158,6 +180,14 @@ a:hover {
 .btn svg {
   max-width: 100%;
   max-height: 100%;
+}
+
+.copy-text {
+  --bs-code-color: hsl(330, 75%, 64%);
+  cursor: pointer;
+  border: 1px solid var(--bs-code-color);
+  border-radius: 0.25rem;
+  padding: 0.5rem;
 }
 
 .info-container {

@@ -6,7 +6,10 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "areYouSure": "Sind Sie sicher?",
-    "error": "Fehler"
+    "error": "Fehler",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "required": "Erforderlich"
   },
   "update": {
     "available": "Eine neue Version ({{version}}) ist verfügbar und wird heruntergeladen.",
@@ -18,8 +21,9 @@
     "yourEmail": "Ihre E-Mail-Adresse",
     "yourName": "Ihr Name",
     "enterYourName": "Geben Sie Ihren Namen ein",
-    "connectToEmail": "E-Mail-Adresse des Benutzers, mit dem Sie sich verbinden möchten",
-    "joinSession": "Bildschirmfreigabe beitreten von"
+    "connectTo": "Verbinden mit",
+    "joinSession": "Bildschirmfreigabe beitreten von",
+    "invitationCode": "Einladungscode"
   },
   "app": {
     "logout": "Abmelden",
@@ -52,6 +56,8 @@
     }
   },
   "viewer": {
+    "exampleMail": "beispiel{'@'}email.com",
+    "emailOrCodeInvalid": "Ungültige E-Mail-Adresse oder Code",
     "requestScreenShare": "Bildschirmfreigabe anfordern",
     "requestFrom": "Von {email}",
     "requestAccess": "Zugriff anfragen",
@@ -162,7 +168,7 @@
     },
     "download": {
       "prompt": "Sie haben die PeekaView App noch nicht?",
-      "button": "PeekaView für Windows herunterladen"
+      "button": "PeekaView herunterladen"
     },
     "openSession": {
       "title": "Bildschirm freigeben",

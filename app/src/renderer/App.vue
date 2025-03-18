@@ -12,7 +12,7 @@ import Imprint from './components/Imprint.vue'
 
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
-import { ViewerData } from './types'
+import { ViewerData, ViewerDataSchema } from './types'
 import { uuidv4, displayNameMail } from '../util'
 import { getPushToken } from './firebase'
 import { callApi } from './api'
@@ -40,7 +40,7 @@ watch(expandedTagRef, (ref) => {
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
 const recentContacts = ref<Record<string, ContactData>>({})
-const formViewerData = ref<ViewerData>({ email: viewEmail ?? '', name: '' })
+const formViewerData = ref<ViewerDataSchema>({ emailOrCode: viewEmail ?? '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
 const isViewFixed = computed(() => action === Action.View && !!viewEmail)
 
@@ -183,7 +183,7 @@ function shareRecentContact(id?: string) {
               <ViewerForm
                 v-model="formViewerData"
                 :is-fixed="isViewFixed"
-                @submit="activeViewerData = formViewerData"
+                @submit="activeViewerData = $event"
               />
             </template>
 
@@ -302,14 +302,6 @@ body.view-active {
 .header-subtitle {
   margin: 0;
   color: #9d9d9d;
-}
-
-footer select {
-  color: gray;
-  background: #42403e;
-  border: 0px solid black;
-  border-radius: 5px;
-  padding: 5px;
 }
 
 .recent-contacts {

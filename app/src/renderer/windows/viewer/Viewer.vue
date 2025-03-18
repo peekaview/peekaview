@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { ViewerData } from '../../types'
+import { ViewerData, ViewerDataSchema } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
 import { getStoredItem } from '../../util'
@@ -8,7 +8,7 @@ import { ContactData } from '../../../interface'
 import { callApi } from '../../api'
 import { parseCode } from '../../../util'
 
-const formViewerData = ref<ViewerData>({ email: '', name: '' })
+const formViewerData = ref<ViewerDataSchema>({ emailOrCode: '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
 
 getStoredItem('name').then(value => {
@@ -37,7 +37,7 @@ onMounted(() => {
     }
 
     if (contact.email)
-      formViewerData.value.email = contact.email
+      formViewerData.value.emailOrCode = contact.email
   })
 })
 </script>
@@ -55,7 +55,7 @@ onMounted(() => {
           <div class="panel">
             <ViewerForm
               v-model="formViewerData"
-              @submit="activeViewerData = formViewerData"
+              @submit="activeViewerData = $event"
             />
           </div>
         </div>

@@ -15,6 +15,7 @@ header('Content-Type: application/json');
 
 // Add a custom error handler
 function handleError($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
     die(json_encode(['error' => $errstr]));
 }
 set_error_handler('handleError');
@@ -85,6 +86,9 @@ function validateName($name) {
 // Ensure storage directories exist
 if (!file_exists(STORAGE_PATH . '/users')) {
     mkdir(STORAGE_PATH . '/users', 0777, true);
+}
+if (!file_exists(STORAGE_PATH . '/push')) {
+    mkdir(STORAGE_PATH . '/push', 0777, true);
 }
 if (!file_exists(STORAGE_PATH . '/requests')) {
     mkdir(STORAGE_PATH . '/requests', 0777, true);
@@ -248,7 +252,7 @@ function doesAnyoneWantToSeeMyScreen() {
                 'request_id' => $requestId,
                 'timestamp' => $requestTime
             ];
-        } else if ($requestTime < $thirtyMinutesAgo) {
+        } else if ($requestTime < $thirtyMinutesAgo && file_exists($requestFile)) {
             unlink($requestFile);
         }
     }
@@ -276,7 +280,11 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
-    $email = validateEmail($_GET['email']);
+    if (isset($_GET['code'])) {
+        $email = getTempData($_GET['code']);
+    } else {
+        $email = validateEmail($_GET['email']);
+    }
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['request_id'] ?? '');
     $lang = validateLang($_GET['lang'] ?? '');
@@ -296,8 +304,8 @@ function showMeYourScreen() {
     $requestFile = getRequestFilename($email, $requestId);
     
     // If init is true, delete the request file
-    if ($init) {
-        @unlink($requestFile);
+    if ($init && file_exists($requestFile)) {
+        unlink($requestFile);
     }
 
     // If request doesn't exist, create it
@@ -482,14 +490,13 @@ function sendPushNotification() {
     return ['success' => true];
 }
 
-function saveTempData() {
-    $dataToSave = $_POST['data'] ?? $_GET['data'] ?? '';
-    if (empty($dataToSave)) {
+function saveTempData($data) {
+    if (empty($data)) {
         throw new Exception('No data provided');
     }
     
     // Check data size limit (100KB)
-    if (strlen($dataToSave) > 102400) {
+    if (strlen($data) > 102400) {
         throw new Exception('Data exceeds maximum size limit of 100KB');
     }
     
@@ -523,8 +530,7 @@ function saveTempData() {
     return ['code' => $code];
 }
 
-function getTempData() {
-    $code = $_GET['code'] ?? '';
+function getTempData($code) {
     if (empty($code) || !preg_match('/^[a-zA-Z0-9]{8}$/', $code)) {
         throw new Exception('Invalid code format');
     }
@@ -545,6 +551,9 @@ function getTempData() {
 // Route requests with error handling
 try {
     $action = $_GET['action'] ?? '';
+    $data = $_POST['data'] ?? $_GET['data'] ?? '';
+    $code = $_GET['code'] ?? '';
+    // TODO: retrieve GET and POST data here and pass into functions, to reduce dependency coupling
     switch ($action) {
         case 'createScreenShareRoom':
             $out = createScreenShareRoom();
@@ -574,10 +583,10 @@ try {
             $out = sendPushNotification();
             break;
         case 'saveTempData':
-            $out = saveTempData();
+            $out = saveTempData($data);
             break;
         case 'getTempData':
-            $out = getTempData();
+            $out = getTempData($code);
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));

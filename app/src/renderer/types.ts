@@ -13,7 +13,19 @@ export type RemoteControlData = {
   hostname: string
 }
 
-export type ViewerData = {
+export type ViewerData = EitherEmailOrCode & {
+  name: string
+}
+
+export type EitherEmailOrCode = {
   email: string
+  code?: undefined
+} | {
+  email?: undefined
+  code: string
+}
+
+export type ViewerDataSchema = {
+  emailOrCode: string
   name: string
 }

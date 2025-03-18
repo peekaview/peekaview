@@ -97,9 +97,9 @@ async function present(email: string, token: string) {
     window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, userName: email }))
     return getStreamFromSource(source, shareAudio)
   }, {
-    onRequest: async (request) => {
+    onRequest: async (_id, name) => {
       const result = await prompt({
-        text: t('share.requestAccess.message', { name: request.name }),
+        text: t('share.requestAccess.message', { name }),
         confirmButtonText: t('share.requestAccess.accept'),
         cancelButtonText: t('share.requestAccess.deny'),
         sound: 'ringtone',

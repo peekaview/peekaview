@@ -8,11 +8,6 @@ import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool } from '../../interface'
 import { stringToColor } from '../../util'
 
-interface Request {
-  request_id: string
-  name: string
-}
-
 export type Presenter = ReturnType<typeof usePresenter>
 
 type PresenterData = {
@@ -22,7 +17,7 @@ type PresenterData = {
 }
 
 type PresenterOptions = {
-  onRequest?: (request: Request) => Promise<boolean>
+  onRequest?: (id: string, name: string) => Promise<boolean>
   onStream?: (stream: MediaStream, shareAudio?: boolean) => void
   onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
@@ -57,22 +52,26 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const streamState = ref<StreamState>('stopped')
   const stream = shallowRef<MediaStream | undefined>()
 
-  let requestTimeout: number | undefined
+  const requestQueue = reactive<Record<string, string>>({})
+
+  let checkRequestTimeout: number | undefined
   watch(streamState, (state) => {
     if (state === 'stopped')
       return
     
     const interval = async () => {
-      clearTimeout(requestTimeout)
+      clearTimeout(checkRequestTimeout)
       await checkRequests()
 
-      requestTimeout = window.setTimeout(async () => {
+      checkRequestTimeout = window.setTimeout(async () => {
         await checkRequests()
         interval()
       }, 2000)
     }
 
     interval()
+
+    processRequests()
   })
 
   window.electronAPI?.onHidden((flag) => {
@@ -246,30 +245,45 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     }
     
     try {
-      const requests = await callApi<Request[]>(requestData)
-      for (const request of requests) {
-        if (!options?.onRequest) {
-          acceptRequest(request)
-        } else {
-          const response = await options.onRequest(request)
-          if (response)
-            acceptRequest(request)
-          else
-            denyRequest(request)
-        }
-      }
+      const requests = await callApi<{
+        request_id: string
+        name: string
+      }[]>(requestData)
+      for (const request of requests)
+        requestQueue[request.request_id] = request.name
     } catch (error) {
       console.error('Error checking requests:', error);
       handleApiError(error as Error, requestData)
     }
   }
 
-  async function acceptRequest(request: Request) {
+  let processRequestTimeout: number | undefined
+  async function processRequests() {
+    clearTimeout(processRequestTimeout)
+    const keys = Object.keys(requestQueue)
+    if (keys.length > 0) {
+      const id = keys[0]
+      if (!options?.onRequest) {
+        await acceptRequest(id)
+      } else {
+        const response = await options.onRequest(id, requestQueue[id])
+        if (response)
+          await acceptRequest(id)
+        else
+          await denyRequest(id)
+      }
+      delete requestQueue[id]
+    }
+
+    processRequestTimeout = window.setTimeout(() => processRequests(), 100)
+  }
+
+  async function acceptRequest(id: string) {
     const requestData = {
       action: 'youAreAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: request.request_id,
+      request_id: id,
     }
 
     try {
@@ -280,12 +294,12 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     }
   }
 
-  async function denyRequest(request: Request) {
+  async function denyRequest(id: string) {
     const requestData = {
       action: 'youAreNotAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: request.request_id,
+      request_id: id,
     }
     try {
       await callApi(requestData)
@@ -345,8 +359,14 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   }
 
   function cleanUpCallbacks() {
-    clearTimeout(requestTimeout)
-    requestTimeout = undefined
+    clearTimeout(checkRequestTimeout)
+    checkRequestTimeout = undefined
+    clearTimeout(processRequestTimeout)
+    processRequestTimeout = undefined
+
+    for (const id in requestQueue)
+      delete requestQueue[id]
+
     clearInterval(pingInterval.value)
     pingInterval.value = undefined
   }

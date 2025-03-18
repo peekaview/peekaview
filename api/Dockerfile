@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy PHP file into container
 COPY ./api.php /app/public/index.php
 COPY ./download.php /app/public/download.php
+COPY ./send.php /app/public/send.php
 COPY ./helper /app/public/helper
 
 # Copy and set up entrypoint script
