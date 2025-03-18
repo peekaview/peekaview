@@ -7,6 +7,7 @@ COPY ./api.php /app/public/index.php
 COPY ./download.php /app/public/download.php
 COPY ./send.php /app/public/send.php
 COPY ./helper /app/public/helper
+COPY ./vendor /app/public/vendor
 
 # Copy and set up entrypoint script
 COPY ./docker-entrypoint.sh /docker-entrypoint.sh
