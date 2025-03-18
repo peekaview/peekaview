@@ -8,6 +8,7 @@ COPY ./download.php /app/public/download.php
 COPY ./send.php /app/public/send.php
 COPY ./helper /app/public/helper
 COPY ./composer.json /app/public/composer.json
+COPY ./serviceAccountKey.json.example /app/public/serviceAccountKey.json.example
 
 # Install Git and required extensions
 RUN apt-get update && \
