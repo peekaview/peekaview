@@ -7,7 +7,7 @@ use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 
 // Initialize Firebase
-$factory = (new Factory)->withServiceAccount('./storage/serviceAccountKey.json');
+$factory = (new Factory)->withServiceAccount(STORAGE_PATH . '/serviceAccountKey.json');
 $messaging = $factory->createMessaging();
 
 /**
