@@ -1,4 +1,4 @@
-FROM dunglas/frankenphp:latest
+FROM dunglas/frankenphp:builder-php8.2-alpine
 
 # Set working directory in container
 WORKDIR /app
