@@ -245,6 +245,7 @@
     "expand": "Expand",
     "pointer": "Draw / Point",
     "remoteControl": "Remote Control",
+    "clipboard": "Clipboard",
     "openClipboard": "Open clipboard",
     "currentViewers": "Viewers",
     "shareDifferentScreen": "Share different screen",

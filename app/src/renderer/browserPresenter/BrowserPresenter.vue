@@ -202,6 +202,7 @@ function freezeAndFocus() {
     containerRef.value?.videoRef?.pause()
     shutterActive.value = false
     
+    // TODO: what if someone freezes while a modal is open? fix!
     const unsize = await fixSize([width, height], [0, 0])
     window.focus()
     window.setTimeout(() => {
@@ -249,8 +250,14 @@ async function fixSize(size: readonly [number, number], position?: readonly [num
 async function transform(size: readonly [number, number], position?: readonly [number, number]) {
   // on macOS, when the window is resized is first, it might mainly overlap into another window, thus move it to the top left corner beforehand
   if (position && platform === 'mac') { 
-    window.moveTo(0, 0)
-    await sleep(300) // let moving finish
+    const width = window.outerWidth
+    const height = window.outerHeight
+
+    // if one of the new sizes is more than the double of the current size, it is likely have more area in another window
+    if (width < (size[0] / 2) || height < (size[1] / 2)) {
+      window.moveTo(0, 0)
+      await sleep(300) // let moving finish
+    }
   }
 
   window.resizeTo(...size)
@@ -260,30 +267,28 @@ async function transform(size: readonly [number, number], position?: readonly [n
   }
 }
 
-let modalPromise: Promise<string> | Promise<void> | undefined
+const modalQueue: (Promise<string> | Promise<void>)[] = []
 async function resizeAndPrompt(options: PromptOptions) {
-  if (modalPromise) // TODO: fix, not safe in case a third modal is opened!
-    await modalPromise
+  await Promise.all(modalQueue)
 
-  modalPromise = prompt(options)
+  const modalPromise = prompt(options)
+  modalQueue.push(modalPromise)
   const unsize = await fixSize(windowModalSize)
 
   const result = await modalPromise
-  modalPromise = undefined
 
   unsize()
   return result
 }
 
 async function resizeAndNotify(options: NotifyOptions) {
-  if (modalPromise)
-    await modalPromise
+  await Promise.all(modalQueue)
 
-  modalPromise = notify(options)
+  const modalPromise = notify(options)
+  modalQueue.push(modalPromise)
   const unsize = await fixSize(windowModalSize)
 
   await modalPromise
-  modalPromise = undefined
 
   unsize()
 }
@@ -335,7 +340,7 @@ function onResumeSharing() {
       <div v-if="shutterActive" class="shutter" />
     </StreamContainer>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile"/>
+      <Clipboard v-if="showClipboard" :data="clipboardFile" @close="showClipboard = false"/>
     </div>
   </div>
 </template>
@@ -394,5 +399,14 @@ video {
   z-index: 2000;
   top: 50px;
   left: 50px;
+}
+
+.clipboard {
+  max-width: 350px;
+}
+
+.clipboard .clipboard-content {
+  width: 300px;
+  height: 100px;
 }
 </style>

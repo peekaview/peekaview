@@ -36,7 +36,7 @@ function close() {
 </script>
 
 <template>
-  <Clipboard ref="clipboard" :data="file" draggable @close="close" @on-collapse="onCollapse"/>
+  <Clipboard ref="clipboard" :data="file" collapsible @close="close" @on-collapse="onCollapse"/>
 </template>
 
 <style>

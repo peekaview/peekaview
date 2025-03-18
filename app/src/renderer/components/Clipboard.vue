@@ -18,13 +18,13 @@ type ClipboardFile = File & {
 
 const props = withDefaults(defineProps<{
   data: File | undefined
-  draggable?: boolean
   initialRows?: number
+  collapsible?: boolean
   invertCollapseIcons?: boolean
 }>(), {
   data: undefined,
-  draggable: false,
   initialRows: 8,
+  collapsible: false,
   invertCollapseIcons: false
 })
 
@@ -179,11 +179,11 @@ function close() {
 <template>
   <div v-if="clipboardFile" class="clipboard" :class="{ collapsed: collapsed }">
     <Toolbar>
-      <div class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="flex:0 0 auto" @click="collapsed = !collapsed">
+      <div v-if="collapsible" class="btn btn-sm btn-secondary" :title="$t(`toolbar.${collapsed ? 'expand' : 'collapse'}`)" style="flex:0 0 auto" @click="collapsed = !collapsed">
         <ChevronDownSvg v-if="iconCollapsed" />
         <ChevronUpSvg v-else />
       </div>
-      <div style="flex:1 1 auto;-webkit-app-region:drag"></div>
+      <div class="toolbar-title" style="flex:1 1 auto;-webkit-app-region:drag">{{ $t('toolbar.clipboard') }}</div>
       <div class="btn btn-sm btn-secondary" :title="$t('general.close')" style="flex:0 0 auto" @click="close">
         <CloseSvg />
       </div>

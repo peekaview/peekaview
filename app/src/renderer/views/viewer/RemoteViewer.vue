@@ -491,7 +491,7 @@ function stop() {
       </div>
     </StreamContainer>
     <div class="clipboard-container">
-      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" invert-collapse-icons />
+      <Clipboard v-if="showClipboard" :data="clipboardFile" :initial-rows="12" collapsible invert-collapse-icons />
     </div>
     <div v-if="activeMessage" class="message">
       <template v-if="activeMessage === 'init' || activeMessage === 'help'">
@@ -555,6 +555,7 @@ function stop() {
     cursor: default;
     position: absolute;
     top: 0.125rem;
+    right: 0.5rem;
     z-index: 3000;
   }
 

@@ -56,11 +56,14 @@ watch(() => props.collapsible, flag => !flag && (collapsed.value = false))
     border-radius: 5px;
     border: 1px solid hsla(0, 0%, 25%, 0.75);
     box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+  }
 
-
-    position: absolute;
-    right: 10px;
-    top: 0px;
+  .toolbar-title {
+    font-size: 0.8rem;
+    align-self: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .toolbar svg {
