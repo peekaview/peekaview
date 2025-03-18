@@ -9,8 +9,10 @@ COPY ./send.php /app/public/send.php
 COPY ./helper /app/public/helper
 COPY ./composer.json /app/public/composer.json
 
-# Install Git
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Install Git and required extensions
+RUN apt-get update && \
+    apt-get install -y git unzip && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
