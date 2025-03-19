@@ -219,6 +219,10 @@ declare const CSP_POLICY: string
       updateContextMenu()
     })
 
+    store.onDidChange('recentContacts', () => {
+      updateContextMenu()
+    })
+
     protocol.handle('peekaview', request => {
       log.info('Protocol handler called with URL:', request.url)
       handleProtocol(request.url)
@@ -321,7 +325,6 @@ declare const CSP_POLICY: string
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
-              updateContextMenu()
             } },
           ] })
         }
