@@ -4,7 +4,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
+import { getPlatform, getStoredItem, incrementRecentContacts, setStoredItem } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool } from '../../interface'
 import { stringToColor } from '../../util'
 
@@ -31,7 +31,31 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
-  const viewCode = computed(() => btoa(`viewEmail=${ unref(data.email) }`))
+  const viewCode = ref<string>()
+  watch(() => unref(data.email), async (email) => {
+    viewCode.value = await emailToViewCode(email)
+  }, { immediate: true })
+
+  const viewCodeCache = ref<Record<string, string>>({})
+  getStoredItem('viewCodeCache').then(cache => {
+    viewCodeCache.value = cache
+    
+    watch(viewCodeCache, (cache) => {
+      setStoredItem('viewCodeCache', cache)
+    })
+  })
+
+  async function emailToViewCode(email: string) {
+    if (viewCodeCache[email])
+      return viewCodeCache[email]
+  
+    const data = await callApi<{ code: string }>({
+      action: 'saveTempData',
+      data: email,
+    })
+    viewCodeCache[email] = data.code
+    return data.code
+  }
 
   watch(viewers, async (viewers, oldViewers) => {
     window.electronAPI?.updateUsers(JSON.stringify(viewers))
@@ -111,14 +135,6 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     const settings = stream.value?.getVideoTracks()[0].getSettings()
     const width = settings?.width || maxWidth
     const height = settings?.height || maxHeight
-  
-    // TODO: do send in case a new viewer joins somehow
-    /*if (lastResetWidth === width && lastResetHeight === height)
-      return
-
-    lastResetWidth = width
-    lastResetHeight = height
-    */ 
 
     const resetData = {
       isScreen: true, // TODO
@@ -212,7 +228,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       }
       streamState.value = 'active'
 
-      source && window.electronAPI?.sharingActive(viewCode.value, JSON.stringify({ source, userName: unref(data.email) }))
+      source && window.electronAPI?.sharingActive(viewCode.value!, JSON.stringify({ source, userName: unref(data.email) }))
     } catch (error) {
       console.error('Error sharing local screen:', error)
     }

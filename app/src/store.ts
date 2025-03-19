@@ -8,6 +8,7 @@ export interface StorageSchema {
   code: string | undefined
   recentContacts: Record<string, ContactData>
   lastViewActive: number | undefined
+  viewCodeCache: Record<string, string>
   macWindowList: {
     timestamp: number
     data: string
@@ -37,6 +38,10 @@ export const schema: JSONSchema4 = {
   lastViewActive: {
     type: 'number',
     default: undefined,
+  },
+  viewCodeCache: {
+    type: 'object',
+    default: {},
   },
   macWindowList: {
     type: 'object',

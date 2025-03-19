@@ -5,12 +5,12 @@ import Modal from '../../components/Modal.vue'
 import PingWave from '../../../assets/sounds/ping.wav'
 import RingtoneWave from '../../../assets/sounds/ringtone.wav'
 
-import { DialogOptions, DialogType } from '../../../interface'
+import { DialogMessage, DialogOptions, DialogType } from '../../../interface'
 
 import ContentCopySvg from '../../../assets/icons/content-copy.svg'
 import CheckSvg from '../../../assets/icons/check.svg'
 
-export type DialogButton = {
+type DialogButton = {
   id: number
   label: string
 }
@@ -24,9 +24,7 @@ const modalRef = useTemplateRef<InstanceType<typeof Modal>>('modal')
 
 const id = ref<number>()
 const title = ref<string>()
-const message = ref<string>()
-const message2 = ref<string>()
-const copyText = ref<string>()
+const messages = ref<DialogMessage[]>([])
 const type = ref<DialogType>()
 const buttons = ref<DialogButton[]>([])
 const defaultId = ref<number>()
@@ -36,9 +34,13 @@ const windowType = ref<'tray' | 'dialog'>('dialog')
 window.electronAPI!.onDialog((options: DialogOptions) => {
   id.value = options.id
   title.value = options.title
-  message.value = options.message
-  message2.value = options.message2
-  copyText.value = options.copyText
+  for (let message of options.messages ?? []) {
+    if (typeof message === 'string') {
+      messages.value.push({ content: message })
+    } else {
+      messages.value.push(message)
+    }
+  }
   type.value = options.type
   defaultId.value = options.defaultId
   cancelId.value = options.cancelId
@@ -85,14 +87,13 @@ function reply(result: number) {
   modalRef.value?.close()
 }
 
-const copied = ref(false)
-async function copy() {
-  if (!copyText.value)
-    return
-
-  await navigator.clipboard.writeText(copyText.value)
-  copied.value = true
-  setTimeout(() => copied.value = false, 2000);
+const copied = ref<string>()
+let copyTimeout: number | undefined
+async function copy(text: string) {
+  clearTimeout(copyTimeout)
+  await navigator.clipboard.writeText(text)
+  copied.value = text
+  copyTimeout = window.setTimeout(() => copied.value = undefined, 2000);
 }
 
 async function select(e: MouseEvent) {
@@ -108,74 +109,73 @@ async function select(e: MouseEvent) {
       <div class="modal-title h5">{{ title }}</div>
     </template>
     <template #default>
-      <a v-if="windowType === 'tray'" href="#close" class="btn btn-clear float-right" aria-label="Close" @click="reply(cancelId!)"></a>
+      <div v-if="type === 'call'" class="wrapper" style="margin-left: auto">
+        <div class="ring">
+          <div class="coccoc-alo-phone coccoc-alo-green coccoc-alo-show">
+            <div class="coccoc-alo-ph-circle"></div>
+            <div class="coccoc-alo-ph-circle-fill"></div>
+            <div class="coccoc-alo-ph-img-circle"></div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="type === 'download'" class="lds-ring">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+
+      <div v-else class="f-modal-alert">
+        <div v-if="type === 'error'" class="f-modal-icon f-modal-error animate">
+          <span class="f-modal-x-mark">
+            <span class="f-modal-line f-modal-left animateXLeft"></span>
+            <span class="f-modal-line f-modal-right animateXRight"></span>
+          </span>
+          <div class="f-modal-placeholder"></div>
+          <div class="f-modal-fix"></div>
+        </div>
+        <div v-else-if="type === 'warning'" class="f-modal-icon f-modal-warning scaleWarning">
+          <span class="f-modal-body pulseWarningIns"></span>
+          <span class="f-modal-dot pulseWarningIns"></span>
+        </div>
+        <div v-else-if="type === 'info'" class="f-modal-icon f-modal-info scaleWarning">
+          <span class="f-modal-body pulseInfoIns"></span>
+          <span class="f-modal-dot pulseInfoIns"></span>
+        </div>
+        <div v-else-if="type === 'success'" class="f-modal-icon f-modal-success animate">
+          <span class="f-modal-line f-modal-tip animateSuccessTip"></span>
+          <span class="f-modal-line f-modal-long animateSuccessLong"></span>
+          <div class="f-modal-placeholder"></div>
+          <div class="f-modal-fix"></div>
+        </div>
+      </div>
       <div class="content" :class="windowType === 'tray' ? 'tray' : ''">
-        <div v-if="type === 'call'" class="wrapper" style="margin-left: auto">
-          <div class="ring">
-            <div class="coccoc-alo-phone coccoc-alo-green coccoc-alo-show">
-              <div class="coccoc-alo-ph-circle"></div>
-              <div class="coccoc-alo-ph-circle-fill"></div>
-              <div class="coccoc-alo-ph-img-circle"></div>
+        
+        <template v-for="message in messages">
+          <p>
+            <b>{{ message.content }}</b>
+            <br v-if="message.copyText">
+          </p>
+          <div v-if="message.copyText" class="copy-text-wrapper">
+            <div class="copy-text-container">
+              <input
+                v-model="message.copyText"
+                type="text"
+                readonly
+                @click="select"
+              >
+              <button
+                class="btn btn-sm btn-secondary" 
+                @click="copy(message.copyText)"
+              >
+                <CheckSvg v-if="copied === message.copyText" />
+                <ContentCopySvg v-else />
+              </button>
             </div>
           </div>
-        </div>
-
-        <div v-if="type === 'download'" class="lds-ring">
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-        </div>
-
-        <div class="f-modal-alert">
-          <div v-if="type === 'error'" class="f-modal-icon f-modal-error animate">
-            <span class="f-modal-x-mark">
-              <span class="f-modal-line f-modal-left animateXLeft"></span>
-              <span class="f-modal-line f-modal-right animateXRight"></span>
-            </span>
-            <div class="f-modal-placeholder"></div>
-            <div class="f-modal-fix"></div>
-          </div>
-          <div v-else-if="type === 'warning'" class="f-modal-icon f-modal-warning scaleWarning">
-            <span class="f-modal-body pulseWarningIns"></span>
-            <span class="f-modal-dot pulseWarningIns"></span>
-          </div>
-          <div v-else-if="type === 'info'" class="f-modal-icon f-modal-info scaleWarning">
-            <span class="f-modal-body pulseInfoIns"></span>
-            <span class="f-modal-dot pulseInfoIns"></span>
-          </div>
-          <div v-else-if="type === 'success'" class="f-modal-icon f-modal-success animate">
-            <span class="f-modal-line f-modal-tip animateSuccessTip"></span>
-            <span class="f-modal-line f-modal-long animateSuccessLong"></span>
-            <div class="f-modal-placeholder"></div>
-            <div class="f-modal-fix"></div>
-          </div>
-        </div>
+        </template>
         
-        <p>
-          <b v-if="message">{{ message }}</b>
-          <br v-if="message && copyText">
-        </p>
-        <div v-if="copyText" class="copy-text-wrapper">
-          <div class="copy-text-container">
-            <input
-              v-model="copyText"
-              type="text"
-              readonly
-              @click="select"
-            >
-            <button
-              class="btn btn-sm btn-secondary" 
-              @click="copy"
-            >
-              <CheckSvg v-if="copied" />
-              <ContentCopySvg v-else />
-            </button>
-          </div>
-        </div>
-        <p v-if="message2"><b>{{ message2 }}</b></p>
-        
-
         <div class="modal-buttons">
           <button
             v-for="(button, index) in buttons"
@@ -192,6 +192,7 @@ async function select(e: MouseEvent) {
         </div>
         
       </div>
+      <a v-if="windowType === 'tray'" href="#close" class="btn btn-clear float-right" aria-label="Close" @click="reply(cancelId!)"></a>
     </template>
   </Modal>
 </template>
@@ -204,26 +205,22 @@ async function select(e: MouseEvent) {
     src: local('Abel Regular'), local('Abel-Regular'), url('../../../assets/fonts/abel-v10-latin-regular.woff2') format('woff2');
   }
 
-  .modal-body .content .f-modal-alert {
-    margin-top: -40px;
+  .modal-body {
+    display: flex;
+    min-width: 0;
+  }
+
+  .modal-body .content {
+    flex: 1 1 auto;
+    margin-top: 1rem;
   }
 
   .modal-body .content p {
-    margin: 0px;
-    margin-left: 90px;
-  }
-
-  .modal-body .content.tray .f-modal-alert {
-    margin-top: 0px;
-    margin-bottom: -40px;
-    transform: scale(0.4);
-    margin-right: 10px;
-    margin-left: -10px;
+    margin: 0;
   }
 
   .modal-body .copy-text-wrapper {
     margin: 10px 0;
-    width: 80vw;
     padding: 8px;
     background: transparent;
   }

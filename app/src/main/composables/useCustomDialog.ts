@@ -5,10 +5,6 @@ import { DialogOptions } from '../../interface'
 
 import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
-const isWin32 = process.platform === 'win32'
-const isLinux = process.platform === 'linux'
-const isMac = process.platform === 'darwin'
-
 export function useCustomDialog() {
   const dialoglist: BrowserWindow[] = []
   const traylist: BrowserWindow[] = []
@@ -58,13 +54,13 @@ export function useCustomDialog() {
     const primary = screen.getPrimaryDisplay()
     if (type === 'tray') {
       const width = 600
-      const height = 240
+      const height = 300
 
       windowParams = {
         width,
         height,
-        x: primary.bounds.x + (isMac || isLinux || isWin32 ? (primary.workAreaSize.width - width) / 2 : primary.workAreaSize.width - width),
-        y: primary.bounds.y + (isMac || isLinux || isWin32 ? 70 : primary.workAreaSize.height - 200),
+        x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
+        y: primary.bounds.y + 70,
         entryKey: 'dialog',
       }
     } else if (type === 'dialog') {
@@ -90,10 +86,7 @@ export function useCustomDialog() {
       defaultId: 0,
       cancelId: (type !== 'dialog' ? 0 : (options.buttons ?? []).length - 1),
       windowType: type,
-      message: '',
-      message2: '',
       timeout: (type === 'tray' ? 8000 : 0),
-      copyText: '',
       sound,
     }
 

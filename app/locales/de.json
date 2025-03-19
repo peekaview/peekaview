@@ -223,8 +223,8 @@
   },
   "sharingActive": {
     "title": "Bildschirmfreigabe aktiv",
-    "message": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen",
-    "message2": "Oder diesen Code weitergeben: {code}"
+    "linkMessage": "Um jemanden einzuladen, Ihren Bildschirm zu sehen, teilen Sie diesen Link",
+    "codeMessage": "Oder geben Sie diesen Code weiter"
   },
   "trayMenu": {
     "running": "PeekaView läuft",

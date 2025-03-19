@@ -109,14 +109,17 @@ export interface ScreenSource {
   thumbnail: string
 }
 
+export type DialogMessage = {
+  content: string
+  copyText?: string
+}
+
 export type DialogType = 'error' | 'warning' | 'info' | 'success' | 'download' | 'call' | 'question'
 
 export interface DialogOptions {
   id?: number
   title?: string
-  message?: string
-  message2?: string
-  copyText?: string
+  messages?: (string | DialogMessage)[]
   type?: DialogType
   windowType?: 'tray' | 'dialog'
   sound?: string | null

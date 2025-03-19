@@ -1,6 +1,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { parseCode } from '../../util'
 import { setStoredItem } from '../util'
+import { callApi } from '@renderer/api'
 
 export enum Action {
   Login = 'login',
@@ -10,34 +11,51 @@ export enum Action {
 
 export function useParamsData() {
   const action = ref<Action>()
-  const code = localStorage.getItem('code')
-  const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
-
-  const email = ref<string | undefined>(e)
-  const token = ref<string | undefined>(t)
   
+  const email = ref<string | undefined>()
+  const token = ref<string | undefined>()
+
   const target = ref<string | undefined>()
   const viewEmail = ref<string | undefined>()
 
-  const params = new URLSearchParams(window.location.search)
-  handleParams(params)
+  const path = window.location.pathname
+  if (path !== '/') {
+    const inviteCode = path.substring(1)
+    callApi<{ data: string }>({
+      action: 'getTempData',
+      code: inviteCode,
+    }).then((data) => {
+      action.value = Action.View
+      viewEmail.value = data.data
+    }, (error) => {
+      console.error('Error using invite code', error)
+    })
+  } else {
+    const code = localStorage.getItem('code')
+    const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
+    email.value = e
+    token.value = t
 
-  for (const a of Object.values(Action)) {
-    if (!params.has(a))
-      continue
+    const params = new URLSearchParams(window.location.search)
+    handleParams(params)
 
-    action.value = a
-    const value = params.get(a)
-    if (value)
-      handleParams(new URLSearchParams(atob(value)))
+    for (const a of Object.values(Action)) {
+      if (!params.has(a))
+        continue
 
-    break
+      action.value = a
+      const value = params.get(a)
+      if (value)
+        handleParams(new URLSearchParams(atob(value)))
+
+      break
+    }
+
+    watch(action, (action) => {
+      if (action === Action.Share && (!email.value || !token.value))
+        window.location.search = 'login'
+    })
   }
-
-  watch(action, (action) => {
-    if (action === Action.Share && (!email.value || !token.value))
-      window.location.search = 'login'
-  })
 
   function handleParams(params: URLSearchParams) {
     token.value = params.get('token') ?? token.value

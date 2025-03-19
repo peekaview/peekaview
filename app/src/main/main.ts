@@ -434,7 +434,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -463,7 +463,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(viewerWindow, 'viewer')
-    viewerWindow.webContents.openDevTools()
+    //viewerWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       viewerWindow!.on('ready-to-show', () => {
@@ -652,7 +652,7 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      //presenterWindow?.hide()
+      presenterWindow?.hide()
     }
 
     currentSource = data
@@ -667,10 +667,14 @@ declare const CSP_POLICY: string
 
     customDialog.openTrayDialog({
       title: i18n.t('sharingActive.title'),
-      message: i18n.t('sharingActive.message'),
-      message2: i18n.t('sharingActive.message2'),
-      copyText: `${import.meta.env.VITE_APP_URL}?view=${currentViewCode}`,
-      timeout: 15000
+      messages: [{
+        content: i18n.t('sharingActive.linkMessage'),
+        copyText: `${import.meta.env.VITE_APP_URL}/${currentViewCode}`,
+      }, {
+        content: i18n.t('sharingActive.codeMessage'),
+        copyText: currentViewCode,
+      }],
+      timeout: 0, //15000
     })
   }
 
