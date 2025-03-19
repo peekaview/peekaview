@@ -255,5 +255,9 @@
     "stop": "Bildschirmfreigabe beenden",
     "copyToClipboard": "In die Zwischenablage kopieren",
     "download": "Herunterladen"
+  },
+  "notifications": {
+    "shareScreen": "{name} möchte seinen/ihren Bildschirm teilen.",
+    "viewSharedScreen": "{name} möchte Ihren Bildschirm sehen."
   }
 }

@@ -14,7 +14,7 @@ import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData, ViewerDataSchema } from './types'
 import { uuidv4, displayNameMail } from '../util'
-import { getPushToken } from './firebase'
+import { getPushToken, onNotification } from './firebase'
 import { callApi } from './api'
 import { getStoredItem, setStoredItem } from './util'
 import { ContactData } from '../interface'
@@ -61,12 +61,16 @@ uuidPromise.then(uuid => {
     setStoredItem('uuid', uuid)
   }
 
+  console.log('uuid', uuid)
+
   getPushToken().then(async (token) => {
-    callApi({
+    await callApi({
       action: 'registerPushToken',
       uuid,
       token,
     })
+
+    onNotification()
   }, (error) => {
     console.error('error getting token', error)
   })

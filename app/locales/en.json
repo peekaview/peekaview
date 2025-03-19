@@ -255,5 +255,9 @@
     "stop": "Stop sharing",
     "copyToClipboard": "Copy to clipboard",
     "download": "Download"
+  },
+  "notifications": {
+    "shareScreen": "{name} wants to share their screen.",
+    "viewSharedScreen": "{name} wants to view your screen."
   }
 } 
