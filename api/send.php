@@ -19,7 +19,7 @@ if (!defined('STORAGE_PATH')) {
  * @param string $token The device token
  * @return void
  */
-function sendMessage($title, $message, $token) {
+function sendMessage($title, $message, $token, $imageUrl = null, $data = []) {
     // Initialize Firebase
     try {
         $factory = (new Factory)->withServiceAccount(STORAGE_PATH . '/serviceAccountKey.json');
@@ -35,10 +35,11 @@ function sendMessage($title, $message, $token) {
     }
     
     try {
-        $notification = Notification::create($title, $message);
+        $notification = Notification::create($title, $message, $imageUrl);
         
         $message = CloudMessage::withTarget('token', $token)
-            ->withNotification($notification);
+            ->withNotification($notification)
+            ->withData($data);
             
         $response = $messaging->send($message);
         error_log("Message sent to " . $token . " " . json_encode($response) . "\n");
