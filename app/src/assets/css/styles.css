@@ -86,8 +86,9 @@ select option:hover {
   background: var(--panel-bg-color);
   border-radius: 15px;
   padding: 2rem;
-  box-shadow: 0 4px 12px #0006;
+  box-shadow: 0 4px 12px var(--shadow-color);
   backdrop-filter: blur(10px);
+  margin-bottom: 2rem;
 }
 
 /* Form Styles */
@@ -276,17 +277,54 @@ select option:hover {
 }
 
 .pill-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--input-text-color);
   background-color: var(--input-bg-color);
   border-radius: 5px;
-  padding: 0.5rem 1rem;
   height: 2.5rem;
+  min-width: 0;
   border-radius: 1.25rem;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  user-select: none;
 }
 
-.pill-tag:hover {
+.pill-tag:hover, .pill-tag.active {
   background-color: var(--input-bg-focus-color);
+}
+
+.pill-tag-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0 1rem;
+  white-space: nowrap;
+}
+
+.pill-tag-dropdown {
+  color: var(--dropdown-text-color);
+  background-color: var(--dropdown-bg-color);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  border-radius: 0.25rem;
+}
+
+.pill-tag-dropdown a {
+  padding: 0.5rem;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.pill-tag-dropdown a:hover {
+  background-color: var(--dropdown-bg-hover-color);
+}
+
+.pill-tag svg {
+  flex: 0 0 2rem;
+  height: 2rem;
+  fill: var(--input-text-color);
 }
 
 .close-button {

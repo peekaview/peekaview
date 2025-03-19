@@ -32,6 +32,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@floating-ui/vue": "^1.1.6",
     "@nut-tree-fork/node-mac-permissions": "^2.2.1",
     "@nut-tree-fork/nut-js": "4.2.4",
     "@panzoom/panzoom": "^4.5.1",
@@ -43,6 +44,7 @@
     "engine.io-client": "^6.5.3",
     "firebase": "^11.4.0",
     "firebase-electron": "^1.1.0",
+    "floating-ui": "^5.2.8",
     "floating-vue": "^5.2.2",
     "i18next": "^23.16.5",
     "i18next-fs-backend": "^2.3.2",
@@ -52,6 +54,7 @@
     "socket.io-client": "^4.8.1",
     "sweetalert2": "^11.14.4",
     "vee-validate": "^4.15.0",
+    "vite-plugin-pwa": "^0.21.1",
     "vue": "^3.5.12",
     "vue-i18n": "^10.0.4",
     "ws": "^8.18.0",

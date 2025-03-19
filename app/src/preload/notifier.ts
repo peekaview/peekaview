@@ -10,7 +10,7 @@ import {
 
 import { base } from './base'
 
-import firebaseConfig from '../firebase.json'
+import firebaseConfig from '../../firebase.json'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,

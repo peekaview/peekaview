@@ -9,7 +9,9 @@
     "error": "Fehler",
     "copy": "Kopieren",
     "copied": "Kopiert",
-    "required": "Erforderlich"
+    "required": "Erforderlich",
+    "accept": "Annehmen",
+    "deny": "Ablehnen"
   },
   "update": {
     "available": "Eine neue Version ({{version}}) ist verfügbar und wird heruntergeladen.",
@@ -180,11 +182,7 @@
       "keepAlive": "Ihre Sitzung bleibt aktiv, solange Sie das Vorschaufenster geöffnet lassen.",
       "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
     },
-    "requestAccess": {
-      "message": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
-      "accept": "Akzeptieren",
-      "deny": "Ablehnen"
-    },
+    "requestAccess": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
     "waitingStatus": {
       "checking": "Prüfen auf Teilnehmeranfragen..."
     },
@@ -256,5 +254,9 @@
     "stop": "Bildschirmfreigabe beenden",
     "copyToClipboard": "In die Zwischenablage kopieren",
     "download": "Herunterladen"
+  },
+  "notifications": {
+    "shareScreen": "{name} möchte seinen/ihren Bildschirm mit Ihnen teilen.",
+    "viewSharedScreen": "{name} möchte Ihren Bildschirm sehen."
   }
 }

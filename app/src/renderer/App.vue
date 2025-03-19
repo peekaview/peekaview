@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ComponentPublicInstance, computed, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useFloating } from '@floating-ui/vue'
 
 import Login from './views/Login.vue'
 import Viewer from './views/viewer/Viewer.vue'
@@ -9,18 +11,34 @@ import PresenterForm from './views/form/PresenterForm.vue'
 import GDPR from './components/GDPR.vue'
 import Imprint from './components/Imprint.vue'
 
-import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 import { useParamsData, Action } from './composables/useParamsData'
 import i18n, { type Locale } from './i18n'
 import { ViewerData, ViewerDataSchema } from './types'
 import { uuidv4, displayNameMail } from '../util'
-import { getPushToken } from './firebase'
+import { getPushToken, onNotification } from './firebase'
 import { callApi } from './api'
-import { getStoredItem, setStoredItem } from './util'
+import { getStoredItem, setStoredItem, prompt } from './util'
 import { ContactData } from '../interface'
+
+import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
+
+const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, target, viewEmail } = useParamsData()
+
+const dropdownRef = useTemplateRef('dropdown')
+const tagRefs = ref<Record<string, Element | ComponentPublicInstance>>({})
+
+const expandedContactId = ref<string | undefined>()
+const expandedTagRef = computed(() => expandedContactId.value ? tagRefs.value[expandedContactId.value] : null)
+const { floatingStyles, update: updateFloating } = useFloating(expandedTagRef, dropdownRef, {
+  placement: 'top-end',
+})
+watch(expandedTagRef, (ref) => {
+  if (ref)
+    updateFloating()
+})
 
 const presenterActive = ref(false)
 const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
@@ -46,11 +64,26 @@ uuidPromise.then(uuid => {
     setStoredItem('uuid', uuid)
   }
 
+  console.log('uuid', uuid)
+
   getPushToken().then(async (token) => {
-    callApi({
+    await callApi({
       action: 'registerPushToken',
       uuid,
       token,
+    })
+
+    onNotification(async (payload) => {
+      console.log('notification', payload)
+      const result = await prompt({
+        text: payload.notification?.body,
+        confirmButtonText: 'Accept',
+        cancelButtonText: 'Deny',
+      })
+
+      if (result === '0') {
+        
+      }
     })
   }, (error) => {
     console.error('error getting token', error)
@@ -73,6 +106,70 @@ const locale = computed({
     localStorage.setItem('locale', value)
   }
 })
+
+function expandContact(id: string) {
+  if (expandedContactId.value === id)
+    expandedContactId.value = undefined
+  else
+    expandedContactId.value = id
+}
+
+function viewRecentContact(id?: string) {
+  if (!id)
+    return
+
+  const contact = recentContacts.value[id]
+  if (!contact)
+    return
+
+  const name = formViewerData.value.name // todo: name is not updated correctly
+  if (!name)
+    return
+
+  activeViewerData.value = {
+    name,
+    email: contact.email!,
+  }
+
+  if (email && token)
+    callApi({
+      action: 'sendPushNotification',
+      email,
+      token,
+      uuid: contact.id,
+      notification: JSON.stringify({
+        title: 'PeekaView',
+        body: t('notifications.viewSharedScreen', { name }),
+        icon: PeekaViewLogo,
+        data: {
+          url: `${import.meta.env.VITE_APP_URL}/?share`,
+          type: 'share',
+        }
+      })
+    })
+}
+
+function shareRecentContact(id?: string) {
+  if (!id || !email || !token)
+    return
+
+  callApi({
+    action: 'sendPushNotification',
+    email,
+    token,
+    uuid: id,
+    notification: JSON.stringify({
+      title: 'PeekaView',
+      body: t('notifications.shareScreen', { name: email }),
+      icon: PeekaViewLogo,
+      data: {
+        url: `${import.meta.env.VITE_APP_URL}/${''}`,
+        type: 'view',
+        code: ''
+      }
+    })
+  })
+}
 </script>
 
 <template>
@@ -86,7 +183,7 @@ const locale = computed({
     </a>
   </header>
 
-  <div class="main-container">
+  <div class="main-container" @click="expandedContactId = undefined">
     <Viewer
       v-if="activeViewerData"
       :contact="activeViewerData"
@@ -121,18 +218,6 @@ const locale = computed({
                 :is-fixed="isViewFixed"
                 @submit="activeViewerData = $event"
               />
-
-              <template v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
-                <hr>
-                <h6>{{ $t('app.form.recentContacts') }}:</h6>
-                <div class="recent-contacts">
-                  <template v-for="(contact, id) in recentContacts" :key="id">
-                    <div v-if="contact.email" class="pill-tag" @click="formViewerData.emailOrCode = contact.email">
-                      {{ displayNameMail(contact) }}
-                    </div>
-                  </template>
-                </div>
-              </template>
             </template>
 
             <template v-else-if="plannedAction === 'share'">
@@ -145,6 +230,22 @@ const locale = computed({
               <Login v-else target="web" />
             </template>
           </template>
+        </div>
+        <div v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
+          <h6>{{ $t('app.form.recentContacts') }}:</h6>
+          <div class="recent-contacts">
+            <template v-for="(contact, id) in recentContacts" :key="id">
+              <div v-if="contact.email" :ref="(el) => tagRefs[id] = el!" class="pill-tag" :class="{ active: expandedContactId === id }" @click.stop="expandContact(id)">
+                <div class="pill-tag-content">
+                  <span>{{ displayNameMail(contact) }}</span>
+                </div>
+              </div>
+            </template>
+            <div v-show="expandedContactId" ref="dropdown" class="pill-tag-dropdown" :style="floatingStyles" @click.stop>
+              <a class="dropdown-item" href="#" @click="viewRecentContact(expandedContactId)">{{ $t('app.form.likeToView') }}</a>
+              <a class="dropdown-item" href="#" @click="shareRecentContact(expandedContactId)">{{ $t('app.form.likeToShare') }}</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

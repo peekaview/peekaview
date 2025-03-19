@@ -163,6 +163,7 @@ declare const CSP_POLICY: string
 
   app.whenReady().then(() => {
     log.info('App is ready, initializing...')
+    log.info('UUID:', store.get('uuid'))
     
     // Add notification permission check
     /*if (process.platform === 'darwin') {
@@ -215,6 +216,10 @@ declare const CSP_POLICY: string
     updateContextMenu()
 
     store.onDidChange('code', () => {
+      updateContextMenu()
+    })
+
+    store.onDidChange('recentContacts', () => {
       updateContextMenu()
     })
 
@@ -308,32 +313,28 @@ declare const CSP_POLICY: string
         },
           { type: 'separator' }
       )
-      
-      menuItems.push(
-        { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
-        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
-        { type: 'separator' },
-      )
 
       const recentContacts = store.get('recentContacts')
       if (recentContacts && Object.keys(recentContacts).length > 0) {
-        const submenu: Array<(Electron.MenuItemConstructorOptions)> = []
+        menuItems.push({ icon: createMenuIcon(AccountGroupIcon), label: i18n.t('trayMenu.recentContacts') + ':', type: 'normal', enabled: false })
+        
         for (const id in recentContacts) {
-          submenu.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
+          menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
             { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
             { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
-              updateContextMenu()
             } },
           ] })
         }
-        menuItems.push({ icon: createMenuIcon(AccountGroupIcon), label: i18n.t('trayMenu.recentContacts'), type: 'submenu', submenu })
         menuItems.push({ type: 'separator' })
       }
-
+      
       menuItems.push(
+        { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
+        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
+        { type: 'separator' },
         { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
@@ -747,7 +748,6 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('set-stored-item', async <K extends keyof StorageSchema>(_event, key: K, value: StorageSchema[K]) => {
-    console.log('set-stored-item', key, value)
     store.set(key, value)
   })
 

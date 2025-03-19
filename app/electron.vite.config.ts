@@ -3,6 +3,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 import { loadEnv } from 'vite'
 import svgLoader from 'vite-svg-loader'
+import { VitePWA } from 'vite-plugin-pwa'
 
 import packageJson from './package.json'
 
@@ -101,7 +102,28 @@ export default defineConfig({
         "simple-peer": "simple-peer/simplepeer.min.js",
       }
     },
-    plugins: [vue(), svgLoader()],
+    plugins: [
+      vue(),
+      svgLoader(),
+      VitePWA({
+        strategies: 'injectManifest',
+        injectRegister: null,
+        registerType: 'autoUpdate',
+        devOptions: {
+          enabled: true,
+          type: 'module',
+          navigateFallback: 'index.html'
+        },
+        srcDir: './',
+        workbox: {
+          sourcemap: true
+        },
+        manifest: {
+          name: 'PeekaView',
+          theme_color: '#ffffff',
+        }
+      })
+    ],
     publicDir: resolve('static'),
     server: {
       fs: {

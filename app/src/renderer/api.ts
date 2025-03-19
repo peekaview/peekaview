@@ -2,6 +2,17 @@ import i18n from "./i18n"
 import { EitherEmailOrCode } from "./types"
 import { notify } from "./util"
 
+export type NotificationPayload = {
+  title: string
+  body: string
+  icon?: string
+  data?: {
+    url?: string
+    type?: 'share' | 'view'
+    code?: string
+  }
+}
+
 export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"
   name: string
@@ -28,9 +39,10 @@ export type ApiRequestParams = ShowMeYourScreenParams | {
   token: string
 } | {
   action: "sendPushNotification"
+  email: string
+  token: string
   uuid: string
-  title: string
-  message: string
+  notification: JsonString<NotificationPayload>
 } | {
   action: "saveTempData"
   data: string

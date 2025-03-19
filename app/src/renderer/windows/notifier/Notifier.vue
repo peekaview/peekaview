@@ -27,6 +27,10 @@ async function updatePushToken(token: string) {
     action: 'registerPushToken',
     uuid,
     token,
+  }).then((response) => {
+    window.electronAPI?.log('Push token registered:', response)
+  }, (error) => {
+    window.electronAPI?.log('Error registering push token:', error)
   })
 }
 </script>
