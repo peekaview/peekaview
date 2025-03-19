@@ -482,10 +482,15 @@ function sendPushNotification() {
 
     require_once __DIR__.'/send.php';
 
-    $title = $_GET['title'];
-    $message = $_GET['message'];
+    $notification = $_GET['notification'];
+    $notification = json_decode($notification, true);
+
+    $title = $notification['title'];
+    $message = $notification['message'];
+    $imageUrl = $notification['imageUrl'];
+    $data = $notification['data'];
     $pushToken = file_get_contents($pushFile);
-    sendMessage($title, $message, $pushToken);
+    sendMessage($title, $message, $pushToken, $imageUrl, $data);
 
     return ['success' => true];
 }

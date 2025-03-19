@@ -46,12 +46,12 @@ export async function callApi<TResponse = void>(params: ApiRequestParams) {
     ...filteredParams,
   }).toString()}`)
   if (response.status === 401)
-    throw new UnauthorizedError(`${response.status} ${response.statusText}`)
+    throw new UnauthorizedError(response.statusText)
 
   if (response.status === 500)
     notify({
       title: 'Server Error',
-      text: `${response.status} ${response.statusText}`,
+      text: response.statusText,
       confirmButtonText: 'OK',
       type: 'error',
     })
