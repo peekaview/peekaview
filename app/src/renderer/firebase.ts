@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app"
-import { getMessaging, getToken, onMessage } from "firebase/messaging"
+import { getMessaging, getToken, MessagePayload, onMessage } from "firebase/messaging"
 
 import firebaseConfig from '../../firebase.json'
 
@@ -7,15 +7,12 @@ const app = initializeApp(firebaseConfig)
 
 export const messaging = getMessaging(app)
 
-export async function onNotification() {
-  console.log('onNotification')
-  onMessage(messaging, (payload) => {
-    console.log('Notification received', payload)
-  })
+export async function onNotification(handler: (payload: MessagePayload) => void) {
+  onMessage(messaging, handler)
 }
 
 export async function getPushToken() {
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register(    
@@ -27,8 +24,9 @@ export async function getPushToken() {
             vapidKey: firebaseConfig.vapidKey,
             serviceWorkerRegistration : registration 
           })
-        , reject)
-        .then(resolve, reject)
+        )
+        .then(resolve)
+        .catch(reject)
     } else {
       reject(new Error('Service worker not supported'))
     }

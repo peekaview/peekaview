@@ -69,9 +69,9 @@ async function start() {
   }, {
     onRequest: async (_id, name) => {
       const result = await resizeAndPrompt({
-        text: t('share.requestAccess.message', { name }),
-        confirmButtonText: t('share.requestAccess.accept'),
-        cancelButtonText: t('share.requestAccess.deny'),
+        text: t('share.requestAccess', { name }),
+        confirmButtonText: t('general.accept'),
+        cancelButtonText: t('general.deny'),
         sound: 'ringtone',
       })
 

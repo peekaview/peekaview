@@ -8,6 +8,8 @@ export type NotificationPayload = {
   icon?: string
   data?: {
     url?: string
+    type?: 'share' | 'view'
+    code?: string
   }
 }
 
@@ -40,7 +42,7 @@ export type ApiRequestParams = ShowMeYourScreenParams | {
   email: string
   token: string
   uuid: string
-  notification: NotificationPayload
+  notification: JsonString<NotificationPayload>
 } | {
   action: "saveTempData"
   data: string

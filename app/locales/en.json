@@ -9,7 +9,9 @@
     "error": "Error",
     "copy": "Copy",
     "copied": "Copied",
-    "required": "Required"
+    "required": "Required",
+    "accept": "Accept",
+    "deny": "Deny"
   },
   "update": {
     "available": "A new version ({{version}}) is available and will be downloaded.",
@@ -180,11 +182,7 @@
       "keepAlive": "Your session will remain active as long as you keep the preview window opened.",
       "invite": "You can invite someone to join your view with this link:"
     },
-    "requestAccess": {
-      "message": "{name} wants to see your screen. Do you want to accept?",
-      "accept": "Accept",
-      "deny": "Deny"
-    },
+    "requestAccess": "{name} wants to see your screen. Do you want to accept?",
     "waitingStatus": {
       "checking": "Checking for participant requests..."
     },
@@ -257,7 +255,7 @@
     "download": "Download"
   },
   "notifications": {
-    "shareScreen": "{name} wants to share their screen.",
+    "shareScreen": "{name} wants to share their screen with you.",
     "viewSharedScreen": "{name} wants to view your screen."
   }
 } 

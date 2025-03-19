@@ -12,9 +12,9 @@ onBackgroundMessage(messaging, async (payload) => {
   const registration = await navigator.serviceWorker.getRegistration()
   registration?.showNotification(payload.notification.title, {
     body: payload.notification.body,
-    icon: payload.notification.icon,
+    icon: payload.notification.image,
     data: {
-      url: payload.notification.data.url
+      url: payload.data.url
     }
   })
 });

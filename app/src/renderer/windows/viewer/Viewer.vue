@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ViewerData, ViewerDataSchema } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
@@ -7,6 +8,10 @@ import { getStoredItem } from '../../util'
 import { ContactData } from '../../../interface'
 import { callApi } from '../../api'
 import { parseCode } from '../../../util'
+
+import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
+
+const { t } = useI18n()
 
 const formViewerData = ref<ViewerDataSchema>({ emailOrCode: '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
@@ -31,8 +36,15 @@ onMounted(() => {
         email: email!,
         token: token!,
         uuid: contact.id,
-        title: 'PeekaView',
-        message: 'Someone wants to view your screen!',
+        notification: JSON.stringify({
+          title: 'PeekaView',
+          body: t('notifications.viewSharedScreen', { name: email }),
+          icon: PeekaViewLogo,
+          data: {
+            url: `${import.meta.env.VITE_APP_URL}/?share`,
+            type: 'share'
+          }
+        })
       })
     }
 

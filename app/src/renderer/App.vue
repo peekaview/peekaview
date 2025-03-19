@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ComponentPublicInstance, computed, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useFloating } from '@floating-ui/vue'
 
 import Login from './views/Login.vue'
@@ -16,10 +17,12 @@ import { ViewerData, ViewerDataSchema } from './types'
 import { uuidv4, displayNameMail } from '../util'
 import { getPushToken, onNotification } from './firebase'
 import { callApi } from './api'
-import { getStoredItem, setStoredItem } from './util'
+import { getStoredItem, setStoredItem, prompt } from './util'
 import { ContactData } from '../interface'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
+
+const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, token, email, target, viewEmail } = useParamsData()
@@ -70,7 +73,18 @@ uuidPromise.then(uuid => {
       token,
     })
 
-    onNotification()
+    onNotification(async (payload) => {
+      console.log('notification', payload)
+      const result = await prompt({
+        text: payload.notification?.body,
+        confirmButtonText: 'Accept',
+        cancelButtonText: 'Deny',
+      })
+
+      if (result === '0') {
+        
+      }
+    })
   }, (error) => {
     console.error('error getting token', error)
   })
@@ -123,8 +137,15 @@ function viewRecentContact(id?: string) {
       email,
       token,
       uuid: contact.id,
-      title: 'PeekaView',
-      message: 'Someone wants to view your screen!',
+      notification: JSON.stringify({
+        title: 'PeekaView',
+        body: t('notifications.viewSharedScreen', { name }),
+        icon: PeekaViewLogo,
+        data: {
+          url: `${import.meta.env.VITE_APP_URL}/?share`,
+          type: 'share',
+        }
+      })
     })
 }
 
@@ -137,8 +158,16 @@ function shareRecentContact(id?: string) {
     email,
     token,
     uuid: id,
-    title: 'PeekaView',
-    message: 'Someone wants to share their screen!',
+    notification: JSON.stringify({
+      title: 'PeekaView',
+      body: t('notifications.shareScreen', { name: email }),
+      icon: PeekaViewLogo,
+      data: {
+        url: `${import.meta.env.VITE_APP_URL}/${''}`,
+        type: 'view',
+        code: ''
+      }
+    })
   })
 }
 </script>

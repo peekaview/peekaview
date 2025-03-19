@@ -10,6 +10,8 @@ import { notify, prompt } from '../../util'
 import { parseCode } from '../../../util'
 import { callApi, UnauthorizedError } from '../../api'
 
+import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
+
 const { t } = useI18n()
 
 const showSources = ref(false)
@@ -21,6 +23,7 @@ const toolsEnabled = ref<Record<ViewerTool, boolean>>({
 })
 
 const presenter = ref<Presenter>()
+const contactToNotify = ref<ContactData>()
 const unauthorized = ref(false)
 
 onMounted(() => {
@@ -30,24 +33,17 @@ onMounted(() => {
 
   const { email, token } = parseCode(code)
 
-  window.electronAPI?.onNotifyContact((contact: ContactData) => {
-    window.electronAPI?.log('Notify contact:', contact)
-    callApi<Response>({
-      action: 'sendPushNotification',
-      email: email!,
-      token: token!,
-      uuid: contact.id,
-      title: 'PeekaView',
-      message: 'Someone wants share their screen with you!',
-    })
-  })
-
   present(email!, token!)
 })
 
 onBeforeUnmount(() => {
   presenter.value?.cleanUpStream()
   presenter.value?.cleanUpCallbacks()
+})
+
+window.electronAPI?.onNotifyContact((contact: ContactData) => {
+  window.electronAPI?.log('Notify contact:', contact)
+  contactToNotify.value = contact
 })
 
 window.electronAPI?.onOpenScreenSourceSelection(() => {
@@ -99,9 +95,9 @@ async function present(email: string, token: string) {
   }, {
     onRequest: async (_id, name) => {
       const result = await prompt({
-        text: t('share.requestAccess.message', { name }),
-        confirmButtonText: t('share.requestAccess.accept'),
-        cancelButtonText: t('share.requestAccess.deny'),
+        text: t('share.requestAccess', { name }),
+        confirmButtonText: t('general.accept'),
+        cancelButtonText: t('general.deny'),
         sound: 'ringtone',
       })
           
@@ -130,7 +126,27 @@ async function present(email: string, token: string) {
       })
     }
   })
-  presenter.value.startSession()
+
+  await presenter.value.startSession()
+
+  if (contactToNotify.value) {
+    callApi<Response>({
+      action: 'sendPushNotification',
+      email: email!,
+      token: token!,
+      uuid: contactToNotify.value.id,
+      notification: JSON.stringify({
+        title: 'PeekaView',
+        body: t('notifications.viewSharedScreen', { name: email }),
+        icon: PeekaViewLogo,
+        data: {
+          url: `${import.meta.env.VITE_APP_URL}/${''}`,
+          type: 'view',
+          code: presenter.value!.viewCode
+        }
+      })
+    })
+  }
 }
 
 function select(source: ScreenSource) {
