@@ -107,6 +107,9 @@ export default defineConfig({
       svgLoader(),
       VitePWA({
         strategies: 'injectManifest',
+        injectManifest: {
+          injectionPoint: undefined
+        },
         injectRegister: null,
         registerType: 'autoUpdate',
         devOptions: {
