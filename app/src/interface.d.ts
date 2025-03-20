@@ -82,6 +82,7 @@ export interface IElectronAPI {
   onTogglePointer: (callback: (toggle?: boolean) => void) => void,
   toggleClipboard: (toggle?: boolean) => Promise<void>,
   clipboardReady: () => Promise<void>,
+  onClipboardEnabled: (callback: () => void) => void,
   dataToClipboard: (callback: (data: string) => void) => Electron.IpcRenderer,
   setToolbarSize: (width: number, height: number) => Promise<void>,
   stopSharing: () => Promise<void>,

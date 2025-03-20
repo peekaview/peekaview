@@ -434,7 +434,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    //presenterWindow.webContents.openDevTools()
+    presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -652,7 +652,7 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      presenterWindow?.hide()
+      //presenterWindow?.hide()
     }
 
     currentSource = data
@@ -679,16 +679,17 @@ declare const CSP_POLICY: string
   }
 
   ipcMain.handle('sharing-active', async (_event, viewCode: string, data: string) => {
+    log.info('sharing-active')
     const streamerData = JSON.parse(data) as StreamerData
     log.info('sharing-active handler called with source: ', streamerData.source.id, viewCode)
     
-    if (viewCode !== null) {
+    //if (viewCode !== null) {
       currentViewCode = viewCode
       startPresenting(streamerData)
     
       customDialog.playSoundOnOpen('ping')
       await openShareMessage()
-    }
+    //}
   })
 
   ipcMain.handle('show-sharing-active', async (_event) => {

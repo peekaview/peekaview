@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleClipboard: (toggle?: boolean) => ipcRenderer.invoke('toggle-clipboard', toggle),
   toggleRemoteControl: (toggle?: boolean) => ipcRenderer.invoke('toggle-remote-control', toggle),
   togglePointer: (toggle?: boolean) => ipcRenderer.invoke('toggle-pointer', toggle),
+  onClipboardEnabled: (callback: () => void) => ipcRenderer.on('on-clipboard-enabled', callback),
   onUpdateOverlayData: (callback: (data: OverlayData) => void) => ipcRenderer.on('on-update-overlay-data', (_event, data) => callback(data)),
   setToolbarSize: (width: number, height: number) => ipcRenderer.invoke('set-toolbar-size', width, height),
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),

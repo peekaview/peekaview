@@ -87,11 +87,9 @@ async function present(email: string, token: string) {
 
     showSources.value = false
     selectedSource.value = undefined
-    if (!source)
-      return
 
-    window.electronAPI?.sharingActive(presenter.value!.viewCode, JSON.stringify({ source, userName: email }))
-    return getStreamFromSource(source, shareAudio)
+    const stream = source ? await getStreamFromSource(source, shareAudio) : undefined
+    return { stream, source }
   }, {
     onRequest: async (_id, name) => {
       const result = await prompt({

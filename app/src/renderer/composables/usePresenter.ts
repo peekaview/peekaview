@@ -26,17 +26,17 @@ type PresenterOptions = {
   onApiError?: (error: Error, requestData: any) => void
 }
 
-export function usePresenter(data: PresenterData, getStream: (shareAudio: boolean) => Promise<MediaStream | undefined>, options?: PresenterOptions) {
+export function usePresenter(data: PresenterData, getStream: (shareAudio: boolean) => Promise<{ stream: MediaStream | undefined, source: ScreenSource | undefined }>, options?: PresenterOptions) {
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = ref<string>()
+  const viewCodeCache = ref<Record<string, string>>({})
   watch(() => unref(data.email), async (email) => {
     viewCode.value = await emailToViewCode(email)
   }, { immediate: true })
 
-  const viewCodeCache = ref<Record<string, string>>({})
   getStoredItem('viewCodeCache').then(cache => {
     viewCodeCache.value = cache
     
@@ -49,12 +49,18 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     if (viewCodeCache[email])
       return viewCodeCache[email]
   
-    const data = await callApi<{ code: string }>({
-      action: 'saveTempData',
-      data: email,
-    })
-    viewCodeCache[email] = data.code
-    return data.code
+    try {
+      const data = await callApi<{ code: string }>({
+        action: 'saveTempData',
+        data: email,
+      })
+      viewCodeCache[email] = data.code
+      return data.code
+    } catch (error) {
+      console.error('Error generating view code:', error)
+    }
+
+    return undefined
   }
 
   watch(viewers, async (viewers, oldViewers) => {
@@ -210,17 +216,18 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     }
   }
 
-  async function presentSource(source?: ScreenSource, shareAudio = false) {
+  async function presentSource(shareAudio = false) {
+    console.log('presentSource')
     if (!screenPresent.value)
       return
 
     try {
-      const s = await getStream(shareAudio)
-      if (!s)
+      const { stream: str, source } = await getStream(shareAudio)
+      if (!str)
         return
 
       await cleanUpStream()
-      stream.value = s
+      stream.value = str
       await screenPresent.value.addStream(stream.value, shareAudio)
       options?.onStream?.(stream.value, shareAudio)
       stream.value.getVideoTracks()[0].onended = () => {
@@ -228,6 +235,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       }
       streamState.value = 'active'
 
+      console.log('sharingActive', viewCode.value, source)
       source && window.electronAPI?.sharingActive(viewCode.value!, JSON.stringify({ source, userName: unref(data.email) }))
     } catch (error) {
       console.error('Error sharing local screen:', error)

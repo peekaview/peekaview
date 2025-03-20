@@ -7,6 +7,12 @@ const toolbar = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
 
 const users = ref<UserData[]>([])
 
+const clipboardEnabled = ref(false)
+
+window.electronAPI?.onClipboardEnabled(() => {
+  clipboardEnabled.value = true
+})
+
 window.electronAPI?.onUpdateOverlayData((data) => {
   data.users !== undefined && (users.value = data.users)
   data.toolsEnabled !== undefined && toolbar.value?.togglePointer(data.toolsEnabled.pointer)
@@ -50,6 +56,7 @@ function showInviteLink() {
   <PresenterToolbar
     ref="toolbar"
     :viewer-count="users.length"
+    :clipboard-enabled="clipboardEnabled"
     draggable
     @toggle-remote-control="toggleRemoteControl"
     @toggle-pointer="togglePointer"

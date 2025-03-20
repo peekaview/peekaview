@@ -36,7 +36,7 @@ const stream = ref<MediaStream>()
 
 const toolsEnabled = ref({ pointer: true, remoteControl: false })
 const showClipboard = ref(false)
-const clipboardFile = ref<File>({ content: 'data:text/plain;base64,' })
+const clipboardFile = ref<File>()
 const fileChunkRegistry = useFileChunkRegistry(file => clipboardFile.value = file)
 watch(clipboardFile, () => showClipboard.value = true)
 watch(() => toolsEnabled.value.pointer, () => {
@@ -65,7 +65,7 @@ async function start() {
 
     stream.value = s
 
-    return s
+    return { stream: s, source: undefined }
   }, {
     onRequest: async (_id, name) => {
       const result = await resizeAndPrompt({
@@ -316,6 +316,7 @@ function onResumeSharing() {
   <div v-else ref="outer" class="presenter-container">
     <PresenterToolbar
       ref="toolbar"
+      :clipboard-enabled="!!clipboardFile"
       :viewer-count="presenter.viewers.length"
       @toggle-pointer="toolsEnabled.pointer = $event"
       @toggle-clipboard="showClipboard = !showClipboard"

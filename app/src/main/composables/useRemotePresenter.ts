@@ -432,6 +432,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     lastClipboardData = data
 
+    toolbarWindow!.webContents.send('on-clipboard-enabled')
     clipboardWindow!.webContents.send('data-to-clipboard', JSON.stringify(data))
   }
 

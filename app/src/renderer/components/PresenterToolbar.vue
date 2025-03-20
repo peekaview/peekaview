@@ -12,10 +12,12 @@ import PlaySvg from '../../assets/icons/play.svg'
 import { getPlatform } from '../util'
 
 withDefaults(defineProps<{
-  viewerCount: number
+  viewerCount?: number
   draggable?: boolean
+  clipboardEnabled?: boolean
 }>(), {
   draggable: false,
+  clipboardEnabled: false,
 })
 
 const emit = defineEmits<{
@@ -119,11 +121,11 @@ defineExpose({
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
-    <div class="viewer-count" :class="{ 'viewer-count-none': viewerCount === 0 }">
+    <div v-if="viewerCount" class="viewer-count" :class="{ 'viewer-count-none': viewerCount === 0 }">
       <AccountGroupSvg />
       <span>{{ viewerCount }}</span>
     </div>
-    <div class="btn btn-sm btn-secondary" :title="$t('toolbar.openClipboard')" @click="$emit('toggle-clipboard')">
+    <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardEnabled }" :title="$t('toolbar.openClipboard')" @click="clipboardEnabled && $emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
     <div class="btn btn-sm btn-secondary" :title="$t('toolbar.shareDifferentScreen')" @click="$emit('share-different-screen')">
