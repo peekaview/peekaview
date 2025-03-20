@@ -485,12 +485,16 @@ function sendPushNotification() {
     $notification = $_GET['notification'];
     $notification = json_decode($notification, true);
 
-    $title = $notification['title'];
-    $message = $notification['message'];
-    $imageUrl = $notification['imageUrl'];
-    $data = $notification['data'];
-    $pushToken = file_get_contents($pushFile);
-    sendMessage($title, $message, $pushToken, $imageUrl, $data);
+    try {
+        $title = $notification['title'];
+        $message = $notification['message'];
+        $imageUrl = $notification['imageUrl'];
+        $data = $notification['data'];
+        $pushToken = file_get_contents($pushFile);
+        sendMessage($title, $message, $pushToken, $imageUrl, $data);
+    } catch (Exception $e) {
+        throw new Exception('Failed to send push notification: ' . $e->getMessage() . ' - ' . json_encode($notification));
+    }
 
     return ['success' => true];
 }
@@ -530,7 +534,7 @@ function saveTempData($data) {
     }
     
     // Save the data
-    file_put_contents($tempFile, $dataToSave);
+    file_put_contents($tempFile, $data);
     
     return ['code' => $code];
 }
