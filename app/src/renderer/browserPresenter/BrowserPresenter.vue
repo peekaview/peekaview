@@ -30,7 +30,6 @@ const toolbarRef = useTemplateRef('toolbar')
 const containerRef = useTemplateRef('container')
 
 const presenter = ref<Presenter>()
-const contactToNotify = ref<ContactData>()
 const streamSize = ref<Size>({ width: 0, height: 0 })
 const sizeFixed = ref(false)
 const stream = ref<MediaStream>()
@@ -50,11 +49,15 @@ const { send, receive, onReceive } = useRemoteHandlers(presenter)
 
 async function start() {
   userInputRequired.value = false
-  const code = new URLSearchParams(window.location.search).get('data')
+  const params = new URLSearchParams(window.location.search)
+  const code = params.get('data')
   if (!code)
     throw new Error('')
   
   const { email, token } = parseCode(code)
+  const notify = params.get('notify')
+  const contactToNotify = notify ? JSON.parse<ContactData>(notify) : undefined
+
   presenter.value = usePresenter({
     email: email!,
     token: token!,

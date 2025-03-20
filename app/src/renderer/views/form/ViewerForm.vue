@@ -30,12 +30,12 @@ const { handleSubmit, values, errors } = useForm<ViewerDataSchema>({
     name: string().required(t('general.required')),
   })),
 })
-const { value: emailOrCode } = useField('emailOrCode')
-const { value: name } = useField('name')
+const { value: emailOrCode } = useField<string>('emailOrCode')
+const { value: name } = useField<string>('name')
 
 watch(() => props.modelValue.emailOrCode, (value) => emailOrCode.value = value)
 watch(() => props.modelValue.name, (value) => name.value = value)
-watch(() => values, (value) => emit('update:modelValue', value), { deep: true })
+watch(() => [emailOrCode.value, name.value], ([emailOrCode, name]) => emit('update:modelValue', { emailOrCode, name }))
 
 const submit = handleSubmit(async (values) => {
   if (validateEmail(values.emailOrCode)) {

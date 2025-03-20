@@ -314,14 +314,16 @@ declare const CSP_POLICY: string
           { type: 'separator' }
       )
 
+      const code = store.get('code')
       const recentContacts = store.get('recentContacts')
+
       if (recentContacts && Object.keys(recentContacts).length > 0) {
         menuItems.push({ icon: createMenuIcon(AccountGroupIcon), label: i18n.t('trayMenu.recentContacts') + ':', type: 'normal', enabled: false })
         
         for (const id in recentContacts) {
           menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
             { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
-            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(recentContacts[id]) },
+            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(code, recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
@@ -333,9 +335,9 @@ declare const CSP_POLICY: string
       
       menuItems.push(
         { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
-        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
+        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(code) },
         { type: 'separator' },
-        { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!store.get('code') },
+        { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!code },
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
           { icon: createMenuIcon(LanguageIcon), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
@@ -434,7 +436,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -444,7 +446,7 @@ declare const CSP_POLICY: string
     })
   }
 
-  const createViewerWindow = (contactToNotify?: ContactData) => {
+  const createViewerWindow = (code: string | undefined, contactToNotify?: ContactData) => {
     viewerWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
@@ -462,7 +464,7 @@ declare const CSP_POLICY: string
       }
     })
 
-    windowLoad(viewerWindow, 'viewer')
+    windowLoad(viewerWindow, 'viewer', code ? { data: code } : undefined)
     //viewerWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
@@ -652,7 +654,7 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      //presenterWindow?.hide()
+      presenterWindow?.hide()
     }
 
     currentSource = data

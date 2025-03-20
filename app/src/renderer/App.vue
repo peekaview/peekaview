@@ -77,12 +77,22 @@ uuidPromise.then(uuid => {
       console.log('notification', payload)
       const result = await prompt({
         text: payload.notification?.body,
-        confirmButtonText: 'Accept',
-        cancelButtonText: 'Deny',
+        confirmButtonText: t('general.ok'),
+        cancelButtonText: t('general.cancel'),
       })
 
       if (result === '0') {
-        
+        switch (payload.data!.type) {
+          case 'view':
+            activeViewerData.value = {
+              name: formViewerData.value!.name,
+              email: payload.data!.email,
+            }
+            break
+          case 'share':
+            presenterActive.value = true
+            break
+        }
       }
     })
   }, (error) => {
@@ -115,6 +125,7 @@ function expandContact(id: string) {
 }
 
 function viewRecentContact(id?: string) {
+  presenterActive.value = false
   if (!id)
     return
 
@@ -125,11 +136,6 @@ function viewRecentContact(id?: string) {
   const name = formViewerData.value.name // todo: name is not updated correctly
   if (!name)
     return
-
-  activeViewerData.value = {
-    name,
-    email: contact.email!,
-  }
 
   if (email && token)
     callApi({
@@ -144,31 +150,24 @@ function viewRecentContact(id?: string) {
           icon: PeekaViewLogo,
           url: `${import.meta.env.VITE_APP_URL}/?share`,
           type: 'share',
+          email,
         }
       })
     })
+
+  activeViewerData.value = {
+    name,
+    email: contact.email!,
+  }
 }
 
+const contactToNotify = ref<ContactData | undefined>()
 function shareRecentContact(id?: string) {
   if (!id || !email || !token)
     return
 
-  callApi({
-    action: 'sendPushNotification',
-    email,
-    token,
-    uuid: id,
-    notification: JSON.stringify({
-      title: 'PeekaView',
-      message: t('notifications.shareScreen', { name: email }),
-      data: {
-        icon: PeekaViewLogo,
-        url: `${import.meta.env.VITE_APP_URL}/${''}`,
-        type: 'view',
-        code: ''
-      }
-    })
-  })
+  contactToNotify.value = recentContacts.value[id]
+  presenterActive.value = true
 }
 </script>
 
@@ -200,6 +199,7 @@ function shareRecentContact(id?: string) {
             v-else-if="presenterActive && email && token"
             :email="email"
             :token="token"
+            :contact-to-notify="contactToNotify"
             @stop="presenterActive = false"
           />
           <template v-else>
@@ -241,7 +241,7 @@ function shareRecentContact(id?: string) {
                 </div>
               </div>
             </template>
-            <div v-show="expandedContactId" ref="dropdown" class="pill-tag-dropdown" :style="floatingStyles" @click.stop>
+            <div v-show="expandedContactId" ref="dropdown" class="pill-tag-dropdown" :style="floatingStyles" @click.stop="expandedContactId = undefined">
               <a class="dropdown-item" href="#" @click="viewRecentContact(expandedContactId)">{{ $t('app.form.likeToView') }}</a>
               <a class="dropdown-item" href="#" @click="shareRecentContact(expandedContactId)">{{ $t('app.form.likeToShare') }}</a>
             </div>

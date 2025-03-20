@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ViewerData, ViewerDataSchema } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
@@ -21,6 +21,11 @@ getStoredItem('name').then(value => {
     formViewerData.value.name = value
 })
 
+const contactToNotify = ref<ContactData | undefined>()
+window.electronAPI?.onNotifyContact((contact) => {
+  contactToNotify.value = contact
+})
+
 onMounted(() => {
   const code = new URLSearchParams(window.location.search).get('data')
   if (!code)
@@ -28,9 +33,12 @@ onMounted(() => {
 
   const { email, token } = parseCode(code)
 
-  window.electronAPI?.onNotifyContact((contact: ContactData) => {
+  watch(contactToNotify, (contact) => {
+    if (!contact)
+      return
+
     if (email && token) {
-      window.electronAPI?.log('Notify contact:', contact)
+      window.electronAPI?.log('Notify contact:', JSON.stringify(contact))
       callApi<Response>({
         action: 'sendPushNotification',
         email: email!,
@@ -42,7 +50,8 @@ onMounted(() => {
           data: {
             icon: PeekaViewLogo,
             url: `${import.meta.env.VITE_APP_URL}/?share`,
-            type: 'share'
+            type: 'share',
+            email,
           }
         })
       })

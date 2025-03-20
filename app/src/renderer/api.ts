@@ -10,7 +10,7 @@ export type NotificationPayload = {
     icon?: string
     url?: string
     type?: 'share' | 'view'
-    code?: string
+    email?: string
   }
 }
 

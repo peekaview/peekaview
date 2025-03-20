@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ContactData } from '../../interface';
 
 const props = defineProps<{
   email: string
   token: string
+  contactToNotify?: ContactData
 }>()
 
 const emit = defineEmits<{
@@ -31,7 +33,13 @@ function present() {
     email: props.email,
     token: props.token,
   }).toString()))
-  presenterWindow.value = window.open(`browserPresenter/index.html?data=${data.value}`, '_blank', `width=400,height=300,popup=true`) ?? undefined
+  
+  presenterWindow.value = window.open(
+    `browserPresenter/index.html?data=${data.value}${props.contactToNotify ? `&notify=${JSON.stringify(props.contactToNotify)}` : ''}`,
+    '_blank',
+    `width=400,height=300,popup=true`
+  ) ?? undefined
+
   if (!presenterWindow.value) {
     throw new Error('Failed to open presenter window')
   }

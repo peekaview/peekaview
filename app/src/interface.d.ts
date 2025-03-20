@@ -205,83 +205,83 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "reset" ? RemoteResetData
   : never
 
-  export type RemoteMouseData = {
-    userId: string
-    x: number
-    y: number
-    delta?: number
-    tool?: ViewerTool
-  }
+export type RemoteMouseData = {
+  userId: string
+  x: number
+  y: number
+  delta?: number
+  tool?: ViewerTool
+}
 
-  export type RemoteKeyData = {
-    key: string
-    tool?: ViewerTool
-  }
+export type RemoteKeyData = {
+  key: string
+  tool?: ViewerTool
+}
 
-  export type RemoteCopyData = {
-    cut?: boolean
-    tool?: ViewerTool
-  }
+export type RemoteCopyData = {
+  cut?: boolean
+  tool?: ViewerTool
+}
 
-  export type RemotePasteData = {
-    text: string
-    tool?: ViewerTool
-  }
+export type RemotePasteData = {
+  text: string
+  tool?: ViewerTool
+}
 
-  export type RemoteTextData = {
-    text: string
-    time: number
-  }
+export type RemoteTextData = {
+  text: string
+  time: number
+}
 
-  export type RemoteFileData = {
-    id: string
-    name: string
-    length: number
-  }
+export type RemoteFileData = {
+  id: string
+  name: string
+  length: number
+}
 
-  export type RemoteFileChunkData = {
-    id: string
-    index: number
-    content: string
-  }
+export type RemoteFileChunkData = {
+  id: string
+  index: number
+  content: string
+}
 
-  export type RemoteResetData = {
-    isScreen: boolean
-    inBrowser: boolean
-    dimensions: Dimensions
-    coverBounds: Rectangle[]
-    toolsEnabled: Record<ViewerTool, boolean>
-    streamState: StreamState
-  }
+export type RemoteResetData = {
+  isScreen: boolean
+  inBrowser: boolean
+  dimensions: Dimensions
+  coverBounds: Rectangle[]
+  toolsEnabled: Record<ViewerTool, boolean>
+  streamState: StreamState
+}
 
-  export type OverlayData = {
-    users?: UserData[]
-    scale?: number
-    toolsEnabled: Record<ViewerTool, boolean>
-  }
+export type OverlayData = {
+  users?: UserData[]
+  scale?: number
+  toolsEnabled: Record<ViewerTool, boolean>
+}
 
-  export type Dimensions = {
-    left: number
-    top: number
-    right: number
-    bottom: number
-  }
+export type Dimensions = {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
 
-  export type Point = {
-    x: number
-    y: number
-  }
+export type Point = {
+  x: number
+  y: number
+}
 
-  export type Size = {
-    width: number
-    height: number
-  }
+export type Size = {
+  width: number
+  height: number
+}
 
-  export type Rectangle = Point & Size
+export type Rectangle = Point & Size
 
-  export type File = {
-    content: string
-    name?: string
-  }
+export type File = {
+  content: string
+  name?: string
+}
 
-  export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }
+export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }

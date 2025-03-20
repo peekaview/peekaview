@@ -90,7 +90,7 @@ async function present(email: string, token: string) {
   }, {
     notify: {
       contact: contactToNotify,
-      getMessage: (name: string) => t('notifications.viewSharedScreen', { name }),
+      getMessage: (name: string) => t('notifications.shareScreen', { name }),
     },
     onRequest: async (_id, name) => {
       const result = await prompt({
