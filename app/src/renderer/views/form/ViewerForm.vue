@@ -20,7 +20,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const { handleSubmit, values, errors } = useForm<ViewerDataSchema>({
+const { handleSubmit, errors } = useForm<ViewerDataSchema>({
   initialValues: {
     emailOrCode: props.modelValue.emailOrCode || '',
     name: props.modelValue.name || '',
