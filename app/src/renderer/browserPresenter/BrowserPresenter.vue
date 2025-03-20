@@ -74,6 +74,7 @@ async function start() {
     },
     onRequest: async (_id, name) => {
       const result = await resizeAndPrompt({
+        type: 'info',
         text: t('share.requestAccess', { name }),
         confirmButtonText: t('general.accept'),
         cancelButtonText: t('general.deny'),
@@ -102,6 +103,7 @@ async function start() {
     onStop: () => window.close(),
     onAllViewersLeft: async() => {
       const result = await resizeAndPrompt({
+        type: 'info',
         text: t('share.allViewersLeft'),
         confirmButtonText: t('general.yes'),
         cancelButtonText: t('general.no'),

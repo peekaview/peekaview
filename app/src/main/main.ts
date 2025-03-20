@@ -674,7 +674,7 @@ declare const CSP_POLICY: string
         content: i18n.t('sharingActive.codeMessage'),
         copyText: currentViewCode,
       }],
-      timeout: 0, //15000
+      timeout: 15000
     })
   }
 

@@ -104,7 +104,7 @@ async function select(e: MouseEvent) {
 
 <template>
   <Modal ref="modal">
-    <template v-if="windowType === 'dialog'" #header>
+    <template v-if="title" #header>
       <a href="#close" class="btn btn-clear float-right" aria-label="Close" @click="reply(cancelId!)"></a>
       <div class="modal-title h5">{{ title }}</div>
     </template>
@@ -126,7 +126,7 @@ async function select(e: MouseEvent) {
         <div></div>
       </div>
 
-      <div v-else class="f-modal-alert">
+      <div v-else-if="!!type" class="f-modal-alert">
         <div v-if="type === 'error'" class="f-modal-icon f-modal-error animate">
           <span class="f-modal-x-mark">
             <span class="f-modal-line f-modal-left animateXLeft"></span>
@@ -192,7 +192,7 @@ async function select(e: MouseEvent) {
         </div>
         
       </div>
-      <a v-if="windowType === 'tray'" href="#close" class="btn btn-clear float-right" aria-label="Close" @click="reply(cancelId!)"></a>
+      <a v-if="!title" href="#close" class="btn btn-clear float-right" aria-label="Close" @click="reply(cancelId!)"></a>
     </template>
   </Modal>
 </template>
@@ -261,6 +261,7 @@ async function select(e: MouseEvent) {
   }
 
   .modal-body .modal-buttons button {
+    margin-top: 1rem;
     flex-grow: 1;
   }
 </style>

@@ -223,7 +223,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
           return
 
         console.log('Notify contact:', contact)
-        window.electronAPI?.log('Notify contact:', contact)
+        window.electronAPI?.log('Notify contact:', JSON.stringify(contact))
         callApi<Response>({
           action: 'sendPushNotification',
           email: unref(data.email),

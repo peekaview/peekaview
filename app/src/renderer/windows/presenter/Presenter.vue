@@ -94,6 +94,7 @@ async function present(email: string, token: string) {
     },
     onRequest: async (_id, name) => {
       const result = await prompt({
+        type: 'info',
         text: t('share.requestAccess', { name }),
         confirmButtonText: t('general.accept'),
         cancelButtonText: t('general.deny'),
@@ -104,6 +105,7 @@ async function present(email: string, token: string) {
     },
     onAllViewersLeft: async () => {
       const result = await prompt({
+        type: 'info',
         text: t('share.allViewersLeft'),
         confirmButtonText: t('general.yes'),
         cancelButtonText: t('general.no'),

@@ -48,20 +48,18 @@ export function useCustomDialog() {
       height: number
       x: number
       y: number
-      entryKey: string
     }
 
     const primary = screen.getPrimaryDisplay()
     if (type === 'tray') {
       const width = 600
-      const height = 300
+      const height = 400
 
       windowParams = {
         width,
         height,
         x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
         y: primary.bounds.y + 70,
-        entryKey: 'dialog',
       }
     } else if (type === 'dialog') {
       const width = 500
@@ -72,7 +70,6 @@ export function useCustomDialog() {
         height,
         x: primary.bounds.x + (primary.workAreaSize.width - width) / 2,
         y: primary.bounds.y + (primary.workAreaSize.height - height) / 2,
-        entryKey: 'dialog',
       }
     } else {
       return
@@ -119,7 +116,7 @@ export function useCustomDialog() {
       },
     })
 
-    windowLoad(dialogWindow, windowParams.entryKey)
+    windowLoad(dialogWindow, 'dialog')
 
     if (type === 'dialog')
       dialogWindow.center()

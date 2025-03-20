@@ -488,8 +488,8 @@ function sendPushNotification() {
     try {
         $title = $notification['title'];
         $message = $notification['message'];
-        $image = $notification['image'];
-        $data = $notification['data'];
+        $image = array_key_exists('image', $notification) ? $notification['image'] : null;
+        $data = array_key_exists('data', $notification) ? $notification['data'] : [];
         $pushToken = file_get_contents($pushFile);
         sendMessage($pushToken, $title, $message, $image, $data);
     } catch (Exception $e) {
