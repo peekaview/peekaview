@@ -8,9 +8,7 @@ import { usePresenter, getStreamFromSource, Presenter } from '../../composables/
 import { ContactData, ScreenSource, ViewerTool } from '../../../interface'
 import { notify, prompt } from '../../util'
 import { parseCode } from '../../../util'
-import { callApi, UnauthorizedError } from '../../api'
-
-import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
+import { UnauthorizedError } from '../../api'
 
 const { t } = useI18n()
 
@@ -41,8 +39,7 @@ onBeforeUnmount(() => {
   presenter.value?.cleanUpCallbacks()
 })
 
-window.electronAPI?.onNotifyContact((contact: ContactData) => {
-  window.electronAPI?.log('Notify contact:', contact)
+window.electronAPI?.onNotifyContact((contact) => {
   contactToNotify.value = contact
 })
 
@@ -91,6 +88,10 @@ async function present(email: string, token: string) {
     const stream = source ? await getStreamFromSource(source, shareAudio) : undefined
     return { stream, source }
   }, {
+    notify: {
+      contact: contactToNotify,
+      getMessage: (name: string) => t('notifications.viewSharedScreen', { name }),
+    },
     onRequest: async (_id, name) => {
       const result = await prompt({
         text: t('share.requestAccess', { name }),
@@ -126,25 +127,6 @@ async function present(email: string, token: string) {
   })
 
   await presenter.value.startSession()
-
-  if (contactToNotify.value) {
-    callApi<Response>({
-      action: 'sendPushNotification',
-      email: email!,
-      token: token!,
-      uuid: contactToNotify.value.id,
-      notification: JSON.stringify({
-        title: 'PeekaView',
-        body: t('notifications.viewSharedScreen', { name: email }),
-        icon: PeekaViewLogo,
-        data: {
-          url: `${import.meta.env.VITE_APP_URL}/${''}`,
-          type: 'view',
-          code: presenter.value!.viewCode
-        }
-      })
-    })
-  }
 }
 
 function select(source: ScreenSource) {

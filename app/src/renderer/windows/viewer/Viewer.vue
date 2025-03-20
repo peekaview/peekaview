@@ -38,9 +38,9 @@ onMounted(() => {
         uuid: contact.id,
         notification: JSON.stringify({
           title: 'PeekaView',
-          body: t('notifications.viewSharedScreen', { name: email }),
-          icon: PeekaViewLogo,
+          message: t('notifications.viewSharedScreen', { name: email }),
           data: {
+            icon: PeekaViewLogo,
             url: `${import.meta.env.VITE_APP_URL}/?share`,
             type: 'share'
           }

@@ -488,10 +488,10 @@ function sendPushNotification() {
     try {
         $title = $notification['title'];
         $message = $notification['message'];
-        $imageUrl = $notification['imageUrl'];
+        $image = $notification['image'];
         $data = $notification['data'];
         $pushToken = file_get_contents($pushFile);
-        sendMessage($title, $message, $pushToken, $imageUrl, $data);
+        sendMessage($pushToken, $title, $message, $image, $data);
     } catch (Exception $e) {
         throw new Exception('Failed to send push notification: ' . $e->getMessage() . ' - ' . json_encode($notification));
     }

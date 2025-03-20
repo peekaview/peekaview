@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 import StreamContainer from '../views/viewer/StreamContainer.vue'
 import Clipboard from '../components/Clipboard.vue'
-import { File, Size } from '../../interface'
+import { ContactData, File, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
 import { notify, prompt, PromptOptions, NotifyOptions, getPlatform } from '../util'
@@ -30,6 +30,7 @@ const toolbarRef = useTemplateRef('toolbar')
 const containerRef = useTemplateRef('container')
 
 const presenter = ref<Presenter>()
+const contactToNotify = ref<ContactData>()
 const streamSize = ref<Size>({ width: 0, height: 0 })
 const sizeFixed = ref(false)
 const stream = ref<MediaStream>()
@@ -67,6 +68,10 @@ async function start() {
 
     return { stream: s, source: undefined }
   }, {
+    notify: {
+      contact: contactToNotify,
+      getMessage: (name: string) => t('notifications.viewSharedScreen', { name }),
+    },
     onRequest: async (_id, name) => {
       const result = await resizeAndPrompt({
         text: t('share.requestAccess', { name }),

@@ -81,6 +81,7 @@ export function useCustomDialog() {
     const defaultOptions: DialogOptions = {
       title: 'Info',
       type: 'info',
+      messages: [],
       buttons: [],
       noLink: true,
       defaultId: 0,

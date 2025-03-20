@@ -4,9 +4,10 @@ import { notify } from "./util"
 
 export type NotificationPayload = {
   title: string
-  body: string
-  icon?: string
+  message: String
+  image?: string
   data?: {
+    icon?: string
     url?: string
     type?: 'share' | 'view'
     code?: string
@@ -60,18 +61,32 @@ export async function callApi<TResponse = void>(params: ApiRequestParams) {
   if (response.status === 401)
     throw new UnauthorizedError(response.statusText)
 
-  if (response.status === 500)
+  let responseBody: TResponse
+  try {
+    responseBody = await response.json() as TResponse
+  } catch (e) {
     notify({
       title: 'Server Error',
       text: response.statusText,
       confirmButtonText: 'OK',
       type: 'error',
     })
+    throw new Error(`${response.status} ${response.statusText} ${e instanceof Error ? e.message : ''}`)
+  }
+
+  if (response.status === 500) {
+    notify({
+      title: 'Server Error',
+      text: responseBody ? JSON.stringify(responseBody) : response.statusText,
+      confirmButtonText: 'OK',
+      type: 'error',
+    })
+  }
 
   if (!response.ok)
     throw new Error(`${response.status} ${response.statusText}`)
 
-  return (await response.json()) as TResponse
+  return responseBody
 }
 
 export class UnauthorizedError extends Error {

@@ -3,10 +3,12 @@ import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
 import type { AcceptedRequestData } from '../types'
-import { callApi, UnauthorizedError } from '../api'
+import { callApi, NotificationPayload, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts, setStoredItem } from '../util'
-import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool } from '../../interface'
+import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData } from '../../interface'
 import { stringToColor } from '../../util'
+
+import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
 export type Presenter = ReturnType<typeof usePresenter>
 
@@ -17,6 +19,10 @@ type PresenterData = {
 }
 
 type PresenterOptions = {
+  notify?: {
+    contact: MaybeRef<ContactData | undefined>
+    getMessage: (name: string) => string
+  }
   onRequest?: (id: string, name: string) => Promise<boolean>
   onStream?: (stream: MediaStream, shareAudio?: boolean) => void
   onRemote?: SendRemote
@@ -167,6 +173,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     resetTimeout = window.setTimeout(() => sendReset(true), 2000)
   }
   
+  let unwatchContactToNotify: () => void
   async function startSession() {
     if (screenPresent.value)
       return
@@ -209,8 +216,32 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
         }
       })
       
-      presentSource()
-    } catch (error) {
+      await presentSource()
+
+      unwatchContactToNotify = watch(() => unref(options?.notify?.contact), (contact) => {
+        if (!contact)
+          return
+
+        console.log('Notify contact:', contact)
+        window.electronAPI?.log('Notify contact:', contact)
+        callApi<Response>({
+          action: 'sendPushNotification',
+          email: unref(data.email),
+          token: unref(data.token),
+          uuid: contact.id,
+          notification: JSON.stringify<NotificationPayload>({
+            title: 'PeekaView',
+            message: options!.notify!.getMessage(unref(data.email)),
+            data: {
+              icon: PeekaViewLogo,
+              url: `${import.meta.env.VITE_APP_URL}/${''}`,
+              type: 'view',
+              code: viewCode.value
+            }
+          })
+        })
+      }, { immediate: true })
+  } catch (error) {
       console.error('Error creating room:', error);
       handleApiError(error as Error, requestData)
     }
@@ -393,6 +424,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
 
     clearInterval(pingInterval.value)
     pingInterval.value = undefined
+    unwatchContactToNotify?.()
   }
 
   return reactive({

@@ -120,7 +120,7 @@ export type DialogType = 'error' | 'warning' | 'info' | 'success' | 'download' |
 export interface DialogOptions {
   id?: number
   title?: string
-  messages?: (string | DialogMessage)[]
+  messages: (string | DialogMessage)[]
   type?: DialogType
   windowType?: 'tray' | 'dialog'
   sound?: string | null

@@ -139,9 +139,9 @@ function viewRecentContact(id?: string) {
       uuid: contact.id,
       notification: JSON.stringify({
         title: 'PeekaView',
-        body: t('notifications.viewSharedScreen', { name }),
-        icon: PeekaViewLogo,
+        message: t('notifications.viewSharedScreen', { name }),
         data: {
+          icon: PeekaViewLogo,
           url: `${import.meta.env.VITE_APP_URL}/?share`,
           type: 'share',
         }
@@ -160,9 +160,9 @@ function shareRecentContact(id?: string) {
     uuid: id,
     notification: JSON.stringify({
       title: 'PeekaView',
-      body: t('notifications.shareScreen', { name: email }),
-      icon: PeekaViewLogo,
+      message: t('notifications.shareScreen', { name: email }),
       data: {
+        icon: PeekaViewLogo,
         url: `${import.meta.env.VITE_APP_URL}/${''}`,
         type: 'view',
         code: ''

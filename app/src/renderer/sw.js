@@ -12,7 +12,8 @@ onBackgroundMessage(messaging, async (payload) => {
   const registration = await navigator.serviceWorker.getRegistration()
   registration?.showNotification(payload.notification.title, {
     body: payload.notification.body,
-    icon: payload.notification.image,
+    icon: payload.data.icon,
+    image: payload.data.imageUrl,
     data: {
       url: payload.data.url
     }

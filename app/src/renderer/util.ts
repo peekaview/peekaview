@@ -44,7 +44,7 @@ export async function notify({ type, title, text, html, confirmButtonText }: Not
       id,
       type,
       title,
-      message: text ?? html,
+      messages: [text ?? html],
       buttons,
     })
 
@@ -77,7 +77,7 @@ export async function prompt({ type, title, text, html, confirmButtonText, cance
       type,
       title,
       sound,
-      message: text ?? html,
+      messages: [text ?? html],
       buttons: [
         confirmButtonText, // result === '0'
         cancelButtonText, // result === '1'
