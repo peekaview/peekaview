@@ -29,7 +29,7 @@ if (process.platform === 'darwin') {
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
-import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData, ContactData } from '../interface.js'
+import { DialogOptions, ElectronWindowDimensions, RemoteData, RemoteEvent, ScreenSource, StreamerData, UserData, ContactData, NotificationPayload } from '../interface.js'
 import { StorageSchema } from '../store'
 import { resolvePath, windowLoad } from './util'
 import { i18n, i18nReady, languages } from './i18n'
@@ -71,7 +71,7 @@ declare const CSP_POLICY: string
   log.info('Starting app update check')
   
   // Create notification icon once
-  const updateNotificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
+  const notificationIcon = nativeImage.createFromPath(path.join(__dirname, PeekaViewLogo)).resize({ width: 64, height: 64 })
 
   // Configure auto updater events
   autoUpdater.on('checking-for-update', () => {
@@ -272,7 +272,7 @@ declare const CSP_POLICY: string
     })
 
     log.info("App initialization complete")
-    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: updateNotificationIcon }).show()
+    new Notification({ title: 'PeekaView', body: i18n.t('trayMenu.running'), icon: notificationIcon }).show()
 
     createNotifierWindow()
   })
@@ -323,7 +323,7 @@ declare const CSP_POLICY: string
         for (const id in recentContacts) {
           menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
             { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
-            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(code, recentContacts[id]) },
+            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(undefined, recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
@@ -335,7 +335,7 @@ declare const CSP_POLICY: string
       
       menuItems.push(
         { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting() },
-        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(code) },
+        { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow() },
         { type: 'separator' },
         { icon: createMenuIcon(LogoutIcon), label: i18n.t('trayMenu.logout'), type: 'normal', click: () => logout(), enabled: !!code },
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
@@ -446,7 +446,7 @@ declare const CSP_POLICY: string
     })
   }
 
-  const createViewerWindow = (code: string | undefined, contactToNotify?: ContactData) => {
+  const createViewerWindow = (viewEmail?: string, contactToNotify?: ContactData) => {
     viewerWindow = new BrowserWindow({
       title: 'PeekaView',
       icon: path.join(__dirname, PeekaViewLogo),
@@ -464,7 +464,14 @@ declare const CSP_POLICY: string
       }
     })
 
-    windowLoad(viewerWindow, 'viewer', code ? { data: code } : undefined)
+    const params: Record<string, string> = {}
+    const code = store.get('code')
+    if (code)
+      params.data = code
+    if (viewEmail)
+      params.viewEmail = viewEmail
+
+    windowLoad(viewerWindow, 'viewer', params)
     //viewerWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
@@ -766,8 +773,20 @@ declare const CSP_POLICY: string
     store.clear()
   })
 
-  ipcMain.handle('notify', async (_event, title: string, body: string) => {
-    new Notification({ title, body, icon: updateNotificationIcon }).show()
+  ipcMain.handle('receive-notification', async (_event, payload: NotificationPayload) => {
+    console.log('receive-notification', payload)
+    const notification = new Notification({ title: payload.title, body: payload.message, icon: notificationIcon })
+    notification.on('click', () => {
+      switch (payload.data?.type) {
+        case 'share':
+          tryPresenting()
+          break
+        case 'view':
+          createViewerWindow(payload.data?.email)
+          break
+      }
+    })
+    notification.show()
   })
 
   // Create a helper function to create resized template menu icons

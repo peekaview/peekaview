@@ -3,6 +3,8 @@ import { type DialogOptions } from './main/composables/useCustomDialog'
 
 import { StorageSchema } from './store'
 
+import { MessagePayload } from 'firebase/messaging'
+
 declare global {
   interface Window {
     electronAPI?: IElectronAPI
@@ -59,7 +61,7 @@ export interface IElectronAPI {
   onFirebaseStarted: (callback: (token: string) => void) => void,
   onFirebaseError: (callback: (error: string) => void) => void,
   onFirebaseTokenUpdated: (callback: (token: string) => void) => void,
-  onFirebaseNotificationReceived: (callback: (notification: any) => void) => void,
+  onFirebaseNotificationReceived: (callback: (message: MessagePayload) => void) => void,
   dialog: (options: DialogOptions) => Promise<void>,
   getResourcesPath: () => Promise<string>,
   sendRemote: SendRemote,
@@ -101,13 +103,25 @@ export interface IElectronAPI {
   onUpdateOverlayData: (callback: (data: OverlayData) => void) => void,
   updateUsers: (users: string) => Promise<void>,
   onNotifyContact: (callback: (contact: ContactData) => void) => void,
-  notify: (title: string, body: string) => Promise<void>,
+  receiveNotification: (notification: NotificationPayload) => void,
 }
 
 export interface ScreenSource {
   id: string
   name: string
   thumbnail: string
+}
+
+export type NotificationPayload = {
+  title: string
+  message: string
+  image?: string
+  data?: {
+    icon?: string
+    url?: string
+    type?: 'share' | 'view'
+    email?: string
+  }
 }
 
 export type DialogMessage = {

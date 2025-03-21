@@ -11,14 +11,16 @@ import {
 import { base } from './base'
 
 import firebaseConfig from '../../firebase.json'
+import { NotificationPayload } from 'src/interface'
+import { MessagePayload } from 'firebase/messaging'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
   onFirebaseStarted: (callback: (token: string) => void) => ipcRenderer.on(NOTIFICATION_SERVICE_STARTED, (_event, token) => callback(token)),
   onFirebaseError: (callback: (error: string) => void) => ipcRenderer.on(NOTIFICATION_SERVICE_ERROR, (_event, error) => callback(error)),
   onFirebaseTokenUpdated: (callback: (token: string) => void) => ipcRenderer.on(TOKEN_UPDATED, (_event, token) => callback(token)),
-  onFirebaseNotificationReceived: (callback: (notification: any) => void) => ipcRenderer.on(NOTIFICATION_RECEIVED, (_event, notification) => callback(notification)),
-  notify: (title: string, body: string) => ipcRenderer.invoke('notify', title, body),
+  onFirebaseNotificationReceived: (callback: (message: MessagePayload) => void) => ipcRenderer.on(NOTIFICATION_RECEIVED, (_event, message) => callback(message)),
+  receiveNotification: (notification: NotificationPayload) => ipcRenderer.invoke('receive-notification', notification),
 })
 
 ipcRenderer.send(START_NOTIFICATION_SERVICE, {

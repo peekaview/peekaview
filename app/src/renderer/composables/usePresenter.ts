@@ -3,9 +3,9 @@ import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
 import type { AcceptedRequestData } from '../types'
-import { callApi, NotificationPayload, UnauthorizedError } from '../api'
+import { callApi, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts, setStoredItem } from '../util'
-import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData } from '../../interface'
+import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
 import { stringToColor } from '../../util'
 
 import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'

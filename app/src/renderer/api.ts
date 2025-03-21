@@ -1,18 +1,7 @@
+import { NotificationPayload } from "src/interface"
 import i18n from "./i18n"
 import { EitherEmailOrCode } from "./types"
 import { notify } from "./util"
-
-export type NotificationPayload = {
-  title: string
-  message: String
-  image?: string
-  data?: {
-    icon?: string
-    url?: string
-    type?: 'share' | 'view'
-    email?: string
-  }
-}
 
 export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"

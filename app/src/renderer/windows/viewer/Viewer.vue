@@ -27,11 +27,15 @@ window.electronAPI?.onNotifyContact((contact) => {
 })
 
 onMounted(() => {
-  const code = new URLSearchParams(window.location.search).get('data')
+  const params = new URLSearchParams(window.location.search)
+  const code = params.get('data')
   if (!code)
     throw new Error('')
 
   const { email, token } = parseCode(code)
+  const viewEmail = params.get('viewEmail')
+  if (viewEmail)
+    formViewerData.value.emailOrCode = viewEmail
 
   watch(contactToNotify, (contact) => {
     if (!contact)

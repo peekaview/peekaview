@@ -16,8 +16,12 @@ window.electronAPI?.onFirebaseTokenUpdated((token) => {
   updatePushToken(token)
 })
 
-window.electronAPI?.onFirebaseNotificationReceived((notification) => {
-  window.electronAPI?.log('Firebase notification received:', notification)
+window.electronAPI?.onFirebaseNotificationReceived((message) => {
+  window.electronAPI?.receiveNotification({
+    title: message.notification?.title ?? '',
+    message: message.notification?.body ?? '',
+    data: message.data
+  })
 })
 
 async function updatePushToken(token: string) {
