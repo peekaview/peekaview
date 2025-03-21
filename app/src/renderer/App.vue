@@ -41,11 +41,15 @@ watch(expandedTagRef, (ref) => {
 })
 
 const presenterActive = ref(false)
-const plannedAction = ref<'view' | 'share'>(action === Action.Share ? 'share' : 'view')
+const plannedAction = ref<'view' | 'share'>(action.value === Action.Share ? 'share' : 'view')
 const recentContacts = ref<Record<string, ContactData>>({})
-const formViewerData = ref<ViewerDataSchema>({ emailOrCode: viewEmail ?? '', name: '' })
+const formViewerData = ref<ViewerDataSchema>({ emailOrCode: viewEmail.value ?? '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
-const isViewFixed = computed(() => action === Action.View && !!viewEmail)
+const isViewFixed = computed(() => action.value === Action.View && !!viewEmail.value)
+watch(viewEmail, (value) => {
+  if (value && !formViewerData.value.emailOrCode)
+    formViewerData.value.emailOrCode = value
+})
 
 getStoredItem('name').then(value => {
   if (value)
@@ -137,11 +141,11 @@ function viewRecentContact(id?: string) {
   if (!name)
     return
 
-  if (email && token)
+  if (email.value && token.value)
     callApi({
       action: 'sendPushNotification',
-      email,
-      token,
+      email: email.value,
+      token: token.value,
       uuid: contact.id,
       notification: JSON.stringify({
         title: 'PeekaView',
@@ -150,7 +154,7 @@ function viewRecentContact(id?: string) {
           icon: PeekaViewLogo,
           url: `${import.meta.env.VITE_APP_URL}/?share`,
           type: 'share',
-          email,
+          email: email.value,
         }
       })
     })
@@ -163,7 +167,7 @@ function viewRecentContact(id?: string) {
 
 const contactToNotify = ref<ContactData | undefined>()
 function shareRecentContact(id?: string) {
-  if (!id || !email || !token)
+  if (!id || !email.value || !token.value)
     return
 
   contactToNotify.value = recentContacts.value[id]

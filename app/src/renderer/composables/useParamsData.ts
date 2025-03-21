@@ -18,9 +18,8 @@ export function useParamsData() {
   const target = ref<string | undefined>()
   const viewEmail = ref<string | undefined>()
 
-  const path = window.location.pathname
-  if (path !== '/') {
-    const inviteCode = path.substring(1)
+  const inviteCode = window.location.pathname.replaceAll('/', '')
+  if (inviteCode !== '/') {
     callApi<{ data: string }>({
       action: 'getTempData',
       code: inviteCode,
@@ -76,11 +75,11 @@ export function useParamsData() {
     }
   }
 
-  return reactive({
+  return {
     action: computed(() => action.value),
     token: computed(() => token.value),
     email: computed(() => email.value),
     target: computed(() => target.value),
     viewEmail: computed(() => viewEmail.value),
-  })
+  }
 }
