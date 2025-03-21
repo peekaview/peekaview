@@ -11,7 +11,7 @@ import {
 import { base } from './base'
 
 import firebaseConfig from '../../firebase.json'
-import { NotificationPayload } from 'src/interface'
+import { NotificationPayload } from '../interface'
 import { MessagePayload } from 'firebase/messaging'
 
 contextBridge.exposeInMainWorld('electronAPI', {
