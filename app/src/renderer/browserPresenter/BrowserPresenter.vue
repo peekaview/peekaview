@@ -149,6 +149,15 @@ onReceive("mouse-up", (data) => {
   }
 })
 
+onReceive("text", (data) => {
+  console.log("text", data)
+
+  clipboardFile.value = {
+    content: 'data:text/plain;base64,' + btoa(data.text),
+    name: ''
+  }
+})
+
 onReceive("file", (data) => {
   console.log("file", data)
   fileChunkRegistry.register(data)

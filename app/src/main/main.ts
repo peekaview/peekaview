@@ -555,15 +555,15 @@ declare const CSP_POLICY: string
       return
     }
     let sourceId = data.source.id
-    
-    remotePresenter?.stop()
 
-    if (remotePresenter === undefined)
+    if (remotePresenter === undefined) {
       remotePresenter = useRemotePresenter((event, data) => presenterWindow?.webContents.send('send-remote', event, data), users, (hidden) => {
         presenterWindow?.webContents.send('on-hidden', hidden)
       })
-  
-    remotePresenter.start(sourceId)
+      remotePresenter.start(sourceId)
+    } else {
+      remotePresenter.useSource(sourceId)
+    }
   }
 
   function stopSharing() {

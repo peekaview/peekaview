@@ -145,7 +145,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     content: 'data:text/plain;base64,'
   }
   let lastKey: string
-  let active = false
   let toolsEnabled = {
     pointer: true,
     remoteControl: false,
@@ -167,11 +166,30 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   
   // Intervals
   let checkWindowInterval: NodeJS.Timeout | undefined
-  let resetInterval: NodeJS.Timeout | undefined
 
   let hwnd: string | undefined
 
   async function start(sourceId: string) {
+    await useSource(sourceId)
+
+    await startStreaming()
+
+    sourceManager.checkIfRectangleUpdated()
+    checkWindow()
+    if (!checkWindowInterval)
+      checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
+  }
+
+  function stop() {
+    if (checkWindowInterval != undefined) {
+      clearInterval(checkWindowInterval)
+      checkWindowInterval = undefined
+    }
+
+    stopStreaming()
+  }
+
+  async function useSource(sourceId: string) {
     if (sourceId.includes(':'))
       hwnd = sourceId.split(':')[1]
 
@@ -185,53 +203,12 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     
     console.log(`${hwnd} in windowList`)
 
-    await startStreaming()
+    sourceManager = createSourceManager(hwnd)
+    await sourceManager.onInit()
+    sourceManager.bringToFront()
 
-    sourceManager.checkIfRectangleUpdated()
-    checkWindow()
-    if (!checkWindowInterval)
-      checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
-  }
-
-  function checkWindow() {
-    // pause streaming, if window is minimized
-    updateWindowBorders(sourceManager.getOuterDimensions())
-    if (sourceManager.isMinimized()) {
-      console.log('window is minimized')
-      pauseStreaming(true)
-    }
-    else if (sourceManager.checkIfRectangleUpdated()) {
-      console.log('window was resized')
-      pauseStreaming(true)
-      // resume streaming, if window is back to normal state
-    }
-    else if (sourceManager.isVisible()) {
-      resumeStreamingIfPaused(true)
-    }
-
-    if (!sourceManager.isVisible() && streamState !== 'hidden') {
-      console.log('window is not visible')
-      //stop()
-      pauseStreaming(true)
-    }
-  }
-
-  function stop() {
-    if (resetInterval != undefined) {
-      clearInterval(resetInterval)
-      resetInterval = undefined
-    }
-
-    if (checkWindowInterval != undefined) {
-      clearInterval(checkWindowInterval)
-      checkWindowInterval = undefined
-    }
-
-    hideOverlayWindow()
-    hideRemoteControl()
-    deactivate()
-
-    streamState = 'stopped'
+    overlayWindow?.setBounds(sourceManager.getOverlayRectangle(), false)
+    toolbarWindow?.setBounds(getDefaultToolbarBounds(), false)
   }
 
   function pauseStreaming(fromHidden = false) {
@@ -245,8 +222,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     streamState = fromHidden ? 'hidden' : 'paused'
 
     console.log('pause')
-    hideOverlayWindow()
-    hideRemoteControl()
     sendReset()
   }
 
@@ -263,17 +238,45 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   async function startStreaming() {
-    if (hwnd !== undefined && streamState === 'stopped') {
+    if (streamState === 'stopped') {
       console.log("startStreaming")
 
       streamState = 'active'
 
-      sourceManager = createSourceManager(hwnd)
-      await sourceManager.onInit()
-      sourceManager.bringToFront()
-      await activate(sourceManager)
+      await createOverlayWindow()
+      await createToolbarWindow()
 
       sendReset()
+    }
+  }
+
+  async function stopStreaming() {
+    console.log("stopStreaming")
+
+    overlayWindow?.close()
+    toolbarWindow?.close()
+    clipboardWindow?.close()
+
+    streamState = 'stopped'
+  }
+
+  function checkWindow() {
+    updateWindowBorders(sourceManager.getOuterDimensions())
+
+    if (sourceManager.isMinimized()) {
+      console.log('window is minimized')
+      pauseStreaming(true)
+    }
+    else if (sourceManager.checkIfRectangleUpdated()) {
+      console.log('window was resized')
+      overlayWindow?.setBounds(sourceManager.getOverlayRectangle())
+    }
+    else if (sourceManager.isVisible()) {
+      resumeStreamingIfPaused(true)
+    }
+    else if (streamState !== 'hidden') {
+      console.log('window is not visible')
+      pauseStreaming(true)
     }
   }
 
@@ -300,21 +303,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     }
 
     resetTimeout = setTimeout(() => sendReset(true), 2000)
-  }
-
-  function deactivate() {
-    active = false
-
-    overlayWindow?.close()
-    toolbarWindow?.close()
-    clipboardWindow?.close()
-  }
-
-  async function activate(manager: SourceManager) {
-    sourceManager = manager
-    active = true
-    await createOverlayWindow()
-    await createToolbarWindow()
   }
 
   function updateWindowBorders(newBorders: Dimensions) {
@@ -371,6 +359,10 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       },
     })
 
+    overlayWindow.on('closed', () => {
+      overlayWindow = undefined
+    })
+
     overlayWindow.removeMenu()
     overlayWindow.setIgnoreMouseEvents(true)
     //overlayWindow.webContents.openDevTools()
@@ -392,35 +384,11 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     })
   }
 
-  function hideOverlayWindow() {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      try {
-        overlayWindow.hide() // First hide the window
-        setTimeout(() => { // Add delay before closing
-          if (overlayWindow && !overlayWindow.isDestroyed()) {
-            overlayWindow.close()
-            overlayWindow = undefined
-          }
-        }, 100)
-      } catch (error) {
-        console.warn('Error closing overlay window:', error)
-        overlayWindow = undefined // Reset reference if error occurs
-      }
-    }
-  }
-
-  function hideOverlays() {
-    if (overlayWindow) {
-      overlayWindow.close()
-      overlayWindow = undefined
-    }
-  }
-
   async function sendToOverlayWindow(action: string, data: RemoteMouseData) {
     if (!overlayWindow)
       await createOverlayWindow()
 
-    if (!data.userId || !active)
+    if (!data.userId || streamState !== 'active')
       return
   
     overlayWindow!.webContents.send(action, data)
@@ -536,6 +504,17 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     })
   }
 
+  function getDefaultToolbarBounds() {
+    const width = 600
+    const height = 60
+
+    const display = sourceManager.getCurrentScreen()
+    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width))
+    const y = display.bounds.y
+
+    return { x, y, width, height }
+  }
+
   function getToolbarBounds() {
     if (!toolbarWindow)
       return undefined
@@ -593,11 +572,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       size = window?.getSize()
       window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
     }
-  }
-
-  function hideRemoteControl() {
-    hideOverlays()
-    active = false
   }
 
   function updateUsers(newUsers: UserData[]) {
@@ -738,7 +712,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   function textToClipboard(data: RemoteTextData) {
-    if (!active || !toolsEnabled.remoteControl) {
+    if (streamState !== 'active' || !toolsEnabled.remoteControl) {
       dataToClipboard({ content: `data:text/plain;base64,${btoa(data.text)}` })
     }
     else {
@@ -928,21 +902,15 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   return {
     start,
     stop,
+    useSource,
     pauseStreaming,
     resumeStreamingIfPaused,
     sendReset,
 
-    activate,
-    deactivate,
-    createOverlayWindow,
-    hideOverlayWindow,
     toggleClipboard,
     toggleRemoteControl,
     togglePointer,
-    getToolbarBounds,
-    hideRemoteControl,
     updateUsers,
-    updateWindowBorders,
     onRemote,
     resizeWindow,
     setToolbarSize,
