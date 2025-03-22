@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { parseCode } from '../../util'
-import { setStoredItem } from '../util'
+import { getStoredItem, setStoredItem } from '../util'
 import { callApi } from '@renderer/api'
 
 export enum Action {
@@ -19,15 +19,29 @@ export function useParamsData() {
   const viewEmail = ref<string | undefined>()
 
   const inviteCode = window.location.pathname.replaceAll('/', '')
-  if (inviteCode !== '/') {
-    callApi<{ data: string }>({
-      action: 'getTempData',
-      code: inviteCode,
-    }).then((data) => {
-      action.value = Action.View
-      viewEmail.value = data.data
-    }, (error) => {
-      console.error('Error using invite code', error)
+  if (inviteCode) {
+    getStoredItem('viewCodeCache').then(async (cache) => {
+      if (!cache)
+        cache = {}
+      else if (cache[inviteCode]) {
+        action.value = Action.View
+        viewEmail.value = cache[inviteCode]
+        return
+      }
+
+      try {
+        const data = await callApi<{ data: string }>({
+          action: 'getTempData',
+          code: inviteCode,
+        })
+        cache[inviteCode] = data.data
+        setStoredItem('viewCodeCache', cache)
+
+        action.value = Action.View
+        viewEmail.value = data.data
+      } catch (error) {
+        console.error('Error using invite code', error)
+      }
     })
   } else {
     const code = localStorage.getItem('code')

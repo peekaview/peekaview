@@ -4,7 +4,7 @@ import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./us
 
 import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform, getStoredItem, incrementRecentContacts, setStoredItem } from '../util'
+import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
 import { stringToColor } from '../../util'
 
@@ -38,29 +38,16 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = ref<string>()
-  const viewCodeCache = ref<Record<string, string>>({})
   watch(() => unref(data.email), async (email) => {
     viewCode.value = await emailToViewCode(email)
   }, { immediate: true })
 
-  getStoredItem('viewCodeCache').then(cache => {
-    viewCodeCache.value = cache
-    
-    watch(viewCodeCache, (cache) => {
-      setStoredItem('viewCodeCache', cache)
-    })
-  })
-
   async function emailToViewCode(email: string) {
-    if (viewCodeCache[email])
-      return viewCodeCache[email]
-  
     try {
       const data = await callApi<{ code: string }>({
         action: 'saveTempData',
         data: email,
       })
-      viewCodeCache[email] = data.code
       return data.code
     } catch (error) {
       console.error('Error generating view code:', error)

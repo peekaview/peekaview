@@ -134,18 +134,18 @@ export function getStoredItem<K extends keyof StorageSchema>(key: K, defaultValu
   if (window.electronAPI)
     return window.electronAPI.getStoredItem(key, defaultValue)
 
+  let value: StorageSchema[K] | undefined = defaultValue
   const item = localStorage.getItem(key)
-  if (!item)
-    return Promise.resolve(defaultValue)
-
-  try {
-    return Promise.resolve(JSON.parse<StorageSchema[K]>(item))
-  }
-  catch (error) {
-    console.warn('Store values are not JSON-formatted! Store will be cleared.')
-    localStorage.clear()
-    return Promise.resolve(defaultValue)
-  }
+  if (item)
+    try {
+      value = JSON.parse<StorageSchema[K]>(item)
+    }
+    catch (error) {
+      console.warn('Store values are not JSON-formatted! Store will be cleared.')
+      localStorage.clear()
+    }
+ 
+  return Promise.resolve(value)
 }
 
 export function setStoredItem<K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) {

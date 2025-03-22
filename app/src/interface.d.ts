@@ -54,7 +54,7 @@ declare global {
 
 export interface IElectronAPI {
   log: (...messages: any[]) => Promise<void>,
-  getStoredItem: <K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) => Promise<StorageSchema[K]>,
+  getStoredItem: <K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) => Promise<StorageSchema[K] | undefined>,
   setStoredItem: <K extends keyof StorageSchema>(key: K, value: StorageSchema[K]) => Promise<void>,
   removeStoredItem: <K extends keyof StorageSchema>(key: K) => Promise<void>,
   clearStore: () => Promise<void>,
