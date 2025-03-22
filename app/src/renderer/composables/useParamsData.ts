@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { parseCode } from '../../util'
 import { setStoredItem } from '../util'
 import { callApi } from '@renderer/api'
