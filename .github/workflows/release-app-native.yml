@@ -166,9 +166,16 @@ jobs:
           run: if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml }; pnpm install; pnpm install --global clean-modules; pnpm clean-modules -y             
 
         - name: Apply patch to windowsSignAzureManager.js
+          working-directory: ./app
           run: |
-            $filePath = "app/node_modules/app-builder-lib/out/codeSign/windowsSignAzureManager.js"
-            (Get-Content $filePath) -replace 'Files: `"\$\{options\.path\}`"', 'Files: options.path' | Set-Content $filePath
+            $filePath = "node_modules/app-builder-lib/out/codeSign/windowsSignAzureManager.js"
+            if (Test-Path $filePath) {
+              (Get-Content $filePath) -replace 'Files: `"\$\{options\.path\}`"', 'Files: options.path' | Set-Content $filePath
+              Write-Host "Patch applied successfully"
+            } else {
+              Write-Host "Warning: File not found at $filePath"
+              dir "node_modules/app-builder-lib/out/codeSign/" -ErrorAction SilentlyContinue
+            }
             
         - name: Setup Environment
           working-directory: ./app
