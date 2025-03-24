@@ -244,8 +244,9 @@ function doesAnyoneWantToSeeMyScreen() {
         $requestData = explode(',', file_get_contents($requestFile));
         
         $requestTime = intval($requestData[1]);
-        $accessToken = $requestData[3] ?? '';
-        if ($requestData[2] === 'request_open' && $requestTime >= $thirtyMinutesAgo) {
+        $status = $requestData[2] ?? '';
+        $accessToken = $requestData[4] ?? '';
+        if ($status === 'request_open' && $requestTime >= $thirtyMinutesAgo) {
             $requestId = basename($requestFile);
             $requestId = substr($requestId, strpos($requestId, '.') + 1, -4);
             $requests[] = [
@@ -324,7 +325,7 @@ function showMeYourScreen() {
         }
         
         // Create new request
-        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', $accessToken]));
+        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', '', $accessToken]));
     }
     
     // Check request status

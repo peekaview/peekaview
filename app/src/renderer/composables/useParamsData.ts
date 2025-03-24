@@ -34,11 +34,17 @@ export function useParamsData() {
           })
 
           cache[inviteCode] = JSON.parse<ViewCodeData>(data.data)
-          setStoredItem('viewCodeCache', cache)
         } else if (typeof cache[inviteCode] === 'string') {
-          cache[inviteCode] = { viewEmail: cache[inviteCode] as string, accessToken: '' }
-          setStoredItem('viewCodeCache', cache)
+          cache[inviteCode] = { viewEmail: cache[inviteCode], accessToken: '' }
         }
+
+        for (const code in cache) {
+          if (code === inviteCode || cache[code].viewEmail !== cache[inviteCode].viewEmail)
+            continue
+
+          delete cache[code]
+        }
+        setStoredItem('viewCodeCache', cache)
 
         action.value = Action.View
         viewEmail.value = cache[inviteCode].viewEmail

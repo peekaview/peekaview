@@ -309,6 +309,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     const keys = Object.keys(requestQueue)
     if (keys.length > 0) {
       const id = keys[0]
+      window.electronAPI?.log('processRequests', JSON.stringify(requestQueue[id]))
       if (!options?.onRequest || requestQueue[id].accessToken === accessToken.value) {
         await acceptRequest(id)
       } else {

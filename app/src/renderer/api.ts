@@ -7,6 +7,7 @@ export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"
   name: string
   requestId: string
+  accessToken?: string | undefined
   init: '1' | '0'
 } & EitherEmailOrCode
 
