@@ -179,4 +179,32 @@ jobs:
             AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
             AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: pnpm run build:win
+          run: |
+            # Update electron-builder.yml to use Azure Signing
+            echo '
+            win:
+              sign: false
+              signingHashAlgorithms:
+                - sha256
+              trustedSign:
+                clientId: ${{ secrets.AZURE_CLIENT_ID }}
+                clientSecret: ${{ secrets.AZURE_CLIENT_SECRET }}
+                tenantId: ${{ secrets.AZURE_TENANT_ID }}
+                endpoint: https://neu.codesigning.azure.net/
+                profileName: CodeSigningCertificate
+                accountName: limtec
+                rfc3161TimeStampServer: http://timestamp.acs.microsoft.com
+            ' > electron-builder-signing.yml
+            
+            # Merge with existing electron-builder config (if exists)
+            if (Test-Path electron-builder.yml) {
+              $existingConfig = Get-Content -Raw electron-builder.yml
+              $signingConfig = Get-Content -Raw electron-builder-signing.yml
+              $mergedConfig = $existingConfig + "`n" + $signingConfig
+              $mergedConfig | Set-Content electron-builder.yml
+            } else {
+              Move-Item electron-builder-signing.yml electron-builder.yml
+            }
+            
+            # Run the build
+            pnpm run build:win
