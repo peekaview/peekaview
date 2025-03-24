@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, useTemplateRef, watch, toRaw } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { Tooltip } from 'floating-vue'
+
 import Toolbar from '../components/Toolbar.vue'
 
 import ClipboardTextOutlineSvg from '../../assets/icons/clipboard-text-outline.svg'
@@ -10,9 +13,10 @@ import MonitorSvg from '../../assets/icons/monitor.svg'
 import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
 import { getPlatform } from '../util'
+import { UserData } from '../../interface'
 
-withDefaults(defineProps<{
-  viewerCount?: number
+const props = withDefaults(defineProps<{
+  viewers?: UserData[]
   draggable?: boolean
   clipboardEnabled?: boolean
 }>(), {
@@ -30,6 +34,44 @@ const emit = defineEmits<{
   (e: 'share-different-screen'): void
   (e: 'show-invite-link'): void
 }>()
+
+const { t } = useI18n()
+
+const viewersLog = ref<{ joined: boolean, name: string, timeout: number }[]>([])
+const viewersTooltip = computed(() => 
+  viewersLog.value
+    .map(({ joined, name }) => t(`toolbar.viewer${joined ? 'Joined' : 'Left'}`, { name }))
+    .join('<br>')
+)
+watch(() => props.viewers, (viewers) => {
+  console.log("viewers", toRaw(viewers))
+}, { immediate: true })
+watch(viewersLog, (viewersLog) => {
+  console.log("viewersLog", toRaw(viewersLog))
+}, { immediate: true })
+
+watch(() => props.viewers, (viewers, oldViewers) => {
+  for (const viewer of viewers || []) {
+    if (!oldViewers || !oldViewers.find(v => v.id === viewer.id)) {
+      viewersLog.value.push({
+        joined: true,
+        name: (viewer.name || viewer.email)!,
+        timeout: Date.now() + 5000,
+      })
+    }
+  }
+
+  for (const viewer of oldViewers || []) {
+    if (!viewers || !viewers.find(v => v.id === viewer.id)) {
+      viewersLog.value.push({
+        joined: false,
+        name: (viewer.name || viewer.email)!,
+        timeout: Date.now() + 5000,
+      })
+    }
+  }
+})
+//setInterval(() => viewersLog.value = viewersLog.value.filter(log => log.timeout > Date.now()), 1000)
 
 const macMinimumWidth = 160
 
@@ -54,7 +96,6 @@ const remoteControlEnabled = computed({
     _remoteControlEnabled.value = enabled
   },
 })
-
 
 const isPaused = ref(false)
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
@@ -121,9 +162,17 @@ defineExpose({
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
-    <div v-if="viewerCount" class="viewer-count" :class="{ 'viewer-count-none': viewerCount === 0 }">
-      <AccountGroupSvg />
-      <span>{{ viewerCount }}</span>
+    <div v-if="viewers" class="viewer-count" :class="{ 'viewer-count-none': viewers.length === 0 }">
+      <Tooltip
+        :triggers="[]"
+        :shown="Object.keys(viewersLog).length > 0"
+      >
+        <AccountGroupSvg />
+        <span>{{ viewers.length }}</span>
+        <template #popper>
+          <span v-html="viewersTooltip" />
+        </template>
+      </Tooltip>
     </div>
     <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardEnabled }" :title="$t('toolbar.openClipboard')" @click="clipboardEnabled && $emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />

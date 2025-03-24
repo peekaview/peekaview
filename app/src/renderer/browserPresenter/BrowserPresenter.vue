@@ -336,7 +336,7 @@ function onResumeSharing() {
     <PresenterToolbar
       ref="toolbar"
       :clipboard-enabled="!!clipboardFile"
-      :viewer-count="presenter.viewers.length"
+      :viewers="presenter.viewers"
       @toggle-pointer="toolsEnabled.pointer = $event"
       @toggle-clipboard="showClipboard = !showClipboard"
       @stop-sharing="onStopSharing()"

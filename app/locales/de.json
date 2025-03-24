@@ -246,6 +246,8 @@
     "clipboard": "Zwischenablage",
     "openClipboard": "Zwischenablage öffnen",
     "currentViewers": "Teilnehmer",
+    "viewerJoined": "{name} ist beigetreten.",
+    "viewerLeft": "{name} hat den Raum verlassen.",
     "shareDifferentScreen": "Anderen Bildschirm teilen",
     "inviteLink": "Einladungslink",
     "showInviteLink": "Einladungslink anzeigen",

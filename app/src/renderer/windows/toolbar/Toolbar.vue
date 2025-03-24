@@ -55,7 +55,7 @@ function showInviteLink() {
 <template>
   <PresenterToolbar
     ref="toolbar"
-    :viewer-count="users.length"
+    :viewers="users"
     :clipboard-enabled="clipboardEnabled"
     draggable
     @toggle-remote-control="toggleRemoteControl"

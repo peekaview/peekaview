@@ -246,6 +246,8 @@
     "clipboard": "Clipboard",
     "openClipboard": "Open clipboard",
     "currentViewers": "Viewers",
+    "viewerJoined": "{name} joined.",
+    "viewerLeft": "{name} left.",
     "shareDifferentScreen": "Share different screen",
     "inviteLink": "Invite link",
     "showInviteLink": "Show invite link",

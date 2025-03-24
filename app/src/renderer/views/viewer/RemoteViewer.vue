@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from "vue"
 import { useI18n } from 'vue-i18n'
+import { Tooltip } from 'floating-vue'
 
 import { notify, isTouchEnabled, getPlatform, getStoredItem, incrementRecentContacts } from '../../util'
 import { ScreenView, useScreenView, ScreenShareData } from '../../composables/useSimplePeerScreenShare'
