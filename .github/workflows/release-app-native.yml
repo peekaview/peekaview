@@ -163,7 +163,7 @@ jobs:
 
         - name: Install Dependencies
           working-directory: ./app
-          run: if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml }; pnpm install --no-optional
+          run: if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml }; pnpm install
             
         - name: Setup Environment
           working-directory: ./app
