@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { parseCode } from '../../util'
 import { getStoredItem, setStoredItem } from '../util'
 import { callApi } from '@renderer/api'
+import { ViewCodeData } from 'src/interface'
 
 export enum Action {
   Login = 'login',
@@ -17,28 +18,31 @@ export function useParamsData() {
 
   const target = ref<string | undefined>()
   const viewEmail = ref<string | undefined>()
+  const accessToken = ref<string | undefined>()
 
   const inviteCode = window.location.pathname.replaceAll('/', '')
   if (inviteCode) {
     getStoredItem('viewCodeCache').then(async (cache) => {
-      if (!cache)
-        cache = {}
-      else if (cache[inviteCode]) {
-        action.value = Action.View
-        viewEmail.value = cache[inviteCode]
-        return
-      }
-
       try {
-        const data = await callApi<{ data: string }>({
-          action: 'getTempData',
-          code: inviteCode,
-        })
-        cache[inviteCode] = data.data
-        setStoredItem('viewCodeCache', cache)
+        if (!cache)
+          cache = {}
+        
+        if (!cache[inviteCode]) {
+          const data = await callApi<{ data: string }>({
+            action: 'getTempData',
+            code: inviteCode,
+          })
+
+          cache[inviteCode] = JSON.parse<ViewCodeData>(data.data)
+          setStoredItem('viewCodeCache', cache)
+        } else if (typeof cache[inviteCode] === 'string') {
+          cache[inviteCode] = { viewEmail: cache[inviteCode] as string, accessToken: '' }
+          setStoredItem('viewCodeCache', cache)
+        }
 
         action.value = Action.View
-        viewEmail.value = data.data
+        viewEmail.value = cache[inviteCode].viewEmail
+        accessToken.value = cache[inviteCode].accessToken
       } catch (error) {
         console.error('Error using invite code', error)
       }
@@ -95,5 +99,6 @@ export function useParamsData() {
     email: computed(() => email.value),
     target: computed(() => target.value),
     viewEmail: computed(() => viewEmail.value),
+    accessToken: computed(() => accessToken.value),
   }
 }

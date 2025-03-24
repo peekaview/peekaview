@@ -31,9 +31,12 @@ type AcceptedRequestResponse = {
 
 type Response = UnacceptedRequestResponse | AcceptedRequestResponse
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   contact: ViewerData
-}>()
+  accessToken?: string | undefined
+}>(), {
+  accessToken: undefined,
+})
 
 const emit = defineEmits<{
   (e: 'accepted', data: ScreenShareData): void
@@ -75,7 +78,8 @@ async function requestScreen(uuid: string, initial = false) {
       action: 'showMeYourScreen' as const,
       init: initial ? '1' as const : '0' as const,
       name: props.contact.name,
-      request_id: uuid.replace(/-/g, '').substring(0, 8), // uuid,
+      accessToken: props.accessToken,
+      requestId: uuid.replace(/-/g, '').substring(0, 8), // uuid,
     }
 
     const data = await callApi<Response>(props.contact.email ? {

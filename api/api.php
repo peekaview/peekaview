@@ -244,13 +244,15 @@ function doesAnyoneWantToSeeMyScreen() {
         $requestData = explode(',', file_get_contents($requestFile));
         
         $requestTime = intval($requestData[1]);
+        $accessToken = $requestData[3] ?? '';
         if ($requestData[2] === 'request_open' && $requestTime >= $thirtyMinutesAgo) {
             $requestId = basename($requestFile);
             $requestId = substr($requestId, strpos($requestId, '.') + 1, -4);
             $requests[] = [
                 'name' => $requestData[0],
-                'request_id' => $requestId,
-                'timestamp' => $requestTime
+                'requestId' => $requestId,
+                'timestamp' => $requestTime,
+                'accessToken' => $accessToken
             ];
         } else if ($requestTime < $thirtyMinutesAgo && file_exists($requestFile)) {
             unlink($requestFile);
@@ -286,7 +288,8 @@ function showMeYourScreen() {
         $email = validateEmail($_GET['email']);
     }
     $name = validateName($_GET['name'] ?? '');
-    $requestId = validateRequestId($_GET['request_id'] ?? '');
+    $requestId = validateRequestId($_GET['requestId'] ?? '');
+    $accessToken = $_GET['access_token'] ?? '';
     $lang = validateLang($_GET['lang'] ?? '');
     $init = isset($_GET['init']) && $_GET['init'] === '1';
     
@@ -321,7 +324,7 @@ function showMeYourScreen() {
         }
         
         // Create new request
-        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open']));
+        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', $accessToken]));
     }
     
     // Check request status
@@ -391,7 +394,7 @@ function showMeYourScreen() {
     
     return [
         'status' => 'request_open',
-        'request_id' => $requestId,
+        'requestId' => $requestId,
         'user_status' => $userStatus,
         'last_seen' => $lastSeen,
     ];
@@ -424,7 +427,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     authorizeUser($userFile);
     
     $email = validateEmail($_GET['email']);
-    $requestId = validateRequestId($_GET['request_id'] ?? '');
+    $requestId = validateRequestId($_GET['requestId'] ?? '');
     $requestFile = getRequestFilename($email, $requestId);
     if (!file_exists($requestFile)) {
         throw new Exception('Request not found');

@@ -92,10 +92,10 @@ async function present(email: string, token: string) {
       contact: contactToNotify,
       getMessage: (name: string) => t('notifications.shareScreen', { name }),
     },
-    onRequest: async (_id, name) => {
+    onRequest: async (request) => {
       const result = await prompt({
         type: 'info',
-        text: t('share.requestAccess', { name }),
+        text: t('share.requestAccess', { name: request.name }),
         confirmButtonText: t('general.accept'),
         cancelButtonText: t('general.deny'),
         sound: 'ringtone',

@@ -6,7 +6,7 @@ import { notify } from "./util"
 export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"
   name: string
-  request_id: string
+  requestId: string
   init: '1' | '0'
 } & EitherEmailOrCode
 
@@ -18,7 +18,7 @@ export type ApiRequestParams = ShowMeYourScreenParams | {
   action: "youAreAllowedToSeeMyScreen" | "youAreNotAllowedToSeeMyScreen"
   email: string
   token: string
-  request_id: string
+  requestId: string
 } | {
   action: "registerMyEmail"
   email: string

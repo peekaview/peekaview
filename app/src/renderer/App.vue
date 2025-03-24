@@ -25,7 +25,7 @@ import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 const { t } = useI18n()
 
 const showInfo = ref<"imprint" | "gdpr">()
-const { action, token, email, target, viewEmail } = useParamsData()
+const { action, token, email, target, viewEmail, accessToken } = useParamsData()
 
 const dropdownRef = useTemplateRef('dropdown')
 const tagRefs = ref<Record<string, Element | ComponentPublicInstance>>({})
@@ -190,6 +190,7 @@ function shareRecentContact(id?: string) {
     <Viewer
       v-if="activeViewerData"
       :contact="activeViewerData"
+      :access-token="accessToken"
       @stop="activeViewerData = undefined"
     />
     <div v-else class="content-wrapper">

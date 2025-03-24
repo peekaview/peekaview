@@ -146,6 +146,11 @@ export interface DialogOptions {
   data?: any
 }
 
+export type ViewCodeData = {
+  viewEmail: string
+  accessToken: string
+}
+
 export type Platform = 'mac' | 'win' | 'linux' | 'android' | 'ios' | 'other'
 
 export type AtLeastNameOrEmail = {

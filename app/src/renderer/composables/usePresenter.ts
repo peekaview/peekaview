@@ -6,7 +6,7 @@ import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
-import { stringToColor } from '../../util'
+import { generateToken, stringToColor } from '../../util'
 
 import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
@@ -18,12 +18,18 @@ type PresenterData = {
   toolsEnabled: MaybeRef<Record<ViewerTool, boolean>>
 }
 
+type RequestData = {
+  requestId: string
+  accessToken?: string | undefined
+  name: string
+}
+
 type PresenterOptions = {
   notify?: {
     contact: MaybeRef<ContactData | undefined>
     getMessage: (name: string) => string
   }
-  onRequest?: (id: string, name: string) => Promise<boolean>
+  onRequest?: (request: RequestData) => Promise<boolean>
   onStream?: (stream: MediaStream, shareAudio?: boolean) => void
   onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
@@ -38,15 +44,16 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
   const viewCode = ref<string>()
+  const accessToken = ref<string>(generateToken(8))
   watch(() => unref(data.email), async (email) => {
-    viewCode.value = await emailToViewCode(email)
+    viewCode.value = await dataToViewCode(email, accessToken.value)
   }, { immediate: true })
 
-  async function emailToViewCode(email: string) {
+  async function dataToViewCode(viewEmail: string, accessToken: string) {
     try {
       const data = await callApi<{ code: string }>({
         action: 'saveTempData',
-        data: email,
+        data: JSON.stringify({ viewEmail, accessToken }),
       })
       return data.code
     } catch (error) {
@@ -75,7 +82,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const streamState = ref<StreamState>('stopped')
   const stream = shallowRef<MediaStream | undefined>()
 
-  const requestQueue = reactive<Record<string, string>>({})
+  const requestQueue = reactive<Record<string, RequestData>>({})
 
   let checkRequestTimeout: number | undefined
   watch(streamState, (state) => {
@@ -287,12 +294,9 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     }
     
     try {
-      const requests = await callApi<{
-        request_id: string
-        name: string
-      }[]>(requestData)
+      const requests = await callApi<RequestData[]>(requestData)
       for (const request of requests)
-        requestQueue[request.request_id] = request.name
+        requestQueue[request.requestId] = request
     } catch (error) {
       console.error('Error checking requests:', error);
       handleApiError(error as Error, requestData)
@@ -305,10 +309,10 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     const keys = Object.keys(requestQueue)
     if (keys.length > 0) {
       const id = keys[0]
-      if (!options?.onRequest) {
+      if (!options?.onRequest || requestQueue[id].accessToken === accessToken.value) {
         await acceptRequest(id)
       } else {
-        const response = await options.onRequest(id, requestQueue[id])
+        const response = await options.onRequest(requestQueue[id])
         if (response)
           await acceptRequest(id)
         else
@@ -325,7 +329,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       action: 'youAreAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: id,
+      requestId: id,
     }
 
     try {
@@ -341,7 +345,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       action: 'youAreNotAllowedToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
-      request_id: id,
+      requestId: id,
     }
     try {
       await callApi(requestData)

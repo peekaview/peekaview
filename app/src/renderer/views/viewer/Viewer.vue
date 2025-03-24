@@ -10,6 +10,7 @@ import { removeStoredItem, setStoredItem } from '../../util'
 
 defineProps<{
   contact: ViewerData
+  accessToken?: string | undefined
 }>()
 
 const emit = defineEmits<{
@@ -55,6 +56,7 @@ function stop() {
         <div class="panel">
           <RequestAccess
             :contact="contact"
+            :access-token="accessToken"
             @accepted="screenShareData = $event"
             @denied="stop"
             @stop="stop"

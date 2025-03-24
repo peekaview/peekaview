@@ -75,10 +75,10 @@ async function start() {
       contact: contactToNotify,
       getMessage: (name: string) => t('notifications.viewSharedScreen', { name }),
     },
-    onRequest: async (_id, name) => {
+    onRequest: async (request) => {
       const result = await resizeAndPrompt({
         type: 'info',
-        text: t('share.requestAccess', { name }),
+        text: t('share.requestAccess', { name: request.name }),
         confirmButtonText: t('general.accept'),
         cancelButtonText: t('general.deny'),
         sound: 'ringtone',
