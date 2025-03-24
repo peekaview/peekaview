@@ -51,7 +51,7 @@ jobs:
           
       - name: Install dependencies
         working-directory: ./app
-        run: pnpm install
+        run: rm -f pnpm-lock.yaml && pnpm install
         
       - name: Build production
         working-directory: ./app
