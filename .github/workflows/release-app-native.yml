@@ -188,49 +188,10 @@ jobs:
         - name: Apply patch to windowsSignAzureManager.js
           working-directory: ./app
           run: |
-            $files = Get-ChildItem -Path "node_modules/.pnpm/**/app-builder-lib/out/codeSign/windowsSignAzureManager.js" -ErrorAction SilentlyContinue
-            if ($files) {
-              foreach ($file in $files) {
-                Write-Host "Patching file: $($file.FullName)"
-                
-                # Let's examine line by line to find exactly what we need to replace
-                $lines = Get-Content $file.FullName
-                $lineNumber = 0
-                $targetLineNumber = -1
-                foreach ($line in $lines) {
-                  $lineNumber++
-                  if ($line -match "Files:") {
-                    Write-Host "Found 'Files:' in line $lineNumber: $line"
-                    $targetLineNumber = $lineNumber
-                  }
-                }
-                
-                if ($targetLineNumber -gt 0) {
-                  # Create a new file with modified content
-                  $newLines = @()
-                  $lineNumber = 0
-                  foreach ($line in $lines) {
-                    $lineNumber++
-                    if ($lineNumber -eq $targetLineNumber) {
-                      # More general replacement that should work regardless of exact format
-                      $newLine = $line -replace 'Files:.*', 'Files: options.path,'
-                      $newLines += $newLine
-                      Write-Host "Original line: $line"
-                      Write-Host "Modified line: $newLine"
-                    } else {
-                      $newLines += $line
-                    }
-                  }
-                  
-                  # Save the modified content back to the file
-                  $newLines | Set-Content $file.FullName
-                  Write-Host "Patch applied successfully"
-                } else {
-                  Write-Host "Couldn't find the 'Files:' line in the file"
-                }
-              }
-            } else {
-              Write-Host "No files found matching the pattern"
+            $filePath = "node_modules/.pnpm/app-builder-lib@26.0.12_dmg-builder@26.0.12_electron-builder-squirrel-windows@26.0.12/node_modules/app-builder-lib/out/codeSign/windowsSignAzureManager.js"
+            if (Test-Path $filePath) {
+              (Get-Content $filePath) -replace 'Files \'"D:\\a\\peekaview\\peekaview\\app\\dist\\win-unpacked\\PeekaView.exe"\'', 'Files \'D:\\a\\peekaview\\peekaview\\app\\dist\\win-unpacked\\PeekaView.exe\'' | Set-Content $filePath
+              Write-Host "Patch applied successfully"
             }
             
         - name: Setup Environment
