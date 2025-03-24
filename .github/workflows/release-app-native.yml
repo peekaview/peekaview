@@ -188,22 +188,49 @@ jobs:
         - name: Apply patch to windowsSignAzureManager.js
           working-directory: ./app
           run: |
-            $filePath = "node_modules/.pnpm/app-builder-lib@26.0.12_dmg-builder@26.0.12_electron-builder-squirrel-windows@26.0.12/node_modules/app-builder-lib/out/codeSign/windowsSignAzureManager.js"
-            if (Test-Path $filePath) {
-              (Get-Content $filePath) -replace 'Files: `"\$\{options\.path\}`"', 'Files: options.path' | Set-Content $filePath
-              Write-Host "Patch applied successfully"
-            } else {
-              Write-Host "Warning: File not found at $filePath"
-              # Try with a more generic approach in case the version changes
-              $foundFiles = Get-ChildItem -Path "node_modules/.pnpm" -Recurse -Filter "windowsSignAzureManager.js" -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($foundFiles) {
-                $actualFilePath = $foundFiles.FullName
-                Write-Host "Found file at: $actualFilePath"
-                (Get-Content $actualFilePath) -replace 'Files: `"\$\{options\.path\}`"', 'Files: options.path' | Set-Content $actualFilePath
-                Write-Host "Patch applied successfully to found file"
-              } else {
-                Write-Host "Failed to find windowsSignAzureManager.js in any location"
+            $files = Get-ChildItem -Path "node_modules/.pnpm/**/app-builder-lib/out/codeSign/windowsSignAzureManager.js" -ErrorAction SilentlyContinue
+            if ($files) {
+              foreach ($file in $files) {
+                Write-Host "Patching file: $($file.FullName)"
+                
+                # Let's examine line by line to find exactly what we need to replace
+                $lines = Get-Content $file.FullName
+                $lineNumber = 0
+                $targetLineNumber = -1
+                foreach ($line in $lines) {
+                  $lineNumber++
+                  if ($line -match "Files:") {
+                    Write-Host "Found 'Files:' in line $lineNumber: $line"
+                    $targetLineNumber = $lineNumber
+                  }
+                }
+                
+                if ($targetLineNumber -gt 0) {
+                  # Create a new file with modified content
+                  $newLines = @()
+                  $lineNumber = 0
+                  foreach ($line in $lines) {
+                    $lineNumber++
+                    if ($lineNumber -eq $targetLineNumber) {
+                      # More general replacement that should work regardless of exact format
+                      $newLine = $line -replace 'Files:.*', 'Files: options.path,'
+                      $newLines += $newLine
+                      Write-Host "Original line: $line"
+                      Write-Host "Modified line: $newLine"
+                    } else {
+                      $newLines += $line
+                    }
+                  }
+                  
+                  # Save the modified content back to the file
+                  $newLines | Set-Content $file.FullName
+                  Write-Host "Patch applied successfully"
+                } else {
+                  Write-Host "Couldn't find the 'Files:' line in the file"
+                }
               }
+            } else {
+              Write-Host "No files found matching the pattern"
             }
             
         - name: Setup Environment
