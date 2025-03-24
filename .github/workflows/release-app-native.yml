@@ -165,6 +165,26 @@ jobs:
           working-directory: ./app
           run: if (Test-Path pnpm-lock.yaml) { Remove-Item pnpm-lock.yaml }; pnpm install; pnpm install --global clean-modules; pnpm clean-modules -y             
 
+        - name: Find windowsSignAzureManager.js
+          working-directory: ./app
+          run: |
+            Write-Host "Searching for windowsSignAzureManager.js..."
+            $foundFiles = Get-ChildItem -Path "node_modules" -Recurse -Filter "windowsSignAzureManager.js" -ErrorAction SilentlyContinue
+            if ($foundFiles) {
+              foreach ($file in $foundFiles) {
+                Write-Host "Found at: $($file.FullName)"
+              }
+            } else {
+              Write-Host "No windowsSignAzureManager.js file found"
+              Write-Host "Looking for app-builder-lib directory..."
+              Get-ChildItem -Path "node_modules" -Directory -Filter "app-builder-lib" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host "Found app-builder-lib at: $($_.FullName)"
+                Get-ChildItem -Path $_.FullName -Recurse -Directory | Select-Object -First 10 | ForEach-Object {
+                  Write-Host "  Subdirectory: $($_.FullName)"
+                }
+              }
+            }
+
         - name: Apply patch to windowsSignAzureManager.js
           working-directory: ./app
           run: |
