@@ -529,48 +529,42 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     toolbarSize = { width, height }
   }
 
+  // the window needs to be 20px wider to avoid cutting off the borders or shadows
+  const shadowPadding = 20
+  // on mac the window needs to be at least 160px wide for it to stay transparent
+  const macMinimumWidth = 160
+  const macMinimumHeight = 60
   function resizeWindow(windowName: string, dimensions: ElectronWindowDimensions) {
-    let window: BrowserWindow | undefined
     switch (windowName) {
-      case 'clipboard':
-        window = clipboardWindow
-        break
       case 'toolbar':
-        window = toolbarWindow
+        if (!toolbarWindow || !dimensions.size.width)
+          return
+
+        const currentBounds = toolbarWindow.getBounds()
+        let width = dimensions.size.width + shadowPadding
+        let height = dimensions.size.height ?? currentBounds.height
+        if (isMac) {
+          width = Math.max(width, macMinimumWidth)
+          height = Math.max(height, macMinimumHeight)
+          toolbarWindow.setMinimumSize(macMinimumWidth, macMinimumHeight)
+        }
+
+        const newX = currentBounds.x + currentBounds.width - width
+        toolbarWindow.setPosition(newX, currentBounds.y)
+        toolbarWindow.setSize(width, height)
+        return
+      case 'clipboard':
+        if (!clipboardWindow)
+          return
+
+        let size = clipboardWindow.getMinimumSize()
+        clipboardWindow.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])  
+  
+        size = clipboardWindow.getSize()
+        clipboardWindow.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
         break
       default:
         return
-    }
-
-    if (!window)
-      return
-
-    let size = window?.getMinimumSize()
-    window?.setMinimumSize(dimensions.minimumSize?.width ?? size[0], dimensions.minimumSize?.height ?? size[1])  
-
-    // For toolbar window, keep the right border in the same place
-    if (windowName === 'toolbar' && dimensions.size.width) {
-      window?.setMinimumSize(160, 60)
-
-      // on the window needs to be 20px wider to avoid cutting off the borders or shadows
-      // on mac the window needs to be at least 160px wide
-      const currentBounds = window.getBounds()
-      let newWidth = dimensions.size.width + 20
-      if (newWidth < 160) {
-        newWidth = 160
-      }
-      let newHeight = dimensions.size.height ?? currentBounds.height
-      if (newHeight < 60) {
-        newHeight = 60
-      }
-      const newX = currentBounds.x + currentBounds.width - newWidth
-      
-      window.setPosition(newX, currentBounds.y)
-      
-      window.setSize(newWidth, newHeight)
-    } else {
-      size = window?.getSize()
-      window?.setSize(dimensions.size.width ?? size[0], dimensions.size.height ?? size[1])
     }
   }
 

@@ -26,7 +26,7 @@ window.electronAPI?.onNotifyContact((contact) => {
   contactToNotify.value = contact
 })
 
-onMounted(() => {
+onMounted(async () => {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('data')
   if (!code)
@@ -36,6 +36,9 @@ onMounted(() => {
   const viewEmail = params.get('viewEmail')
   if (viewEmail)
     formViewerData.value.emailOrCode = viewEmail
+
+  const name = await getStoredItem('name')
+  formViewerData.value.name = name ?? email!
 
   watch(contactToNotify, (contact) => {
     if (!contact)
@@ -80,6 +83,7 @@ onMounted(() => {
           <div class="panel">
             <ViewerForm
               v-model="formViewerData"
+              auto-submit
               @submit="activeViewerData = $event"
             />
           </div>

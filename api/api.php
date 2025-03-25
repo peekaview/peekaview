@@ -16,7 +16,8 @@ header('Content-Type: application/json');
 // Add a custom error handler
 function handleError($errno, $errstr, $errfile, $errline) {
     http_response_code(500);
-    die(json_encode(['error' => $errstr]));
+    //TODO: return something else in production
+    die(json_encode(['error' => $errstr, 'file' => $errfile, 'line' => $errline]));
 }
 set_error_handler('handleError');
 

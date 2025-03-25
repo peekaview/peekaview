@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, useTemplateRef } from 'vue'
+
 import PresenterToolbar from '../../components/PresenterToolbar.vue'
+
 import { UserData } from '../../../interface'
 
 const toolbar = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
@@ -50,6 +52,12 @@ function toggleClipboard() {
 function showInviteLink() {
   window.electronAPI!.showSharingActive()
 }
+
+function resizeWindow(rect: DOMRect) {
+  window.electronAPI?.resizeWindow('toolbar', {
+    size: { width: Math.round(rect.width) },
+  })
+}
 </script>
 
 <template>
@@ -66,6 +74,7 @@ function showInviteLink() {
     @share-different-screen="shareDifferentScreen"
     @toggle-clipboard="toggleClipboard"
     @show-invite-link="showInviteLink"
+    @resize="resizeWindow"
   />
 </template>
 

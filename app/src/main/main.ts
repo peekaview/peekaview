@@ -323,7 +323,7 @@ declare const CSP_POLICY: string
         for (const id in recentContacts) {
           menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
             { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
-            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(undefined, recentContacts[id]) },
+            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', enabled: !!recentContacts[id].email, click: () => createViewerWindow(undefined, recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
@@ -577,6 +577,7 @@ declare const CSP_POLICY: string
     log.info('Stopping sharing, clearing currentViewCode')
     currentViewCode = undefined
     remotePresenter?.stop()
+    remotePresenter = undefined
     customDialog.closeTrayDialogs()
   }
 

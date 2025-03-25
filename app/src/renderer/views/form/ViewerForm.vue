@@ -8,10 +8,14 @@ import { object, string } from 'yup'
 import { ViewerData, ViewerDataSchema } from '../../types'
 import { validateEmail, validateCode } from '../../../util'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: ViewerDataSchema
   isFixed?: boolean
-}>()
+  autoSubmit?: boolean
+}>(), {
+  isFixed: false,
+  autoSubmit: false
+})
 
 const emit = defineEmits<{
   (e: 'update:modelValue', data: ViewerDataSchema): void
@@ -19,6 +23,11 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+watch(() => props.modelValue, (data) => {
+  if (props.autoSubmit && data.name && data.emailOrCode)
+    submit()
+}, { immediate: true, deep: true })
 
 const { handleSubmit, errors } = useForm<ViewerDataSchema>({
   initialValues: {

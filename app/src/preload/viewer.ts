@@ -1,9 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { base } from './base'
-import { ContactData } from '../interface'
+import { DialogOptions, ContactData } from '../interface'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   ...base,
+  dialog: (options: DialogOptions) => ipcRenderer.invoke('dialog', options),
   onNotifyContact: (callback: (contact: ContactData) => void) => ipcRenderer.on('on-notify-contact', (_event, contact: ContactData) => callback(contact)),
 });

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, useTemplateRef, watch, toRaw } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import { Tooltip } from 'floating-vue'
 
 import Toolbar from '../components/Toolbar.vue'
@@ -12,7 +11,6 @@ import AccountPlusOutlineSvg from '../../assets/icons/account-plus-outline.svg'
 import MonitorSvg from '../../assets/icons/monitor.svg'
 import PauseSvg from '../../assets/icons/pause.svg'
 import PlaySvg from '../../assets/icons/play.svg'
-import { getPlatform } from '../util'
 import { UserData } from '../../interface'
 
 const props = withDefaults(defineProps<{
@@ -33,27 +31,17 @@ const emit = defineEmits<{
   (e: 'stop-sharing'): void
   (e: 'share-different-screen'): void
   (e: 'show-invite-link'): void
+  (e: 'resize', rect: DOMRect): void
 }>()
 
-const { t } = useI18n()
+const viewersLog = ref<{ id: number, joined: boolean, name: string, timeout: number }[]>([])
 
-const viewersLog = ref<{ joined: boolean, name: string, timeout: number }[]>([])
-const viewersTooltip = computed(() => 
-  viewersLog.value
-    .map(({ joined, name }) => t(`toolbar.viewer${joined ? 'Joined' : 'Left'}`, { name }))
-    .join('<br>')
-)
-watch(() => props.viewers, (viewers) => {
-  console.log("viewers", toRaw(viewers))
-}, { immediate: true })
-watch(viewersLog, (viewersLog) => {
-  console.log("viewersLog", toRaw(viewersLog))
-}, { immediate: true })
-
+let logId = 0
 watch(() => props.viewers, (viewers, oldViewers) => {
   for (const viewer of viewers || []) {
     if (!oldViewers || !oldViewers.find(v => v.id === viewer.id)) {
       viewersLog.value.push({
+        id: logId++,
         joined: true,
         name: (viewer.name || viewer.email)!,
         timeout: Date.now() + 5000,
@@ -64,6 +52,7 @@ watch(() => props.viewers, (viewers, oldViewers) => {
   for (const viewer of oldViewers || []) {
     if (!viewers || !viewers.find(v => v.id === viewer.id)) {
       viewersLog.value.push({
+        id: logId++,
         joined: false,
         name: (viewer.name || viewer.email)!,
         timeout: Date.now() + 5000,
@@ -71,11 +60,8 @@ watch(() => props.viewers, (viewers, oldViewers) => {
     }
   }
 })
-//setInterval(() => viewersLog.value = viewersLog.value.filter(log => log.timeout > Date.now()), 1000)
+setInterval(() => viewersLog.value = viewersLog.value.filter(log => log.timeout > Date.now()), 1000)
 
-const macMinimumWidth = 160
-
-const isMac = getPlatform() === 'mac'
 const inApp = !!window.electronAPI
 const toolbarRef = useTemplateRef('toolbar')
 
@@ -100,34 +86,18 @@ const remoteControlEnabled = computed({
 const isPaused = ref(false)
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
 
-setInterval(() => {
-  const rect = toolbarRef.value?.$el.getBoundingClientRect()
-  if (!rect)
-    return
-  
-  window.electronAPI?.setToolbarSize(Math.round(rect.width + 10), Math.round(rect.height + 10))
-}, 500)
-
 onMounted(() => resizeWindow())
 
 function onCollapse() {
-  if (!inApp)
-    return
-
   nextTick(() => resizeWindow())
 }
 
 function resizeWindow() {
-  const rect = toolbarRef.value?.$el.getBoundingClientRect()
+  const rect = toolbarRef.value?.$el.getBoundingClientRect() as DOMRect
   if (!rect)
     return
 
-  const width = Math.round(rect.width) + 10
-  const minimumWidth = Math.min(width, isMac ? macMinimumWidth : width) // mac requires a specific minimum width for the window to stay transparent
-  window.electronAPI?.resizeWindow('toolbar', {
-    size: { width },
-    minimumSize: { width: minimumWidth },
-  })
+  emit('resize', rect)
 }
 
 function togglePointer(enabled?: boolean) {
@@ -170,7 +140,11 @@ defineExpose({
         <AccountGroupSvg />
         <span>{{ viewers.length }}</span>
         <template #popper>
-          <span v-html="viewersTooltip" />
+          <div class="viewer-log">
+            <span v-for="(viewer) in viewersLog" :key="viewer.id">
+              {{ $t(`toolbar.viewer${viewer.joined ? 'Joined' : 'Left'}`, { name: viewer.name }) }}
+            </span>
+          </div>
         </template>
       </Tooltip>
     </div>
@@ -215,5 +189,12 @@ defineExpose({
 
 .viewer-count-none svg {
   fill: #f00;
+}
+
+.viewer-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.8rem;
 }
 </style>
