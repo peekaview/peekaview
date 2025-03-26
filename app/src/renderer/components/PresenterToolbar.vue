@@ -16,9 +16,11 @@ import { UserData } from '../../interface'
 const props = withDefaults(defineProps<{
   viewers?: UserData[]
   draggable?: boolean
+  invertCollapseIcons?: boolean
   clipboardEnabled?: boolean
 }>(), {
   draggable: false,
+  invertCollapseIcons: false,
   clipboardEnabled: false,
 })
 
@@ -31,7 +33,7 @@ const emit = defineEmits<{
   (e: 'stop-sharing'): void
   (e: 'share-different-screen'): void
   (e: 'show-invite-link'): void
-  (e: 'resize', rect: DOMRect): void
+  (e: 'resize', data: { rect: DOMRect, oldRect: DOMRect | undefined }): void
 }>()
 
 const viewersLog = ref<{ id: number, joined: boolean, name: string, timeout: number }[]>([])
@@ -92,12 +94,14 @@ function onCollapse() {
   nextTick(() => resizeWindow())
 }
 
+let oldRect: DOMRect
 function resizeWindow() {
   const rect = toolbarRef.value?.$el.getBoundingClientRect() as DOMRect
   if (!rect)
     return
 
-  emit('resize', rect)
+  emit('resize', { rect, oldRect })
+  oldRect = rect
 }
 
 function togglePointer(enabled?: boolean) {
@@ -121,7 +125,7 @@ defineExpose({
 </script>
 
 <template>
-  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" @on-collapse="onCollapse">
+  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" :invert-collapse-icons="invertCollapseIcons" @on-collapse="onCollapse">
     <label class="checkbox-container">
       <input type="checkbox" v-model="pointerEnabled" />
       <span class="checkmark"></span>
@@ -132,22 +136,23 @@ defineExpose({
       <span class="checkmark"></span>
       <span class="checkbox-label">{{ $t('toolbar.remoteControl') }}</span>
     </label>
-    <div v-if="viewers" class="viewer-count" :class="{ 'viewer-count-none': viewers.length === 0 }">
-      <Tooltip
-        :triggers="[]"
-        :shown="Object.keys(viewersLog).length > 0"
-      >
-        <AccountGroupSvg />
-        <span>{{ viewers.length }}</span>
-        <template #popper>
-          <div class="viewer-log">
-            <span v-for="(viewer) in viewersLog" :key="viewer.id">
-              {{ $t(`toolbar.viewer${viewer.joined ? 'Joined' : 'Left'}`, { name: viewer.name }) }}
-            </span>
-          </div>
-        </template>
-      </Tooltip>
-    </div>
+    <Tooltip
+      v-if="viewers"
+      class="viewer-count"
+      :class="{ 'viewer-count-none': viewers.length === 0 }"
+      :triggers="[]"
+      :shown="Object.keys(viewersLog).length > 0"
+    >
+      <AccountGroupSvg />
+      <span>{{ viewers.length }}</span>
+      <template #popper>
+        <div class="viewer-log">
+          <span v-for="(viewer) in viewersLog" :key="viewer.id">
+            {{ $t(`toolbar.viewer${viewer.joined ? 'Joined' : 'Left'}`, { name: viewer.name }) }}
+          </span>
+        </div>
+      </template>
+    </Tooltip>
     <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardEnabled }" :title="$t('toolbar.openClipboard')" @click="clipboardEnabled && $emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>

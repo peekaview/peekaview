@@ -303,4 +303,4 @@ export type File = {
   name?: string
 }
 
-export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size> }
+export type ElectronWindowDimensions = { size: Partial<Size>, minimumSize?: Partial<Size>, maximumSize?: Partial<Size>, deltaSize?: Partial<Size> }

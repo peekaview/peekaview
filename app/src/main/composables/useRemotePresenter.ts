@@ -529,8 +529,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     toolbarSize = { width, height }
   }
 
-  // the window needs to be 20px wider to avoid cutting off the borders or shadows
-  const shadowPadding = 20
+  // in windows the window needs to be 20px wider to avoid cutting off the borders or shadows
+  const winPadding = 20
   // on mac the window needs to be at least 160px wide for it to stay transparent
   const macMinimumWidth = 160
   const macMinimumHeight = 60
@@ -541,16 +541,22 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
           return
 
         const currentBounds = toolbarWindow.getBounds()
-        let width = dimensions.size.width + shadowPadding
-        let height = dimensions.size.height ?? currentBounds.height
+        let x = currentBounds.x + currentBounds.width - dimensions.size.width
+        let y = currentBounds.y
+        let width = dimensions.size.width
+        let height = currentBounds.height
         if (isMac) {
           width = Math.max(width, macMinimumWidth)
           height = Math.max(height, macMinimumHeight)
           toolbarWindow.setMinimumSize(macMinimumWidth, macMinimumHeight)
+        } else if (isWin32) {
+          if (dimensions.size.width < currentBounds.width) {
+            x -= winPadding
+            width += winPadding
+          }
         }
 
-        const newX = currentBounds.x + currentBounds.width - width
-        toolbarWindow.setPosition(newX, currentBounds.y)
+        toolbarWindow.setPosition(x, y)
         toolbarWindow.setSize(width, height)
         return
       case 'clipboard':

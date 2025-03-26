@@ -53,9 +53,10 @@ function showInviteLink() {
   window.electronAPI!.showSharingActive()
 }
 
-function resizeWindow(rect: DOMRect) {
+function resizeWindow(data: { rect: DOMRect, oldRect: DOMRect | undefined }) {
   window.electronAPI?.resizeWindow('toolbar', {
-    size: { width: Math.round(rect.width) },
+    size: { width: Math.round(data.rect.width) },
+    deltaSize: { width: data.oldRect ? Math.round(data.rect.width - (data.oldRect?.width ?? 0)) : 0 },
   })
 }
 </script>
@@ -66,6 +67,7 @@ function resizeWindow(rect: DOMRect) {
     :viewers="users"
     :clipboard-enabled="clipboardEnabled"
     draggable
+    invert-collapse-icons
     @toggle-remote-control="toggleRemoteControl"
     @toggle-pointer="togglePointer"
     @pause-sharing="pauseSharing"
