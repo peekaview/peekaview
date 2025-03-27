@@ -232,7 +232,7 @@ function freezeAndFocus() {
 }
 
 async function showInviteLink() {
-  const url = `${import.meta.env.VITE_APP_URL}/${presenter.value?.viewCode}`
+  const url = new URL(`${import.meta.env.VITE_APP_URL}/${presenter.value?.viewCode}`)
   const result = await resizeAndPrompt({
     type: 'info',
     title: t('toolbar.inviteLink'),
@@ -242,7 +242,7 @@ async function showInviteLink() {
   })
 
   if (result === '0')
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(url.toString())
 }
 
 async function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
@@ -267,22 +267,22 @@ async function fixSize(size: readonly [number, number], position?: readonly [num
 }
 
 async function transform(size: readonly [number, number], position?: readonly [number, number]) {
-  // on macOS, when the window is resized is first, it might mainly overlap into another window, thus move it to the top left corner beforehand
-  if (position && platform === 'mac') { 
-    const width = window.outerWidth
-    const height = window.outerHeight
+  if (platform === 'linux') {
+    window.resizeTo(...size)
 
-    // if one of the new sizes is more than the double of the current size, it is likely have more area in another window
-    if (width < (size[0] / 2) || height < (size[1] / 2)) {
-      window.moveTo(0, 0)
+    if (position) {
+      await sleep(300) // let resizing finish
+      window.moveTo(...position)
+    }
+  } else {
+    // on macOS, when the window is resized is first, it might mainly overlap into another window, thus move it to the top left corner beforehand
+    console.log("transform", size, position)
+    if (position) {
+      window.moveTo(...position)
       await sleep(300) // let moving finish
     }
-  }
 
-  window.resizeTo(...size)
-  if (position) {
-    await sleep(300) // let resize finish
-    window.moveTo(...position)
+    window.resizeTo(...size)
   }
 }
 

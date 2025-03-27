@@ -152,7 +152,7 @@ function viewRecentContact(id?: string) {
         message: t('notifications.viewSharedScreen', { name }),
         data: {
           icon: PeekaViewLogo,
-          url: `${import.meta.env.VITE_APP_URL}/?share`,
+          url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
           type: 'share',
           email: email.value,
         }

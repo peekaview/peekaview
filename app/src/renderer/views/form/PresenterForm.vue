@@ -15,7 +15,7 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const downloadLink = import.meta.env.VITE_DOWNLOAD_URL
+const downloadUrl = new URL(import.meta.env.VITE_DOWNLOAD_URL).toString()
 
 const code = computed(() => btoa(`email=${props.email}&token=${props.token}`))
 
@@ -28,7 +28,7 @@ function shareViaApp() {
       title: t('share.appDialog.title'),
       html: 
         t('share.appDialog.message') + '<br><br>' +
-        t('share.appDialog.download', { link: downloadLink }),
+        t('share.appDialog.download', { link: downloadUrl }),
       type: 'info',
       confirmButtonText: t('share.appDialog.tryAgain'),
       cancelButtonText: t('share.appDialog.cancel'),
@@ -61,7 +61,7 @@ function shareViaApp() {
   
   <div class="download-option">
     <span>{{ $t('share.download.prompt') }}</span>
-    <a :href="downloadLink" download>
+    <a :href="downloadUrl" download>
       {{ $t('share.download.button') }}
     </a>
   </div>

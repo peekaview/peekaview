@@ -436,7 +436,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    presenterWindow.webContents.openDevTools()
+    //presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -662,7 +662,7 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      //presenterWindow?.hide()
+      presenterWindow?.hide()
     }
 
     currentSource = data
@@ -679,7 +679,7 @@ declare const CSP_POLICY: string
       title: i18n.t('sharingActive.title'),
       messages: [{
         content: i18n.t('sharingActive.linkMessage'),
-        copyText: `${import.meta.env.VITE_APP_URL}/${currentViewCode}`,
+        copyText: new URL(`${import.meta.env.VITE_APP_URL}/${currentViewCode}`).toString(),
       }, {
         content: i18n.t('sharingActive.codeMessage'),
         copyText: currentViewCode,

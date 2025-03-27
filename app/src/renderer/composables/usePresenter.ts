@@ -228,7 +228,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
             message: options!.notify!.getMessage(unref(data.email)),
             data: {
               icon: PeekaViewLogo,
-              url: `${import.meta.env.VITE_APP_URL}/${''}`,
+              url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
               type: 'view',
               email: unref(data.email),
             }

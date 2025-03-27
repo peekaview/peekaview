@@ -291,7 +291,7 @@ function showMeYourScreen() {
     }
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['requestId'] ?? '');
-    $accessToken = $_GET['access_token'] ?? '';
+    $accessToken = $_GET['accessToken'] ?? '';
     $lang = validateLang($_GET['lang'] ?? '');
     $init = isset($_GET['init']) && $_GET['init'] === '1';
     
@@ -326,7 +326,7 @@ function showMeYourScreen() {
         }
         
         // Create new request
-        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', '', $accessToken]));
+        file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', $accessToken, '']));
     }
 
     $response = [
@@ -337,15 +337,8 @@ function showMeYourScreen() {
     // Check request status
     if (file_exists($requestFile)) {
         $requestData = explode(',', file_get_contents($requestFile));
-        $response['contents'] = file_get_contents($requestFile);
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
-
-        if (!isset($requestData[4]) || $requestData[4] !== $accessToken) {
-            $response['debug'] = 'access token saved';
-            $requestData[4] = $accessToken;
-            file_put_contents($requestFile, implode(',', $requestData));
-        }
 
         switch ($status) {
             case 'request_accepted':
@@ -368,13 +361,13 @@ function showMeYourScreen() {
                 if (time() - $timestamp > REQUEST_TIMEOUT || $userStatus == 'offline') {
                     $token = $userData[1];
                     // Update status to not answered and send email
-                    if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
+                    if (!isset($requestData[4]) || $requestData[4] !== 'email_sent') {
                         require_once __DIR__.'/helper/EmailHelper.php';
                         
                         $emailHelper = new EmailHelper();
                         $shareLink = "https://".APP_DOMAIN."/?share=".base64_encode("email=$email&token=$token");
                         if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
-                            $requestData[3] = 'email_sent';
+                            $requestData[4] = 'email_sent';
                             file_put_contents($requestFile, implode(',', $requestData));
                         }
                     }

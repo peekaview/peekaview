@@ -12,7 +12,7 @@ import { ipcMain, app, dialog, BrowserWindow, screen, clipboard as electronClipb
 import { SourceManager } from '../sources/SourceManager.js'
 import { createSourceManager } from '../sources/createSourceManager.js'
 import { windowLoad } from '../util.js'
-import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, RemotePasteData, Size, StreamState, SendRemote } from '../../interface.d'
+import { Dimensions, ElectronWindowDimensions, File, RemoteData, RemoteEvent, RemoteTextData, RemoteFileData, RemoteMouseData, RemoteFileChunkData, UserData, RemoteKeyData, RemoteCopyData, Size, StreamState, SendRemote } from '../../interface.d'
 import { useFileChunkRegistry } from '../../composables/useFileChunking.js'
 
 import { i18n } from '../i18n'
@@ -680,9 +680,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     await electronClipboard.writeText(tmp)
   }
 
-  async function pasteFromClipboard(data: RemotePasteData) {
+  async function pasteFromClipboard(text: string) {
     const tmp = await electronClipboard.readText()
-    await electronClipboard.writeText(data.text)
+    await electronClipboard.writeText(text)
     await keyboard.pressKey(controlkey, Key.V)
     await keyboard.releaseKey(controlkey, Key.V)
     await electronClipboard.writeText(tmp)
@@ -713,7 +713,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     else {
       console.log(`localclipboard: ${localClipboardTime}, remoteclipboard: ${data.time}`)
       if (data.time > localClipboardTime) {
-        pasteFromClipboard(data)
+        pasteFromClipboard(data.text)
       }
     }
   }
@@ -837,11 +837,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
         const copyData = data as RemoteCopyData
         if (toolsEnabled.remoteControl && copyData.tool == 'remoteControl')
           copyToClipboard(copyData)
-        break
-      case 'paste':
-        const pasteData = data as RemotePasteData
-        if (toolsEnabled.remoteControl && pasteData.tool == 'remoteControl')
-          pasteFromClipboard(pasteData)
         break
       case 'mouse-move':
         mouseData = data as RemoteMouseData

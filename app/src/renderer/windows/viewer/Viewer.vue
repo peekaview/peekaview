@@ -56,7 +56,7 @@ onMounted(async () => {
           message: t('notifications.viewSharedScreen', { name: email }),
           data: {
             icon: PeekaViewLogo,
-            url: `${import.meta.env.VITE_APP_URL}/?share`,
+            url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
             type: 'share',
             email,
           }

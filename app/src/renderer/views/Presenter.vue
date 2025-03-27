@@ -13,7 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const presenterWindow = ref<Window | undefined>()
-const inviteUrl = computed(() => `${import.meta.env.VITE_APP_URL}?view=${btoa(`viewEmail=${ props.email }`)}`)
+const inviteUrl = computed(() => new URL(`${import.meta.env.VITE_APP_URL}?view=${btoa(`viewEmail=${ props.email }`)}`).toString())
 
 onMounted(() => {
   present()
@@ -55,7 +55,7 @@ function present() {
 
 const copied = ref(false)
 function copyCode() {
-  navigator.clipboard.writeText(inviteUrl.value)
+  navigator.clipboard.writeText(inviteUrl.value.toString())
   if (copied.value)
     return
   

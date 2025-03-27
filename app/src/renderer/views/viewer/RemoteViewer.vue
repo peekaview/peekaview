@@ -174,13 +174,10 @@ onReceive("mouse-up", (data) => {
   containerRef.value?.receiveMouseUp(data)
 })
 
-onReceive("paste", (data) => {
-  navigator.clipboard.writeText(data.text)
-})
-
 onReceive("text", (data) => {
   console.log("text", data)
 
+  navigator.clipboard.writeText(data.text)
   clipboardFile.value = {
     content: 'data:text/plain;base64,' + btoa(data.text),
     name: ''

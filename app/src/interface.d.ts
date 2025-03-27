@@ -205,7 +205,7 @@ export type SendRemoteOptions = {
 
 export type SendRemote = <T extends RemoteEvent>(event: T, data: RemoteData<T>, options?: SendRemoteOptions) => Promise<void> | void
 
-export type RemoteEvent = "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "key-down" | "copy" | "paste" | "text" | "file" | "file-chunk" | "reset"
+export type RemoteEvent = "mouse-click" | "mouse-dblclick" | "mouse-leftclick" | "mouse-move" | "mouse-down" | "mouse-up" | "mouse-wheel" | "key-down" | "copy" | "text" | "file" | "file-chunk" | "reset"
 
 export type RemoteData<T extends RemoteEvent> = 
   T extends "mouse-click" ? RemoteMouseData
@@ -217,7 +217,6 @@ export type RemoteData<T extends RemoteEvent> =
   : T extends "mouse-wheel" ? RemoteMouseData
   : T extends "key-down" ? RemoteKeyData
   : T extends "copy" ? RemoteCopyData
-  : T extends "paste" ? RemotePasteData
   : T extends "text" ? RemoteTextData
   : T extends "file" ? RemoteFileData
   : T extends "file-chunk" ? RemoteFileChunkData
@@ -239,11 +238,6 @@ export type RemoteKeyData = {
 
 export type RemoteCopyData = {
   cut?: boolean
-  tool?: ViewerTool
-}
-
-export type RemotePasteData = {
-  text: string
   tool?: ViewerTool
 }
 
