@@ -360,7 +360,6 @@ function showMeYourScreen() {
             if ($userStatus == 'offline') {
                 return [
                     'status' => 'request_notified',
-                    'message' => "$email ist leider gerade offline<br>Wir haben den Benutzer per Email benachrichtigt",
                     'user_status' => $userStatus,
                     'last_seen' => $lastSeen,
                 ];
@@ -368,7 +367,6 @@ function showMeYourScreen() {
 
             return [
                 'status' => 'request_not_answered',
-                'message' => "$email hat nicht rechtzeitig geantwortet<br>Wir haben den Benutzer per Email benachrichtigt",
                 'user_status' => 'away',
                 'last_seen' => $lastSeen
             ];
@@ -377,7 +375,6 @@ function showMeYourScreen() {
         if ($status === 'request_denied') {
             return [
                 'status' => 'request_denied',
-                'message' => "$email hat die Anfrage abgelehnt",
                 'user_status' => $userStatus,
                 'last_seen' => $lastSeen
             ];
