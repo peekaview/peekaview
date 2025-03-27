@@ -328,6 +328,11 @@ function showMeYourScreen() {
         // Create new request
         file_put_contents($requestFile, implode(',', [$name, time(), 'request_open', '', $accessToken]));
     }
+
+    $response = [
+        'user_status' => $userStatus,
+        'last_seen' => $lastSeen,
+    ];
     
     // Check request status
     if (file_exists($requestFile)) {
@@ -335,73 +340,57 @@ function showMeYourScreen() {
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
 
-        if ($requestData[4] !== $accessToken) {
+        if (!isset($requestData[4]) || $requestData[4] !== $accessToken) {
             $requestData[4] = $accessToken;
             file_put_contents($requestFile, implode(',', $requestData));
         }
-        
-        // if request is not accepted in time or user seems to be offline
-        if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
-            
-            $token = $userData[1];
-            // Update status to not answered and send email
-            if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
-                require_once __DIR__.'/helper/EmailHelper.php';
-                
-                $emailHelper = new EmailHelper();
-                $shareLink = "https://".APP_DOMAIN."/?share=".base64_encode("email=$email&token=$token");
-                if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
-                    $requestData[3] = 'email_sent';
-                    file_put_contents($requestFile, implode(',', $requestData));
+
+        switch ($status) {
+            case 'request_accepted':
+                $response['status'] = 'request_accepted';
+                //$response['jwt'] = generateJWT($name, $userData[3]);
+                $response['roomId'] = $userData[3];
+                $response['videoServer'] = $userData[4];
+                $response['controlServer'] = $userData[5];
+                $response['turnCredentials'] = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
+                break;
+            case 'request_denied':
+                $response['status'] = 'request_denied';
+                break;
+            case 'request_open':
+            default:
+                $response['status'] = 'request_open';
+                $response['requestId'] = $requestId;
+
+                // if request is not accepted in time or user seems to be offline
+                if (time() - $timestamp > REQUEST_TIMEOUT || $userStatus == 'offline') {
+                    $token = $userData[1];
+                    // Update status to not answered and send email
+                    if (!isset($requestData[3]) || $requestData[3] !== 'email_sent') {
+                        require_once __DIR__.'/helper/EmailHelper.php';
+                        
+                        $emailHelper = new EmailHelper();
+                        $shareLink = "https://".APP_DOMAIN."/?share=".base64_encode("email=$email&token=$token");
+                        if ($emailHelper->sendShareRequest($email, $name, $shareLink)) {
+                            $requestData[3] = 'email_sent';
+                            file_put_contents($requestFile, implode(',', $requestData));
+                        }
+                    }
+                    
+                    // user seems to be offline
+                    if ($userStatus == 'offline') {
+                        $response['status'] = 'request_notified';
+                    }
+                    else {
+                        $response['status'] = 'request_not_answered';
+                        $response['user_status'] = 'away';
+                    }
                 }
-            }
-            
-            // user seems to be offline
-            if ($userStatus == 'offline') {
-                return [
-                    'status' => 'request_notified',
-                    'user_status' => $userStatus,
-                    'last_seen' => $lastSeen,
-                ];
-            }
-
-            return [
-                'status' => 'request_not_answered',
-                'user_status' => 'away',
-                'last_seen' => $lastSeen
-            ];
-        }
-
-        if ($status === 'request_denied') {
-            return [
-                'status' => 'request_denied',
-                'user_status' => $userStatus,
-                'last_seen' => $lastSeen
-            ];
-        }
-        
-        if ($status === 'request_accepted') {
-            $turnCredentials = generateTurnCredentials(TURN_SHARED_SECRET, TURN_EXPIRE);
-
-            return [
-                'status' => 'request_accepted',
-                //'jwt' => generateJWT($name, $userData[3]),
-                'roomId' => $userData[3],
-                'videoServer' => $userData[4],
-                'controlServer' => $userData[5],
-                'turnCredentials' => $turnCredentials,
-                'user_status' => $userStatus,
-                'last_seen' => $lastSeen
-            ];
+                break;
         }
     }
     
-    return [
-        'status' => 'request_open',
-        'requestId' => $requestId,
-        'user_status' => $userStatus,
-        'last_seen' => $lastSeen,
-    ];
+    return $response;
 }
 
 function getUserStatus($userFile) {
