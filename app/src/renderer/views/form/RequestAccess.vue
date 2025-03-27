@@ -13,7 +13,6 @@ type RequestUserStatus = "online" | "away" | "offline" | "unknown"
 type WaitingStatus = "establishing" | "notified" | "waiting"
 
 type UnacceptedRequestResponse = {
-  message: string
   status: Exclude<RequestStatus, "request_accepted">
   user_status: RequestUserStatus
   last_seen: number
@@ -23,7 +22,6 @@ type UnacceptedRequestResponse = {
 }
 
 type AcceptedRequestResponse = {
-  message: string
   status: "request_accepted"
   user_status: RequestUserStatus
   last_seen: number
@@ -74,6 +72,7 @@ async function requestScreen(uuid: string, initial = false) {
     if (waitingStatus.value === undefined)
       return
 
+    console.log('accessToken', props.accessToken)
     const params = {
       action: 'showMeYourScreen' as const,
       init: initial ? '1' as const : '0' as const,

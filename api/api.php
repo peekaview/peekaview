@@ -334,6 +334,11 @@ function showMeYourScreen() {
         $requestData = explode(',', file_get_contents($requestFile));
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
+
+        if ($requestData[4] !== $accessToken) {
+            $requestData[4] = $accessToken;
+            file_put_contents($requestFile, implode(',', $requestData));
+        }
         
         // if request is not accepted in time or user seems to be offline
         if ($status === 'request_open' && time() - $timestamp > REQUEST_TIMEOUT || $status === 'request_open' && $userStatus == 'offline') {
