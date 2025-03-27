@@ -333,14 +333,16 @@ function showMeYourScreen() {
         'user_status' => $userStatus,
         'last_seen' => $lastSeen,
     ];
-    
+
     // Check request status
     if (file_exists($requestFile)) {
         $requestData = explode(',', file_get_contents($requestFile));
+        $response['contents'] = file_get_contents($requestFile);
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
 
         if (!isset($requestData[4]) || $requestData[4] !== $accessToken) {
+            $response['debug'] = 'access token saved';
             $requestData[4] = $accessToken;
             file_put_contents($requestFile, implode(',', $requestData));
         }
