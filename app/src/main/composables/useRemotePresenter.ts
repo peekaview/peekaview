@@ -458,12 +458,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (toolbarWindow)
       return
 
-    const width = 600
-    const height = 60
+    const { x, y, width, height } = getDefaultToolbarBounds()
 
-    const display = sourceManager.getCurrentScreen()
-    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width))
-    const y = display.bounds.y
     toolbarWindow = new BrowserWindow({
       x,
       y,
@@ -504,12 +500,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     })
   }
 
-  function getDefaultToolbarBounds() {
-    const width = 600
-    const height = 60
-
+  function getDefaultToolbarBounds(width = 600, height = 60) {
     const display = sourceManager.getCurrentScreen()
-    const x = Math.round(display.bounds.x + (display.workAreaSize.width - width))
+    const x = Math.round(display.bounds.x + display.workAreaSize.width - width)
     const y = display.bounds.y
 
     return { x, y, width, height }
@@ -541,23 +534,25 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
           return
 
         const currentBounds = toolbarWindow.getBounds()
-        let x = currentBounds.x + currentBounds.width - dimensions.size.width
-        let y = currentBounds.y
+        const display = sourceManager.getCurrentScreen()
+        console.log('currentBounds', currentBounds)
+        console.log('dimensions', dimensions)
+
         let width = dimensions.size.width
         let height = currentBounds.height
+
+        let x = display.bounds.x + display.workAreaSize.width - width
+        let y = display.bounds.y
+
         if (isMac) {
           width = Math.max(width, macMinimumWidth)
           height = Math.max(height, macMinimumHeight)
           toolbarWindow.setMinimumSize(macMinimumWidth, macMinimumHeight)
         } else if (isWin32) {
-          if (dimensions.size.width < currentBounds.width) {
-            x -= winPadding
-            width += winPadding
-          }
+          width += winPadding
         }
 
-        toolbarWindow.setPosition(x, y)
-        toolbarWindow.setSize(width, height)
+        toolbarWindow.setBounds({ x, y, width, height })
         return
       case 'clipboard':
         if (!clipboardWindow)
