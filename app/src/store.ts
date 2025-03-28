@@ -1,5 +1,5 @@
 import { JSONSchema4 } from 'json-schema'
-import { ContactData, ViewCodeData } from './interface'
+import { ContactData, InviteCodeData } from './interface'
 
 export interface StorageSchema {
   uuid: string
@@ -8,7 +8,7 @@ export interface StorageSchema {
   code: string | undefined
   recentContacts: Record<string, ContactData>
   lastViewActive: number | undefined
-  viewCodeCache: Record<string, ViewCodeData>
+  inviteCodeCache: Record<string, InviteCodeData>
   macWindowList: {
     timestamp: number
     data: string
@@ -39,7 +39,7 @@ export const schema: JSONSchema4 = {
     type: 'number',
     default: undefined,
   },
-  viewCodeCache: {
+  inviteCodeCache: {
     type: 'object',
     default: {},
   },

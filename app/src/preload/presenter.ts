@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onRemote: (callback: SendRemote) => ipcRenderer.on('send-remote', (_event, event, data) => callback(event, data)),
   onReplyDialog: (callback: (dialogId: number, result: string) => void) => ipcRenderer.on('reply-dialog', (_event, dialogId: number, result: string) => callback(dialogId, result)),
   logout: (discardSession = false) => ipcRenderer.invoke('logout', discardSession),
-  sharingActive: (viewCode: string, data: string) => ipcRenderer.invoke('sharing-active', viewCode, data),
+  sharingActive: (inviteCode: string, data: string) => ipcRenderer.invoke('sharing-active', inviteCode, data),
   stopSharing: () => ipcRenderer.invoke('stop-sharing'),
   pauseSharing: () => ipcRenderer.invoke('pause-sharing'),
   resumeSharing: () => ipcRenderer.invoke('resume-sharing'),

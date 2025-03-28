@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData, ViewerData } from '../../types'
+import type { AcceptedRequestData, RoomData, ViewerData } from '../../types'
 import { callApi } from '../../api'
 import { getPlatform, getStoredItem, notify, setStoredItem } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
@@ -81,7 +81,10 @@ async function requestScreen(uuid: string, initial = false) {
       requestId: uuid.replace(/-/g, '').substring(0, 8), // uuid,
     }
 
-    const data = await callApi<Response>(props.contact.email ? {
+    const data = await callApi<Response>(props.contact.uuid ? {
+      ...params,
+      uuid: props.contact.uuid,
+    } : props.contact.email ? {
       ...params,
       email: props.contact.email,
     } : {
@@ -125,7 +128,7 @@ async function requestScreen(uuid: string, initial = false) {
   }
 }
 
-async function handleRequestAccepted(data: AcceptedRequestData) {
+async function handleRequestAccepted(data: RoomData) {
   console.log('handleRequestAccepted called with data:', data)
   waitingStatus.value = undefined
   requestStatus.value = undefined

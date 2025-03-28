@@ -1,20 +1,24 @@
 import { NotificationPayload } from "src/interface"
 import i18n from "./i18n"
-import { EitherEmailOrCode } from "./types"
+import { EitherEmailOrCodeOrUuid } from "./types"
 import { notify } from "./util"
 
 export type ShowMeYourScreenParams = {
   action: "showMeYourScreen"
   name: string
   requestId: string
-  accessToken?: string | undefined
   init: '1' | '0'
-} & EitherEmailOrCode
+} & EitherEmailOrCodeOrUuid
 
 export type ApiRequestParams = ShowMeYourScreenParams | {
-  action: "iAmOnline" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
+  action: "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
   email: string
   token: string
+} | {
+  action: "iAmOnline"
+  email: string
+  token: string
+  inviteCode: string
 } | {
   action: "youAreAllowedToSeeMyScreen" | "youAreNotAllowedToSeeMyScreen"
   email: string
@@ -23,6 +27,7 @@ export type ApiRequestParams = ShowMeYourScreenParams | {
 } | {
   action: "registerMyEmail"
   email: string
+  uuid: string
   target: 'web' | 'app'
 } | {
   action: "registerPushToken"
@@ -35,10 +40,7 @@ export type ApiRequestParams = ShowMeYourScreenParams | {
   uuid: string
   notification: JsonString<NotificationPayload>
 } | {
-  action: "saveTempData"
-  data: string
-} | {
-  action: "getTempData"
+  action: "useInviteCode"
   code: string
 }
 

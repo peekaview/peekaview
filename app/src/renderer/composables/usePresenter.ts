@@ -6,7 +6,7 @@ import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
-import { generateToken, stringToColor } from '../../util'
+import { stringToColor } from '../../util'
 
 import PeekaViewLogo from '../../assets/img/peekaviewlogo.png'
 
@@ -43,25 +43,9 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
   const viewers = computed(() => Object.values(screenPresent.value?.participants ?? {}).map(p => p.user))
-  const viewCode = ref<string>()
-  const accessToken = ref<string>(generateToken(8))
-  watch(() => unref(data.email), async (email) => {
-    viewCode.value = await dataToViewCode(email, accessToken.value)
-  }, { immediate: true })
 
-  async function dataToViewCode(viewEmail: string, accessToken: string) {
-    try {
-      const data = await callApi<{ code: string }>({
-        action: 'saveTempData',
-        data: JSON.stringify({ viewEmail, accessToken }),
-      })
-      return data.code
-    } catch (error) {
-      console.error('Error generating view code:', error)
-    }
-
-    return undefined
-  }
+  const inviteCode = ref<string>()
+  const accessToken = ref<string>()
 
   watch(viewers, async (viewers, oldViewers) => {
     window.electronAPI?.updateUsers(JSON.stringify(viewers))
@@ -196,6 +180,8 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
         serverUrl: acceptedData.videoServer,
         controlServer: acceptedData.controlServer,
       }
+      inviteCode.value = acceptedData.inviteCode
+      accessToken.value = acceptedData.accessToken
 
       pingInterval.value = window.setInterval(() => {
         updateOnlineStatus()
@@ -260,8 +246,8 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       }
       streamState.value = 'active'
 
-      console.log('sharingActive', viewCode.value, source)
-      source && window.electronAPI?.sharingActive(viewCode.value!, JSON.stringify({ source, userName: unref(data.email) }))
+      console.log('sharingActive', inviteCode.value, source)
+      source && window.electronAPI?.sharingActive(inviteCode.value!, JSON.stringify({ source, userName: unref(data.email) }))
     } catch (error) {
       console.error('Error sharing local screen:', error)
     }
@@ -275,6 +261,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       action: 'iAmOnline' as const,
       email: unref(data.email),
       token: unref(data.token),
+      inviteCode: inviteCode.value!,
     }
 
     try {
@@ -420,7 +407,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
   }
 
   return reactive({
-    viewCode,
+    inviteCode,
     stream,
     viewers,
     screenShareData: computed(() => screenShareData.value),

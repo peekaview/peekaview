@@ -77,7 +77,7 @@ export interface IElectronAPI {
   openScreenSourceSelection: () => Promise<void>,
   onOpenScreenSourceSelection: (callback: () => void) => void,
   sourceSelected: (source: string | undefined) => Promise<void>,
-  sharingActive: (viewCode: string, data: string) => Promise<void>,
+  sharingActive: (inviteCode: string, data: string) => Promise<void>,
   toggleRemoteControl: (toggle?: boolean) => Promise<void>,
   onToggleRemoteControl: (callback: (toggle?: boolean) => void) => void,
   togglePointer: (toggle?: boolean) => Promise<void>,
@@ -146,7 +146,7 @@ export interface DialogOptions {
   data?: any
 }
 
-export type ViewCodeData = {
+export type InviteCodeData = {
   viewEmail: string
   accessToken: string
 }

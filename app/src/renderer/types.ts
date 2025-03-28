@@ -1,10 +1,15 @@
 import { TurnCredentials, UserData } from "src/interface"
 
-export type AcceptedRequestData = {
+export type RoomData = {
   videoServer: string
   controlServer: string
   roomId: string
   turnCredentials: TurnCredentials
+}
+
+export type AcceptedRequestData = RoomData & {
+  inviteCode: string
+  accessToken: string
 }
 
 export type RemoteControlData = {
@@ -13,16 +18,22 @@ export type RemoteControlData = {
   hostname: string
 }
 
-export type ViewerData = EitherEmailOrCode & {
+export type ViewerData = EitherEmailOrCodeOrUuid & {
   name: string
 }
 
-export type EitherEmailOrCode = {
+export type EitherEmailOrCodeOrUuid = {
   email: string
   code?: undefined
+  uuid?: undefined
 } | {
   email?: undefined
   code: string
+  uuid?: undefined
+} | {
+  email?: undefined
+  code?: undefined
+  uuid: string
 }
 
 export type ViewerDataSchema = {

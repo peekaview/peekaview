@@ -7,7 +7,7 @@ import ViewerForm from '../../views/form/ViewerForm.vue'
 import { getStoredItem } from '../../util'
 import { ContactData } from '../../../interface'
 import { callApi } from '../../api'
-import { parseCode } from '../../../util'
+import { displayNameMail, parseCode } from '../../../util'
 
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
 
@@ -15,11 +15,6 @@ const { t } = useI18n()
 
 const formViewerData = ref<ViewerDataSchema>({ emailOrCode: '', name: '' })
 const activeViewerData = ref<ViewerData | undefined>()
-
-getStoredItem('name').then(value => {
-  if (value)
-    formViewerData.value.name = value
-})
 
 const contactToNotify = ref<ContactData | undefined>()
 window.electronAPI?.onNotifyContact((contact) => {
@@ -37,7 +32,7 @@ onMounted(async () => {
   if (viewEmail)
     formViewerData.value.emailOrCode = viewEmail
 
-  const name = await getStoredItem('name')
+  const name = (await getStoredItem('name')) ?? email!
   formViewerData.value.name = name ?? email!
 
   watch(contactToNotify, (contact) => {
@@ -53,7 +48,7 @@ onMounted(async () => {
         uuid: contact.id,
         notification: JSON.stringify({
           title: 'PeekaView',
-          message: t('notifications.viewSharedScreen', { name: email }),
+          message: t('notifications.viewSharedScreen', { name: displayNameMail({ name, email }) }),
           data: {
             icon: PeekaViewLogo,
             url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
@@ -64,8 +59,11 @@ onMounted(async () => {
       })
     }
 
-    if (contact.email)
-      formViewerData.value.emailOrCode = contact.email
+    // TODO: can always be assured that a name or an email is available?
+    activeViewerData.value = {
+      uuid: contact.id,
+      name,
+    }
   })
 })
 </script>

@@ -48,9 +48,11 @@ async function handleRegister(e: Event) {
     return
 
   try {
+    const uuid = (await getStoredItem('uuid'))!
     const response = await callApi<Response>({
       action: 'registerMyEmail',
       email: email.value,
+      uuid,
       target: props.target === 'app' ? 'app' : 'web',
     })
 

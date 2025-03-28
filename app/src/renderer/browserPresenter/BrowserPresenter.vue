@@ -232,7 +232,7 @@ function freezeAndFocus() {
 }
 
 async function showInviteLink() {
-  const url = new URL(`${import.meta.env.VITE_APP_URL}/${presenter.value?.viewCode}`)
+  const url = new URL(`${import.meta.env.VITE_APP_URL}/${presenter.value?.inviteCode}`)
   const result = await resizeAndPrompt({
     type: 'info',
     title: t('toolbar.inviteLink'),

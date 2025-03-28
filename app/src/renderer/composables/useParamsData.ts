@@ -2,7 +2,6 @@ import { computed, ref, watch } from 'vue'
 import { parseCode } from '../../util'
 import { getStoredItem, setStoredItem } from '../util'
 import { callApi } from '@renderer/api'
-import { ViewCodeData } from 'src/interface'
 
 export enum Action {
   Login = 'login',
@@ -22,18 +21,18 @@ export function useParamsData() {
 
   const inviteCode = window.location.pathname.replaceAll('/', '')
   if (inviteCode) {
-    getStoredItem('viewCodeCache').then(async (cache) => {
+    getStoredItem('inviteCodeCache').then(async (cache) => {
       try {
         if (!cache)
           cache = {}
         
         if (!cache[inviteCode]) {
-          const data = await callApi<{ data: string }>({
-            action: 'getTempData',
+          const data = await callApi<{ email: string, accessToken: string }>({
+            action: 'useInviteCode',
             code: inviteCode,
           })
 
-          cache[inviteCode] = JSON.parse<ViewCodeData>(data.data)
+          cache[inviteCode] = { viewEmail: data.email, accessToken: data.accessToken }
         } else if (typeof cache[inviteCode] === 'string') {
           cache[inviteCode] = { viewEmail: cache[inviteCode], accessToken: '' }
         }
@@ -44,7 +43,7 @@ export function useParamsData() {
 
           delete cache[code]
         }
-        setStoredItem('viewCodeCache', cache)
+        setStoredItem('inviteCodeCache', cache)
 
         action.value = Action.View
         viewEmail.value = cache[inviteCode].viewEmail

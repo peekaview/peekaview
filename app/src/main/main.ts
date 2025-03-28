@@ -13,7 +13,8 @@ import {
   Tray,
   session,
   shell,
-  nativeTheme
+  nativeTheme,
+  MenuItemConstructorOptions
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
@@ -146,7 +147,7 @@ declare const CSP_POLICY: string
 
   let tray: Tray
 
-  let currentViewCode: string | undefined
+  let currentInviteCode: string | undefined
 
   let remotePresenter: RemotePresenter | undefined
   const customDialog = useCustomDialog()
@@ -321,14 +322,22 @@ declare const CSP_POLICY: string
         menuItems.push({ icon: createMenuIcon(AccountGroupIcon), label: i18n.t('trayMenu.recentContacts') + ':', type: 'normal', enabled: false })
         
         for (const id in recentContacts) {
-          menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu: [
+          const submenu: Array<MenuItemConstructorOptions> = [
             { icon: createMenuIcon(PresentIcon), label: i18n.t('trayMenu.shareMyScreen'), type: 'normal', click: () => tryPresenting(recentContacts[id]) },
-            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', enabled: !!recentContacts[id].email, click: () => createViewerWindow(undefined, recentContacts[id]) },
+            { icon: createMenuIcon(RequestIcon), label: i18n.t('trayMenu.requestScreenShare'), type: 'normal', click: () => createViewerWindow(undefined, recentContacts[id]) },
             { icon: createMenuIcon(TrashCanIcon), label: i18n.t('trayMenu.deleteContact'), type: 'normal', click: () => {
               delete recentContacts[id]
               store.set('recentContacts', recentContacts)
             } },
-          ] })
+          ]
+
+          if (!app.isPackaged) {
+            submenu.push(
+              { type: 'separator' },
+              { label: '[Dev] ID: ' + id, type: 'normal', enabled: false }
+            )
+          }
+          menuItems.push({ label: displayNameMail(recentContacts[id]), type: 'submenu', submenu })
         }
         menuItems.push({ type: 'separator' })
       }
@@ -472,7 +481,7 @@ declare const CSP_POLICY: string
       params.viewEmail = viewEmail
 
     windowLoad(viewerWindow, 'viewer', params)
-    //viewerWindow.webContents.openDevTools()
+    viewerWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       viewerWindow!.on('ready-to-show', () => {
@@ -553,6 +562,7 @@ declare const CSP_POLICY: string
     presenterWindow?.close()
     presenterWindow = undefined
     store.delete('code')
+    store.set('recentContacts', {})
     createLoginWindow(discardSession)
   }
 
@@ -574,8 +584,8 @@ declare const CSP_POLICY: string
   }
 
   function stopSharing() {
-    log.info('Stopping sharing, clearing currentViewCode')
-    currentViewCode = undefined
+    log.info('Stopping sharing, clearing currentInviteCode')
+    currentInviteCode = undefined
     remotePresenter?.stop()
     remotePresenter = undefined
     customDialog.closeTrayDialogs()
@@ -669,9 +679,9 @@ declare const CSP_POLICY: string
   })
 
   const openShareMessage = async () => {
-    log.info('Opening share message, currentViewCode:', currentViewCode)
-    if (!currentViewCode) {
-      log.warn('No currentViewCode available')
+    log.info('Opening share message, currentInviteCode:', currentInviteCode)
+    if (!currentInviteCode) {
+      log.warn('No currentInviteCode available')
       return
     }
 
@@ -679,22 +689,22 @@ declare const CSP_POLICY: string
       title: i18n.t('sharingActive.title'),
       messages: [{
         content: i18n.t('sharingActive.linkMessage'),
-        copyText: new URL(`${import.meta.env.VITE_APP_URL}/${currentViewCode}`).toString(),
+        copyText: new URL(`${import.meta.env.VITE_APP_URL}/${currentInviteCode}`).toString(),
       }, {
         content: i18n.t('sharingActive.codeMessage'),
-        copyText: currentViewCode,
+        copyText: currentInviteCode,
       }],
       timeout: 15000
     })
   }
 
-  ipcMain.handle('sharing-active', async (_event, viewCode: string, data: string) => {
+  ipcMain.handle('sharing-active', async (_event, inviteCode: string, data: string) => {
     log.info('sharing-active')
     const streamerData = JSON.parse(data) as StreamerData
-    log.info('sharing-active handler called with source: ', streamerData.source.id, viewCode)
+    log.info('sharing-active handler called with source: ', streamerData.source.id, inviteCode)
     
-    //if (viewCode !== null) {
-      currentViewCode = viewCode
+    //if (inviteCode !== null) {
+      currentInviteCode = inviteCode
       startPresenting(streamerData)
     
       customDialog.playSoundOnOpen('ping')
@@ -703,7 +713,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('show-sharing-active', async (_event) => {
-    log.info('show-sharing-active handler called with currentViewCode:', currentViewCode)
+    log.info('show-sharing-active handler called with currentInviteCode:', currentInviteCode)
     await openShareMessage()
   })
 
