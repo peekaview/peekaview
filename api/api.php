@@ -250,7 +250,7 @@ function doesAnyoneWantToSeeMyScreen() {
         
         $requestTime = intval($requestData[1]);
         $status = $requestData[2] ?? '';
-        $accessToken = $requestData[4] ?? '';
+        $accessToken = $requestData[3] ?? '';
         if ($status === 'request_open' && $requestTime >= $thirtyMinutesAgo) {
             $requestId = basename($requestFile);
             $requestId = substr($requestId, strpos($requestId, '.') + 1, -4);
@@ -290,6 +290,11 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 function showMeYourScreen() {
     if (isset($_GET['uuid'])) {
         $uuidFile = getUuidFilename($_GET['uuid']);
+        if (!file_exists($uuidFile)) {
+            throw new Exception('User with UUID ' . $_GET['uuid'] . ' is not registered');
+        }
+        //TODO: send mail?
+
         $email = file_get_contents($uuidFile);
     } else if (isset($_GET['code'])) {
         $email = getTempData($_GET['code']);
@@ -344,8 +349,6 @@ function showMeYourScreen() {
     // Check request status
     if (file_exists($requestFile)) {
         $requestData = explode(',', file_get_contents($requestFile));
-        $response['contents'] = file_get_contents($requestFile);
-        $response['accessToken'] = $accessToken;
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
 
