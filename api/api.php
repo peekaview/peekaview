@@ -138,7 +138,7 @@ function generateRandomString($length = 10) {
 }
 
 function generateSafeRandomCode($length = 8) {
-    // Exclude easily confused characters: O, 0, l, I, 1
+    // Exclude easily confused characters: O, 0, i, l, I, 1
     $chars = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
     $code = '';
     $max = strlen($chars) - 1;
@@ -148,6 +148,10 @@ function generateSafeRandomCode($length = 8) {
     }
     
     return $code;
+}
+
+function getUuidFilename($uuid) {
+    return STORAGE_PATH . '/uuid/' . $uuid . '.txt';
 }
 
 function getPushFilename($uuid) {
@@ -284,7 +288,10 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
-    if (isset($_GET['code'])) {
+    if (isset($_GET['uuid'])) {
+        $uuidFile = getUuidFilename($_GET['uuid']);
+        $email = file_get_contents($uuidFile);
+    } else if (isset($_GET['code'])) {
         $email = getTempData($_GET['code']);
     } else {
         $email = validateEmail($_GET['email']);
@@ -337,6 +344,8 @@ function showMeYourScreen() {
     // Check request status
     if (file_exists($requestFile)) {
         $requestData = explode(',', file_get_contents($requestFile));
+        $response['contents'] = file_get_contents($requestFile);
+        $response['accessToken'] = $accessToken;
         $timestamp = intval($requestData[1]);
         $status = $requestData[2];
 
@@ -442,6 +451,10 @@ function registerMyEmail() {
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
         file_put_contents($userFile, $userData);
+
+        $uuid = $_GET['uuid'];
+        $uuidFile = getUuidFilename($uuid);
+        file_put_contents($uuidFile, $email);
     }
     
     require_once __DIR__.'/helper/EmailHelper.php';
