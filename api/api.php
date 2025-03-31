@@ -94,8 +94,8 @@ if (!file_exists(STORAGE_PATH . '/push')) {
 if (!file_exists(STORAGE_PATH . '/requests')) {
     mkdir(STORAGE_PATH . '/requests', 0777, true);
 }
-if (!file_exists(STORAGE_PATH . '/tempdata')) {
-    mkdir(STORAGE_PATH . '/tempdata', 0777, true);
+if (!file_exists(STORAGE_PATH . '/invite')) {
+    mkdir(STORAGE_PATH . '/invite', 0777, true);
 }
 
 function generateJWT($email, $roomId) {
