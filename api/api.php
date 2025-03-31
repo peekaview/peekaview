@@ -203,15 +203,15 @@ function createScreenShareRoom() {
     $token = $_GET['token'];
     $userFile = getUserFile($email);
     authorizeUser($userFile, $token);
-    
-    $videoServer = VIDEO_SERVERS[array_rand(VIDEO_SERVERS)];
-    $controlServer = CONTROL_SERVERS[array_rand(CONTROL_SERVERS)];
-    $roomId = generateRandomString(8);
 
     $inviteCode = generateRandomString(8);
     $accessToken = generateRandomString(16);
     $inviteFile = getInviteFilename($inviteCode);
     file_put_contents($inviteFile, implode(';', [$email, $accessToken]));
+    
+    $roomId = generateRandomString(8);
+    $videoServer = VIDEO_SERVERS[array_rand(VIDEO_SERVERS)];
+    $controlServer = CONTROL_SERVERS[array_rand(CONTROL_SERVERS)];
 
     $userData = explode(';', file_get_contents($userFile));
     $userData[2] = 'active';
@@ -536,7 +536,7 @@ function useInviteCode($code) {
         return ['error' => 'Code expired'];
     }
     
-    $inviteData = file_get_contents($inviteFile);
+    $inviteData = explode(';', file_get_contents($inviteFile));
     
     return ['email' => $inviteData[0], 'accessToken' => $inviteData[1]];
 }
