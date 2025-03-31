@@ -166,13 +166,12 @@ function getRequestFilename($email, $requestId) {
     return STORAGE_PATH . '/requests/' . str_replace(['@', '.'], ['_', '_'], $email) . '.' . $requestId . '.txt';
 }
 
-function getTempDataFilename($code) {
-    return STORAGE_PATH . '/tempdata/' . $code . '.txt';
+function getInviteFilename($code) {
+    return STORAGE_PATH . '/invite/' . $code . '.txt';
 }
 
-function getUserFile() {
+function getUserFile($email) {
     global $log;
-    $email = validateEmail($_GET['email']);
     $log[] = "Looking for user file for $email";
     
     $userFile = getUserFilename($email);
@@ -185,9 +184,8 @@ function getUserFile() {
     return $userFile;
 }
 
-function authorizeUser($userFile) {
+function authorizeUser($userFile, $token) {
     global $log;
-    $token = $_GET['token'];
     $log[] = "Authorizing user by token $token";
     $userData = explode(';', file_get_contents($userFile));
     $log[] = "User data: " . json_encode($userData);
@@ -201,13 +199,20 @@ function authorizeUser($userFile) {
 }
 
 function createScreenShareRoom() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
+    $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
     
     $videoServer = VIDEO_SERVERS[array_rand(VIDEO_SERVERS)];
     $controlServer = CONTROL_SERVERS[array_rand(CONTROL_SERVERS)];
     $roomId = generateRandomString(8);
-    
+
+    $inviteCode = generateRandomString(8);
+    $accessToken = generateRandomString(16);
+    $inviteFile = getInviteFilename($inviteCode);
+    file_put_contents($inviteFile, implode(';', [$email, $accessToken]));
+
     $userData = explode(';', file_get_contents($userFile));
     $userData[2] = 'active';
     $userData[3] = $roomId;
@@ -221,25 +226,34 @@ function createScreenShareRoom() {
         'videoServer' => $videoServer,
         'controlServer' => $controlServer,
         'turnCredentials' => $turnCredentials,
-        'roomId' => $roomId
+        'roomId' => $roomId,
+        'inviteCode' => $inviteCode,
+        'accessToken' => $accessToken,
     ];
 }
 
 function iAmOnline() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
+    $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
+
+    $code = $_GET['inviteCode'];
+    $inviteFile = getInviteFilename($code);
 
     // Set user online
     touch($userFile, time());
+    touch($inviteFile, time());
 
     return ['success' => true];
 }
 
 function doesAnyoneWantToSeeMyScreen() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
-    
     $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
+    
     $requests = [];
     $currentTime = time();
     $thirtyMinutesAgo = $currentTime - (30 * 60);
@@ -288,6 +302,7 @@ function generateTurnCredentials($secret = 'test123', $expiry = 8640000) {
 }
 
 function showMeYourScreen() {
+    $accessToken = $_GET['accessToken'] ?? '';
     if (isset($_GET['uuid'])) {
         $uuidFile = getUuidFilename($_GET['uuid']);
         if (!file_exists($uuidFile)) {
@@ -297,13 +312,14 @@ function showMeYourScreen() {
 
         $email = file_get_contents($uuidFile);
     } else if (isset($_GET['code'])) {
-        $email = getTempData($_GET['code']);
+        $data = useInviteCode($_GET['code']);
+        $email = $data['email'];
+        $accessToken = $data['accessToken'];
     } else {
         $email = validateEmail($_GET['email']);
     }
     $name = validateName($_GET['name'] ?? '');
     $requestId = validateRequestId($_GET['requestId'] ?? '');
-    $accessToken = $_GET['accessToken'] ?? '';
     $lang = validateLang($_GET['lang'] ?? '');
     $init = isset($_GET['init']) && $_GET['init'] === '1';
     
@@ -423,10 +439,11 @@ function getUserStatus($userFile) {
 }
 
 function handleIfAllowedToSeeMyScreen($requestStatus) {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
-    
     $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
+    
     $requestId = validateRequestId($_GET['requestId'] ?? '');
     $requestFile = getRequestFilename($email, $requestId);
     if (!file_exists($requestFile)) {
@@ -441,9 +458,9 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
 
 function registerMyEmail() {
     $email = validateEmail($_GET['email']);
-    $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
+    $userFile = getUserFile($email);
     
-    $userFile = getUserFilename($email);
+    $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
     if (file_exists($userFile)) {
         // User already exists, get existing token
@@ -478,8 +495,10 @@ function registerPushToken() {
 }
 
 function sendPushNotification() {
-    $userFile = getUserFile();
-    authorizeUser($userFile);
+    $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
     
     $uuid = $_GET['uuid'];
     $pushFile = getPushFilename($uuid);
@@ -502,62 +521,24 @@ function sendPushNotification() {
     return ['success' => true];
 }
 
-function saveTempData($data) {
-    if (empty($data)) {
-        throw new Exception('No data provided');
-    }
-    
-    // Check data size limit (100KB)
-    if (strlen($data) > 102400) {
-        throw new Exception('Data exceeds maximum size limit of 100KB');
-    }
-    
-    // Clean up old temp files
-    $oneDayAgo = time() - (24 * 60 * 60);
-    $pattern = STORAGE_PATH . '/tempdata/*.txt';
-    foreach (glob($pattern) as $tempFile) {
-        if (filemtime($tempFile) < $oneDayAgo) {
-            unlink($tempFile);
-        }
-    }
-    
-    // Generate a unique code
-    $attempts = 0;
-    $maxAttempts = 10;
-    $code = '';
-    
-    do {
-        $code = generateSafeRandomCode(8);
-        $tempFile = getTempDataFilename($code);
-        $attempts++;
-    } while (file_exists($tempFile) && $attempts < $maxAttempts);
-    
-    if ($attempts >= $maxAttempts) {
-        throw new Exception('Failed to generate a unique code');
-    }
-    
-    // Save the data
-    file_put_contents($tempFile, $data);
-    
-    return ['code' => $code];
-}
-
-function getTempData($code) {
+function useInviteCode($code) {
     if (empty($code) || !preg_match('/^[a-zA-Z0-9]{8}$/', $code)) {
         throw new Exception('Invalid code format');
     }
     
-    $tempFile = getTempDataFilename($code);
-    if (!file_exists($tempFile)) {
-        throw new Exception('Code not found or expired');
+    $inviteFile = getInviteFilename($code);
+    if (!file_exists($inviteFile))
+        return ['error' => 'Code not found or expired'];
+    
+    $time = filemtime($inviteFile);
+    if ($time < time() - OFFLINE_TIMEOUT) {
+        unlink($tempFile);
+        return ['error' => 'Code expired'];
     }
     
-    $data = file_get_contents($tempFile);
+    $inviteData = file_get_contents($inviteFile);
     
-    // Delete the file after successful retrieval
-    unlink($tempFile);
-    
-    return ['data' => $data];
+    return ['email' => $inviteData[0], 'accessToken' => $inviteData[1]];
 }
 
 // Route requests with error handling
@@ -594,11 +575,8 @@ try {
         case 'sendPushNotification':
             $out = sendPushNotification();
             break;
-        case 'saveTempData':
-            $out = saveTempData($data);
-            break;
-        case 'getTempData':
-            $out = getTempData($code);
+        case 'useInviteCode':
+            $out = useInviteCode($code);
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));
