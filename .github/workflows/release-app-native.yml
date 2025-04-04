@@ -68,7 +68,7 @@ jobs:
 
         - name: Install Dependencies
           working-directory: ./app
-          run: rm -f pnpm-lock.yaml && pnpm install            
+          run: rm -f pnpm-lock.yaml && pnpm install && pnpm uninstall fsevents            
 
         - name: Setup Environment
           working-directory: ./app
