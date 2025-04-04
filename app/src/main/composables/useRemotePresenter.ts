@@ -535,8 +535,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
         const currentBounds = toolbarWindow.getBounds()
         const display = sourceManager.getCurrentScreen()
-        console.log('currentBounds', currentBounds)
-        console.log('dimensions', dimensions)
 
         let width = dimensions.size.width
         let height = currentBounds.height

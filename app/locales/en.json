@@ -172,6 +172,7 @@
       "prompt": "Don't have the PeekaView App yet?",
       "button": "Download PeekaView"
     },
+    "logout": "Logout",
     "openSession": {
       "title": "Share Your Screen",
       "description": "Select a screen / window you want to share. A selection of screens / windows you can share will open in a separate window."

@@ -22,6 +22,7 @@ const toolsEnabled = ref<Record<ViewerTool, boolean>>({
 
 const presenter = ref<Presenter>()
 const contactToNotify = ref<ContactData>()
+const shareAudio = ref(false)
 const unauthorized = ref(false)
 
 onMounted(() => {
@@ -74,7 +75,7 @@ async function present(email: string, token: string) {
     email,
     token,
     toolsEnabled,
-  }, async (shareAudio) => {
+  }, async () => {
     showSources.value = true
     const source = await new Promise<ScreenSource | undefined>((resolve) => {
       watch<[ScreenSource | undefined, boolean]>(() => [selectedSource.value, showSources.value], ([source, show]) => {
@@ -85,7 +86,7 @@ async function present(email: string, token: string) {
     showSources.value = false
     selectedSource.value = undefined
 
-    const stream = source ? await getStreamFromSource(source, shareAudio) : undefined
+    const stream = source ? await getStreamFromSource(source, shareAudio.value) : undefined
     return { stream, source }
   }, {
     notify: {
@@ -147,6 +148,7 @@ function close() {
   </div>
   <Sources
     v-else-if="showSources"
+    v-model:shareAudio="shareAudio"
     @select="select"
     @cancel="close"
   />

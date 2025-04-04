@@ -172,6 +172,7 @@
       "prompt": "Sie haben die PeekaView App noch nicht?",
       "button": "PeekaView herunterladen"
     },
+    "logout": "Ausloggen",
     "openSession": {
       "title": "Bildschirm freigeben",
       "description": "Wählen Sie einen Bildschirm / ein Fenster zur Freigabe aus. Es wird ein separates Fenster geöffnet, in welchem eine Auswahl getroffen werden kann."

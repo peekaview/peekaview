@@ -80,16 +80,18 @@ export function useParamsData() {
   }
 
   function handleParams(params: URLSearchParams) {
-    token.value = params.get('token') ?? token.value
     email.value = params.get('email')?.toLowerCase() ?? email.value
+    token.value = params.get('token') ?? token.value
     target.value = params.get('target') ?? target.value
     viewEmail.value = params.get('viewEmail')?.toLowerCase() ?? viewEmail.value
   
     if (params.get('discardSession') === 'true') {
       email.value = undefined
       token.value = undefined
-      localStorage.removeItem('email')
-      localStorage.removeItem('token')
+      localStorage.removeItem('code')
+      localStorage.removeItem('name')
+      localStorage.removeItem('recentContacts')
+      localStorage.removeItem('inviteCodeCache')
     }
     
     if (email.value && token.value) {

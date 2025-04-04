@@ -35,7 +35,7 @@ interface ScreenPeerOptions {
 }
 
 export type ScreenPresent = Reactive<ScreenBase & {
-  addStream: (stream: MediaStream, shareAudio: boolean) => Promise<void>
+  addStream: (stream: MediaStream) => Promise<void>
   cleanUpStream: () => Promise<void>
   leave: () => void
 }>
@@ -231,22 +231,33 @@ export async function useScreenPresent(screenShareData: ScreenShareData, options
   const { socket, participants, createParticipant, sendRemote, dismiss } = await useScreenPeer(screenShareData, 'presenter', {
     onRemote: options?.onRemote,
     stream,
-    roleHandlers: {
+    roleHandlers: { 
       viewer: (socketId) => {
         createParticipant(socketId, true, () => {}, () => dismiss(socketId))
       }
     },
   })
 
-  const addStream = async (s: MediaStream, _shareAudio = false) => {
+  const addStream = async (s: MediaStream) => {
+    const videoConstraints = {
+      width: { max: 2560 },
+      height: { max: 1440 },
+      frameRate: { max: 15 },
+    }
+
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    }
+
     s.getVideoTracks().forEach(track => {
-      const constraints = {
-        width: { max: 2560 },
-        height: { max: 1440 },
-        frameRate: { max: 15 },
-      };
-      track.applyConstraints(constraints);
-    });
+      track.applyConstraints(videoConstraints)
+    })
+
+    s.getAudioTracks().forEach(track => {
+      track.applyConstraints(audioConstraints)
+    })
     
     stream.value = s;
     for (const socketId in participants.value)

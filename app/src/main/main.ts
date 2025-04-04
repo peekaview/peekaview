@@ -18,6 +18,7 @@ import {
 } from 'electron'
 import { autoUpdater } from "electron-updater"
 import { is } from '@electron-toolkit/utils'
+import { createMenuIcon, invertIcon } from './util'
 import { displayNameMail, uuidv4 } from '../util'
 import log from 'electron-log/main'
 import { exec } from 'child_process'
@@ -140,14 +141,16 @@ declare const CSP_POLICY: string
   // allow superhigh cpu usage for faster video-encoding
   app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '1000')
 
+  app.setLoginItemSettings({
+    openAtLogin: true, // auto-start on login
+  })
+
   let notifierWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let viewerWindow: BrowserWindow | undefined
   let presenterWindow: BrowserWindow | undefined
 
   let tray: Tray
-
-  let currentInviteCode: string | undefined
 
   let remotePresenter: RemotePresenter | undefined
   const customDialog = useCustomDialog()
@@ -192,15 +195,12 @@ declare const CSP_POLICY: string
     tray = new Tray(trayIcon)
 
     if (process.platform === 'win32') {
-      // For Windows, listen to system theme changes
-      nativeTheme.on('updated', () => {
-        const isDark = nativeTheme.shouldUseDarkColors
-        tray.setImage(isDark ? invertIcon(trayIcon) : trayIcon)
-      })
-      // Set initial icon based on current theme
       if (nativeTheme.shouldUseDarkColors) {
         tray.setImage(invertIcon(trayIcon))
       }
+      nativeTheme.on('updated', () => {
+        tray.setImage(nativeTheme.shouldUseDarkColors ? invertIcon(trayIcon) : trayIcon)
+      })
     }
 
     tray.setToolTip('PeekaView')
@@ -305,7 +305,6 @@ declare const CSP_POLICY: string
           label: '[Dev] Open PeekaView URL', type: 'normal', click: () => {
             try {
               const text = clipboard.readText()
-              new URL(text) // test if it's a valid URL
               handleProtocol(text)
             } catch (e) {
               console.error('Clipboard content does not seem to be a valid PeekaView URL')
@@ -313,7 +312,7 @@ declare const CSP_POLICY: string
           },
         },
           { type: 'separator' }
-      )
+        )
 
       const code = store.get('code')
       const recentContacts = store.get('recentContacts')
@@ -445,7 +444,7 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    //presenterWindow.webContents.openDevTools()
+    presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -528,13 +527,14 @@ declare const CSP_POLICY: string
     })
   }
 
-  function handleProtocol(url: string) {
-    log.info("Processing protocol URL", url)
-    const params = new URL(url).searchParams
-
-    const code = params.get('code') ?? undefined
+  function handleProtocol(urlString: string) {
+    log.info("Processing protocol URL", urlString)
+    
+    const url = new URL(urlString)
+    const code = url.searchParams.get('code') ?? undefined
     store.set('code', code)
     log.info('Auth code stored from protocol')
+
     loginWindow?.close()
     loginWindow = undefined
     tryPresenting()
@@ -561,9 +561,33 @@ declare const CSP_POLICY: string
     log.info('Logging out, discarding session:', discardSession)
     presenterWindow?.close()
     presenterWindow = undefined
+    
     store.delete('code')
+    store.delete('name')
     store.set('recentContacts', {})
+    store.set('inviteCodeCache', {})
+
     createLoginWindow(discardSession)
+  }
+
+  function openInviteMessage(inviteCode: string | undefined) {
+    if (!inviteCode) {
+      log.warn('Cannot open invite message, no inviteCode available')
+      return
+    }
+
+    log.info('Opening invite message, inviteCode:', inviteCode)
+    customDialog.openTrayDialog({
+      title: i18n.t('sharingActive.title'),
+      messages: [{
+        content: i18n.t('sharingActive.linkMessage'),
+        copyText: new URL(`${import.meta.env.VITE_APP_URL}/${inviteCode}`).toString(),
+      }, {
+        content: i18n.t('sharingActive.codeMessage'),
+        copyText: inviteCode,
+      }],
+      timeout: 15000
+    })
   }
 
   async function startPresenting(data: StreamerData) {
@@ -581,14 +605,6 @@ declare const CSP_POLICY: string
     } else {
       remotePresenter.useSource(sourceId)
     }
-  }
-
-  function stopSharing() {
-    log.info('Stopping sharing, clearing currentInviteCode')
-    currentInviteCode = undefined
-    remotePresenter?.stop()
-    remotePresenter = undefined
-    customDialog.closeTrayDialogs()
   }
 
   function getAppUrl() {
@@ -672,34 +688,14 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      presenterWindow?.hide()
+      //presenterWindow?.hide()
     }
 
     currentSource = data
   })
 
-  const openShareMessage = async () => {
-    log.info('Opening share message, currentInviteCode:', currentInviteCode)
-    if (!currentInviteCode) {
-      log.warn('No currentInviteCode available')
-      return
-    }
-
-    customDialog.openTrayDialog({
-      title: i18n.t('sharingActive.title'),
-      messages: [{
-        content: i18n.t('sharingActive.linkMessage'),
-        copyText: new URL(`${import.meta.env.VITE_APP_URL}/${currentInviteCode}`).toString(),
-      }, {
-        content: i18n.t('sharingActive.codeMessage'),
-        copyText: currentInviteCode,
-      }],
-      timeout: 15000
-    })
-  }
-
+  let currentInviteCode: string | undefined
   ipcMain.handle('sharing-active', async (_event, inviteCode: string, data: string) => {
-    log.info('sharing-active')
     const streamerData = JSON.parse(data) as StreamerData
     log.info('sharing-active handler called with source: ', streamerData.source.id, inviteCode)
     
@@ -708,18 +704,21 @@ declare const CSP_POLICY: string
       startPresenting(streamerData)
     
       customDialog.playSoundOnOpen('ping')
-      await openShareMessage()
+      openInviteMessage(inviteCode)
     //}
   })
 
-  ipcMain.handle('show-sharing-active', async (_event) => {
-    log.info('show-sharing-active handler called with currentInviteCode:', currentInviteCode)
-    await openShareMessage()
+  ipcMain.handle('show-sharing-active', () => {
+    openInviteMessage(currentInviteCode)
   })
 
   ipcMain.handle('stop-sharing', async (_event) => {
-    stopSharing()
     console.log('stop-sharing handler called')
+    currentInviteCode = undefined
+    remotePresenter?.stop()
+    remotePresenter = undefined
+    customDialog.closeTrayDialogs()
+    
     presenterWindow?.close()
     presenterWindow = undefined
   })
@@ -799,50 +798,4 @@ declare const CSP_POLICY: string
     })
     notification.show()
   })
-
-  // Create a helper function to create resized template menu icons
-  const createMenuIcon = (iconPath: string): Electron.NativeImage => {
-    const icon = nativeImage.createFromPath(path.join(__dirname, iconPath))
-    
-    if (process.platform === 'darwin') {
-      const newIcon = invertIcon(icon)
-      newIcon.setTemplateImage(true)
-      return newIcon.resize({ width: 16, height: 16 })
-    }
-
-    // On Windows, invert for dark theme
-    if (process.platform === 'win32' && ! nativeTheme.shouldUseDarkColors) {
-      return invertIcon(icon).resize({ 
-        width: 16, 
-        height: 16,
-        quality: 'best'  // Use best quality to preserve transparency
-      })
-    }
-
-    return icon.resize({ 
-      width: 16, 
-      height: 16,
-      quality: 'best'  // Use best quality to preserve transparency
-    })
-  }
-
-  function invertIcon(icon: Electron.NativeImage): Electron.NativeImage {
-    // Get bitmap data and size
-    const size = icon.getSize()
-    const bitmap = icon.getBitmap()
-    
-    // Invert colors (each pixel has 4 values: R,G,B,A)
-    for (let i = 0; i < bitmap.length; i += 4) {
-      // Only invert if the pixel is not fully transparent
-      if (bitmap[i + 3] > 5) {
-        bitmap[i] = 255 - bitmap[i]     // R
-        bitmap[i + 1] = 255 - bitmap[i + 1] // G
-        bitmap[i + 2] = 255 - bitmap[i + 2] // B
-      }
-      // Leave alpha channel (i + 3) unchanged
-    }
-    
-    // Create new image from inverted bitmap with correct dimensions
-    return nativeImage.createFromBitmap(bitmap, size)
-  }
 })()

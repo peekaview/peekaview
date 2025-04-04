@@ -50,6 +50,12 @@ declare global {
   interface HTMLDivElement {
     addEventListener<K extends PanzoomEvent>(type: K, listener: (this: HTMLDivElement, ev: { detail: PanzoomEventDetail }) => any, options?: boolean | AddEventListenerOptions): void;
   }
+
+  // TODO: experimental features, remove once general typing is supported
+  interface Screen {
+    availLeft: number
+    availTop: number
+  }
 }
 
 export interface IElectronAPI {

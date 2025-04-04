@@ -30,7 +30,7 @@ type PresenterOptions = {
     getMessage: (name: string) => string
   }
   onRequest?: (request: RequestData) => Promise<boolean>
-  onStream?: (stream: MediaStream, shareAudio?: boolean) => void
+  onStream?: (stream: MediaStream) => void
   onRemote?: SendRemote
   onReset?: (data: RemoteData<'reset'>) => void
   onStop?: () => void
@@ -38,7 +38,7 @@ type PresenterOptions = {
   onApiError?: (error: Error, requestData: any) => void
 }
 
-export function usePresenter(data: PresenterData, getStream: (shareAudio: boolean) => Promise<{ stream: MediaStream | undefined, source: ScreenSource | undefined }>, options?: PresenterOptions) {
+export function usePresenter(data: PresenterData, getStream: () => Promise<{ stream: MediaStream | undefined, source: ScreenSource | undefined }>, options?: PresenterOptions) {
   const inApp = !!window.electronAPI
   const screenPresent = ref<ScreenPresent>()
   const screenShareData = ref<ScreenShareData>()
@@ -161,6 +161,7 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
       email: unref(data.email),
       token: unref(data.token),
     }
+    console.log("createScreenShareRoom", requestData)
 
     try {
       const acceptedData = await callApi<AcceptedRequestData>(requestData)
@@ -227,20 +228,19 @@ export function usePresenter(data: PresenterData, getStream: (shareAudio: boolea
     }
   }
 
-  async function presentSource(shareAudio = false) {
-    console.log('presentSource')
+  async function presentSource() {
     if (!screenPresent.value)
       return
 
     try {
-      const { stream: str, source } = await getStream(shareAudio)
+      const { stream: str, source } = await getStream()
       if (!str)
         return
 
       await cleanUpStream()
       stream.value = str
-      await screenPresent.value.addStream(stream.value, shareAudio)
-      options?.onStream?.(stream.value, shareAudio)
+      await screenPresent.value.addStream(stream.value)
+      options?.onStream?.(stream.value)
       stream.value.getVideoTracks()[0].onended = () => {
         stopSharing()
       }

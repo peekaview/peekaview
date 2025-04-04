@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, useTemplateRef, watch, onMounted } from 'vue'
+import { ref, onBeforeUnmount, useTemplateRef, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import StreamContainer from '../views/viewer/StreamContainer.vue'
 import Clipboard from '../components/Clipboard.vue'
-import { ContactData, File, Size } from '../../interface'
+import { ContactData, File, Platform, Size } from '../../interface'
 import PresenterToolbar from '../components/PresenterToolbar.vue'
 import { usePresenter, getStreamInBrowser, type Presenter } from '../composables/usePresenter'
 import { notify, prompt, PromptOptions, NotifyOptions, getPlatform } from '../util'
@@ -14,16 +14,27 @@ import { useFileChunkRegistry } from '../../composables/useFileChunking'
 import LoadingDarkGif from '../../assets/img/loading_dark.gif'
 import { useRemoteHandlers } from '../composables/useRemoteHandlers'
 
+type WindowConfig = { minTransformTime: number, urlBarHeight: number, titleBarHeight: number }
+
+ // TODO: as of now those are for Chrome on KDE, check other OS's / browsers
+const defaultWindowConfig = { minTransformTime: 300, urlBarHeight: 36, titleBarHeight: 268 }
+const windowConfigByOs: Partial<Record<Platform, WindowConfig>> = {
+  linux: { minTransformTime: 250, urlBarHeight: 36, titleBarHeight: 268 },
+  win: { minTransformTime: 250, urlBarHeight: 36, titleBarHeight: 268 },
+  mac: { minTransformTime: 300, urlBarHeight: 36, titleBarHeight: 268 },
+}
+
+const windowDefaultSize = [480, 360] as const
+const windowSelectSize = [720, 600] as const
+const windowModalSize = [480, 600] as const
+
 const { t } = useI18n()
 
 const platform = getPlatform()
-const windowDefaultSize = [400, 400] as const
-const windowSelectSize = [720, 600] as const
-const windowModalSize = [400, 550] as const
-
- // TODO: as of now those are for Chrome on KDE, check other OS's / browsers
-const urlBarHeight = 36
-const titleBarHeight = 268
+const windowConfig = {
+  ...defaultWindowConfig,
+  ...(windowConfigByOs[platform] ?? {}),
+}
 
 const outerRef = useTemplateRef('outer')
 const toolbarRef = useTemplateRef('toolbar')
@@ -55,6 +66,7 @@ async function start() {
     throw new Error('')
   
   const { email, token } = parseCode(code)
+  const shareAudio = params.get('shareAudio') === 'true'
   const notify = params.get('notify')
   const contactToNotify = notify ? JSON.parse<ContactData>(notify) : undefined
 
@@ -62,10 +74,10 @@ async function start() {
     email: email!,
     token: token!,
     toolsEnabled,
-  }, async (shareAudio) => {
-    const unsize = await fixSize(windowSelectSize)
+  }, async () => {
+    const unsize = await fixSize(windowSelectSize, 1)
     const s = await getStreamInBrowser(shareAudio)
-    unsize()
+    await unsize()
 
     stream.value = s
 
@@ -199,6 +211,8 @@ function fitPreview() {
   const deltaHeight = Math.round(outerRect.height - videoRect.height - toolbarRect.height)
   if (deltaWidth > 0 || deltaHeight > 0)
     window.resizeTo(window.outerWidth - deltaWidth, window.outerHeight - deltaHeight)
+
+  return [deltaWidth, deltaHeight]
 }
 
 let throttling = false
@@ -209,7 +223,7 @@ function freezeAndFocus() {
 
   const toolbarRect = toolbarRef.value!.$el.getBoundingClientRect()
   const width = streamSize.value.width
-  const height = streamSize.value.height + toolbarRect.height + urlBarHeight
+  const height = streamSize.value.height + toolbarRect.height + windowConfig.urlBarHeight
   if (width <= window.innerWidth && height <= window.innerHeight)
     return
 
@@ -222,10 +236,10 @@ function freezeAndFocus() {
     shutterActive.value = false
     
     // TODO: what if someone freezes while a modal is open? fix!
-    const unsize = await fixSize([width, height], [0, 0])
+    const unsize = await fixSize([width, height], -1)
     window.focus()
-    window.setTimeout(() => {
-      unsize(true)
+    window.setTimeout(async () => {
+      await unsize(true)
       containerRef.value?.videoRef?.play()
     }, 3000)
   }, 150)
@@ -245,7 +259,22 @@ async function showInviteLink() {
     navigator.clipboard.writeText(url.toString())
 }
 
-async function fixSize(size: readonly [number, number], position?: readonly [number, number]) {
+// OS-dependent findings on transforming windows:
+//
+// Linux KDE: A window cannot be resized beyond the boundaries of its current screen; instead, it is moved in top left direction until it fits.
+// Also, the coordinate origin is not relative to the screen which the window has most of its area on, but absolute.
+// Data about this screen's position is only obtainable through experimental browser features without baseline availability as of now.
+//
+// Windows: Resizing a window beyond the boundaries of its current screen is possible only into another screen, but when it's mainly overlapping into that,
+// then moving it will use that's screen coordinate origin instead. Thus it needs to be moved first. On the other hand though, a window cannot be resized
+// to overlap outside of any visible screen, but compared to Linux the according position adjustment does not seem to follow any comprehensible logic.
+//
+// Mac: So far the same as for Windows.
+//
+// The overall approach should be the following to avoid overlaps at all:
+// If the window size is to be increased, then it should be moved beforehand. Generally applies when fixing to a size.
+// If the window size is to be decreased, then it should be moved afterwards. Generally applies when unfixing off a size.
+async function fixSize(size: readonly [number, number], cornerAlign = 0) {
   if (sizeFixed.value)
     throw new Error('Window size is already fixed!')
 
@@ -255,35 +284,42 @@ async function fixSize(size: readonly [number, number], position?: readonly [num
   const height = window.outerHeight
 
   sizeFixed.value = true
-  await transform(size, position)
+
+  const [left, top] = getAbsoluteScreenPosition()
+  if (cornerAlign < 0)
+    window.moveTo(left, top)
+  else if (cornerAlign > 0)
+    window.moveTo(window.screen.width + left - size[0], window.screen.height + top - size[1])
+
+  await sleep(windowConfig.minTransformTime)
+  window.resizeTo(...size)
 
   return async (toPrevious = false) => {
+    if (toPrevious) {
+      window.resizeTo(width, height)
+      await sleep(windowConfig.minTransformTime)
+      window.moveTo(x, Math.max(y, windowConfig.titleBarHeight))
+      sizeFixed.value = false
+    } else {
+      window.resizeTo(...windowDefaultSize)
+      await nextTick()
+      fitPreview()
+      await sleep(windowConfig.minTransformTime)
+      // recall in case the current screen has changed
+      const [left, top] = getAbsoluteScreenPosition()
+      // decrease by 1 to avoid slight overlaps for some OS's
+      window.moveTo(window.screen.width + left - window.outerWidth - 1, window.screen.height + top - window.outerHeight - 1)
+    }
     sizeFixed.value = false
-    if (toPrevious)
-      await transform([width, height], [x, Math.max(y, titleBarHeight)]) // timeout required to let resize finish
-    else
-      await transform(windowDefaultSize, [99999, 99999]) // force to the bottom right corner, because the correct values cannot be determined in a multi monitor setup
   }
 }
 
-async function transform(size: readonly [number, number], position?: readonly [number, number]) {
-  if (platform === 'linux') {
-    window.resizeTo(...size)
-
-    if (position) {
-      await sleep(300) // let resizing finish
-      window.moveTo(...position)
-    }
-  } else {
-    // on macOS, when the window is resized is first, it might mainly overlap into another window, thus move it to the top left corner beforehand
-    console.log("transform", size, position)
-    if (position) {
-      window.moveTo(...position)
-      await sleep(300) // let moving finish
-    }
-
-    window.resizeTo(...size)
-  }
+function getAbsoluteScreenPosition() {
+  // TODO: experimental features, check for baseline availability
+  return [
+    platform === 'linux' && window.screen.availLeft || 0,
+    platform === 'linux' && window.screen.availTop || 0
+  ]
 }
 
 const modalQueue: (Promise<string> | Promise<void>)[] = []
@@ -292,7 +328,7 @@ async function resizeAndPrompt(options: PromptOptions) {
 
   const modalPromise = prompt(options)
   modalQueue.push(modalPromise)
-  const unsize = await fixSize(windowModalSize)
+  const unsize = await fixSize(windowModalSize, 1)
 
   const result = await modalPromise
 
@@ -305,7 +341,7 @@ async function resizeAndNotify(options: NotifyOptions) {
 
   const modalPromise = notify(options)
   modalQueue.push(modalPromise)
-  const unsize = await fixSize(windowModalSize)
+  const unsize = await fixSize(windowModalSize, 1)
 
   await modalPromise
 

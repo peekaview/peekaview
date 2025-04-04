@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, defineModel } from 'vue'
 
 import { ScreenSource } from '../../../interface'
 
@@ -9,6 +9,8 @@ const emit = defineEmits<{
   (e: 'select', source: ScreenSource): void
   (e: 'cancel'): void
 }>()
+
+const shareAudio = defineModel<boolean>('shareAudio', { required: false, default: false })
 
 const sources = ref<ScreenSource[]>()
 const selectedSource = ref<ScreenSource | undefined>()
