@@ -2,32 +2,13 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { AcceptedRequestData, RoomData, ViewerData } from '../../types'
+import type { RequestStatus, RequestUserStatus, RoomData, ViewerData } from '../../types'
 import { callApi } from '../../api'
 import { getPlatform, getStoredItem, notify, setStoredItem } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
 import { stringToColor } from '../../../util'
 
-type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
-type RequestUserStatus = "online" | "away" | "offline" | "unknown"
 type WaitingStatus = "establishing" | "notified" | "waiting"
-
-type UnacceptedRequestResponse = {
-  status: Exclude<RequestStatus, "request_accepted">
-  user_status: RequestUserStatus
-  last_seen: number
-  videoServer: undefined
-  controlServer: undefined
-  roomId: undefined
-}
-
-type AcceptedRequestResponse = {
-  status: "request_accepted"
-  user_status: RequestUserStatus
-  last_seen: number
-} & AcceptedRequestData
-
-type Response = UnacceptedRequestResponse | AcceptedRequestResponse
 
 const props = withDefaults(defineProps<{
   contact: ViewerData
@@ -74,14 +55,13 @@ async function requestScreen(uuid: string, initial = false) {
 
     console.log('accessToken', props.accessToken)
     const params = {
-      action: 'showMeYourScreen' as const,
       init: initial ? '1' as const : '0' as const,
       name: props.contact.name,
       accessToken: props.accessToken,
       requestId: uuid.replace(/-/g, '').substring(0, 8), // uuid,
     }
 
-    const data = await callApi<Response>(props.contact.uuid ? {
+    const data = await callApi('showMeYourScreen', props.contact.uuid ? {
       ...params,
       uuid: props.contact.uuid,
     } : props.contact.email ? {

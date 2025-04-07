@@ -12,6 +12,7 @@ export enum Action {
 export function useParamsData() {
   const action = ref<Action>()
   
+  const loginCode = ref<string | undefined>()
   const email = ref<string | undefined>()
   const token = ref<string | undefined>()
 
@@ -20,15 +21,14 @@ export function useParamsData() {
   const accessToken = ref<string | undefined>()
 
   const inviteCode = window.location.pathname.replaceAll('/', '')
-  if (inviteCode) {
+  if (inviteCode)
     getStoredItem('inviteCodeCache').then(async (cache) => {
       try {
         if (!cache)
           cache = {}
         
         if (!cache[inviteCode]) {
-          const data = await callApi<{ email: string, accessToken: string }>({
-            action: 'useInviteCode',
+          const data = await callApi('useInviteCode', {
             code: inviteCode,
           })
 
@@ -52,34 +52,56 @@ export function useParamsData() {
         console.error('Error using invite code', error)
       }
     })
-  } else {
-    const code = localStorage.getItem('code')
-    const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
-    email.value = e
-    token.value = t
+  else
+    (async () => {
+      const code = localStorage.getItem('code')
+      const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
+      email.value = e
+      token.value = t
 
-    const params = new URLSearchParams(window.location.search)
-    handleParams(params)
+      const params = new URLSearchParams(window.location.search)
+      handleParams(params)
 
-    for (const a of Object.values(Action)) {
-      if (!params.has(a))
-        continue
+      for (const a of Object.values(Action)) {
+        if (!params.has(a))
+          continue
 
-      action.value = a
-      const value = params.get(a)
-      if (value)
-        handleParams(new URLSearchParams(atob(value)))
+        action.value = a
+        const value = params.get(a)
+        if (value)
+          handleParams(new URLSearchParams(atob(value)))
 
-      break
-    }
+        break
+      }
 
-    watch(action, (action) => {
-      if (action === Action.Share && (!email.value || !token.value))
-        window.location.search = 'login'
-    })
-  }
+      if (loginCode.value) {
+        try {
+          const data = await callApi('login', {
+            code: loginCode.value,
+          })
+
+          email.value = data.email
+          token.value = data.token
+          target.value = data.target
+            
+        } catch (e) {
+          // TODO: Handle error
+        }
+      }
+      
+      if (email.value && token.value) {
+        const code = btoa(`email=${email.value}&token=${token.value}`)
+        setStoredItem('code', code)
+      }
+
+      watch(action, (action) => {
+        if (action === Action.Share && (!email.value || !token.value))
+          window.location.search = 'login'
+      })
+    })()
 
   function handleParams(params: URLSearchParams) {
+    loginCode.value = params.get('login') ?? loginCode.value
     email.value = params.get('email')?.toLowerCase() ?? email.value
     token.value = params.get('token') ?? token.value
     target.value = params.get('target') ?? target.value
@@ -93,17 +115,13 @@ export function useParamsData() {
       localStorage.removeItem('recentContacts')
       localStorage.removeItem('inviteCodeCache')
     }
-    
-    if (email.value && token.value) {
-      const code = btoa(`email=${email.value}&token=${token.value}`)
-      setStoredItem('code', code)
-    }
   }
 
   return {
     action: computed(() => action.value),
-    token: computed(() => token.value),
+    loginCode: computed(() => loginCode.value),
     email: computed(() => email.value),
+    token: computed(() => token.value),
     target: computed(() => target.value),
     viewEmail: computed(() => viewEmail.value),
     accessToken: computed(() => accessToken.value),

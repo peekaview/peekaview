@@ -51,7 +51,7 @@
     "openApp": "Open App",
     "toShare": "Go to screen sharing",
     "orEnterCode": "Or enter this code in the app to proceed:",
-    "contactSupport": "If you're having trouble, please contact support.",
+    "contactSupport": "Should any issues arise, please contact support.",
     "connectionError": {
       "title": "Connection Error",
       "text": "There was a problem connecting to the server. Please try again."

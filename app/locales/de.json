@@ -51,7 +51,7 @@
     "openApp": "App öffnen",
     "toShare": "Zur Bildschirmfreigabe",
     "orEnterCode": "Oder geben Sie diesen Code in der App ein, um fortzufahren:",
-    "contactSupport": "Wenn Sie Probleme haben, wenden Sie sich bitte an den Support.",
+    "contactSupport": "Falls Probleme auftreten, wenden Sie sich bitte an den Support.",
     "connectionError": {
       "title": "Verbindungsfehler",
       "text": "Beim Herstellen der Verbindung ist ein Problem aufgetreten. Bitte versuchen Sie es erneut."

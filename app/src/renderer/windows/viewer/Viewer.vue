@@ -41,8 +41,7 @@ onMounted(async () => {
 
     if (email && token) {
       window.electronAPI?.log('Notify contact:', JSON.stringify(contact))
-      callApi<Response>({
-        action: 'sendPushNotification',
+      callApi('sendPushNotification', {
         email: email!,
         token: token!,
         uuid: contact.id,

@@ -37,6 +37,7 @@ define('VIDEO_SERVERS', array_filter(array_map('trim', explode(',', getenv('VIDE
 define('STORAGE_PATH', '/storage');
 define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
+define('LOGIN_TIMEOUT', 600); // seconds
 
 $out = [];
 $log = [];
@@ -96,6 +97,9 @@ if (!file_exists(STORAGE_PATH . '/requests')) {
 }
 if (!file_exists(STORAGE_PATH . '/invite')) {
     mkdir(STORAGE_PATH . '/invite', 0777, true);
+}
+if (!file_exists(STORAGE_PATH . '/login')) {
+    mkdir(STORAGE_PATH . '/login', 0777, true);
 }
 
 function generateJWT($email, $roomId) {
@@ -168,6 +172,10 @@ function getRequestFilename($email, $requestId) {
 
 function getInviteFilename($code) {
     return STORAGE_PATH . '/invite/' . $code . '.txt';
+}
+
+function getLoginFilename($code) {
+    return STORAGE_PATH . '/login/' . $code . '.txt';
 }
 
 function getUserFile($email) {
@@ -471,19 +479,45 @@ function registerMyEmail() {
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
         file_put_contents($userFile, $userData);
-
-        $uuid = $_GET['uuid'];
-        $uuidFile = getUuidFilename($uuid);
-        file_put_contents($uuidFile, $email);
     }
+
+    $uuid = $_GET['uuid'];
+    $uuidFile = getUuidFilename($uuid);
+    file_put_contents($uuidFile, $email);
+
+    $loginCode = generateRandomString(8);
+    $loginFile = getLoginFilename($loginCode);
+    $loginData = implode(';', [$email, $token, $target]);
+    file_put_contents($loginFile, $loginData);
     
     require_once __DIR__.'/helper/EmailHelper.php';
 
     $emailHelper = new EmailHelper();
-    $registrationLink = "https://".APP_DOMAIN."/?login=".base64_encode("email=$email&token=$token&target=$target");
+    $registrationLink = "https://".APP_DOMAIN."/?login=".$loginCode;
     $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
 
     return ['success' => true];
+}
+
+function login() {
+    $loginCode = $_GET['code'];
+    $loginFile = getLoginFilename($loginCode);
+    if (!file_exists($loginFile)) {
+        return ['error' => 'Code not foudn or expired'];
+    }
+    
+    $time = filemtime($loginFile);
+    if ($time < time() - LOGIN_TIMEOUT) {
+        unlink($loginFile);
+        return ['error' => 'Code expired'];
+    }
+
+    $loginData = explode(';', file_get_contents($loginFile));
+    $email = $loginData[0];
+    $token = $loginData[1];
+    $target = $loginData[2];
+
+    return ['email' => $email, 'token' => $token, 'target' => $target];
 }
 
 function registerPushToken() {
@@ -532,7 +566,7 @@ function useInviteCode($code) {
     
     $time = filemtime($inviteFile);
     if ($time < time() - OFFLINE_TIMEOUT) {
-        unlink($tempFile);
+        unlink($inviteFile);
         return ['error' => 'Code expired'];
     }
     

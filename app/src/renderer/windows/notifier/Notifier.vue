@@ -27,8 +27,7 @@ window.electronAPI?.onFirebaseNotificationReceived((message) => {
 async function updatePushToken(token: string) {
   window.electronAPI?.log('Updated push token:', token)
   const uuid = (await getStoredItem('uuid'))!
-  callApi({
-    action: 'registerPushToken',
+  callApi('registerPushToken', {
     uuid,
     token,
   }).then((response) => {

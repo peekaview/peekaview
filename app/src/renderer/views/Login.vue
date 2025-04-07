@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
-import { parseCode } from '../../util'
-
-type Response = {
-  success: boolean
-  error?: string
-}
 
 const props = defineProps<{
   target?: string
@@ -17,20 +11,11 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const email = ref<string>()
-const token = ref<string>()
-
-const code = computed({
-  get: () => (email.value && token.value) ? btoa(`email=${email.value}&token=${token.value}`) : undefined,
-  set: (value) => {
-    const { email: e, token: t } = parseCode(value)
-    email.value = e ?? email.value
-    token.value = t ?? token.value
-  },
-})
+const formEmail = ref<string>()
+const code = ref<string | undefined>()
 
 onMounted(async () => {
-  code.value = await getStoredItem('code')
+  code.value = new URLSearchParams(window.location.search).get('code') ?? undefined
 })
 
 function handleOpenApp() {
@@ -42,16 +27,15 @@ function toScreenShare() {
 }
     
 async function handleRegister(e: Event) {
-  e.preventDefault();
+  e.preventDefault()
 
-  if (!email.value)
+  if (!formEmail.value)
     return
 
   try {
     const uuid = (await getStoredItem('uuid'))!
-    const response = await callApi<Response>({
-      action: 'registerMyEmail',
-      email: email.value,
+    const response = await callApi('registerMyEmail', {
+      email: formEmail.value,
       uuid,
       target: props.target === 'app' ? 'app' : 'web',
     })
@@ -59,7 +43,7 @@ async function handleRegister(e: Event) {
     if (response.success)
       handleJustRegistered()
   } catch (error) {
-    console.error('Error during registration:', error);
+    console.error('Error during registration:', error)
     handleError()
   }
 }
@@ -91,7 +75,7 @@ function handleError() {
       <div class="mb-4">
         <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
-          v-model="email"
+          v-model="formEmail"
           placeholder="example@email.com" required>
       </div>
       <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
@@ -106,8 +90,8 @@ function handleError() {
         {{ $t('login.openApp') }}
       </button>
 
-      <div class="text-secondary">
-        <small>{{ $t('login.orEnterCode') }}</small>
+      <div>
+        <p>{{ $t('login.orEnterCode') }}</p>
         <div class="bg-light p-3 rounded mt-2 mb-3">
           <code>{{ code }}</code>
         </div>

@@ -71,8 +71,7 @@ uuidPromise.then(uuid => {
   console.log('uuid', uuid)
 
   getPushToken().then(async (token) => {
-    await callApi({
-      action: 'registerPushToken',
+    await callApi('registerPushToken', {
       uuid,
       token,
     })
@@ -142,8 +141,7 @@ function viewRecentContact(id?: string) {
     return
 
   if (email.value && token.value)
-    callApi({
-      action: 'sendPushNotification',
+    callApi('sendPushNotification', {
       email: email.value,
       token: token.value,
       uuid: contact.id,

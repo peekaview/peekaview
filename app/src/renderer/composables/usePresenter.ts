@@ -2,7 +2,6 @@ import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue
 
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
-import type { AcceptedRequestData } from '../types'
 import { callApi, UnauthorizedError } from '../api'
 import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
@@ -157,14 +156,13 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       return
 
     const requestData = {
-      action: 'createScreenShareRoom' as const,
       email: unref(data.email),
       token: unref(data.token),
     }
     console.log("createScreenShareRoom", requestData)
 
     try {
-      const acceptedData = await callApi<AcceptedRequestData>(requestData)
+      const acceptedData = await callApi('createScreenShareRoom', requestData)
 
       const id = (await getStoredItem('uuid'))!
       screenShareData.value = {
@@ -205,8 +203,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
 
         console.log('Notify contact:', contact)
         window.electronAPI?.log('Notify contact:', JSON.stringify(contact))
-        callApi<Response>({
-          action: 'sendPushNotification',
+        callApi('sendPushNotification', {
           email: unref(data.email),
           token: unref(data.token),
           uuid: contact.id,
@@ -258,14 +255,13 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       return
 
     const requestData = {
-      action: 'iAmOnline' as const,
       email: unref(data.email),
       token: unref(data.token),
       inviteCode: inviteCode.value!,
     }
 
     try {
-      await callApi(requestData)
+      await callApi('iAmOnline', requestData)
       lastPingTime.value = Date.now()
     } catch (error) {
       console.error('Error updating online status:', error)
@@ -275,13 +271,12 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
 
   async function checkRequests() {
     const requestData = {
-      action: 'doesAnyoneWantToSeeMyScreen' as const,
       email: unref(data.email),
       token: unref(data.token),
     }
     
     try {
-      const requests = await callApi<RequestData[]>(requestData)
+      const requests = await callApi('doesAnyoneWantToSeeMyScreen', requestData)
       for (const request of requests)
         requestQueue[request.requestId] = request
     } catch (error) {
@@ -298,13 +293,10 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       const id = keys[0]
       window.electronAPI?.log('processRequests', JSON.stringify(requestQueue[id]))
       if (!options?.onRequest || requestQueue[id].accessToken === accessToken.value) {
-        await acceptRequest(id)
+        await handleRequest(id, true)
       } else {
         const response = await options.onRequest(requestQueue[id])
-        if (response)
-          await acceptRequest(id)
-        else
-          await denyRequest(id)
+        handleRequest(id, response)
       }
       delete requestQueue[id]
     }
@@ -312,33 +304,18 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
     processRequestTimeout = window.setTimeout(() => processRequests(), 100)
   }
 
-  async function acceptRequest(id: string) {
+  async function handleRequest(id: string, allowed: boolean) {
     const requestData = {
-      action: 'youAreAllowedToSeeMyScreen' as const,
+      allowed,
       email: unref(data.email),
       token: unref(data.token),
       requestId: id,
     }
 
     try {
-      await callApi(requestData)
+      await callApi('handleIfAllowedToSeeMyScreen', requestData)
     } catch (error) {
-      console.error('Error accepting request:', error)
-      handleApiError(error as Error, requestData)
-    }
-  }
-
-  async function denyRequest(id: string) {
-    const requestData = {
-      action: 'youAreNotAllowedToSeeMyScreen' as const,
-      email: unref(data.email),
-      token: unref(data.token),
-      requestId: id,
-    }
-    try {
-      await callApi(requestData)
-    } catch (error) {
-      console.error('Error denying request:', error)
+      console.error('Error handling request:', error)
       handleApiError(error as Error, requestData)
     }
   }

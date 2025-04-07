@@ -1,61 +1,118 @@
 import { NotificationPayload } from "src/interface"
 import i18n from "./i18n"
-import { EitherEmailOrCodeOrUuid } from "./types"
+import { EitherEmailOrCodeOrUuid, RequestStatus, RequestUserStatus, RoomData } from "./types"
 import { notify } from "./util"
 
-export type ShowMeYourScreenParams = {
-  action: "showMeYourScreen"
-  name: string
-  requestId: string
-  init: '1' | '0'
-} & EitherEmailOrCodeOrUuid
-
-export type ApiRequestParams = ShowMeYourScreenParams | {
-  action: "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom"
-  email: string
-  token: string
-} | {
-  action: "iAmOnline"
-  email: string
-  token: string
+type AcceptedRequestData = RoomData & {
   inviteCode: string
-} | {
-  action: "youAreAllowedToSeeMyScreen" | "youAreNotAllowedToSeeMyScreen"
-  email: string
-  token: string
-  requestId: string
-} | {
-  action: "registerMyEmail"
-  email: string
-  uuid: string
-  target: 'web' | 'app'
-} | {
-  action: "registerPushToken"
-  uuid: string
-  token: string
-} | {
-  action: "sendPushNotification"
-  email: string
-  token: string
-  uuid: string
-  notification: JsonString<NotificationPayload>
-} | {
-  action: "useInviteCode"
-  code: string
+  accessToken: string
 }
 
-export async function callApi<TResponse = void>(params: ApiRequestParams) {
+type UnacceptedRequestResponse = {
+  status: Exclude<RequestStatus, "request_accepted">
+  user_status: RequestUserStatus
+  last_seen: number
+  videoServer: undefined
+  controlServer: undefined
+  roomId: undefined
+}
+
+type AcceptedRequestResponse = {
+  status: "request_accepted"
+  user_status: RequestUserStatus
+  last_seen: number
+} & AcceptedRequestData
+
+export type ApiAction = "showMeYourScreen" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom" | "iAmOnline" | "handleIfAllowedToSeeMyScreen" | "registerMyEmail" | "login" | "registerPushToken" | "sendPushNotification" | "useInviteCode"
+
+export type ApiParams<T extends ApiAction> =
+  T extends "showMeYourScreen" ? {
+    name: string
+    requestId: string
+    init: '1' | '0'
+  } & EitherEmailOrCodeOrUuid
+  : T extends "doesAnyoneWantToSeeMyScreen" ? {
+    email: string
+    token: string
+  }
+  : T extends "createScreenShareRoom" ? {
+    email: string
+    token: string
+  }
+  : T extends "iAmOnline" ? {
+    email: string
+    token: string
+    inviteCode: string
+  }
+  : T extends "handleIfAllowedToSeeMyScreen" ? {
+    allowed: boolean
+    email: string
+    token: string
+    requestId: string
+  }
+  : T extends "registerMyEmail" ? {
+    email: string
+    uuid: string
+    target: 'web' | 'app'
+  }
+  : T extends "login" ? {
+    code: string
+  }
+  : T extends "registerPushToken" ? {
+    uuid: string
+    token: string
+  }
+  : T extends "sendPushNotification" ? {
+    email: string
+    token: string
+    uuid: string
+    notification: JsonString<NotificationPayload>
+  }
+  : T extends "useInviteCode" ? {
+    code: string
+  }
+  : never
+
+export type ApiResponse<T extends ApiAction> =
+  T extends "showMeYourScreen" ? UnacceptedRequestResponse | AcceptedRequestResponse
+  : T extends "doesAnyoneWantToSeeMyScreen" ? {
+    requestId: string
+    accessToken?: string | undefined
+    name: string
+  }[]
+  : T extends "createScreenShareRoom" ? AcceptedRequestData
+  : T extends "iAmOnline" ? {}
+  : T extends "handleIfAllowedToSeeMyScreen" ? {}
+  : T extends "registerMyEmail" ? {
+    success: boolean
+    error?: string
+  }
+  : T extends "login" ? {
+    email: string
+    token: string
+    target: 'web' | 'app'
+  }
+  : T extends "registerPushToken" ? {}
+  : T extends "sendPushNotification" ? {}
+  : T extends "useInviteCode" ? {
+    email: string
+    accessToken: string
+  }
+  : never
+
+export async function callApi<TAction extends ApiAction>(action: TAction, params: ApiParams<TAction>) {
   const filteredParams = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined))
   const response = await fetch(`${import.meta.env.VITE_API_URL}?${new URLSearchParams({
     lang: i18n.global.locale.value,
+    action,
     ...filteredParams,
   }).toString()}`)
   if (response.status === 401)
     throw new UnauthorizedError(response.statusText)
 
-  let responseBody: TResponse
+  let responseBody: ApiResponse<TAction>
   try {
-    responseBody = await response.json() as TResponse
+    responseBody = await response.json() as ApiResponse<TAction>
   } catch (e) {
     notify({
       title: 'Server Error',

@@ -7,10 +7,8 @@ export type RoomData = {
   turnCredentials: TurnCredentials
 }
 
-export type AcceptedRequestData = RoomData & {
-  inviteCode: string
-  accessToken: string
-}
+export type RequestStatus = "request_accepted" | "request_denied" | "request_notified" | "request_not_answered" | "request_open"
+export type RequestUserStatus = "online" | "away" | "offline" | "unknown"
 
 export type RemoteControlData = {
   roomid: string
