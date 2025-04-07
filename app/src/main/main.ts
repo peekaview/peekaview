@@ -28,6 +28,13 @@ if (process.platform === 'darwin') {
   app.dock.hide()
 }
 
+const windowDevtools = {
+  notifier: false,
+  login: false,
+  viewer: false,
+  presenter: false,
+}
+
 import { useCustomDialog } from './composables/useCustomDialog'
 import { useRemotePresenter, type RemotePresenter } from './composables/useRemotePresenter'
 
@@ -404,7 +411,8 @@ declare const CSP_POLICY: string
 
     notifierWindow.removeMenu()
     notifierWindow.setIgnoreMouseEvents(true)
-    //notifierWindow.webContents.openDevTools()
+    if (windowDevtools.notifier && !app.isPackaged)
+      notifierWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       notifierWindow!.on('ready-to-show', () => {
@@ -444,7 +452,8 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(presenterWindow, 'presenter', { data: code })
-    presenterWindow.webContents.openDevTools()
+    if (windowDevtools.presenter && !app.isPackaged)
+      presenterWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       presenterWindow!.on('ready-to-show', () => {
@@ -480,7 +489,8 @@ declare const CSP_POLICY: string
       params.viewEmail = viewEmail
 
     windowLoad(viewerWindow, 'viewer', params)
-    viewerWindow.webContents.openDevTools()
+    if (windowDevtools.viewer && !app.isPackaged)
+      viewerWindow.webContents.openDevTools()
 
     return new Promise((resolve) => {
       viewerWindow!.on('ready-to-show', () => {
@@ -516,7 +526,8 @@ declare const CSP_POLICY: string
     })
 
     windowLoad(loginWindow, 'login', { discardSession: discardSession ? 'true' : 'false' })
-    //loginWindow.webContents.openDevTools()
+    if (windowDevtools.login && !app.isPackaged)
+      loginWindow.webContents.openDevTools()
 
     loginWindow.on('ready-to-show', () => {
       loginWindow!.webContents.send('change-language', i18n.resolvedLanguage)
@@ -688,7 +699,8 @@ declare const CSP_POLICY: string
       if (data)
         log.info('Source selected:', data.id, data.name)
   
-      //presenterWindow?.hide()
+      if (!windowDevtools.presenter || app.isPackaged)
+        presenterWindow?.hide()
     }
 
     currentSource = data

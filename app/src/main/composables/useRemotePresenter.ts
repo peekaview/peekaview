@@ -19,6 +19,12 @@ import { i18n } from '../i18n'
 
 import { getWindowList } from '../util.js'
 
+const windowDevtools = {
+  overlay: false,
+  toolbar: false,
+  clipboard: false,
+}
+
 const isWin32 = process.platform === 'win32'
 const isLinux = process.platform === 'linux'
 const isMac = process.platform === 'darwin'
@@ -365,7 +371,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     overlayWindow.removeMenu()
     overlayWindow.setIgnoreMouseEvents(true)
-    //overlayWindow.webContents.openDevTools()
+    if (windowDevtools.overlay && !app.isPackaged)
+      overlayWindow.webContents.openDevTools()
     
     overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     overlayWindow.setAlwaysOnTop(true)
@@ -435,7 +442,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     })
 
     clipboardWindow.removeMenu()
-    //clipboardWindow.webContents.openDevTools()
+    if (windowDevtools.clipboard && !app.isPackaged)
+      clipboardWindow.webContents.openDevTools()
 
     clipboardWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     clipboardWindow.setAlwaysOnTop(true)
@@ -481,7 +489,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       },
     })
 
-    //toolbarWindow.webContents.openDevTools()
+    if (windowDevtools.toolbar && !app.isPackaged)
+      toolbarWindow.webContents.openDevTools()
 
     toolbarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     toolbarWindow.setAlwaysOnTop(true)

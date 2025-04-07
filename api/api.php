@@ -452,6 +452,7 @@ function getUserStatus($userFile) {
 function handleIfAllowedToSeeMyScreen($requestStatus) {
     $email = validateEmail($_GET['email']);
     $token = $_GET['token'];
+    $allowed = $_GET['allowed'] ?? false;
     $userFile = getUserFile($email);
     authorizeUser($userFile, $token);
     
@@ -462,7 +463,7 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
     }
     
     $requestData = explode(',', file_get_contents($requestFile));
-    $requestData[2] = $requestStatus;
+    $requestData[2] = $allowed ? 'request_accepted' : 'request_denied';
     file_put_contents($requestFile, implode(',', $requestData));
     return ['success' => true];
 }
@@ -597,14 +598,14 @@ try {
         case 'doesAnyoneWantToSeeMyScreen':
             $out = doesAnyoneWantToSeeMyScreen();
             break;
-        case 'youAreAllowedToSeeMyScreen':
+        case 'handleIfAllowedToSeeMyScreen':
             $out = handleIfAllowedToSeeMyScreen('request_accepted');
-            break;
-        case 'youAreNotAllowedToSeeMyScreen':
-            $out = handleIfAllowedToSeeMyScreen('request_denied');
             break;
         case 'registerMyEmail':
             $out = registerMyEmail();
+            break;
+        case 'login':
+            $out = login();
             break;
         case 'registerPushToken':
             $out = registerPushToken();
