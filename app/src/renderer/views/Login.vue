@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
 
+import CopySvg from '../../assets/icons/content-copy.svg'
+
 const props = defineProps<{
   target?: string
 }>()
@@ -64,6 +66,10 @@ function handleError() {
     confirmButtonText: t('general.ok'),
   })
 }
+
+function copy(code: string) {
+  navigator.clipboard.writeText(code)
+}
 </script>
 
 <template>
@@ -94,6 +100,9 @@ function handleError() {
         <p>{{ $t('login.orEnterCode') }}</p>
         <div class="bg-light p-3 rounded mt-2 mb-3">
           <code>{{ code }}</code>
+          <div class="btn btn-sm btn-secondary" :title="$t('toolbar.copyToClipboard')" @click="copy(code)">
+            <CopySvg />
+          </div>
         </div>
         <small>{{ $t('login.contactSupport') }}</small>
       </div>

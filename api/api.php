@@ -101,6 +101,9 @@ if (!file_exists(STORAGE_PATH . '/invite')) {
 if (!file_exists(STORAGE_PATH . '/login')) {
     mkdir(STORAGE_PATH . '/login', 0777, true);
 }
+if (!file_exists(STORAGE_PATH . '/uuid')) {
+    mkdir(STORAGE_PATH . '/uuid', 0777, true);
+}
 
 function generateJWT($email, $roomId) {
     // Header
