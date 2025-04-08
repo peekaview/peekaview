@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, defineModel } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import { ScreenSource } from '../../../interface'
 

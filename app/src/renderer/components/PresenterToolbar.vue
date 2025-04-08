@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
+import { ref, computed, useTemplateRef, watch } from 'vue'
 import { Tooltip } from 'floating-vue'
 
 import Toolbar from '../components/Toolbar.vue'
@@ -33,7 +33,7 @@ const emit = defineEmits<{
   (e: 'stop-sharing'): void
   (e: 'share-different-screen'): void
   (e: 'show-invite-link'): void
-  (e: 'resize', data: { rect: DOMRect, oldRect: DOMRect | undefined }): void
+  (e: 'on-collapse'): void
 }>()
 
 const viewersLog = ref<{ id: number, joined: boolean, name: string, timeout: number }[]>([])
@@ -88,22 +88,6 @@ const remoteControlEnabled = computed({
 const isPaused = ref(false)
 watch(isPaused, (enabled) => enabled ? emit('pause-sharing') : emit('resume-sharing'))
 
-onMounted(() => resizeWindow())
-
-function onCollapse() {
-  nextTick(() => resizeWindow())
-}
-
-let oldRect: DOMRect
-function resizeWindow() {
-  const rect = toolbarRef.value?.$el.getBoundingClientRect() as DOMRect
-  if (!rect)
-    return
-
-  emit('resize', { rect, oldRect })
-  oldRect = rect
-}
-
 function togglePointer(enabled?: boolean) {
   if (enabled === undefined)
     enabled = !_pointerEnabled.value
@@ -119,13 +103,14 @@ function toggleRemoteControl(enabled?: boolean) {
 }
 
 defineExpose({
+  toolbarRef,
   togglePointer,
   toggleRemoteControl,
 })
 </script>
 
 <template>
-  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" :invert-collapse-icons="invertCollapseIcons" @on-collapse="onCollapse">
+  <Toolbar ref="toolbar" class="main-toolbar" :collapsible="inApp" :draggable="draggable" :invert-collapse-icons="invertCollapseIcons" @on-collapse="$emit('on-collapse')">
     <label class="checkbox-container">
       <input type="checkbox" v-model="pointerEnabled" />
       <span class="checkmark"></span>

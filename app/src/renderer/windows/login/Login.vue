@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { parseCode } from '../../../util'
-
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
+import { callApi } from '../../api'
 
 const params = new URLSearchParams(window.location.search)
 const discardSession = params.get('discardSession') === 'true'
@@ -17,18 +16,17 @@ function login() {
   loggingIn.value = true
 }
 
-function loginWithCode() {
+async function loginWithCode() {
   if (!code.value)
     return
 
   try {
-    const { email, token } = parseCode(code.value)
-    if (!email || !token) {
-      invalid.value = true
-      return
-    }
-
-    window.electronAPI!.loginWithCode(code.value)
+    const response = await callApi('login', {
+      code: code.value,
+    })
+    
+    const authCode = btoa(`email=${response.email}&token=${response.token}`)
+    window.electronAPI!.loginWithCode(authCode)
   } catch (e) {
     invalid.value = true
   }

@@ -326,7 +326,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       if (inApp)
         window.electronAPI!.logout(true)
       else
-        window.location.href = `/?login=${btoa(`target=web&discardSession=true`)}`
+        window.location.href = `/?login=&target=web&discardSession=true`
       return
     }
 

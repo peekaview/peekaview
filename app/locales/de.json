@@ -212,7 +212,7 @@
     "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
     "enterCode": "Code eingeben",
     "loginWithCode": "Mit Code anmelden",
-    "invalidCode": "Ungültiger Code"
+    "invalidCode": "Code ungültig oder abgelaufen"
   },
   "sourcesWindow": {
     "type": {

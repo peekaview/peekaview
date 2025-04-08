@@ -133,6 +133,13 @@ select option:hover {
   color: #8c8c8c9f;
 }
 
+.inline-btn {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  cursor: pointer;
+}
+
 /* Button Styles */
 .btn {
   min-width: 0;

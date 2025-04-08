@@ -16,7 +16,7 @@ defineEmits<{
 const { t } = useI18n()
 
 const downloadUrl = new URL(import.meta.env.VITE_DOWNLOAD_URL).toString()
-const logoutUrl = `/?login=${btoa(`target=web&discardSession=true`)}`
+const logoutUrl = `/?login=&target=web&discardSession=true`
 
 const code = computed(() => btoa(`email=${props.email}&token=${props.token}`))
 

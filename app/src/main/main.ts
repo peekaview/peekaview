@@ -663,7 +663,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('login-via-browser', async (_event, discardSession: boolean) => {
-    const url = `${getAppUrl()}?login=${btoa(`target=app&discardSession=${discardSession ? 'true' : 'false'}`)}`
+    const url = `${getAppUrl()}?login=&target=app&discardSession=${discardSession ? 'true' : 'false'}`
     log.info('Opening browser login:', url)
     log.info('Discarding session:', discardSession)
     shell.openExternal(url)

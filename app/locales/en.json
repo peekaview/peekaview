@@ -212,7 +212,7 @@
     "orEnterCode": "or enter code from browser",
     "enterCode": "Enter code",
     "loginWithCode": "Login with code",
-    "invalidCode": "Invalid code"
+    "invalidCode": "Code is invalid or expired"
   },
   "sourcesWindow": {
     "type": {

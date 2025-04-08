@@ -507,7 +507,7 @@ function login() {
     $loginCode = $_GET['code'];
     $loginFile = getLoginFilename($loginCode);
     if (!file_exists($loginFile)) {
-        return ['error' => 'Code not foudn or expired'];
+        return ['error' => 'Code not found or expired'];
     }
     
     $time = filemtime($loginFile);

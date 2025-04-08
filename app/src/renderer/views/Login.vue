@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { callApi } from '../api'
@@ -8,20 +8,16 @@ import { getStoredItem, notify } from '../util'
 import CopySvg from '../../assets/icons/content-copy.svg'
 
 const props = defineProps<{
+  code?: string
   target?: string
 }>()
 
 const { t } = useI18n()
 
 const formEmail = ref<string>()
-const code = ref<string | undefined>()
-
-onMounted(async () => {
-  code.value = new URLSearchParams(window.location.search).get('code') ?? undefined
-})
 
 function handleOpenApp() {
-  window.location.href = `peekaview://login/?code=${code.value}`
+  window.location.href = `peekaview://login/?code=${props.code}`
 }
 
 function toScreenShare() {
@@ -67,8 +63,13 @@ function handleError() {
   })
 }
 
+const copied = ref(false)
+let copiedTimeout: number
 function copy(code: string) {
   navigator.clipboard.writeText(code)
+  copied.value = true
+  clearTimeout(copiedTimeout)
+  copiedTimeout = window.setTimeout(() => copied.value = false, 2000)
 }
 </script>
 
@@ -100,9 +101,11 @@ function copy(code: string) {
         <p>{{ $t('login.orEnterCode') }}</p>
         <div class="bg-light p-3 rounded mt-2 mb-3">
           <code>{{ code }}</code>
-          <div class="btn btn-sm btn-secondary" :title="$t('toolbar.copyToClipboard')" @click="copy(code)">
+          &nbsp;
+          <div class="inline-btn" :title="$t('toolbar.copyToClipboard')" @click="copy(code)">
             <CopySvg />
           </div>
+          <span v-if="copied">&nbsp; {{ $t('general.copied') }}</span>
         </div>
         <small>{{ $t('login.contactSupport') }}</small>
       </div>
