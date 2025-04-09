@@ -6,7 +6,7 @@ import { string } from 'yup'
 
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
 import { callApi } from '../../api'
-import { getStoredItem, notify } from '../../util'
+import { getStoredItem } from '../../util'
 
 const { t } = useI18n()
 
@@ -16,7 +16,7 @@ const discardSession = params.get('discardSession') === 'true'
 const loginViaMail = ref(false)
 const loginViaCode = ref(false)
 const invalid = ref(false)
-const { value: email, errorMessage: emailError } = useField<string>('email', string().email(t('validation.invalidEmail')).required(t('validation.required')))
+const { value: email, errorMessage: emailError, setErrors: setEmailError } = useField<string>('email', string().email(t('validation.invalidEmail')).required(t('validation.required')))
 const { value: code, errorMessage: codeError, setErrors: setCodeError } = useField<string>('code', string().required(t('validation.required')))
 
 function loginViaBrowser() {
@@ -38,20 +38,10 @@ async function registerMail() {
 
     if (response.success) {
       loginViaCode.value = true
-      notify({
-        type: 'success',
-        text: t('login.justRegistered'),
-        confirmButtonText: t('general.ok'),
-      })
     }
   } catch (error) {
     console.error('Error during registration:', error)
-    notify({
-      type: 'error',
-      title: t('login.connectionError.title'),
-      text: t('login.connectionError.text'),
-      confirmButtonText: t('general.ok'),
-    })
+    setEmailError(t('login.connectionError.text'))
   }
 }
 
