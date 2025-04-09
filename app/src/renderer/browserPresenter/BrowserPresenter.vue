@@ -324,28 +324,36 @@ function getAbsoluteScreenPosition() {
 
 const modalQueue: (Promise<string> | Promise<void>)[] = []
 async function resizeAndPrompt(options: PromptOptions) {
-  await Promise.all(modalQueue)
+  const queue = [...modalQueue]
+  const modalPromise = new Promise<string>(async (resolve) => {
+    await Promise.all(queue)
 
-  const modalPromise = prompt(options)
+    const promise = prompt(options)
+    const unsize = await fixSize(windowModalSize, 1)
+
+    const result = await promise
+    await unsize()
+    resolve(result)
+  })
   modalQueue.push(modalPromise)
-  const unsize = await fixSize(windowModalSize, 1)
-
-  const result = await modalPromise
-
-  unsize()
-  return result
+  return modalPromise
 }
 
 async function resizeAndNotify(options: NotifyOptions) {
-  await Promise.all(modalQueue)
+  const queue = [...modalQueue]
+  console.log('resizeAndNotify', queue.length)
+  const modalPromise = new Promise<void>(async (resolve) => {
+    await Promise.all(queue)
 
-  const modalPromise = notify(options)
+    const promise = notify(options)
+    const unsize = await fixSize(windowModalSize, 1)
+
+    await promise
+    await unsize()
+    resolve()
+  })
   modalQueue.push(modalPromise)
-  const unsize = await fixSize(windowModalSize, 1)
-
-  await modalPromise
-
-  unsize()
+  return modalPromise
 }
 
 function onStopSharing() {

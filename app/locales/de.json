@@ -9,9 +9,14 @@
     "error": "Fehler",
     "copy": "Kopieren",
     "copied": "Kopiert",
-    "required": "Erforderlich",
     "accept": "Annehmen",
     "deny": "Ablehnen"
+  },
+  "validation": {
+    "required": "Eingabe erforderlich",
+    "invalid": "Ungültige Eingabe",
+    "invalidEmail": "Ungültige E-Mail-Adresse",
+    "invalidCode": "Code ungültig oder abgelaufen"
   },
   "update": {
     "available": "Eine neue Version ({{version}}) ist verfügbar und wird heruntergeladen.",
@@ -205,14 +210,19 @@
     "start": "Freigabe starten"
   },
   "loginWindow": {
-    "login": "Anmelden",
-    "clickToLogin": "Hier klicken um via Browser anzumelden",
+    "login": "Anmeldung",
+    "loginViaMail": "Anmelden via E-Mail",
+    "loginViaBrowser": "Anmelden via Browser",
+    "loginViaBrowserDesc": "Wenn Sie im Browser bereits angemeldet sind, können Sie die Sitzung in die App übernehmen.",
     "sessionError": "Es ist ein Fehler bei Ihrer Sitzung aufgetreten. Bitte versuchen Sie erneut, sich anzumelden.",
+    "enterMail": "E-Mail eingeben",
+    "mail": "E-Mail",
+    "loginRegister": "Anmelden / Registrieren",
     "waitForLogin": "Warte auf Anmeldung",
     "orEnterCode": "oder geben Sie den Code von ihrem Browser ein",
-    "enterCode": "Code eingeben",
-    "loginWithCode": "Mit Code anmelden",
-    "invalidCode": "Code ungültig oder abgelaufen"
+    "useMailCode": "Geben Sie den Code aus der an Ihnen gesendeten E-Mail ein",
+    "code": "Code",
+    "loginWithCode": "Mit Code anmelden"
   },
   "sourcesWindow": {
     "type": {

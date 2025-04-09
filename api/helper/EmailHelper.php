@@ -188,7 +188,7 @@ TEXT;
         return $this->sendEmail($email, $subject, $htmlContent, $textContent);
     }
     
-    public function sendRegistrationConfirmation($email, $confirmLink) {
+    public function sendRegistrationConfirmation($email, $loginUrl, $loginCode = null) {
         $subject = "=?UTF-8?B?" . base64_encode("Bestätigen Sie Ihre Registrierung") . "?=";
         
         $htmlContent = <<<HTML
@@ -199,12 +199,19 @@ TEXT;
     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
         <h2 style="color: #333;">Registrierung bestätigen</h2>
         <p>Hallo und willkommen bei PeekaView,</p>
-        <p>vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
-        <p><a href="{$confirmLink}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
-        <p>Oder nutzen Sie diesen Link: {$confirmLink}</p>
+        <p>vielen Dank für Ihre Registrierung.</p>
+        <p>Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
+        <p><a href="{$loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
+        {if ($loginCode) {
+            <p>Oder geben Sie folgenden Code im Login-Fenster der App ein:</p>
+            <code>{$loginCode}</code>
+        } else {
+            <p>Oder nutzen Sie folgenden Link:</p>
+            <code>{$loginUrl}</code>
+        }}
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
             <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
-        </div>
+        </div>}
     </div>
 </body>
 </html>
@@ -215,10 +222,18 @@ Registrierung bestätigen
 
 Hallo und willkommen bei PeekaView,
 
-vielen Dank für Ihre Registrierung. Bitte bestätigen Sie Ihre E-Mail-Adresse über diesen Link:
+vielen Dank für Ihre Registrierung.
 
-{$confirmLink}
+Bitte bestätigen Sie Ihre E-Mail-Adresse über folgenden Link:
 
+{$loginUrl}
+
+{if ($loginCode) {
+Oder geben Sie folgenden Code im Login-Fenster der App ein:
+
+{$loginCode}
+
+}}
 Dies ist eine automatische E-Mail. Bitte nicht antworten.
 TEXT;
 

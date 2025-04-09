@@ -68,24 +68,18 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
   const requestQueue = reactive<Record<string, RequestData>>({})
 
   let checkRequestTimeout: number | undefined
+  let processRequestTimeout: number | undefined
   watch(streamState, (state) => {
-    if (state === 'stopped')
-      return
-    
-    const interval = async () => {
+    if (state === 'stopped') {
       clearTimeout(checkRequestTimeout)
-      await checkRequests()
-
-      checkRequestTimeout = window.setTimeout(async () => {
-        await checkRequests()
-        interval()
-      }, 2000)
+      checkRequestTimeout = undefined
     }
 
-    interval()
-
-    processRequests()
+    if (!checkRequestTimeout)
+      checkRequests()
   })
+
+  processRequests()
 
   window.electronAPI?.onHidden((flag) => {
     streamState.value = flag ? 'hidden' : 'active'
@@ -270,6 +264,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
   }
 
   async function checkRequests() {
+    clearTimeout(checkRequestTimeout)
     const requestData = {
       email: unref(data.email),
       token: unref(data.token),
@@ -283,15 +278,15 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       console.error('Error checking requests:', error);
       handleApiError(error as Error, requestData)
     }
+
+    checkRequestTimeout = window.setTimeout(() => checkRequests(), 2000)
   }
 
-  let processRequestTimeout: number | undefined
   async function processRequests() {
     clearTimeout(processRequestTimeout)
     const keys = Object.keys(requestQueue)
     if (keys.length > 0) {
       const id = keys[0]
-      window.electronAPI?.log('processRequests', JSON.stringify(requestQueue[id]))
       if (!options?.onRequest || requestQueue[id].accessToken === accessToken.value) {
         await handleRequest(id, true)
       } else {

@@ -474,7 +474,8 @@ function registerMyEmail() {
     
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
     
-    if (file_exists($userFile)) {
+    $userExists = file_exists($userFile);
+    if ($userExists) {
         // User already exists, get existing token
         $userData = explode(';', file_get_contents($userFile));
         $token = $userData[1];
@@ -497,8 +498,8 @@ function registerMyEmail() {
     require_once __DIR__.'/helper/EmailHelper.php';
 
     $emailHelper = new EmailHelper();
-    $registrationLink = "https://".APP_DOMAIN."/?login=".$loginCode;
-    $emailHelper->sendRegistrationConfirmation($email, $registrationLink);
+    $loginUrl = "https://".APP_DOMAIN."/?login=".$loginCode;
+    $emailHelper->sendegistrationConfirmation($email, $loginUrl, $target === 'app' ? loginCode : null);
 
     return ['success' => true];
 }

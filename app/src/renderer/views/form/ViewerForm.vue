@@ -11,10 +11,8 @@ import { validateEmail, validateCode } from '../../../util'
 const props = withDefaults(defineProps<{
   modelValue: ViewerDataSchema
   isFixed?: boolean
-  autoSubmit?: boolean
 }>(), {
   isFixed: false,
-  autoSubmit: false
 })
 
 const emit = defineEmits<{
@@ -24,19 +22,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-watch(() => props.modelValue, (data) => {
-  if (props.autoSubmit && data.name && data.emailOrCode)
-    submit()
-}, { immediate: true, deep: true })
-
 const { handleSubmit, errors } = useForm<ViewerDataSchema>({
   initialValues: {
     emailOrCode: props.modelValue.emailOrCode || '',
     name: props.modelValue.name || '',
   },
   validationSchema: toTypedSchema(object({
-    emailOrCode: string().required(t('general.required')).test('email-or-code', t('viewer.emailOrCodeInvalid'), (value) => !!validateEmail(value) || !!validateCode(value)),
-    name: string().required(t('general.required')),
+    emailOrCode: string().required(t('validation.required')).test('email-or-code', t('viewer.emailOrCodeInvalid'), (value) => !!validateEmail(value) || !!validateCode(value)),
+    name: string().required(t('validation.required')),
   })),
 })
 const { value: emailOrCode } = useField<string>('emailOrCode')

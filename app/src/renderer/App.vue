@@ -239,14 +239,14 @@ function shareRecentContact(id?: string) {
           <h6>{{ $t('app.form.recentContacts') }}:</h6>
           <div class="recent-contacts">
             <template v-for="(contact, id) in recentContacts" :key="id">
-              <div v-if="contact.email" :ref="(el) => tagRefs[id] = el!" class="pill-tag" :class="{ active: expandedContactId === id }" @click.stop="expandContact(id)">
+              <div :ref="(el) => tagRefs[id] = el!" class="pill-tag" :class="{ active: expandedContactId === id }" @click.stop="expandContact(id)">
                 <div class="pill-tag-content">
                   <span>{{ displayNameMail(contact) }}</span>
                 </div>
               </div>
             </template>
             <div v-show="expandedContactId" ref="dropdown" class="pill-tag-dropdown" :style="floatingStyles" @click.stop="expandedContactId = undefined">
-              <a class="dropdown-item" href="#" @click="viewRecentContact(expandedContactId)">{{ $t('app.form.likeToView') }}</a>
+              <a v-if="expandedContactId && recentContacts[expandedContactId]?.email" class="dropdown-item" href="#" @click="viewRecentContact(expandedContactId)">{{ $t('app.form.likeToView') }}</a>
               <a class="dropdown-item" href="#" @click="shareRecentContact(expandedContactId)">{{ $t('app.form.likeToShare') }}</a>
             </div>
           </div>

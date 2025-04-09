@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useField } from 'vee-validate'
+import { string } from 'yup'
 
 import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
@@ -14,7 +16,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 
-const formEmail = ref<string>()
+const { value: email, errorMessage: emailError } = useField<string>('email', string().email(t('validation.invalidEmail')).required(t('validation.required')))
 
 function handleOpenApp() {
   window.location.href = `peekaview://login/?code=${props.code}`
@@ -27,40 +29,32 @@ function toScreenShare() {
 async function handleRegister(e: Event) {
   e.preventDefault()
 
-  if (!formEmail.value)
+  if (!email.value)
     return
 
   try {
     const uuid = (await getStoredItem('uuid'))!
     const response = await callApi('registerMyEmail', {
-      email: formEmail.value,
+      email: email.value,
       uuid,
       target: props.target === 'app' ? 'app' : 'web',
     })
 
     if (response.success)
-      handleJustRegistered()
+      notify({
+        type: 'success',
+        text: t('login.justRegistered'),
+        confirmButtonText: t('general.ok'),
+      })
   } catch (error) {
     console.error('Error during registration:', error)
-    handleError()
+    notify({
+      type: 'error',
+      title: t('login.connectionError.title'),
+      text: t('login.connectionError.text'),
+      confirmButtonText: t('general.ok'),
+    })
   }
-}
-
-function handleJustRegistered() {
-  notify({
-    type: 'success',
-    text: t('login.justRegistered'),
-    confirmButtonText: t('general.ok'),
-  })
-}
-
-function handleError() {
-  notify({
-    type: 'error',
-    title: t('login.connectionError.title'),
-    text: t('login.connectionError.text'),
-    confirmButtonText: t('general.ok'),
-  })
 }
 
 const copied = ref(false)
@@ -82,9 +76,9 @@ function copy(code: string) {
       <div class="mb-4">
         <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
-          v-model="formEmail"
-          placeholder="example@email.com" required>
+          v-model="email" placeholder="example@email.com" required>
       </div>
+      <label v-if="emailError" class="text-danger mt-1">{{ emailError }}</label>
       <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
     </div>
   </form>

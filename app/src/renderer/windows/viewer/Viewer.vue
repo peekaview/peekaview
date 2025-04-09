@@ -80,7 +80,6 @@ onMounted(async () => {
           <div class="panel">
             <ViewerForm
               v-model="formViewerData"
-              auto-submit
               @submit="activeViewerData = $event"
             />
           </div>

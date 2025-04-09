@@ -31,7 +31,7 @@ if (process.platform === 'darwin') {
 const windowDevtools = {
   notifier: false,
   login: false,
-  viewer: false,
+  viewer: true,
   presenter: false,
 }
 
