@@ -190,6 +190,14 @@ TEXT;
     
     public function sendRegistrationConfirmation($email, $loginUrl, $loginCode = null) {
         $subject = "=?UTF-8?B?" . base64_encode("Bestätigen Sie Ihre Registrierung") . "?=";
+
+        $alternative = $loginCode ? <<<HTML
+        <p>Oder geben Sie folgenden Code im Login-Fenster der App ein:</p>
+        <code>{$loginCode}</code>
+HTML : <<<HTML
+        <p>Oder nutzen Sie folgenden Link:</p>
+        <code>{$loginUrl}</code>
+HTML;
         
         $htmlContent = <<<HTML
 <!DOCTYPE html>
@@ -202,13 +210,7 @@ TEXT;
         <p>vielen Dank für Ihre Registrierung.</p>
         <p>Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
         <p><a href="{$loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
-        {if ($loginCode) {
-            <p>Oder geben Sie folgenden Code im Login-Fenster der App ein:</p>
-            <code>{$loginCode}</code>
-        } else {
-            <p>Oder nutzen Sie folgenden Link:</p>
-            <code>{$loginUrl}</code>
-        }}
+        {$alternative}
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
             <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
         </div>}
@@ -216,6 +218,13 @@ TEXT;
 </body>
 </html>
 HTML;
+
+$alternative = $loginCode ? <<<TEXT
+Oder geben Sie folgenden Code im Login-Fenster der App ein:
+
+{$loginCode}
+
+TEXT : '';
 
         $textContent = <<<TEXT
 Registrierung bestätigen
@@ -227,13 +236,7 @@ vielen Dank für Ihre Registrierung.
 Bitte bestätigen Sie Ihre E-Mail-Adresse über folgenden Link:
 
 {$loginUrl}
-
-{if ($loginCode) {
-Oder geben Sie folgenden Code im Login-Fenster der App ein:
-
-{$loginCode}
-
-}}
+{$alternative}
 Dies ist eine automatische E-Mail. Bitte nicht antworten.
 TEXT;
 
