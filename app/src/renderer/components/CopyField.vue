@@ -18,10 +18,11 @@ function copyCode() {
 </script>
 
 <template>
-  <div class="copy-field" @click="copyCode">
+  <div class="copy-field text-center" @click="copyCode">
     <CopySvg />
+    <span class="mt-2">{{ $t(`general.${copied ? 'copied' : 'clickToCopy'}`) }}</span>
+    <br>
     <code>{{ text }}</code>
-    <div class="mt-2" v-if="copied">{{ $t('general.copied') }}!</div>
   </div>
 </template>
 

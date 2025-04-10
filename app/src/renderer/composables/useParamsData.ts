@@ -13,6 +13,7 @@ export function useParamsData() {
   const action = ref<Action>()
   
   const loginCode = ref<string | undefined>()
+  const authCode = ref<string | undefined>()
   const email = ref<string | undefined>()
   const token = ref<string | undefined>()
 
@@ -52,10 +53,12 @@ export function useParamsData() {
         console.error('Error using invite code', error)
       }
     })
-  else
+  
+  if (!action.value)
     (async () => {
-      const code = localStorage.getItem('code')
-      const { email: e, token: t } = parseCode(code ? JSON.parse(code) : undefined)
+      const code = localStorage.getItem('code') ?? undefined
+      authCode.value = code ? JSON.parse(code) : undefined
+      const { email: e, token: t } = parseCode(authCode.value)
       email.value = e
       token.value = t
 
@@ -127,6 +130,7 @@ export function useParamsData() {
   return {
     action: computed(() => action.value),
     loginCode: computed(() => loginCode.value),
+    authCode: computed(() => authCode.value),
     email: computed(() => email.value),
     token: computed(() => token.value),
     target: computed(() => target.value),

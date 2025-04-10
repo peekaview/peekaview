@@ -319,12 +319,8 @@ declare const CSP_POLICY: string
             }
           },
         },
-        {
-          label: '[Dev] Clear store', type: 'normal', click: () => clearStore(),
-        },
-        {
-          label: '[Dev] ID: ' + store.get('uuid'), type: 'normal', enabled: false
-        },
+        { label: '[Dev] Clear store', type: 'normal', click: () => clearStore() },
+        { label: '[Dev] ID: ' + store.get('uuid'), type: 'normal', enabled: false },
         { type: 'separator' }
       )
 

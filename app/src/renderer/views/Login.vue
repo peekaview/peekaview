@@ -9,7 +9,8 @@ import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
 
 const props = defineProps<{
-  code?: string
+  authCode?: string
+  loginCode?: string
   target?: string
 }>()
 
@@ -18,7 +19,7 @@ const { t } = useI18n()
 const { value: email, errorMessage: emailError } = useField<string>('email', string().email(t('validation.invalidEmail')).required(t('validation.required')))
 
 function handleOpenApp() {
-  window.location.href = `peekaview://login/?code=${props.code}`
+  window.location.href = `peekaview://login/?code=${props.authCode}`
 }
 
 function toScreenShare() {
@@ -58,7 +59,7 @@ async function handleRegister(e: Event) {
 </script>
 
 <template>
-  <form v-if="!code" @submit="handleRegister">
+  <form v-if="!loginCode" @submit="handleRegister">
     <div class="form-content">
       <div class="mb-4">
         <p>{{ $t('login.notLoggedIn') }}</p>
@@ -83,7 +84,7 @@ async function handleRegister(e: Event) {
 
       <div>
         <p>{{ $t('login.orEnterCode') }}</p>
-        <CopyField :text="code" />
+        <CopyField class="mb-2" :text="loginCode" />
         <small>{{ $t('login.contactSupport') }}</small>
       </div>
     </div>
