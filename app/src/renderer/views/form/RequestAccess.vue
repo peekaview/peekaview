@@ -6,7 +6,7 @@ import type { RequestStatus, RequestUserStatus, RoomData, ViewerData } from '../
 import { callApi } from '../../api'
 import { getPlatform, getStoredItem, notify, setStoredItem } from '../../util'
 import { ScreenShareData } from '../../composables/useSimplePeerScreenShare'
-import { stringToColor } from '../../../util'
+import { stringToColor, displayNameMail } from '../../../util'
 
 type WaitingStatus = "establishing" | "notified" | "waiting"
 
@@ -191,7 +191,7 @@ function stop() {
   <div v-if="waitingStatus" class="form-content">
     <div class="text-center">
       <div class="waiting-spinner"></div>
-      <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email: props.contact.email }) }}</h4>
+      <h4 class="mt-3">{{ $t(`viewer.waitingStatus.${waitingStatus}`, { email: displayNameMail(props.contact) }) }}</h4>
       <p v-if="requestUserStatus" class="mb-3">
         <span v-if="requestUserStatus === 'online'" class="badge bg-success">{{ $t('viewer.userStatus.online', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>
         <span v-else-if="requestUserStatus === 'away'" class="badge bg-secondary">{{ $t('viewer.userStatus.away', { lastSeen: formatLastSeen(requestLastSeen) }) }}</span>

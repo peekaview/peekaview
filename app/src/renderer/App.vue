@@ -78,6 +78,9 @@ uuidPromise.then(uuid => {
 
     onNotification(async (payload) => {
       console.log('notification', payload)
+      if (payload.data?.type === 'share' && presenterActive.value)
+        return
+
       const result = await prompt({
         text: payload.notification?.body,
         confirmButtonText: t('general.ok'),

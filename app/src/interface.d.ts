@@ -110,6 +110,7 @@ export interface IElectronAPI {
   updateUsers: (users: string) => Promise<void>,
   onNotifyContact: (callback: (contact: ContactData) => void) => void,
   receiveNotification: (notification: NotificationPayload) => void,
+  openAllDevTools: () => Promise<void>,
 }
 
 export interface ScreenSource {

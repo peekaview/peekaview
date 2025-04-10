@@ -30,8 +30,8 @@ if (process.platform === 'darwin') {
 
 const windowDevtools = {
   notifier: false,
-  login: true,
-  viewer: true,
+  login: false,
+  viewer: false,
   presenter: false,
 }
 
@@ -174,7 +174,6 @@ declare const CSP_POLICY: string
 
   app.whenReady().then(() => {
     log.info('App is ready, initializing...')
-    log.info('UUID:', store.get('uuid'))
     
     // Add notification permission check
     /*if (process.platform === 'darwin') {
@@ -318,8 +317,14 @@ declare const CSP_POLICY: string
             }
           },
         },
-          { type: 'separator' }
-        )
+        {
+          label: '[Dev] Clear store', type: 'normal', click: () => store.clear(),
+        },
+        {
+          label: '[Dev] ID: ' + store.get('uuid'), type: 'normal', enabled: false
+        },
+        { type: 'separator' }
+      )
 
       const code = store.get('code')
       const recentContacts = store.get('recentContacts')
@@ -660,6 +665,19 @@ declare const CSP_POLICY: string
 
   ipcMain.handle('logout', async (_event, discardSession: boolean) => {
     logout(discardSession)
+  })
+
+  ipcMain.handle('open-all-dev-tools', async (_event) => {
+    if (app.isPackaged)
+      return
+
+    presenterWindow?.show()
+    presenterWindow?.webContents.openDevTools()
+    loginWindow?.webContents.openDevTools()
+    viewerWindow?.webContents.openDevTools()
+    notifierWindow?.webContents.openDevTools()
+
+    remotePresenter?.openAllDevTools()
   })
 
   ipcMain.handle('login-via-browser', async (_event, discardSession: boolean) => {

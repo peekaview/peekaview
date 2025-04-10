@@ -895,6 +895,16 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
         break;
     }
   }
+
+  function openAllDevTools() {
+    if (app.isPackaged)
+      return
+
+    overlayWindow?.setIgnoreMouseEvents(false)
+    overlayWindow?.webContents.openDevTools()
+    toolbarWindow?.webContents.openDevTools()
+    clipboardWindow?.webContents.openDevTools()
+  }
   
   return {
     start,
@@ -911,5 +921,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     onRemote,
     resizeWindow,
     setToolbarSize,
+
+    openAllDevTools,
   }
 }

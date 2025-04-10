@@ -9,5 +9,6 @@ export const base = {
   clearStore: () => ipcRenderer.invoke('clear-store'),
   onChangeLanguage: (callback: (locale: string) => void) => ipcRenderer.on('change-language', (_event, locale: string) => callback(locale)),
   getResourcesPath: () => ipcRenderer.invoke('get-resources-path'),
+  openAllDevTools: () => ipcRenderer.invoke('open-all-dev-tools'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
 }

@@ -16,8 +16,8 @@ export async function getPushToken() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register(    
-          import.meta.env.MODE === 'production' ? '/sw.js' : '/dev-sw.js?dev-sw',
-          { type: import.meta.env.MODE === 'production' ? 'classic' : 'module' }
+          import.meta.env.DEV ? '/dev-sw.js?dev-sw' :'/sw.js' ,
+          { type: import.meta.env.DEV ? 'module' : 'classic' }
         )
         .then((registration) => 
           getToken(messaging, {

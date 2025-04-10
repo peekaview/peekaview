@@ -5,13 +5,16 @@ import PresenterToolbar from '../../components/PresenterToolbar.vue'
 
 import { UserData } from '../../../interface'
 
+import BugSvg from '../../../assets/icons/bug.svg'
+
+const dev = import.meta.env.DEV
+const leftMargin = 20
+
 const toolbarRef = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
 
 const users = ref<UserData[]>([])
 
 const clipboardEnabled = ref(false)
-
-const leftMargin = 20
 
 window.electronAPI?.onClipboardEnabled(() => {
   clipboardEnabled.value = true
@@ -74,6 +77,10 @@ function resizeWindow() {
 function onCollapse() {
   nextTick(() => resizeWindow())
 }
+
+function openAllDevTools() {
+  window.electronAPI?.openAllDevTools()
+}
 </script>
 
 <template>
@@ -93,7 +100,13 @@ function onCollapse() {
     @toggle-clipboard="toggleClipboard"
     @show-invite-link="showInviteLink"
     @on-collapse="onCollapse"
-  />
+  >
+    <template #buttons-before>
+      <div v-if="dev" class="btn btn-sm btn-secondary" title="Open all Dev Tools" @click="openAllDevTools">
+        <BugSvg />
+      </div>
+    </template>
+  </PresenterToolbar>
 </template>
 
 <style>

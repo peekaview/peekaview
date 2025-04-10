@@ -213,7 +213,7 @@ HTML;
         {$alternative}
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
             <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
-        </div>}
+        </div>
     </div>
 </body>
 </html>

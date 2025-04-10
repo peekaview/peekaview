@@ -138,6 +138,7 @@ defineExpose({
         </div>
       </template>
     </Tooltip>
+    <slot name="buttons-before" />
     <div class="btn btn-sm btn-secondary" :class="{ disabled: !clipboardEnabled }" :title="$t('toolbar.openClipboard')" @click="clipboardEnabled && $emit('toggle-clipboard')">
       <ClipboardTextOutlineSvg />
     </div>
