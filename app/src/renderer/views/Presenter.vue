@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ContactData } from '../../interface';
+
+import CopyField from '../components/CopyField.vue'
+
+import { ContactData } from '../../interface'
 
 const props = defineProps<{
   email: string
@@ -53,14 +56,9 @@ function present() {
   }
 }
 
-const copied = ref(false)
-function copyCode() {
-  navigator.clipboard.writeText(inviteUrl.value.toString())
-  if (copied.value)
-    return
-  
-  copied.value = true
-  setTimeout(() => copied.value = false, 5000)
+function stop() {
+  presenterWindow.value?.close()
+  emit('stop')
 }
 </script>
 
@@ -72,9 +70,7 @@ function copyCode() {
   <hr />
   <div class="text-center">
     <p>{{ $t('share.activeSession.invite') }}</p>
-    <div class="copy-text" @click="copyCode">
-      <code>{{ inviteUrl }}</code>
-    </div>
-    <div class="mt-2" v-if="copied">{{ $t('general.copied') }}!</div>
+    <CopyField :text="inviteUrl" />
   </div>
+  <button class="btn btn-secondary w-100 mt-4" @click="stop">{{ $t('share.activeSession.stop') }}</button>
 </template>

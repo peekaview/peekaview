@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useField } from 'vee-validate'
 import { string } from 'yup'
 
 import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
-
-import CopySvg from '../../assets/icons/content-copy.svg'
 
 const props = defineProps<{
   code?: string
@@ -56,15 +53,6 @@ async function handleRegister(e: Event) {
     })
   }
 }
-
-const copied = ref(false)
-let copiedTimeout: number
-function copy(code: string) {
-  navigator.clipboard.writeText(code)
-  copied.value = true
-  clearTimeout(copiedTimeout)
-  copiedTimeout = window.setTimeout(() => copied.value = false, 2000)
-}
 </script>
 
 <template>
@@ -93,14 +81,7 @@ function copy(code: string) {
 
       <div>
         <p>{{ $t('login.orEnterCode') }}</p>
-        <div class="bg-light p-3 rounded mt-2 mb-3">
-          <code>{{ code }}</code>
-          &nbsp;
-          <div class="inline-btn" :title="$t('toolbar.copyToClipboard')" @click="copy(code)">
-            <CopySvg />
-          </div>
-          <span v-if="copied">&nbsp; {{ $t('general.copied') }}</span>
-        </div>
+        <CopyField :text="code" />
         <small>{{ $t('login.contactSupport') }}</small>
       </div>
     </div>

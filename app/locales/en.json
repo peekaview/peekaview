@@ -186,7 +186,8 @@
       "active": "Sharing Session Active",
       "canBeClosed": "You can close this browser tab.",
       "keepAlive": "Your session will remain active as long as you keep the preview window opened.",
-      "invite": "You can invite someone to join your view with this link:"
+      "invite": "You can invite someone to join your view with this link:",
+      "stop": "Stop sharing"
     },
     "requestAccess": "{name} wants to see your screen. Do you want to accept?",
     "waitingStatus": {

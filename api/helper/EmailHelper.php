@@ -219,7 +219,7 @@ HTML;
 </html>
 HTML;
 
-$alternative = $loginCode ? <<<TEXT
+        $alternative = $loginCode ? <<<TEXT
 Oder geben Sie folgenden Code im Login-Fenster der App ein:
 
 {$loginCode}

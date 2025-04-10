@@ -186,7 +186,8 @@
       "active": "Bildschirmfreigabe aktiv",
       "canBeClosed": "Sie können dieses Browserfenster nun schließen",
       "keepAlive": "Ihre Sitzung bleibt aktiv, solange Sie das Vorschaufenster geöffnet lassen.",
-      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:"
+      "invite": "Sie können jemanden einladen, Ihren Bildschirm zu sehen, indem Sie diesen Link teilen:",
+      "stop": "Freigabe beenden"
     },
     "requestAccess": "{name} möchte Ihren Bildschirm sehen. Möchten Sie akzeptieren?",
     "waitingStatus": {

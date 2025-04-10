@@ -193,14 +193,6 @@ select option:hover {
   max-height: 100%;
 }
 
-.copy-text {
-  --bs-code-color: white;
-  cursor: pointer;
-  border: 1px solid var(--bs-code-color);
-  border-radius: 0.25rem;
-  padding: 0.5rem;
-}
-
 .info-container {
   display: flex;
   flex-direction: column;

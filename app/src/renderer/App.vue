@@ -165,6 +165,7 @@ function viewRecentContact(id?: string) {
 
 const contactToNotify = ref<ContactData | undefined>()
 function shareRecentContact(id?: string) {
+  console.log('shareRecentContact', id, email.value, token.value)
   if (!id || !email.value || !token.value)
     return
 
@@ -235,7 +236,7 @@ function shareRecentContact(id?: string) {
             </template>
           </template>
         </div>
-        <div v-if="!isViewFixed && Object.keys(recentContacts).length > 0">
+        <div v-if="!isViewFixed && !presenterActive && Object.keys(recentContacts).length > 0">
           <h6>{{ $t('app.form.recentContacts') }}:</h6>
           <div class="recent-contacts">
             <template v-for="(contact, id) in recentContacts" :key="id">

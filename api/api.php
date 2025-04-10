@@ -499,7 +499,7 @@ function registerMyEmail() {
 
     $emailHelper = new EmailHelper();
     $loginUrl = "https://".APP_DOMAIN."/?login=".$loginCode;
-    $emailHelper->sendRegistrationConfirmation($email, $loginUrl, $target === 'app' ? loginCode : null);
+    $emailHelper->sendRegistrationConfirmation($email, $loginUrl, $target === 'app' ? $loginCode : null);
 
     return ['success' => true];
 }
