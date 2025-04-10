@@ -71,15 +71,16 @@ async function loginWithCode() {
 
       <div v-if="loginViaCode" class="text-center">
         <template v-if="loginViaMail">
-          <h3 class="text-secondary mt-3">{{ $t('loginWindow.useMailCode') }}</h3>
+          <h6 class="text-secondary mt-3">{{ $t('loginWindow.useMailCode') }}</h6>
         </template>
         <template v-else>
-          <h2>{{ $t('loginWindow.waitForLogin') }}</h2>
-          <h3 class="text-secondary mt-3">{{ $t('loginWindow.orEnterCode') }}</h3>
+          <h4>{{ $t('loginWindow.waitForLogin') }}</h4>
+          <h6 class="text-secondary mt-3">{{ $t('loginWindow.orEnterCode') }}</h6>
         </template>
         <input v-model="code" class="form-control mt-3" type="text" :placeholder="$t('loginWindow.code')" @change="invalid = false">
         <label v-if="codeError" class="text-danger mt-1">{{ codeError }}</label>
         <button class="btn btn-primary btn-lg w-100 mt-3" :disabled="!!codeError" @click="loginWithCode">{{ $t('loginWindow.loginWithCode') }}</button>
+        <button class="btn btn-secondary w-100 mt-3" @click="loginViaCode = false">{{ $t('general.back') }}</button>
       </div>
 
       <div v-else-if="loginViaMail" class="text-center">
@@ -87,6 +88,7 @@ async function loginWithCode() {
         <input v-model="email" class="form-control mt-3" type="text" :placeholder="$t('loginWindow.mail')" @change="invalid = false">
         <label v-if="emailError" class="text-danger mt-1">{{ emailError }}</label>
         <button class="btn btn-primary btn-lg w-100 mt-3" :disabled="!!emailError" @click="registerMail">{{ $t('loginWindow.loginRegister') }}</button>
+        <button class="btn btn-secondary w-100 mt-3" @click="loginViaMail = false">{{ $t('general.back') }}</button>
       </div>
       
       <div v-else class="text-center">
@@ -101,7 +103,7 @@ async function loginWithCode() {
 
 <style scoped>
 img {
-  max-width: 12rem;
-  max-height: 12rem;
+  max-width: 10rem;
+  max-height: 10rem;
 }
 </style>

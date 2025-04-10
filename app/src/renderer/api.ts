@@ -23,7 +23,7 @@ type AcceptedRequestResponse = {
   last_seen: number
 } & AcceptedRequestData
 
-export type ApiAction = "showMeYourScreen" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom" | "iAmOnline" | "handleIfAllowedToSeeMyScreen" | "registerMyEmail" | "login" | "registerPushToken" | "sendPushNotification" | "useInviteCode"
+export type ApiAction = "showMeYourScreen" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom" | "iAmOnline" | "handleIfAllowedToSeeMyScreen" | "registerMyEmail" | "generateLoginCode" | "login" | "registerPushToken" | "sendPushNotification" | "useInviteCode"
 
 export type ApiParams<T extends ApiAction> =
   T extends "showMeYourScreen" ? {
@@ -53,6 +53,11 @@ export type ApiParams<T extends ApiAction> =
   : T extends "registerMyEmail" ? {
     email: string
     uuid: string
+    target: 'web' | 'app'
+  }
+  : T extends "generateLoginCode" ? {
+    email: string
+    token: string
     target: 'web' | 'app'
   }
   : T extends "login" ? {
@@ -86,6 +91,9 @@ export type ApiResponse<T extends ApiAction> =
   : T extends "registerMyEmail" ? {
     success: boolean
     error?: string
+  }
+  : T extends "generateLoginCode" ? {
+    code: string
   }
   : T extends "login" ? {
     email: string

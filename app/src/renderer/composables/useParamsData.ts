@@ -87,6 +87,13 @@ export function useParamsData() {
         } catch (e) {
           // TODO: Handle error
         }
+      } else if (target.value === 'app' && email.value && token.value) {
+        const data = await callApi('generateLoginCode', {
+          email: email.value,
+          token: token.value,
+          target: target.value,
+        })
+        loginCode.value = data.code
       }
       
       if (email.value && token.value) {

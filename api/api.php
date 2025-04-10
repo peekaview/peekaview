@@ -504,6 +504,22 @@ function registerMyEmail() {
     return ['success' => true];
 }
 
+function generateLoginCode() {
+    $email = validateEmail($_GET['email']);
+    $token = $_GET['token'];
+    $userFile = getUserFile($email);
+    authorizeUser($userFile, $token);
+    
+    $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
+
+    $loginCode = generateRandomString(8);
+    $loginFile = getLoginFilename($loginCode);
+    $loginData = implode(';', [$email, $token, $target]);
+    file_put_contents($loginFile, $loginData);
+
+    return ['code' => $loginCode];
+}
+
 function login() {
     $loginCode = $_GET['code'];
     $loginFile = getLoginFilename($loginCode);
@@ -604,6 +620,9 @@ try {
             break;
         case 'registerMyEmail':
             $out = registerMyEmail();
+            break;
+        case 'generateLoginCode':
+            $out = generateLoginCode();
             break;
         case 'login':
             $out = login();

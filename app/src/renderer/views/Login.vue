@@ -3,6 +3,8 @@ import { useI18n } from 'vue-i18n'
 import { useField } from 'vee-validate'
 import { string } from 'yup'
 
+import CopyField from '../components/CopyField.vue'
+
 import { callApi } from '../api'
 import { getStoredItem, notify } from '../util'
 
@@ -88,10 +90,10 @@ async function handleRegister(e: Event) {
   </div>
   <div v-else>
     <div class="form-content">
-      <h2 class="mb-3">{{ $t('login.successful') }}</h2>
-      <p class="text-secondary mb-4">{{ $t('login.successMessage') }}</p>
+      <h2 class="">{{ $t('login.successful') }}</h2>
+      <p class="mt-3">{{ $t('login.successMessage') }}</p>
       
-      <button class="btn btn-primary btn-lg w-100 mb-4" @click="toScreenShare">
+      <button class="btn btn-primary btn-lg w-100 mt-4" @click="toScreenShare">
         {{ $t('login.toShare') }}
       </button>
     </div>

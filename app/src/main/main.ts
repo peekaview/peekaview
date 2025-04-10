@@ -165,9 +165,7 @@ declare const CSP_POLICY: string
   const store = await getStore()
   let users: UserData[] = []
 
-  if (!store.get('uuid')) {
-    store.set('uuid', uuidv4())
-  }
+  initStore()
 
   if (process.platform === 'win32')
     app.setAppUserModelId(app.name)
@@ -221,6 +219,10 @@ declare const CSP_POLICY: string
     })
 
     updateContextMenu()
+
+    store.onDidChange('uuid', () => {
+      updateContextMenu()
+    })
 
     store.onDidChange('code', () => {
       updateContextMenu()
@@ -318,7 +320,7 @@ declare const CSP_POLICY: string
           },
         },
         {
-          label: '[Dev] Clear store', type: 'normal', click: () => store.clear(),
+          label: '[Dev] Clear store', type: 'normal', click: () => clearStore(),
         },
         {
           label: '[Dev] ID: ' + store.get('uuid'), type: 'normal', enabled: false
@@ -630,6 +632,20 @@ declare const CSP_POLICY: string
     return import.meta.env.VITE_APP_URL
   }
 
+  function initStore() {
+    if (!store.get('uuid'))
+      store.set('uuid', uuidv4())
+    if (!store.get('recentContacts'))
+      store.set('recentContacts', {})
+    if (!store.get('inviteCodeCache'))
+      store.set('inviteCodeCache', {})
+  }
+
+  function clearStore() {
+    store.clear()
+    initStore()
+  }
+
   function quit() {
     log.info('Initiating app quit')
     isQuitting = true
@@ -810,7 +826,7 @@ declare const CSP_POLICY: string
   })
 
   ipcMain.handle('clear-store', async () => {
-    store.clear()
+    clearStore()
   })
 
   ipcMain.handle('receive-notification', async (_event, payload: NotificationPayload) => {
