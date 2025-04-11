@@ -21,6 +21,7 @@ const mappedUsers = computed(() => {
 
   return mappedUsers
 })
+watch(scale, () => window.electronAPI?.log('scale', scale.value), { immediate: true })
 
 const drawOverlay = useDrawOverlay(canvasRef, { users: mappedUsers, scale })
 const overlayCursors = useOverlayCursors(mappedUsers)
@@ -56,6 +57,10 @@ window.electronAPI!.onMouseMove((data) => {
 window.electronAPI!.onMouseUp((data) => {
   if (toolsEnabled.value.pointer && data.tool == 'pointer')
     drawOverlay.endStroke(data.userId)
+})
+
+window.addEventListener('resize', () => {
+  drawOverlay.refitDimensions()
 })
 </script>
 

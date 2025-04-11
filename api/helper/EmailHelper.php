@@ -191,10 +191,15 @@ TEXT;
     public function sendRegistrationConfirmation($email, $loginUrl, $loginCode = null) {
         $subject = "=?UTF-8?B?" . base64_encode("Bestätigen Sie Ihre Registrierung") . "?=";
 
-        $alternative = $loginCode ? <<<HTML
+        $loginText = $loginCode ? <<<HTML
+        <p>Sie können sich nun in der App einloggen:</p>
+        <p><a href="{$loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">In der App einloggen</a></p>
         <p>Oder geben Sie folgenden Code im Login-Fenster der App ein:</p>
         <code>{$loginCode}</code>
+        <p>Der Code verliert seine Gültigkeit nach 10 Minuten.</p>
 HTML : <<<HTML
+        <p>Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
+        <p><a href="{$loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
         <p>Oder nutzen Sie folgenden Link:</p>
         <code>{$loginUrl}</code>
 HTML;
@@ -208,9 +213,7 @@ HTML;
         <h2 style="color: #333;">Registrierung bestätigen</h2>
         <p>Hallo und willkommen bei PeekaView,</p>
         <p>vielen Dank für Ihre Registrierung.</p>
-        <p>Bitte bestätigen Sie Ihre E-Mail-Adresse:</p>
-        <p><a href="{$loginUrl}" style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">E-Mail bestätigen</a></p>
-        {$alternative}
+        {$loginText}
         <div style="margin-top: 30px; font-size: 12px; color: #666;">
             <p>Dies ist eine automatische E-Mail. Bitte nicht antworten.</p>
         </div>
@@ -219,12 +222,19 @@ HTML;
 </html>
 HTML;
 
-        $alternative = $loginCode ? <<<TEXT
-Oder geben Sie folgenden Code im Login-Fenster der App ein:
+        $loginText = $loginCode ? <<<TEXT
+Geben Sie folgenden Code im Login-Fenster der App ein:
 
 {$loginCode}
 
-TEXT : '';
+Der Code verliert seine Gültigkeit nach 10 Minuten.
+
+TEXT : <<<TEXT
+Bitte bestätigen Sie Ihre E-Mail-Adresse über folgenden Link:
+
+{$loginUrl}
+
+TEXT ;
 
         $textContent = <<<TEXT
 Registrierung bestätigen
@@ -233,10 +243,7 @@ Hallo und willkommen bei PeekaView,
 
 vielen Dank für Ihre Registrierung.
 
-Bitte bestätigen Sie Ihre E-Mail-Adresse über folgenden Link:
-
-{$loginUrl}
-{$alternative}
+{$loginText}
 Dies ist eine automatische E-Mail. Bitte nicht antworten.
 TEXT;
 

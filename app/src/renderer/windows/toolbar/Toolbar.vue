@@ -6,9 +6,13 @@ import PresenterToolbar from '../../components/PresenterToolbar.vue'
 import { UserData } from '../../../interface'
 
 import BugSvg from '../../../assets/icons/bug.svg'
+import { getPlatform } from '../../util'
 
 const dev = import.meta.env.DEV
+const platform = getPlatform()
+
 const leftMargin = 20
+const rightOffset = (platform === 'mac') ? 20 : 0 // the y position of the toolbar might get skewed in case its shadow overlaps into an adjacent screen
 
 const toolbarRef = useTemplateRef<InstanceType<typeof PresenterToolbar>>('toolbar')
 
@@ -62,13 +66,12 @@ function showInviteLink() {
 
 let oldRect: DOMRect
 function resizeWindow() {
-  console.log('resizeWindow', toolbarRef.value?.$el, toolbarRef.value?.toolbarRef?.$el)
   const rect = toolbarRef.value?.toolbarRef?.$el.getBoundingClientRect() as DOMRect
   if (!rect)
     return
 
   window.electronAPI?.resizeWindow('toolbar', {
-    size: { width: Math.round(rect.width + leftMargin) },
+    size: { width: Math.round(rect.width + leftMargin + rightOffset) },
     deltaSize: { width: oldRect ? Math.round(rect.width - (oldRect?.width ?? 0)) : 0 },
   })
   oldRect = rect

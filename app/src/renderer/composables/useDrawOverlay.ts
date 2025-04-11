@@ -23,12 +23,8 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
 
   const canvasContext = computed(() => canvasRef.value?.getContext("2d") ?? undefined)
   const scale = computed(() => unref(options.scale) ?? 1)
-  const dimensions = computed(() => unref(options.dimensions) ?? (canvasRef.value ? [
-    canvasRef.value.parentElement!.clientWidth ?? 0,
-    canvasRef.value.parentElement!.clientHeight ?? 0
-  ] : undefined))
 
-  watch(() => [canvasRef.value, canvasContext.value, dimensions.value], () => refitDimensions(), { immediate: true })
+  watch(() => [canvasRef.value, canvasContext.value, unref(options.dimensions)], () => refitDimensions(), { immediate: true })
 
   let fadeInterval = setInterval(() => {
     const now = Date.now()
@@ -52,17 +48,25 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
   }, 50)
 
   function refitDimensions() {
-    if (!dimensions.value || !canvasRef.value)
+    console.log("refitDimensions", unref(options.dimensions), canvasRef.value?.parentElement?.clientWidth, canvasRef.value?.parentElement?.clientHeight)
+    window.electronAPI?.log("refitDimensions", unref(options.dimensions), canvasRef.value?.parentElement?.clientWidth, canvasRef.value?.parentElement?.clientHeight)
+    if (!canvasRef.value)
       return
 
-    canvasRef.value.style.width = dimensions.value[0] + "px"
-    canvasRef.value.style.height = dimensions.value[1] + "px"
+    const width = unref(options.dimensions)?.[0] ?? canvasRef.value?.parentElement?.clientWidth
+    const height = unref(options.dimensions)?.[1] ?? canvasRef.value?.parentElement?.clientHeight
+
+    if (!width || !height)
+      return
+
+    canvasRef.value.style.width = width + "px"
+    canvasRef.value.style.height = height + "px"
 
     if (!canvasContext.value)
       return
 
-    canvasContext.value.canvas.width = dimensions.value[0]
-    canvasContext.value.canvas.height = dimensions.value[1]
+    canvasContext.value.canvas.width = width
+    canvasContext.value.canvas.height = height
   }
 
   function startStroke(id: string, point: [number, number]) {
@@ -125,6 +129,7 @@ export function useDrawOverlay(canvasRef: Readonly<ShallowRef<HTMLCanvasElement 
     startStroke,
     continueStroke,
     endStroke,
+    refitDimensions,
     clear,
   }
 }

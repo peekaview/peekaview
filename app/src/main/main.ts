@@ -152,6 +152,16 @@ declare const CSP_POLICY: string
     openAtLogin: true, // auto-start on login
   })
 
+  const contextMenu = await import('electron-context-menu')
+  contextMenu.default({
+    showLearnSpelling: false,
+    showLookUpSelection: false,
+    showSearchWithGoogle: false,
+    showSelectAll: false,
+    showCopyImage: false,
+    showInspectElement: !app.isPackaged,
+  })
+
   let notifierWindow: BrowserWindow | undefined
   let loginWindow: BrowserWindow | undefined
   let viewerWindow: BrowserWindow | undefined
@@ -319,7 +329,10 @@ declare const CSP_POLICY: string
             }
           },
         },
-        { label: '[Dev] Clear store', type: 'normal', click: () => clearStore() },
+        { label: '[Dev] Clear store && exit', type: 'normal', click: () => {
+          store.clear()
+          app.exit()
+        } },
         { label: '[Dev] ID: ' + store.get('uuid'), type: 'normal', enabled: false },
         { type: 'separator' }
       )
@@ -637,11 +650,6 @@ declare const CSP_POLICY: string
       store.set('inviteCodeCache', {})
   }
 
-  function clearStore() {
-    store.clear()
-    initStore()
-  }
-
   function quit() {
     log.info('Initiating app quit')
     isQuitting = true
@@ -683,11 +691,11 @@ declare const CSP_POLICY: string
     if (app.isPackaged)
       return
 
-    presenterWindow?.show()
-    presenterWindow?.webContents.openDevTools()
-    loginWindow?.webContents.openDevTools()
-    viewerWindow?.webContents.openDevTools()
-    notifierWindow?.webContents.openDevTools()
+    //presenterWindow?.show()
+    //presenterWindow?.webContents.openDevTools()
+    //loginWindow?.webContents.openDevTools()
+    //viewerWindow?.webContents.openDevTools()
+    //notifierWindow?.webContents.openDevTools()
 
     remotePresenter?.openAllDevTools()
   })
@@ -819,10 +827,6 @@ declare const CSP_POLICY: string
 
   ipcMain.handle('remove-stored-item', async <K extends keyof StorageSchema>(_event, key: K) => {
     store.delete(key)
-  })
-
-  ipcMain.handle('clear-store', async () => {
-    clearStore()
   })
 
   ipcMain.handle('receive-notification', async (_event, payload: NotificationPayload) => {

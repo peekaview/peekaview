@@ -498,8 +498,13 @@ function registerMyEmail() {
     require_once __DIR__.'/helper/EmailHelper.php';
 
     $emailHelper = new EmailHelper();
-    $loginUrl = "https://".APP_DOMAIN."/?login=".$loginCode;
-    $emailHelper->sendRegistrationConfirmation($email, $loginUrl, $target === 'app' ? $loginCode : null);
+    if ($target === 'app') {
+        $loginUrl = "peekaview://login/?code=" . base64_encode("email=$email&token=$token");
+    } else {
+        $loginUrl = "https://".APP_DOMAIN."/?login=".$loginCode;
+        $loginCode = null;
+    }
+    $emailHelper->sendRegistrationConfirmation($email, $loginUrl, $loginCode);
 
     return ['success' => true];
 }
