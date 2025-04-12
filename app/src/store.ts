@@ -2,6 +2,7 @@ import { JSONSchema4 } from 'json-schema'
 import { ContactData, InviteCodeData } from './interface'
 
 export interface StorageSchema {
+  locale: string
   uuid: string
   name: string | undefined
   pushToken: string | undefined
@@ -16,6 +17,10 @@ export interface StorageSchema {
 }
 
 export const schema: JSONSchema4 = {
+  locale: {
+    type: 'string',
+    default: undefined,
+  },
   uuid: {
     type: 'string',
   },

@@ -228,18 +228,32 @@ declare const CSP_POLICY: string
       onTrayClick()
     })
 
-    updateContextMenu()
+    updateTrayMenu()
+
+    const locale = store.get('locale')
+    if (locale)
+      i18n.changeLanguage(locale)
+
+    store.onDidChange('locale', () => {
+      const locale = store.get('locale')
+      i18n.changeLanguage(locale).then(() => {
+        viewerWindow?.webContents.send('change-language', locale)
+        presenterWindow?.webContents.send('change-language', locale)
+        loginWindow?.webContents.send('change-language', locale)
+        updateTrayMenu()
+      })
+    })
 
     store.onDidChange('uuid', () => {
-      updateContextMenu()
+      updateTrayMenu()
     })
 
     store.onDidChange('code', () => {
-      updateContextMenu()
+      updateTrayMenu()
     })
 
     store.onDidChange('recentContacts', () => {
-      updateContextMenu()
+      updateTrayMenu()
     })
 
     protocol.handle('peekaview', request => {
@@ -315,7 +329,7 @@ declare const CSP_POLICY: string
       tryPresenting()
   }
 
-  const updateContextMenu = () => {
+  const updateTrayMenu = () => {
     i18nReady.then(() => {
       const menuItems: Array<(Electron.MenuItemConstructorOptions) | (Electron.MenuItem)> = []
       if (!app.isPackaged)
@@ -372,19 +386,14 @@ declare const CSP_POLICY: string
         { icon: createMenuIcon(HelpIcon), label: i18n.t('trayMenu.help'), type: 'submenu', submenu: [
           { icon: createMenuIcon(InfoIcon), label: i18n.t('trayMenu.about'), type: 'normal', click: () => showAbout() },
           { icon: createMenuIcon(LanguageIcon), label: i18n.t('trayMenu.changeLanguage'), type: 'submenu', submenu: Object.entries(languages).map(([locale, label]) => (
-            { label, type: 'normal', click: () => i18n.changeLanguage(locale).then(() => {
-              viewerWindow?.webContents.send('change-language', locale)
-              presenterWindow?.webContents.send('change-language', locale)
-              loginWindow?.webContents.send('change-language', locale)
-              updateContextMenu()
-            })}
+            { label, type: 'normal', click: () => store.set('locale', locale) }
           ))},
         ] },
         { icon: createMenuIcon(QuitIcon), label: i18n.t('trayMenu.quit'), type: 'normal', click: () => quit() },
       )
       
-      const contextMenu = Menu.buildFromTemplate(menuItems)
-      tray.setContextMenu(contextMenu)
+      const trayMenu = Menu.buildFromTemplate(menuItems)
+      tray.setContextMenu(trayMenu)
     })
   }
 
