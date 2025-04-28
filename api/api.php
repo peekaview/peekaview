@@ -602,6 +602,18 @@ function useInviteCode($code) {
     return ['email' => $inviteData[0], 'accessToken' => $inviteData[1]];
 }
 
+function wipeAllData() {
+    if (!DEV_MODE) {
+        return ['error' => 'Not allowed'];
+    }
+
+    $pattern = STORAGE_PATH . '/*';
+    foreach (glob($pattern) as $file) {
+        unlink($file);
+    }
+    return ['success' => true];
+}
+
 // Route requests with error handling
 try {
     $action = $_GET['action'] ?? '';
@@ -641,6 +653,9 @@ try {
             break;
         case 'useInviteCode':
             $out = useInviteCode($code);
+            break;
+        case 'wipeAllData':
+            $out = wipeAllData();
             break;
         default:
             die(json_encode(['error' => 'Invalid action']));
