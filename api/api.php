@@ -607,7 +607,7 @@ function wipeAllData() {
         return ['error' => 'Not allowed'];
     }
 
-    $pattern = STORAGE_PATH . '/*';
+    $pattern = STORAGE_PATH . '/**/*';
     foreach (glob($pattern) as $file) {
         unlink($file);
     }
