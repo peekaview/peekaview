@@ -41,6 +41,7 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
+      - DEV_MODE=${DEV_MODE}
     volumes:
       - api_storage:/storage
       - ./serviceAccountKey.json:/storage/serviceAccountKey.json
