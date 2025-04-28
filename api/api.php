@@ -471,16 +471,15 @@ function handleIfAllowedToSeeMyScreen($requestStatus) {
 
 function registerMyEmail() {
     $email = validateEmail($_GET['email']);
-    $userFile = getUserFile($email);
-    
     $target = ($_GET['target'] ?? '') === 'app' ? 'app' : 'web';
-    
-    $userExists = file_exists($userFile);
-    if ($userExists) {
+
+    try {
+        $userFile = getUserFile($email);
+
         // User already exists, get existing token
         $userData = explode(';', file_get_contents($userFile));
         $token = $userData[1];
-    } else {
+    } catch (Exception $e) {
         // New user, generate token
         $token = generateRandomString(16);
         $userData = implode(';', [$email, $token, 'offline', '', '', '', time()]);
