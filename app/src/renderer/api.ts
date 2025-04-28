@@ -23,7 +23,7 @@ type AcceptedRequestResponse = {
   last_seen: number
 } & AcceptedRequestData
 
-export type ApiAction = "showMeYourScreen" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom" | "iAmOnline" | "handleIfAllowedToSeeMyScreen" | "registerMyEmail" | "generateLoginCode" | "login" | "registerPushToken" | "sendPushNotification" | "useInviteCode"
+export type ApiAction = "showMeYourScreen" | "doesAnyoneWantToSeeMyScreen" | "createScreenShareRoom" | "iAmOnline" | "handleIfAllowedToSeeMyScreen" | "registerMyEmail" | "generateLoginCode" | "login" | "registerPushToken" | "sendPushNotification" | "useInviteCode" | "wipeAllData"
 
 export type ApiParams<T extends ApiAction> =
   T extends "showMeYourScreen" ? {
@@ -76,6 +76,7 @@ export type ApiParams<T extends ApiAction> =
   : T extends "useInviteCode" ? {
     code: string
   }
+  : T extends "wipeAllData" ? {}
   : never
 
 export type ApiResponse<T extends ApiAction> =
@@ -106,6 +107,7 @@ export type ApiResponse<T extends ApiAction> =
     email: string
     accessToken: string
   }
+  : T extends "wipeAllData" ? {}
   : never
 
 export async function callApi<TAction extends ApiAction>(action: TAction, params: ApiParams<TAction>) {

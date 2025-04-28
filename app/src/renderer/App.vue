@@ -24,6 +24,7 @@ import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
 
 const { t } = useI18n()
 
+const dev = import.meta.env.DEV
 const showInfo = ref<"imprint" | "gdpr">()
 const { action, loginCode, authCode, email, token, target, viewEmail, accessToken } = useParamsData()
 
@@ -175,6 +176,10 @@ function shareRecentContact(id?: string) {
   contactToNotify.value = recentContacts.value[id]
   presenterActive.value = true
 }
+
+function wipeAllData() {
+  callApi('wipeAllData', {})
+}
 </script>
 
 <template>
@@ -276,6 +281,9 @@ function shareRecentContact(id?: string) {
           <option value="en">English</option>
           <option value="de">Deutsch</option>
         </select>
+      </span>
+      <span v-if="dev">
+        <a href="#" @click="wipeAllData">Wipe all data</a>
       </span>
     </div>
   </footer>
