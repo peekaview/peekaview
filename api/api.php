@@ -22,12 +22,13 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 // Validate required environment variables
-foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'TURN_SHARED_SECRET'] as $required) {
+foreach (['APP_DOMAIN', 'FROM_EMAIL', 'FROM_NAME', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'TURN_SHARED_SECRET', 'DEV_MODE'] as $required) {
     if (!getenv($required)) {
         die(json_encode(['error' => "Missing required environment variable: $required"]));
     }
 }
 
+define('DEV_MODE', getenv('DEV_MODE') === 'true');
 define('ENABLE_LOGGING', false);
 define('TURN_SHARED_SECRET', getenv('TURN_SHARED_SECRET'));
 define('TURN_EXPIRE', 8640000);
