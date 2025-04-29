@@ -129,6 +129,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
         bottom: height,
       },
       coverBounds: [],
+      windowCovered: false,
       toolsEnabled: unref(data.toolsEnabled),
       streamState: streamState.value,
     }
