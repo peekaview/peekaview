@@ -203,7 +203,7 @@ export type StreamerData = {
 
 export type ViewerTool = 'pointer' | 'remoteControl'
 
-export type StreamState = 'hidden' | 'paused' | 'active' | 'stopped'
+export type StreamState = 'init' | 'hidden' | 'paused' | 'active' | 'stopped'
 
 export type SendRemoteOptions = {
   volatile?: boolean
@@ -270,6 +270,7 @@ export type RemoteResetData = {
   inBrowser: boolean
   dimensions: Dimensions
   coverBounds: Rectangle[]
+  windowCovered: boolean
   toolsEnabled: Record<ViewerTool, boolean>
   streamState: StreamState
 }

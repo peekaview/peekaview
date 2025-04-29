@@ -105,7 +105,7 @@ function openAllDevTools() {
     @on-collapse="onCollapse"
   >
     <template #buttons-before>
-      <div v-if="dev" class="btn btn-sm btn-secondary" title="Open all Dev Tools" @click="openAllDevTools">
+      <div v-show="dev" class="btn btn-sm btn-secondary" title="Open all Dev Tools" @click="openAllDevTools">
         <BugSvg />
       </div>
     </template>

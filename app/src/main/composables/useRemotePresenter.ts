@@ -277,12 +277,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       console.log('window was resized')
       overlayWindow?.setBounds(sourceManager.getOverlayRectangle())
     }
-    else if (sourceManager.isVisible()) {
+    else {
       resumeStreamingIfPaused(true)
-    }
-    else if (streamState !== 'hidden') {
-      console.log('window is not visible')
-      pauseStreaming(true)
     }
   }
 
@@ -297,6 +293,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       inBrowser: false,
       dimensions: sourceManager.getOuterDimensions(),
       coverBounds: toolbarBounds ? [toolbarBounds] : [],
+      windowCovered: !sourceManager.isVisible(),
       toolsEnabled,
       streamState,
     }
@@ -842,55 +839,55 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
         break
       case 'copy':
         const copyData = data as RemoteCopyData
-        if (toolsEnabled.remoteControl && copyData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && copyData.tool == 'remoteControl' && sourceManager.isVisible())
           copyToClipboard(copyData)
         break
       case 'mouse-move':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseMove(mouseData)
         
         sendToOverlayWindow('on-mouse-move', mouseData)
         break
       case 'mouse-click':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseClick(mouseData)
         break
       case 'mouse-dblclick':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseDblClick(mouseData)
         break
       case 'mouse-leftclick':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseLeftClick(mouseData)
         
         sendToOverlayWindow('on-mouse-click', mouseData)
         break
       case 'mouse-down':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseDown(mouseData)
         
         sendToOverlayWindow('on-mouse-down', mouseData)
         break;
       case 'mouse-wheel':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseWheel(mouseData)
         break;
       case 'mouse-up':
         mouseData = data as RemoteMouseData
-        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && mouseData.tool == 'remoteControl' && sourceManager.isVisible())
           mouseUp(mouseData)
         
         sendToOverlayWindow('on-mouse-up', mouseData)
         break;
       case 'key-down':
         const keyData = data as RemoteKeyData
-        if (toolsEnabled.remoteControl && keyData.tool == 'remoteControl')
+        if (toolsEnabled.remoteControl && keyData.tool == 'remoteControl' && sourceManager.isVisible())
           keyDown(keyData)
         break;
     }
@@ -902,8 +899,8 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     overlayWindow?.setIgnoreMouseEvents(false)
     overlayWindow?.webContents.openDevTools()
-    toolbarWindow?.webContents.openDevTools()
-    clipboardWindow?.webContents.openDevTools()
+    //toolbarWindow?.webContents.openDevTools()
+    //clipboardWindow?.webContents.openDevTools()
   }
   
   return {

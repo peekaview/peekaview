@@ -141,11 +141,15 @@
       },
       "hidden": {
         "title": "No interaction possible",
-        "description": "The shared window has either been minimized or is hidden behind other windows. Please wait until the host makes it visible again."
+        "description": "The shared window has been minimized. Please wait for the host to make it visible again."
       },
       "visible": {
         "title": "Screen sharing resumed",
         "description": "The shared window is now visible again."
+      },
+      "windowCovered": {
+        "title": "Remote control locked",
+        "description": "The shared window is currently hidden behind other windows. Please wait for the host to make it visible again."
       }
     },
     "streamState": {

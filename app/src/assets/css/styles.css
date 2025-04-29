@@ -1,5 +1,9 @@
 /* Global Styles */
 
+:root {
+  --bs-danger-rgb: 255, 64, 64;
+}
+
 html {
   --primary-color: #1a73e8;
   --primary-hover-color: #1557b0;

@@ -141,11 +141,15 @@
       },
       "hidden": {
         "title": "Keine Interaktion möglich",
-        "description": "Das freigegebene Fenster wurde entweder minimiert oder ist hinter anderen Fenstern versteckt. Bitte warten Sie, bis der Host es wieder sichtbar macht."
+        "description": "Das freigegebene Fenster wurde minimiert. Bitte warten Sie, bis der Host es wieder sichtbar macht."
       },
       "visible": {
         "title": "Bildschirmfreigabe fortgesetzt",
         "description": "Das freigegebene Fenster ist nun wieder sichtbar."
+      },
+      "windowCovered": {
+        "title": "Fernsteuerung gesperrt",
+        "description": "Das freigegebene Fenster ist aktuell hinter anderen Fenstern versteckt. Bitte warten Sie, bis der Host es wieder sichtbar macht."
       }
     },
     "streamState": {

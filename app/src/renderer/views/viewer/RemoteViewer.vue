@@ -23,7 +23,7 @@ import PencilSvg from '../../../assets/icons/pencil.svg'
 
 import type { File, StreamState, ViewerTool } from '../../../interface'
 
-type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'fileUpload' | 'fileDrop'
+type Message = 'init' | 'sync' | 'help' | 'paused' | 'resumed' | 'hidden' | 'visible' | 'windowCovered' | 'fileUpload' | 'fileDrop'
 
 const ToolIcons: Record<ViewerTool, string> = {
   pointer: PencilSvg,
@@ -47,6 +47,7 @@ const containerRef = useTemplateRef<InstanceType<typeof StreamContainer>>('conta
 const screenView = ref<ScreenView>()
 const users = computed(() => Object.values(screenView.value?.participants ?? {}).map(p => p.user))
 const stream = ref<MediaStream>()
+const windowCovered = ref(false)
 
 watch(() => screenView.value?.participants, async (participants) => {
   const socketId = screenView.value?.presenterSocketId
@@ -58,7 +59,7 @@ watch(() => screenView.value?.participants, async (participants) => {
     incrementRecentContacts([presenter.user])
 }, { deep: true })
 
-const streamState = ref<StreamState>('stopped')
+const streamState = ref<StreamState>('init')
 let streamStateTimeout: number
 watch(streamState, (state) => {
   switch (state) {
@@ -109,6 +110,13 @@ watch(() => toolsEnabled.value.pointer, (enabled) => {
 
 watch(() => toolsEnabled.value.remoteControl, (enabled) => {
   toggleTool('remoteControl', enabled)
+})
+
+watch(() => [windowCovered.value, activeTool.value], ([covered, tool]) => {
+  if (covered && tool === 'remoteControl')
+    activeMessage.value = 'windowCovered'
+  else
+    hideMessage('windowCovered')
 })
 
 let tooltipTimeout: number
@@ -199,6 +207,7 @@ onReceive('reset', (data) => {
   presenterInBrowser.value = data.inBrowser
   toolsEnabled.value = data.toolsEnabled
   streamState.value = data.streamState
+  windowCovered.value = data.windowCovered
 
   containerRef.value?.reset(data)
 })
@@ -484,7 +493,7 @@ function stop() {
       @panzoomchange="onPanzoomChange"
       @contextmenu="() => false"
     >
-      <div v-if="streamState !== 'active'" class="text-overlay">
+      <div v-if="streamState !== 'active' && streamState !== 'init'" class="text-overlay">
         <span>{{ $t(`viewer.streamState.${streamState}`) }}</span>
       </div>
     </StreamContainer>

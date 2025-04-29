@@ -61,16 +61,16 @@ async function handleRegister(e: Event) {
 <template>
   <form v-if="!loginCode" @submit="handleRegister">
     <div class="form-content">
-      <div class="mb-4">
+      <div>
         <p>{{ $t('login.notLoggedIn') }}</p>
       </div>
-      <div class="mb-4">
+      <div class="mt-4">
         <label for="email" class="form-label">{{ $t('labels.yourEmail') }}</label>
         <input type="email" class="form-control form-control-lg" id="email" name="email"
           v-model="email" placeholder="example@email.com" required>
       </div>
       <label v-if="emailError" class="text-danger mt-1">{{ emailError }}</label>
-      <button type="submit" class="btn btn-primary btn-lg w-100">{{ $t('login.register') }}</button>
+      <button type="submit" class="btn btn-primary btn-lg w-100 mt-4">{{ $t('login.register') }}</button>
     </div>
   </form>
   <div v-else-if="target === 'app'">
