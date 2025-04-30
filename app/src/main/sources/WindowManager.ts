@@ -10,6 +10,7 @@ export class WindowManager extends SourceManager {
   
   constructor(hwnd: string) {
     super(hwnd)
+    this.type = "window"
     this.cropSize = {
       width: 0,
       height: 0,

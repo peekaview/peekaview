@@ -62,7 +62,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
   const pingInterval = ref<number>()
   const lastPingTime = ref<number>()
   
-  const streamState = ref<StreamState>('stopped')
+  const streamState = ref<StreamState>('init')
   const stream = shallowRef<MediaStream | undefined>()
 
   const requestQueue = reactive<Record<string, RequestData>>({})

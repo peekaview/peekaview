@@ -4,6 +4,7 @@ import { LinuxWindowManager } from "./LinuxWindowManager"
 export class XOrgWindowManager extends LinuxWindowManager {
   constructor(hwnd: string) {
     super(hwnd)
+    this.type = "linux_xorg_window"
   }
   
   getWindowInfo() {

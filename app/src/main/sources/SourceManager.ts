@@ -2,6 +2,7 @@ import { screen, BrowserWindow } from 'electron'
 import { Dimensions, Point } from '../../interface'
 
 export class SourceManager {
+  protected type: string
   protected overlaydebug: BrowserWindow | null;
   protected cache: Record<string, {time: number, result: any}>;
   protected hwnd: string;
@@ -9,6 +10,7 @@ export class SourceManager {
   public fixOverlayBoundsAfterCreation: boolean;
 
   constructor(hwnd: string) {
+    this.type = "unknown"
     this.overlaydebug = null
     this.cache = {}
 
@@ -19,6 +21,8 @@ export class SourceManager {
   }
 
   async onInit() {}
+
+  cleanUp() {}
 
   isScreen() {
     return false

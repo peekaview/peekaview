@@ -168,7 +168,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   let sourceManager: SourceManager
   
   // Streaming control flags
-  let streamState: StreamState = 'stopped'
+  let streamState: StreamState = 'init'
   
   // Intervals
   let checkWindowInterval: NodeJS.Timeout | undefined
@@ -209,6 +209,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     
     console.log(`${hwnd} in windowList`)
 
+    if (sourceManager)
+      sourceManager.cleanUp()
+
     sourceManager = createSourceManager(hwnd)
     await sourceManager.onInit()
     sourceManager.bringToFront()
@@ -227,6 +230,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     streamState = fromHidden ? 'hidden' : 'paused'
 
+    overlayWindow?.hide()
     console.log('pause')
     sendReset()
   }
@@ -239,12 +243,13 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       onHidden(false)
     
     streamState = 'stopped'
+    overlayWindow?.show()
     console.log('resume')
     await startStreaming()
   }
 
   async function startStreaming() {
-    if (streamState === 'stopped') {
+    if (streamState === 'init' || streamState === 'stopped') {
       console.log("startStreaming")
 
       streamState = 'active'
@@ -266,7 +271,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     streamState = 'stopped'
   }
 
-  function checkWindow() {
+  async function checkWindow() {
     updateWindowBorders(sourceManager.getOuterDimensions())
 
     if (sourceManager.isMinimized()) {
@@ -278,7 +283,12 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       overlayWindow?.setBounds(sourceManager.getOverlayRectangle())
     }
     else {
-      resumeStreamingIfPaused(true)
+      await resumeStreamingIfPaused(true)
+
+      if (sourceManager.isVisible())
+        overlayWindow?.show()
+      else
+        overlayWindow?.hide()
     }
   }
 

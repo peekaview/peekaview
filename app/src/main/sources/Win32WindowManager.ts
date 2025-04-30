@@ -29,6 +29,7 @@ export class Win32WindowManager extends WindowManager {
 
   constructor(hwnd: string) {
     super(hwnd)
+    this.type = "win32_window"
 
     try {
       const lib = koffi.load('user32.dll');

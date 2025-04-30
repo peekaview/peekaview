@@ -81,6 +81,7 @@ export default defineConfig({
           clipboard: resolve('src/renderer/windows/clipboard/index.html'),
           dialog: resolve('src/renderer/windows/dialog/index.html'),
           login: resolve('src/renderer/windows/login/index.html'),
+          notifier: resolve('src/renderer/windows/notifier/index.html'),
           overlay: resolve('src/renderer/windows/overlay/index.html'),
           presenter: resolve('src/renderer/windows/presenter/index.html'),
           toolbar: resolve('src/renderer/windows/toolbar/index.html'),

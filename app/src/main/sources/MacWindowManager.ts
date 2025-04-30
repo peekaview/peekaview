@@ -10,12 +10,17 @@ export class MacWindowManager extends WindowManager {
   
   constructor(hwnd: string) {
     super(hwnd)
+    this.type = "mac_window"
     this.maxCacheAge = 1000
     this.currentMonitorProcess = null
   }
 
   async onInit() {
     this.startWindowMonitoring()
+  }
+
+  cleanUp() {
+    this.stopWindowMonitoring()
   }
 
   async getMacWindowlist() {
@@ -138,8 +143,7 @@ export class MacWindowManager extends WindowManager {
     });
   }
 
-  // Add cleanup method to be called when app is closing
-  cleanup() {
+  stopWindowMonitoring() {
     if (this.currentMonitorProcess) {
       try {
         process.kill(-this.currentMonitorProcess.pid);

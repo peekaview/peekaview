@@ -7,6 +7,7 @@ export class ScreenManager extends SourceManager {
   
   constructor(hwnd: string) {
     super(hwnd)
+    this.type = "screen"
     this.fixOverlayBoundsAfterCreation = (process.platform === 'win32')
     this.screen = screen.getPrimaryDisplay()
   }
