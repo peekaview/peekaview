@@ -178,9 +178,10 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   async function start(sourceId: string) {
     await useSource(sourceId)
 
+    sourceManager.checkIfRectangleUpdated()
+
     await startStreaming()
 
-    sourceManager.checkIfRectangleUpdated()
     checkWindow()
     if (!checkWindowInterval)
       checkWindowInterval = setInterval(() => checkWindow(), checkWindowIntervalTime)
@@ -264,6 +265,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   async function stopStreaming() {
     console.log("stopStreaming")
 
+    if (sourceManager)
+      sourceManager.cleanUp()
+
     overlayWindow?.close()
     toolbarWindow?.close()
     clipboardWindow?.close()
@@ -285,9 +289,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     else {
       await resumeStreamingIfPaused(true)
 
-      if (sourceManager.isVisible())
+      if (sourceManager.isVisible() && !overlayWindow?.isVisible())
         overlayWindow?.show()
-      else
+      else if (!sourceManager.isVisible() && overlayWindow?.isVisible())
         overlayWindow?.hide()
     }
   }

@@ -3,7 +3,7 @@ import { computed, MaybeRef, reactive, ref, shallowRef, unref, watch } from 'vue
 import { useScreenPresent, type ScreenPresent, type ScreenShareData } from "./useSimplePeerScreenShare"
 
 import { callApi, UnauthorizedError } from '../api'
-import { getPlatform, getStoredItem, incrementRecentContacts } from '../util'
+import { getPlatform, getStoredItem, incrementRecentContacts, logout } from '../util'
 import { RemoteData, ScreenSource, StreamState, SendRemote, ViewerTool, ContactData, NotificationPayload } from '../../interface'
 import { stringToColor } from '../../util'
 
@@ -214,7 +214,7 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
           })
         })
       }, { immediate: true })
-  } catch (error) {
+    } catch (error) {
       console.error('Error creating room:', error);
       handleApiError(error as Error, requestData)
     }
@@ -318,12 +318,8 @@ export function usePresenter(data: PresenterData, getStream: () => Promise<{ str
       
   function handleApiError(error: Error, requestData: any) {
     window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
-    if (!import.meta.env.DEV && error instanceof UnauthorizedError) {
-      if (inApp)
-        window.electronAPI!.logout(true)
-      else
-        window.location.href = `/?login=&target=web&discardSession=true`
-      return
+    if (error instanceof UnauthorizedError) {
+      logout()
     }
 
     options?.onApiError?.(error, requestData)

@@ -146,9 +146,12 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
     socket.on('connect', () => resolve())
   )
 
+  console.log('socket connected')
+
   socket.emit('join', { roomId, role })
 
   socket.on('initReceive', ({ socketId, role }: { socketId: string, role: PeerRole }) => {
+    console.log('initReceive', socketId, role)
     if (options?.roleHandlers?.[role]) {
       options.roleHandlers[role](socketId)
       return
@@ -158,6 +161,7 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
   })
 
   socket.on('peerIds', async (peerIds: string[]) => {
+    console.log('peerIds', peerIds)
     for (const socketId of peerIds)
       createParticipant(socketId, false, () => {}, () => dismiss(socketId))
   })
@@ -165,14 +169,17 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
   socket.on('peerLeft', socketId => dismiss(socketId))
 
   const createParticipant = (socketId: string, initiator: boolean, onConnect?: (peer: SimplePeer.Instance) => void, onLeave?: () => void) => {
+    console.log('peer create', socketId)
     const newPeer = initPeer(socketId, initiator)
     
     newPeer.on('connect', () => {
+      console.log('peer connect', socketId)
       newPeer.send(JSON.stringify({ type: 'identity', user }))
       onConnect?.(newPeer)
     })
     
     newPeer.on('data', (json: string) => {
+      console.log('peer data', socketId, json)
       const data = JSON.parse(json) as PeerData
       switch (data.type) {
         case 'remote':

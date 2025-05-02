@@ -123,6 +123,7 @@ export class MacWindowManager extends WindowManager {
     }
 
     // Start new monitor process
+    console.log('starting monitor process', this.hwnd)
     this.currentMonitorProcess = require('child_process').spawn('swift', 
       [resolvePath('static/scripts/mac_window_monitor.swift'), this.hwnd], 
       { detached: true }

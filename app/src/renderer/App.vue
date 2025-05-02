@@ -17,7 +17,7 @@ import { ViewerData, ViewerDataSchema } from './types'
 import { uuidv4, displayNameMail } from '../util'
 import { getPushToken, onNotification } from './firebase'
 import { callApi } from './api'
-import { getStoredItem, setStoredItem, prompt } from './util'
+import { getStoredItem, setStoredItem, prompt, logout } from './util'
 import { ContactData } from '../interface'
 
 import PeekaViewLogo from '../assets/img/peekaviewlogo.png'
@@ -177,8 +177,9 @@ function shareRecentContact(id?: string) {
   presenterActive.value = true
 }
 
-function wipeAllData() {
-  callApi('wipeAllData', {})
+async function wipeAllData() {
+  await callApi('wipeAllData', {})
+  logout()
 }
 </script>
 

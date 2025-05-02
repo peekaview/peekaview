@@ -1,7 +1,7 @@
 import { NotificationPayload } from "src/interface"
 import i18n from "./i18n"
 import { EitherEmailOrCodeOrUuid, RequestStatus, RequestUserStatus, RoomData } from "./types"
-import { notify } from "./util"
+import { logout, notify } from "./util"
 
 type AcceptedRequestData = RoomData & {
   inviteCode: string
@@ -146,6 +146,13 @@ export async function callApi<TAction extends ApiAction>(action: TAction, params
     throw new Error(`${response.status} ${response.statusText}`)
 
   return responseBody
+}
+
+export function handleApiError(error: Error, requestData: any) {
+  window.electronAPI?.log("presenter error", error, JSON.stringify(requestData))
+  if (error instanceof UnauthorizedError) {
+    logout()
+  }
 }
 
 export class UnauthorizedError extends Error {

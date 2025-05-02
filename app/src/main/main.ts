@@ -300,8 +300,12 @@ declare const CSP_POLICY: string
     })
 
     app.on('will-quit', e => {
-      if (!isQuitting)
+      if (!isQuitting) {
         e.preventDefault()
+        return
+      }
+
+      remotePresenter?.stop();
     })
 
     log.info("App initialization complete")

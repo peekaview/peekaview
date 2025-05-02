@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { parseCode } from '../../util'
-import { getStoredItem, setStoredItem } from '../util'
-import { callApi } from '@renderer/api'
+import { getStoredItem, logout, setStoredItem } from '../util'
+import { callApi, UnauthorizedError } from '@renderer/api'
 
 export enum Action {
   Login = 'login',
@@ -91,12 +91,18 @@ export function useParamsData() {
           // TODO: Handle error
         }
       } else if (target.value === 'app' && email.value && token.value) {
-        const data = await callApi('generateLoginCode', {
-          email: email.value,
-          token: token.value,
-          target: target.value,
-        })
-        loginCode.value = data.code
+        try {
+          const data = await callApi('generateLoginCode', {
+            email: email.value,
+            token: token.value,
+            target: target.value,
+          })
+          loginCode.value = data.code
+        } catch (error) {
+          if (error instanceof UnauthorizedError) {
+            logout()
+          }
+        }
       }
       
       if (email.value && token.value) {

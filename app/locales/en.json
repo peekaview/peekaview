@@ -236,8 +236,7 @@
       "windows": "Windows",
       "screens": "Screens"
     },
-    "share": "Share",
-    "unauthorized": "Unauthorized!"
+    "share": "Share"
   },
   "sharingActive": {
     "title": "Sharing Session Active",
@@ -278,5 +277,10 @@
   "notifications": {
     "shareScreen": "{name} wants to share their screen with you.",
     "viewSharedScreen": "{name} wants to view your screen."
+  },
+  "unauthorized": {
+    "title": "Session Error",
+    "message": "There was an error with your session. Please try to login again.",
+    "button": "Logout"
   }
 } 

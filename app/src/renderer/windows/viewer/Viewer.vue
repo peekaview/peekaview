@@ -6,8 +6,8 @@ import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
 import { getStoredItem } from '../../util'
 import { ContactData } from '../../../interface'
-import { callApi } from '../../api'
-import { displayNameMail, parseCode } from '../../../util'
+import { callApi, UnauthorizedError } from '../../api'
+import { displayNameMail, logout, parseCode } from '../../../util'
 
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
 
@@ -41,21 +41,28 @@ onMounted(async () => {
 
     if (email && token) {
       window.electronAPI?.log('Notify contact:', JSON.stringify(contact))
-      callApi('sendPushNotification', {
-        email: email!,
-        token: token!,
-        uuid: contact.id,
-        notification: JSON.stringify({
-          title: 'PeekaView',
-          message: t('notifications.viewSharedScreen', { name: displayNameMail({ name, email }) }),
-          data: {
-            icon: PeekaViewLogo,
-            url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
-            type: 'share',
-            email,
-          }
+      try {
+        callApi('sendPushNotification', {
+          email: email!,
+          token: token!,
+          uuid: contact.id,
+          notification: JSON.stringify({
+            title: 'PeekaView',
+            message: t('notifications.viewSharedScreen', { name: displayNameMail({ name, email }) }),
+            data: {
+              icon: PeekaViewLogo,
+              url: new URL(`${import.meta.env.VITE_APP_URL}/?share`).toString(),
+              type: 'share',
+              email,
+            }
+          })
         })
-      })
+      } catch (error) {
+        console.error('Error sending push notification:', error)
+        if (error instanceof UnauthorizedError) {
+          logout()
+        }
+      }
     }
 
     // TODO: can always be assured that a name or an email is available?

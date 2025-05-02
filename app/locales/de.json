@@ -236,8 +236,7 @@
       "windows": "Fenster",
       "screens": "Bildschirme"
     },
-    "share": "Teilen",
-    "unauthorized": "Nicht autorisiert!"
+    "share": "Teilen"
   },
   "sharingActive": {
     "title": "Bildschirmfreigabe aktiv",
@@ -278,5 +277,10 @@
   "notifications": {
     "shareScreen": "{name} möchte seinen/ihren Bildschirm mit Ihnen teilen.",
     "viewSharedScreen": "{name} möchte Ihren Bildschirm sehen."
+  },
+  "unauthorized": {
+    "title": "Sitzungsfehler",
+    "message": "Es ist ein Fehler mit Ihrer Sitzung aufgetreten. Bitte melden Sie sich erneut an.",
+    "button": "Abmelden"
   }
 }

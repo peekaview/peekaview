@@ -19,6 +19,8 @@ export type PromptOptions = DialogOptions & {
   cancelButtonText: string
 }
 
+export const LOGOUT_URL = `/?login=&target=web&discardSession=true`
+
 let increment = 0
 const promiseHandlers: {
   [id: number]: [(value: string) => void, () => void]
@@ -128,6 +130,13 @@ export async function getStaticResourcesPath() {
     prefix = await window.electronAPI.getResourcesPath()
   }
   return prefix ? `${prefix}/static` : ''
+}
+
+export function logout() {
+  if (window.electronAPI)
+    window.electronAPI!.logout(true)
+  else
+    window.location.href = LOGOUT_URL
 }
 
 export function getStoredItem<K extends keyof StorageSchema>(key: K, defaultValue?: StorageSchema[K]) {

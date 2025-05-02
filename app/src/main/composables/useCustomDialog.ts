@@ -1,5 +1,5 @@
 import path from 'path'
-import { ipcMain, app, screen, BrowserWindow } from 'electron'
+import { app, screen, BrowserWindow } from 'electron'
 import { windowLoad } from '../util'
 import { DialogOptions } from '../../interface'
 
@@ -9,15 +9,6 @@ export function useCustomDialog() {
   const dialoglist: BrowserWindow[] = []
   const traylist: BrowserWindow[] = []
   let sound: string | null
-
-  function getDialogResult() {
-    const promise = new Promise((resolve) => {
-      ipcMain.once('replyDialog', (_event, res) => {
-        resolve(res)
-      })
-    })
-    return promise
-  }
 
   function closeTrayDialogs() {
     traylist.forEach((popupwin) => {
@@ -137,7 +128,6 @@ export function useCustomDialog() {
   }
 
   return {
-    getDialogResult,
     closeTrayDialogs,
     closeDialogs,
     playSoundOnOpen,

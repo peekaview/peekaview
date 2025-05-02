@@ -23,7 +23,6 @@ const toolsEnabled = ref<Record<ViewerTool, boolean>>({
 const presenter = ref<Presenter>()
 const contactToNotify = ref<ContactData>()
 const shareAudio = ref(false)
-const unauthorized = ref(false)
 
 onMounted(() => {
   const code = new URLSearchParams(window.location.search).get('data')
@@ -115,10 +114,8 @@ async function present(email: string, token: string) {
       return (result === '0')
     },
     onApiError: (error) => {
-      if (error instanceof UnauthorizedError) {
-        unauthorized.value = true
+      if (error instanceof UnauthorizedError)
         return
-      }
 
       notify({
         type: 'error',
@@ -143,11 +140,8 @@ function close() {
 </script>
 
 <template>
-  <div v-if="unauthorized" class="text-center text-danger">
-    <h2>{{ $t('sourcesWindow.unauthorized') }}</h2>
-  </div>
   <Sources
-    v-else-if="showSources"
+    v-if="showSources"
     v-model:shareAudio="shareAudio"
     @select="select"
     @cancel="close"

@@ -40,6 +40,8 @@ define('REQUEST_TIMEOUT', 20); // seconds
 define('OFFLINE_TIMEOUT', 120); // seconds
 define('LOGIN_TIMEOUT', 600); // seconds
 
+class AuthorizationException extends Exception {}
+
 $out = [];
 $log = [];
 
@@ -189,7 +191,7 @@ function getUserFile($email) {
     $userFile = getUserFilename($email);
     $log[] = "User file: $userFile";
     if (!file_exists($userFile)) {
-        throw new Exception('User not found');
+        throw new AuthorizationException('User not found');
     }
 
     $log[] = "User file found";
@@ -204,7 +206,7 @@ function authorizeUser($userFile, $token) {
     $storedToken = $userData[1] ?? '';
     
     if ($token !== $storedToken) {
-        throw new Exception('Unauthorized');
+        throw new AuthorizationException('Token mismatch');
     }
 
     $log[] = "User authorized";
@@ -660,10 +662,12 @@ try {
         default:
             die(json_encode(['error' => 'Invalid action']));
     }
+} catch (AuthorizationException $e) {
+    http_response_code(401);
+    $out['error'] = $e->getMessage();
 } catch (Exception $e) {
-    $message = $e->getMessage();
-    http_response_code($message === 'Unauthorized' ? 401 : 400);
-    $out['error'] = $message;
+    http_response_code(400);
+    $out['error'] = $e->getMessage();
 }
 
 register_shutdown_function(function($out, $log) {
