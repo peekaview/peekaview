@@ -4,10 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { ViewerData, ViewerDataSchema } from '../../types'
 import Viewer from '../../views/viewer/Viewer.vue'
 import ViewerForm from '../../views/form/ViewerForm.vue'
-import { getStoredItem } from '../../util'
-import { ContactData } from '../../../interface'
 import { callApi, UnauthorizedError } from '../../api'
-import { displayNameMail, logout, parseCode } from '../../../util'
+import { getStoredItem, logout } from '../../util'
+import { displayNameMail, parseCode } from '../../../util'
+import { ContactData } from '../../../interface'
 
 import PeekaViewLogo from '../../../assets/img/peekaviewlogo.png'
 
