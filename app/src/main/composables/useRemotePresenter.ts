@@ -180,7 +180,12 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
     sourceManager.checkIfRectangleUpdated()
 
-    await startStreaming()
+    streamState = 'active'
+
+    await createOverlayWindow()
+    await createToolbarWindow()
+
+    sendReset()
 
     checkWindow()
     if (!checkWindowInterval)
@@ -193,7 +198,14 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       checkWindowInterval = undefined
     }
 
-    stopStreaming()
+    if (sourceManager)
+      sourceManager.cleanUp()
+
+    overlayWindow?.close()
+    toolbarWindow?.close()
+    clipboardWindow?.close()
+
+    streamState = 'stopped'
   }
 
   async function useSource(sourceId: string) {
@@ -225,14 +237,11 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (streamState === 'paused' || (streamState === 'hidden' && fromHidden))
       return
 
-    console.log('pauseStreaming', streamState, fromHidden, streamState === 'hidden' && !fromHidden)
     if (fromHidden)
       onHidden(true)
 
     streamState = fromHidden ? 'hidden' : 'paused'
-
     overlayWindow?.hide()
-    console.log('pause')
     sendReset()
   }
 
@@ -243,36 +252,9 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (fromHidden)
       onHidden(false)
     
-    streamState = 'stopped'
+    streamState = 'active'
     overlayWindow?.show()
-    console.log('resume')
-    await startStreaming()
-  }
-
-  async function startStreaming() {
-    if (streamState === 'init' || streamState === 'stopped') {
-      console.log("startStreaming")
-
-      streamState = 'active'
-
-      await createOverlayWindow()
-      await createToolbarWindow()
-
-      sendReset()
-    }
-  }
-
-  async function stopStreaming() {
-    console.log("stopStreaming")
-
-    if (sourceManager)
-      sourceManager.cleanUp()
-
-    overlayWindow?.close()
-    toolbarWindow?.close()
-    clipboardWindow?.close()
-
-    streamState = 'stopped'
+    sendReset()
   }
 
   async function checkWindow() {
@@ -281,19 +263,20 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     if (sourceManager.isMinimized()) {
       console.log('window is minimized')
       pauseStreaming(true)
+      return
     }
-    else if (sourceManager.checkIfRectangleUpdated()) {
+    
+    if (sourceManager.checkIfRectangleUpdated()) {
       console.log('window was resized')
       overlayWindow?.setBounds(sourceManager.getOverlayRectangle())
     }
-    else {
-      await resumeStreamingIfPaused(true)
+    
+    await resumeStreamingIfPaused(true)
 
-      if (sourceManager.isVisible() && !overlayWindow?.isVisible())
-        overlayWindow?.show()
-      else if (!sourceManager.isVisible() && overlayWindow?.isVisible())
-        overlayWindow?.hide()
-    }
+    if (sourceManager.isVisible() && !overlayWindow?.isVisible())
+      overlayWindow?.show()
+    else if (!sourceManager.isVisible() && overlayWindow?.isVisible())
+      overlayWindow?.hide()
   }
 
   let resetTimeout: NodeJS.Timeout | undefined
@@ -396,6 +379,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     return new Promise<void>((resolve) => {
       overlayWindow!.on('ready-to-show', () => {
         toolbarWindow?.moveTop()
+        console.log('ready-to-show on-update-overlay-data', users)
         overlayWindow!.webContents.send('on-update-overlay-data', { users, scale: 1 / sourceManager.getScaleFactor() })
         resolve()
       })
@@ -589,6 +573,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
   function updateUsers(newUsers: UserData[]) {
     users = newUsers
+    console.log('updateUsers on-update-overlay-data', users)
     overlayWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     toolbarWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     sendReset()

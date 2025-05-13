@@ -103,7 +103,8 @@ uuidPromise.then(uuid => {
       }
     })
   }, (error) => {
-    console.error('error getting token', error)
+    console.error('Firebase token could not be retrieved! This could be either due to the browser blocking notifications for this page or the window being in incognito mode.')
+    console.error(error)
   })
 })
 

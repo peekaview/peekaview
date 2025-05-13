@@ -477,6 +477,7 @@ function stop() {
     </Toolbar>
     <StreamContainer
       v-if="data"
+      v-slot="slotProps"
       ref="container"
       :stream="stream"
       :users="[...users, data.user]"
@@ -493,7 +494,7 @@ function stop() {
       @panzoomchange="onPanzoomChange"
       @contextmenu="() => false"
     >
-      <div v-if="streamState !== 'active' && streamState !== 'init'" class="text-overlay">
+      <div v-if="streamState !== 'active' && streamState !== 'init'" class="text-overlay" :style="{ width: slotProps.dimensions.width+'px', height: slotProps.dimensions.height+'px' }">
         <span>{{ $t(`viewer.streamState.${streamState}`) }}</span>
       </div>
     </StreamContainer>
@@ -573,8 +574,6 @@ function stop() {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
     background: #0008;
   }
 

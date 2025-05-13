@@ -73,7 +73,10 @@ const mappedUsers = computed(() => {
 })
 
 const streamSize = ref<Size>({ width: 0, height: 0 })
-watch(streamSize, () => emit('on-stream-size-change', streamSize.value))
+watch(streamSize, () => {
+  emit('on-stream-size-change', streamSize.value)
+  updateVideoTransform()
+})
 
 const scale = computed(() => {
   if (!streamSize.value.height || !streamSize.value.width)
@@ -384,6 +387,10 @@ defineExpose({
   receiveMouseUp,
   clear,
 })
+
+defineSlots<{
+  default(props: { dimensions: Rectangle }): any
+}>()
 </script>
 
 <template>
@@ -414,7 +421,7 @@ defineExpose({
         <div v-for="bound in coverBounds" class="cover-bounds" :style="bound"></div>
       </template>
     </div>
-    <slot />
+    <slot :dimensions="videoTransform" />
   </div>
 </template>
 

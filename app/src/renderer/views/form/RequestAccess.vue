@@ -53,7 +53,6 @@ async function requestScreen(uuid: string, initial = false) {
     if (waitingStatus.value === undefined)
       return
 
-    console.log('accessToken', props.accessToken)
     const params = {
       init: initial ? '1' as const : '0' as const,
       name: props.contact.name,

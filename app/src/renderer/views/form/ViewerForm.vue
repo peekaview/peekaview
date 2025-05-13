@@ -41,14 +41,12 @@ watch(() => [emailOrCode.value, name.value], ([emailOrCode, name]) => emit('upda
 
 const submit = handleSubmit(async (values) => {
   if (validateEmail(values.emailOrCode)) {
-    console.log('submit email', values)
     emit('submit', {
       email: values.emailOrCode,
       name: values.name,
     })
   }
   else if (validateCode(values.emailOrCode)) {
-    console.log('submit code', values)
     emit('submit', {
       code: values.emailOrCode,
       name: values.name,
