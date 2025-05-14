@@ -351,6 +351,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
       transparent: true,
       skipTaskbar: true,
       frame: false,
+      hasShadow: false,
       webPreferences: {
         preload: path.join(__dirname, '../preload/overlay.js'),
         nodeIntegration: true,
@@ -379,7 +380,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
     return new Promise<void>((resolve) => {
       overlayWindow!.on('ready-to-show', () => {
         toolbarWindow?.moveTop()
-        console.log('ready-to-show on-update-overlay-data', users)
         overlayWindow!.webContents.send('on-update-overlay-data', { users, scale: 1 / sourceManager.getScaleFactor() })
         resolve()
       })
@@ -573,7 +573,6 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
 
   function updateUsers(newUsers: UserData[]) {
     users = newUsers
-    console.log('updateUsers on-update-overlay-data', users)
     overlayWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     toolbarWindow?.webContents.send('on-update-overlay-data', { users: newUsers })
     sendReset()

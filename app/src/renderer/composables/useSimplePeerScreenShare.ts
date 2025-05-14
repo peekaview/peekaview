@@ -118,6 +118,7 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
     })
 
     peer.on('signal', (data) => {
+      console.log('signal to socket', data)
       socket.emit('signal', {
         signal: data,
         socket_id: socketId
@@ -129,6 +130,7 @@ export async function useScreenPeer({ user, roomId, turnCredentials }: ScreenPee
     })
 
     socket.on('signal', (data) => {
+      console.log('signal from socket', data)
       if ((data.socket_id && socketId !== data.socket_id) || peer.destroyed)
         return
 
