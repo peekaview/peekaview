@@ -77,7 +77,8 @@ onMounted(async () => {
 <template>
   <Viewer
     v-if="activeViewerData"
-    :contact="activeViewerData"
+    :contact="{ ...activeViewerData, name: '' }"
+    :name="activeViewerData.name"
     @stop="activeViewerData = undefined"
   />
   <div v-else class="main-container">

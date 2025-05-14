@@ -12,6 +12,7 @@ type WaitingStatus = "establishing" | "notified" | "waiting"
 
 const props = withDefaults(defineProps<{
   contact: ViewerData
+  name: string
   accessToken?: string | undefined
 }>(), {
   accessToken: undefined,
@@ -42,7 +43,7 @@ onMounted(async () => {
     return
   }
 
-  setStoredItem('name', props.contact.name)
+  setStoredItem('name', props.name)
 
   const uuid = (await getStoredItem('uuid'))!
   requestScreen(uuid, true)
@@ -55,7 +56,7 @@ async function requestScreen(uuid: string, initial = false) {
 
     const params = {
       init: initial ? '1' as const : '0' as const,
-      name: props.contact.name,
+      name: props.name,
       accessToken: props.accessToken,
       requestId: uuid.replace(/-/g, '').substring(0, 8), // uuid,
     }
@@ -116,8 +117,8 @@ async function handleRequestAccepted(data: RoomData) {
   emit('accepted', {
     user: {
       id,
-      name: props.contact.name,
-      color: stringToColor(props.contact.name ?? 'Anonymous'),
+      name: props.name,
+      color: stringToColor(props.name ?? 'Anonymous'),
       platform: getPlatform(),
       inApp: !!window.electronAPI,
     },

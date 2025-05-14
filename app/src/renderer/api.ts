@@ -103,10 +103,15 @@ export type ApiResponse<T extends ApiAction> =
   }
   : T extends "registerPushToken" ? {}
   : T extends "sendPushNotification" ? {}
-  : T extends "useInviteCode" ? {
+  : T extends "useInviteCode" ? ({
     email: string
     accessToken: string
-  }
+    error: undefined
+  } | {
+    email: undefined
+    accessToken: undefined
+    error: string
+  })
   : T extends "wipeAllData" ? {}
   : never
 

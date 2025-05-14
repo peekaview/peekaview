@@ -36,6 +36,9 @@ async function registerMail() {
       target: 'app',
     })
 
+    if (response.error)
+      throw new Error(response.error)
+
     if (response.success) {
       loginViaCode.value = true
     }

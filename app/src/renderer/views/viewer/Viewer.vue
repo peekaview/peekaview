@@ -10,6 +10,7 @@ import { removeStoredItem, setStoredItem } from '../../util'
 
 defineProps<{
   contact: ViewerData
+  name: string
   accessToken?: string | undefined
 }>()
 
@@ -56,6 +57,7 @@ function stop() {
         <div class="panel">
           <RequestAccess
             :contact="contact"
+            :name="name"
             :access-token="accessToken"
             @accepted="screenShareData = $event"
             @denied="stop"

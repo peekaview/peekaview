@@ -33,7 +33,10 @@ export function useParamsData() {
             code: inviteCode,
           })
 
-          cache[inviteCode] = { viewEmail: data.email, accessToken: data.accessToken }
+          if (data.error)
+            throw new Error(data.error)
+          
+          cache[inviteCode] = { viewEmail: data.email!, accessToken: data.accessToken! }
         } else if (typeof cache[inviteCode] === 'string') {
           cache[inviteCode] = { viewEmail: cache[inviteCode], accessToken: '' }
         }

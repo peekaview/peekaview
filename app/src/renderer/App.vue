@@ -198,7 +198,8 @@ async function wipeAllData() {
   <div class="main-container" @click="expandedContactId = undefined">
     <Viewer
       v-if="activeViewerData"
-      :contact="activeViewerData"
+      :contact="{ ...activeViewerData, name: '' }"
+      :name="activeViewerData.name"
       :access-token="accessToken"
       @stop="activeViewerData = undefined"
     />

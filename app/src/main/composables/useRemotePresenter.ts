@@ -176,6 +176,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   let hwnd: string | undefined
 
   async function start(sourceId: string) {
+    console.log('Starting remote presenter')
     await useSource(sourceId)
 
     sourceManager.checkIfRectangleUpdated()
@@ -193,6 +194,7 @@ export function useRemotePresenter(sendRemote: SendRemote, newUsers: UserData[] 
   }
 
   function stop() {
+    console.log('Stopping remote presenter')
     if (checkWindowInterval != undefined) {
       clearInterval(checkWindowInterval)
       checkWindowInterval = undefined

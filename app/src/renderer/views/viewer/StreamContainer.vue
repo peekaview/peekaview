@@ -427,8 +427,6 @@ defineSlots<{
 
 <style>
 .stream-container {
-  display: flex;
-  justify-content: center;
   position: relative;
   flex-grow: 1;
   min-height: 0;
