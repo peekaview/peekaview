@@ -1002,8 +1002,9 @@ pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
         return switch_sources(app, &[format!("screen:{}", monitor.id().map_err(|e| e.to_string())?)]).map(|_| ());
     }
     let entry = room.apps.iter().find(|a| a.id == id).ok_or("Anwendung nicht freigegeben")?.clone();
-    let normal = crate::guard::normal_window_ids();
+    // ordinary app windows – asked afresh each time, a newly opened window must count
     let windows = || -> Vec<xcap::Window> {
+        let normal = crate::guard::normal_window_ids();
         xcap::Window::all()
             .unwrap_or_default()
             .into_iter()

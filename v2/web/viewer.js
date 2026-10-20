@@ -608,7 +608,7 @@ export function mountViewer(el, options) {
     mode.querySelector('span').textContent = MODES[state.mode] ?? ''
     const allowed = hostPresent ? TOOLS[state.mode] ?? [] : []
     q('.pv-rec').hidden = !hostPresent || !state.recording
-    q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false
+    q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false || !(state.windows ?? []).length
     q('.pv-dock').hidden = !toolbar || (!allowed.length && !me)
     for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.hidden = !allowed.includes(b.dataset.tool)
     q('[data-clear]').hidden = !allowed.length

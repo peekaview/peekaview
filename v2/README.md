@@ -217,7 +217,7 @@ Build the desktop client as an app bundle:
 cd client && npx @tauri-apps/cli@2 build --debug --bundles app
 ```
 
-CI (`.github/workflows/v2-client.yml`) runs the unit tests and builds Windows, macOS and Linux bundles.
+CI (`.github/workflows/v2-client.yml`) runs the unit tests and builds Windows, macOS and Linux bundles. It runs **only on demand** (Actions → "v2 desktop client" → Run workflow), because every run builds on three platforms.
 
 Run the unit tests: VideoToolbox encoder, TURN credentials, report helpers.
 

@@ -1,15 +1,13 @@
 name: v2 desktop client
 
+# manual only (Actions → "v2 desktop client" → Run workflow): every run builds on three
+# platforms, so it does not start on pushes / pull requests
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "v2/**"
-      - ".github/workflows/v2-client.yml"
-  pull_request:
-    paths:
-      - "v2/**"
-      - ".github/workflows/v2-client.yml"
+
+concurrency:
+  group: v2-client-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
