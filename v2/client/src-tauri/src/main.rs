@@ -434,6 +434,23 @@ pub fn open_path(path: &std::path::Path) {
     let _ = std::process::Command::new("xdg-open").arg(path).spawn();
 }
 
+/// "user@computer" of this presenter – shown to viewers next to a permanent room.
+pub fn who() -> String {
+    static WHO: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    WHO.get_or_init(|| {
+        let user = std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_default();
+        #[cfg(target_os = "macos")]
+        let host = std::process::Command::new("scutil").args(["--get", "ComputerName"]).output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        #[cfg(target_os = "windows")]
+        let host = std::env::var("COMPUTERNAME").ok();
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let host = std::process::Command::new("hostname").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        let host = host.filter(|h| !h.is_empty()).unwrap_or_else(|| "Computer".into());
+        if user.is_empty() { host } else { format!("{user}@{host}") }
+    })
+    .clone()
+}
+
 /// Invitation received via deep link before the UI was ready.
 #[tauri::command]
 fn take_invite(app: AppHandle) -> Option<serde_json::Value> {

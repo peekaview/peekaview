@@ -260,6 +260,15 @@ impl Hub {
                         PinResult::Locked => self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "locked": true })),
                     }
                 }
+                // a viewer's start page asks whether this room is online – no join request
+                Some("ping") if !from.is_empty() && from.len() <= 64 => {
+                    let room = crate::rooms::by_secret(&self.app, &self.shared.secret);
+                    let (name, ..) = self.host.lock().unwrap().clone();
+                    self.signaling.send(&json!({
+                        "type": "pong", "from": "host", "to": from, "who": crate::who(), "name": name,
+                        "room": room.as_ref().map(|r| r.name.clone()), "permanent": room.is_some(), "sharing": true,
+                    }));
+                }
                 Some("answer") if msg["to"] == "host" => {
                     crate::log("p2p: answer received");
                     let pc = self.viewers.lock().unwrap().values().find(|v| v.peer == from).map(|v| v.pc.clone());

@@ -151,6 +151,14 @@ impl Lobby {
                     }
                 }
             }
+            // a viewer's start page asks whether this room is online – no join request
+            Some("ping") => {
+                self.signaling.send(&json!({
+                    "type": "pong", "from": "host", "to": from, "who": crate::who(),
+                    "name": crate::settings::text(app, "name"), "room": self.room.name, "permanent": true, "sharing": false,
+                    "busy": session::active_secret(app).is_some(),
+                }));
+            }
             Some("pin") if msg["to"] == "host" => {
                 let result = self.admission.lock().unwrap().pin(&from, msg["response"].as_str().unwrap_or(""));
                 match result {

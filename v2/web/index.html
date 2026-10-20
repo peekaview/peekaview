@@ -8,49 +8,239 @@
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     body { font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
     #viewer { height: 100%; }
-    form { width: min(340px, calc(100% - 32px)); margin: 14vh auto 0; padding: 28px; border-radius: 18px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
-    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+    #start { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 40px; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     .brand i { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #ef4444; color: #fff; }
-    #join label { display: block; margin: 14px 0 0; color: #a1a1aa; font-size: 12px; }
-    .lead { margin: 0; color: #a1a1aa; }
-    #join input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
-    #join input:focus { border-color: #ef4444; }
-    #join button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 22px; padding: 11px; border: 0; border-radius: 10px; background: #fafafa; color: #09090b; font: inherit; font-weight: 650; cursor: pointer; }
-    #join button:hover { background: #fff; }
+    .lead { margin: -8px 0 0; color: #a1a1aa; }
+    #start label { display: block; color: #a1a1aa; font-size: 12px; }
+    #start input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
+    #start input:focus { border-color: #ef4444; }
+    .rooms-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: -10px; color: #a1a1aa; font-size: 12px; }
+    .rooms { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .room { position: relative; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.07); cursor: pointer; transition: border-color .15s, background .15s; }
+    .room:hover { border-color: rgba(255,255,255,.18); }
+    .room.selected { border-color: #ef4444; background: rgba(239,68,68,.07); box-shadow: 0 0 0 3px rgba(239,68,68,.15); }
+    .room .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #52525b; }
+    .room.online .dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+    .room.checking .dot { background: transparent; border: 2px solid rgba(255,255,255,.25); border-top-color: #fafafa; width: 8px; height: 8px; animation: spin .8s linear infinite; }
+    .room div { flex: 1; min-width: 0; }
+    .room strong, .room span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .room strong { font-weight: 650; }
+    .room span { color: #a1a1aa; font-size: 12px; }
+    .room em { flex: none; font-style: normal; font-size: 12px; color: #71717a; }
+    .room.online em { color: #86efac; }
+    .room .forget { position: absolute; top: 6px; right: 6px; display: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #71717a; font-size: 14px; line-height: 1; cursor: pointer; }
+    .room:hover .forget { display: block; }
+    .room:hover em { visibility: hidden; }
+    .room .forget:hover { background: rgba(255,255,255,.1); color: #fafafa; }
+    .empty { margin: 0; padding: 14px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.12); color: #71717a; text-align: center; font-size: 13px; }
+    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: center; width: min(320px, 100%); height: 54px; margin-top: 4px; border: 0; border-radius: 16px; background: #ef4444; color: #fff; font: 700 17px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); transition: background .15s, transform .1s, opacity .15s; }
+    .connect:hover:not(:disabled) { background: #dc2626; }
+    .connect:active:not(:disabled) { transform: scale(.98); }
+    .connect:disabled { opacity: .35; cursor: default; box-shadow: none; }
+    .connect-hint { margin: -10px 0 0; text-align: center; color: #71717a; font-size: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <form id="join">
+  <form id="start">
     <div class="brand"><i id="logo"></i>PeekaView</div>
-    <p class="lead" id="lead">Du wurdest zu einer Bildschirmfreigabe eingeladen.</p>
-    <label>Dein Name <input id="name" maxlength="32" required></label>
-    <button>Beitreten</button>
+    <p class="lead" id="lead">Bildschirmfreigabe ansehen – direkt, ohne Installation.</p>
+    <label>Dein Name <input id="name" maxlength="32" required autocomplete="name"></label>
+    <div class="rooms-title"><span>Räume</span><span id="count"></span></div>
+    <ul class="rooms" id="rooms"></ul>
+    <button class="connect" id="connect" disabled>Verbinden</button>
+    <p class="connect-hint" id="hint"></p>
   </form>
   <div id="viewer" hidden></div>
 
   <script type="module">
+    // Start page: the room of the opened link (preselected) and the last ten permanent rooms this
+    // browser joined, each with its presenter (user@computer), when it was last used and whether
+    // it is online right now – asked over the room's encrypted signaling ("ping"), which creates
+    // no join request.
     import { mountViewer } from './viewer.js'
     import { icon } from './icons.js'
+    import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
+    const KEY = 'pv-rooms'
+    const MAX = 10
     $('logo').innerHTML = icon('logo', 20)
-    // the room secret travels in the "#…" part of the link – browsers never send it to a server
-    const room = decodeURIComponent(location.hash.slice(1))
-    const saved = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
-    $('name').value = new URLSearchParams(location.search).get('name') ?? saved ?? ''
-    if (!room) $('lead').textContent = 'Öffne den Link, den du von der teilenden Person bekommen hast.'
 
-    function start() {
+    const load = () => {
+      try {
+        return JSON.parse(localStorage.getItem(KEY)) ?? []
+      } catch {
+        return []
+      }
+    }
+    const store = (list) => {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)))
+      } catch {}
+    }
+
+    // the room secret travels in the "#…" part of the link – browsers never send it to a server
+    const linkRoom = decodeURIComponent(location.hash.slice(1))
+    const params = new URLSearchParams(location.search)
+    const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
+    $('name').value = params.get('name') ?? savedName ?? ''
+
+    // rooms on the page: the link's room first, then the remembered ones
+    const status = new Map() // room -> {online, checking, who, room, permanent, name}
+    let selected = linkRoom || load()[0]?.room || ''
+    const rooms = () => {
+      const list = load()
+      const all = linkRoom && !list.some((r) => r.room === linkRoom) ? [{ room: linkRoom, link: true }, ...list] : list
+      return all
+    }
+
+    function ago(ms) {
+      if (!ms) return 'noch nie'
+      const d = new Date(ms)
+      const now = new Date()
+      const min = Math.round((now - d) / 60000)
+      if (min < 2) return 'gerade eben'
+      if (min < 60) return `vor ${min} Min.`
+      const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+      const days = Math.round((day(now) - day(d)) / 86400000)
+      const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      if (days === 0) return `heute, ${time}`
+      if (days === 1) return `gestern, ${time}`
+      if (days < 7) return `vor ${days} Tagen`
+      return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: days > 300 ? 'numeric' : undefined })
+    }
+
+    function render() {
+      const list = rooms()
+      $('count').textContent = load().length ? `${load().length} gemerkt` : ''
+      if (!list.length) {
+        $('rooms').innerHTML = '<li class="empty">Öffne den Link, den du von der teilenden Person bekommen hast.</li>'
+      } else {
+        $('rooms').replaceChildren(
+          ...list.map((r) => {
+            const st = status.get(r.room) ?? {}
+            const li = document.createElement('li')
+            li.className = `room${r.room === selected ? ' selected' : ''}${st.online ? ' online' : ''}${st.checking ? ' checking' : ''}`
+            li.innerHTML = '<i class="dot"></i><div><strong></strong><span></span></div><em></em>'
+            li.querySelector('strong').textContent = st.room ?? r.name ?? (r.link ? 'Dieser Link' : 'Raum')
+            const who = st.who ?? r.who
+            const last = r.link ? 'neu' : `Zuletzt: ${ago(r.last)}`
+            li.querySelector('span').textContent = [who, last].filter(Boolean).join(' · ')
+            li.querySelector('em').textContent = st.checking ? '' : st.online ? (st.busy ? 'belegt' : 'online') : 'offline'
+            if (!r.link) {
+              const forget = Object.assign(document.createElement('button'), { type: 'button', className: 'forget', title: 'Vergessen', textContent: '×' })
+              forget.addEventListener('click', (e) => {
+                e.stopPropagation()
+                store(load().filter((x) => x.room !== r.room))
+                if (selected === r.room) selected = rooms()[0]?.room ?? ''
+                render()
+              })
+              li.append(forget)
+            }
+            li.addEventListener('click', () => {
+              selected = r.room
+              render()
+            })
+            li.addEventListener('dblclick', () => connect())
+            return li
+          }),
+        )
+      }
+      const st = status.get(selected)
+      $('connect').disabled = !selected
+      $('hint').textContent = !selected ? '' : st?.checking ? 'Prüfe, ob der Raum online ist …' : st?.online ? '' : 'Gerade offline – du kannst trotzdem verbinden und warten.'
+    }
+
+    // ---------------------------------------------------------------- online check
+    async function probe(room) {
+      const { secret, hostKey } = parseRoom(room)
+      if (!secret) return
+      status.set(room, { ...status.get(room), checking: !status.get(room)?.seen })
+      render()
+      const me = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
+      let answered = false
+      const signaling = await Signaling.open({
+        secret,
+        hostKey,
+        onMessage: (m) => {
+          if (m.type !== 'pong' || m.to !== me || answered) return
+          answered = true
+          status.set(room, { online: true, seen: true, who: m.who, room: m.room, busy: m.busy, permanent: m.permanent })
+          // permanent rooms are remembered with their presenter
+          if (m.permanent) {
+            const list = load()
+            const entry = list.find((x) => x.room === room)
+            if (entry) {
+              Object.assign(entry, { who: m.who, name: m.room, seen: Date.now() })
+              store(list)
+            } else if (room === joined) {
+              store([{ room, name: m.room, who: m.who, last: Date.now(), seen: Date.now() }, ...list])
+            }
+          }
+          render()
+        },
+      })
+      // ask a few times while the relays connect
+      for (let i = 0; i < 4 && !answered; i++) {
+        signaling.send({ type: 'ping', from: me })
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+      await new Promise((r) => setTimeout(r, 1500))
+      signaling.close()
+      // a single lost answer (relays) does not make a room offline
+      if (!answered) {
+        const before = status.get(room) ?? {}
+        const misses = (before.misses ?? 0) + 1
+        status.set(room, { ...before, online: before.online && misses < 2, misses, checking: false, seen: true })
+      } else {
+        status.set(room, { ...status.get(room), misses: 0 })
+      }
+      render()
+    }
+
+    let probeTimer
+    // the room joined from this page (remembered once it turns out to be permanent)
+    let joined = null
+    function probeAll() {
+      for (const r of rooms()) probe(r.room)
+      probeTimer = setTimeout(probeAll, 30000)
+    }
+
+    // ---------------------------------------------------------------- connect
+    function connect() {
+      const room = selected
       if (!room) return
       const name = $('name').value.trim()
+      if (!name) return $('name').focus()
       try { localStorage.setItem('pv-name', name) } catch {}
-      $('join').hidden = true
+      // remember permanent rooms (the newest first)
+      const st = status.get(room)
+      const list = load()
+      const known = list.find((x) => x.room === room)
+      if (known || st?.permanent) {
+        const entry = { ...(known ?? {}), room, name: st?.room ?? known?.name, who: st?.who ?? known?.who, last: Date.now() }
+        store([entry, ...list.filter((x) => x.room !== room)])
+      }
+      clearTimeout(probeTimer)
+      joined = room
+      if (!st) probe(room)
+      if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
+      $('start').hidden = true
       $('viewer').hidden = false
       mountViewer($('viewer'), { room, name })
     }
 
-    $('join').addEventListener('submit', (e) => { e.preventDefault(); start() })
-    if (room && $('name').value) start()
+    $('start').addEventListener('submit', (e) => {
+      e.preventDefault()
+      connect()
+    })
+
+    render()
+    // a link with ?name=… (integrations, tests) joins right away
+    if (linkRoom && params.has('name')) connect()
+    else probeAll()
   </script>
 </body>
 </html>

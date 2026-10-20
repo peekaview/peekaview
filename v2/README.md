@@ -239,6 +239,14 @@ PEEKAVIEW_DEV_SHARE=screen:<id> PEEKAVIEW_DEV_MODE=draw ./target/debug/peekaview
 
 Debug builds are signed ad hoc, so macOS asks for permissions again after each build. A stable signing identity avoids that.
 
+## The viewer's start page
+
+The viewer site opens with a small start page:
+- **Rooms:** the room of the opened link, preselected, plus the last ten **permanent rooms** this browser joined.
+- **Per room:** its name, the presenter as `user@computer`, when it was last used ("Zuletzt: gestern, 14:20") and whether it is **online** right now.
+- **Online check:** a "ping" over the room's encrypted signaling. The presenter's signed answer creates no join request.
+- **Connecting:** a big **Verbinden** button joins the selected room; an online room can be joined directly.
+
 ## Embedding the viewer
 
 ```js
