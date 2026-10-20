@@ -15,11 +15,11 @@ const MIN_SCALE = 0.12
 
 const STYLE = `
 .pv-wins { position: absolute; inset: 0; overflow: hidden; }
-.pv-win { position: absolute; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; background: #000;
+.pv-win { position: absolute; display: flex; flex-direction: column; border-radius: 10px; background: #000;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .1), 0 12px 32px rgba(0, 0, 0, .5); }
 .pv-win.active { box-shadow: 0 0 0 1px rgba(255, 255, 255, .28), 0 14px 38px rgba(0, 0, 0, .6); }
 .pv-win[hidden] { display: none !important; }
-.pv-win-bar { flex: none; display: flex; align-items: center; gap: 7px; height: ${BAR}px; padding: 0 4px 0 10px; background: #18181b; color: #a1a1aa; font-size: 12px; cursor: grab; touch-action: none; user-select: none; }
+.pv-win-bar { flex: none; display: flex; align-items: center; gap: 7px; height: ${BAR}px; padding: 0 4px 0 10px; border-radius: 10px 10px 0 0; background: #18181b; color: #a1a1aa; font-size: 12px; cursor: grab; touch-action: none; user-select: none; }
 .pv-win.active .pv-win-bar { background: #27272a; color: #fafafa; }
 .pv-win-bar:active { cursor: grabbing; }
 .pv-win-app { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: 700; }
@@ -28,12 +28,23 @@ const STYLE = `
 .pv-win-flag { flex: none; color: #fde68a; font-size: 11px; }
 .pv-win-bar button { flex: none; display: grid; place-items: center; width: 24px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
 .pv-win-bar button:hover { background: rgba(255, 255, 255, .12); }
-.pv-win .pv-view { position: relative; flex: none; }
+.pv-win .pv-view { position: relative; flex: none; overflow: hidden; border-radius: 0 0 10px 10px; }
 .pv-win-paused { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(9, 9, 11, .72); color: #a1a1aa; font-size: 13px; text-align: center; padding: 12px; }
-.pv-win-size { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .35) 50%, rgba(255, 255, 255, .35) 58%, transparent 58%, transparent 70%, rgba(255, 255, 255, .35) 70%, rgba(255, 255, 255, .35) 78%, transparent 78%); }
+/* grab zones for resizing lie outside the picture – a near miss never clicks into the shared window */
+.pv-grab { position: absolute; z-index: 2; touch-action: none; }
+.pv-grab[data-edge="r"] { top: ${BAR}px; right: -9px; width: 9px; bottom: 6px; cursor: ew-resize; }
+.pv-grab[data-edge="b"] { left: 6px; bottom: -9px; height: 9px; right: 6px; cursor: ns-resize; }
+.pv-grab[data-edge="rb"] { right: -12px; bottom: -12px; width: 20px; height: 20px; cursor: nwse-resize; }
+.pv-grab[data-edge="rb"]::after { content: ""; position: absolute; left: 3px; top: 3px; width: 9px; height: 9px; border-right: 2px solid rgba(255, 255, 255, .45); border-bottom: 2px solid rgba(255, 255, 255, .45); border-radius: 0 0 4px 0; opacity: 0; transition: opacity .15s; }
+.pv-win:hover .pv-grab[data-edge="rb"]::after, .pv-win.sizing .pv-grab[data-edge="rb"]::after { opacity: 1; }
+/* live preview while resizing: the new size (on the presenter's screen, if allowed) */
+.pv-win-ghost { position: absolute; left: 0; top: 0; z-index: 3; border: 2px dashed #ef4444; border-radius: 10px; background: rgba(239, 68, 68, .07); pointer-events: none; }
+.pv-win-ghost.scale { border-color: transparent; background: none; }
+.pv-win-ghost span { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 7px; background: rgba(9, 9, 11, .85); color: #fafafa; font: 600 12px/1.3 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+.pv-win-ghost small { display: block; color: #a1a1aa; font-weight: 500; font-size: 11px; }
 .pv-wins.solo .pv-win { border-radius: 0; box-shadow: none; background: transparent; }
-.pv-wins.solo .pv-win-bar, .pv-wins.solo .pv-win-size { display: none; }
+.pv-wins.solo .pv-win .pv-view { border-radius: 0; }
+.pv-wins.solo .pv-win-bar, .pv-wins.solo .pv-grab { display: none; }
 .pv-wins.moving .pv-view { pointer-events: none; }
 `
 
@@ -140,7 +151,7 @@ export class WindowManager {
       <div class="pv-win-bar"><span class="pv-win-app"></span><span class="pv-win-title"></span><span class="pv-win-flag"></span>
         <button data-min title="Minimieren">${icon('minimize', 15)}</button><button data-max title="Maximieren">${icon('maximize', 13)}</button></div>
       <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
-      <div class="pv-win-size" title="Größe ändern (nur hier, nicht beim Host)"></div>`
+      <div class="pv-grab" data-edge="r"></div><div class="pv-grab" data-edge="b"></div><div class="pv-grab" data-edge="rb" title="Größe ändern"></div>`
     this.root.append(el)
     const video = el.querySelector('video')
     const win = { slot, el, video, view: el.querySelector('.pv-view'), ann: new Annotations(el.querySelector('.pv-ann'), { voice: this.options.voice }), x: 0, y: 0, s: 1, min: false, max: false, prev: null, frame: false, order: 0, info: {} }
@@ -157,6 +168,7 @@ export class WindowManager {
       if (win.resized) {
         win.resized = false
         win.s = 1
+        win.ghost?.remove()
       }
       // the presenter resized the window: keep the scale, the frame follows
       this.layout(first ? undefined : win)
@@ -169,7 +181,7 @@ export class WindowManager {
     el.querySelector('[data-max]').addEventListener('click', () => this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('dblclick', (e) => !e.target.closest('button') && this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('pointerdown', (e) => !e.target.closest('button') && this.drag(win, e))
-    el.querySelector('.pv-win-size').addEventListener('pointerdown', (e) => this.resize(win, e))
+    for (const g of el.querySelectorAll('.pv-grab')) g.addEventListener('pointerdown', (e) => this.resize(win, e, g.dataset.edge))
     return win
   }
 
@@ -356,7 +368,9 @@ export class WindowManager {
     if (this.wins.size <= 1) return
     e.preventDefault()
     const bar = e.currentTarget
-    bar.setPointerCapture(e.pointerId)
+    try {
+      bar.setPointerCapture(e.pointerId)
+    } catch {}
     const start = { x: e.clientX, y: e.clientY, wx: win.x, wy: win.y }
     this.root.classList.add('moving')
     const move = (ev) => {
@@ -379,36 +393,71 @@ export class WindowManager {
     bar.addEventListener('pointercancel', up)
   }
 
-  /** Proportional scaling – never larger than one video pixel per screen pixel. */
-  resize(win, e) {
+  /**
+   * Resizing from an edge or the corner, previewed live:
+   * - "Resize/Anordnen erlauben": a dashed frame shows the new size of the presenter's window
+   *   (any size and aspect ratio, in their pixels); it takes that size on release.
+   * - otherwise the picture scales proportionally – never beyond one video pixel per screen pixel.
+   */
+  resize(win, e, edge = 'rb') {
     e.preventDefault()
     e.stopPropagation()
     const handle = e.currentTarget
-    handle.setPointerCapture(e.pointerId)
+    try {
+      handle.setPointerCapture(e.pointerId)
+    } catch {}
     const n = this.native(win)
     const r = win.el.getBoundingClientRect()
+    const a = this.root.getBoundingClientRect()
+    const d = window.devicePixelRatio || 1
+    const remote = !!this.options.canResize?.()
+    const ghost = document.createElement('div')
+    ghost.className = `pv-win-ghost${remote ? '' : ' scale'}`
+    ghost.innerHTML = '<span></span>'
+    win.el.append(ghost)
+    win.el.classList.add('sizing')
     this.root.classList.add('moving')
-    const move = (ev) => {
-      const sw = (ev.clientX - r.left) / n.w
-      const sh = (ev.clientY - r.top - BAR) / n.h
-      win.s = Math.max(MIN_SCALE, Math.min(1, Math.max(sw, sh)))
-      win.max = false
-      this.clamp(win)
-      this.paint(win)
+    let target = { w: r.width, h: r.height - BAR }
+    const show = () => {
+      ghost.style.width = `${Math.round(remote ? target.w : win.el.offsetWidth)}px`
+      ghost.style.height = `${Math.round(remote ? target.h + BAR : win.el.offsetHeight)}px`
+      const label = ghost.querySelector('span')
+      if (remote) {
+        label.innerHTML = '<b></b><small>neue Fenstergröße beim Host</small>'
+        label.querySelector('b').textContent = `${Math.round(target.w * d)} × ${Math.round(target.h * d)} px`
+      } else {
+        label.textContent = `${Math.round(win.s * 100)} %`
+      }
     }
+    const move = (ev) => {
+      const w = edge.includes('r') ? ev.clientX - r.left : r.width
+      const h = edge.includes('b') ? ev.clientY - r.top - BAR : r.height - BAR
+      if (remote) {
+        // free size, within the viewer's area
+        target = { w: Math.max(200 / d, Math.min(a.right - r.left - 2, w)), h: Math.max(150 / d, Math.min(a.bottom - r.top - BAR - 2, h)) }
+      } else {
+        const s = edge === 'r' ? w / n.w : edge === 'b' ? h / n.h : Math.max(w / n.w, h / n.h)
+        win.s = Math.max(MIN_SCALE, Math.min(1, s))
+        win.max = false
+        this.clamp(win)
+        this.paint(win)
+      }
+      show()
+    }
+    show()
     const up = () => {
       handle.removeEventListener('pointermove', move)
       handle.removeEventListener('pointerup', up)
       handle.removeEventListener('pointercancel', up)
       this.root.classList.remove('moving')
+      win.el.classList.remove('sizing')
       this.arranged = true
-      // allowed by the presenter: their window gets this size (in our device pixels)
-      if (this.options.canResize?.()) {
-        const d = window.devicePixelRatio || 1
-        const n = this.native(win)
-        win.resized = true
-        this.options.onResize?.(win.slot, Math.round(n.w * win.s * d), Math.round(n.h * win.s * d))
-      }
+      if (!remote) return ghost.remove()
+      // the presenter's window takes this size; the frame stays until the new picture arrives
+      win.resized = true
+      win.ghost = ghost
+      setTimeout(() => ghost.remove(), 4000)
+      this.options.onResize?.(win.slot, Math.round(target.w * d), Math.round(target.h * d))
     }
     handle.addEventListener('pointermove', move)
     handle.addEventListener('pointerup', up)
