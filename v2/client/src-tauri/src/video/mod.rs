@@ -5,7 +5,11 @@
 //!   hardware encoder, Windows' software encoder as fallback)
 //! * Linux: xcap → openh264 (software)
 //!
-//! Packet handed to the P2P hub: [2u8, flags (bit0 = keyframe), width u16 LE, height u16 LE] + Annex B
+//! Several windows can be shared at once: each runs its own pipeline in one of [`MAX_STREAMS`]
+//! slots, and every viewer connection carries one video track per slot.
+//!
+//! Packet handed to the P2P hub:
+//! [3u8, slot, flags (bit0 = keyframe), width u16 LE, height u16 LE] + Annex B
 
 #[cfg(target_os = "macos")]
 mod mac;
@@ -25,10 +29,31 @@ mod soft;
 pub use soft::Video;
 
 pub const FPS: u32 = 30;
+/// Windows that can be shared at the same time (= video tracks per viewer connection).
+pub const MAX_STREAMS: usize = 6;
 const MAX_W: f64 = 2560.0;
 const MAX_H: f64 = 1600.0;
 /// minimum gap between two requested keyframes
 const KEY_GAP: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// What a pipeline shares with the rest of the session.
+pub struct StreamCtl {
+    pub slot: u8,
+    /// a viewer needs a keyframe (joined, lost packets)
+    pub need_key: std::sync::atomic::AtomicBool,
+    /// the window is on screen (not minimized / on another Space)
+    pub visible: std::sync::atomic::AtomicBool,
+}
+
+impl StreamCtl {
+    pub fn new(slot: u8, visible: bool) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(StreamCtl {
+            slot,
+            need_key: std::sync::atomic::AtomicBool::new(true),
+            visible: std::sync::atomic::AtomicBool::new(visible),
+        })
+    }
+}
 
 #[derive(Clone)]
 pub enum Source {
@@ -48,9 +73,10 @@ pub fn output_size(w: f64, h: f64) -> (u32, u32) {
     (even(w), even(h))
 }
 
-pub fn packet(annex_b: &[u8], key: bool, w: usize, h: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(annex_b.len() + 6);
-    out.push(2u8);
+pub fn packet(slot: u8, annex_b: &[u8], key: bool, w: usize, h: usize) -> Vec<u8> {
+    let mut out = Vec::with_capacity(annex_b.len() + 7);
+    out.push(3u8);
+    out.push(slot);
     out.push(key as u8);
     out.extend_from_slice(&(w as u16).to_le_bytes());
     out.extend_from_slice(&(h as u16).to_le_bytes());

@@ -21,7 +21,9 @@ const DEFAULT_SITE = 'http://localhost:8090'
 
 let sources = []
 let kind = 'screen'
-let selected = null
+// picked sources: one screen, or up to six windows
+let selected = []
+const MAX_WINDOWS = 6
 let invite = null
 let sharing = false
 let link = ''
@@ -142,8 +144,8 @@ function openPanel(which) {
   $('panel').hidden = !which
   $('picker').hidden = which !== 'picker'
   $('settings').hidden = which !== 'settings'
-  if (which !== 'picker') invoke('highlight', { source: null })
-  else if (selected) invoke('highlight', { source: selected })
+  if (which !== 'picker') invoke('highlight', { sources: [] })
+  else invoke('highlight', { sources: selected })
 }
 
 $('share-btn').addEventListener('click', () => {
@@ -172,8 +174,10 @@ function renderGrid(loading = false) {
     ...list.map((s) => {
       const card = document.createElement('button')
       card.className = 'card'
-      card.classList.toggle('selected', s.id === selected)
+      const index = selected.indexOf(s.id)
+      card.classList.toggle('selected', index >= 0)
       card.innerHTML = '<div class="thumb"></div><div class="meta"><strong></strong><span></span></div>'
+      if (index >= 0 && s.kind === 'window') card.querySelector('.thumb').insertAdjacentHTML('beforeend', `<span class="pick">${index + 1}</span>`)
       const thumb = card.querySelector('.thumb')
       if (s.thumb) thumb.style.backgroundImage = `url("${s.thumb}")`
       else thumb.innerHTML = icon(s.kind, 32)
@@ -181,18 +185,38 @@ function renderGrid(loading = false) {
       card.querySelector('span').textContent = s.kind === 'window' ? s.title : s.app
       card.title = `${s.app} – ${s.title}`
       card.addEventListener('click', () => select(s.id))
-      card.addEventListener('dblclick', () => start())
+      card.addEventListener('dblclick', () => {
+        if (!selected.includes(s.id)) select(s.id)
+        start()
+      })
       return card
     }),
   )
 }
 
+// a screen is shared alone; windows can be combined (click again to remove one)
 function select(id) {
-  selected = id
+  const source = sources.find((s) => s.id === id)
+  if (!source) selected = []
+  else if (source.kind === 'screen') selected = [id]
+  else if (selected.includes(id)) selected = selected.filter((x) => x !== id)
+  else {
+    selected = [...selected.filter((x) => x.startsWith('window:')), id]
+    if (selected.length > MAX_WINDOWS) {
+      selected = selected.slice(-MAX_WINDOWS)
+      toast(`Höchstens ${MAX_WINDOWS} Fenster gleichzeitig.`, 'info')
+    }
+  }
   saveUi()
-  $('start').disabled = !selected
+  updateStart()
   renderGrid()
-  invoke('highlight', { source: selected })
+  invoke('highlight', { sources: selected })
+}
+
+function updateStart() {
+  $('start').disabled = !selected.length
+  const n = selected.filter((x) => x.startsWith('window:')).length
+  $('start-label').textContent = sharing ? (n > 1 ? `${n} Fenster teilen` : 'Wechseln') : n > 1 ? `${n} Fenster teilen` : 'Freigabe starten'
 }
 
 async function loadSources() {
@@ -203,8 +227,11 @@ async function loadSources() {
     sources = []
     error(String(e))
   }
-  if (!sources.some((s) => s.id === selected)) select(null)
-  else select(selected)
+  selected = selected.filter((id) => sources.some((s) => s.id === id))
+  saveUi()
+  updateStart()
+  renderGrid()
+  invoke('highlight', { sources: selected })
 }
 
 for (const tab of document.querySelectorAll('.tab')) {
@@ -220,7 +247,7 @@ $('refresh').addEventListener('click', loadSources)
 
 async function start() {
   error()
-  if (!selected) return
+  if (!selected.length) return
   if (sharing) return switchSource()
   const status = await invoke('permission_status')
   if (!status.screen) return invoke('request_permission', { kind: 'screen' })
@@ -235,7 +262,7 @@ async function start() {
     const hosted = await invoke('start_share', {
       site: site(),
       name,
-      source: selected,
+      sources: selected,
       room: $('room').value.trim() || kept.room || null,
       signingKey: kept.key || null,
       color: invite?.color ?? null,
@@ -253,15 +280,14 @@ async function start() {
     error(String(e))
     if (String(e).includes('Bildschirmaufnahme')) invoke('request_permission', { kind: 'screen' })
   } finally {
-    $('start').disabled = !selected
+    updateStart()
   }
 }
 
 function goLive(hosted, mode) {
   link = hosted.link
   $('code').textContent = 'Link kopieren'
-  const source = sources.find((s) => s.id === selected)
-  $('code-btn').title = `${source ? `Geteilt: ${sourceTitle(source)}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
+  $('code-btn').title = `${sharedTitle() ? `Geteilt: ${sharedTitle()}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
   voice.setSelf(0, hosted.ice)
   setMode(mode, false)
   renderAvatars([])
@@ -269,20 +295,23 @@ function goLive(hosted, mode) {
 }
 
 const sourceTitle = (s) => (s.kind === 'window' ? `${s.app} – ${s.title}` : s.title)
+const sharedTitle = () => {
+  const list = selected.map((id) => sources.find((s) => s.id === id)).filter(Boolean)
+  return list.length > 1 ? list.map((s) => s.app || s.title).join(', ') : list[0] ? sourceTitle(list[0]) : ''
+}
 
 // a running share switches to another screen / window; room, viewers, voice and recording continue
 async function switchSource() {
   $('start').disabled = true
   try {
-    await invoke('switch_source', { source: selected })
-    const source = sources.find((s) => s.id === selected)
-    $('code-btn').title = `${source ? `Geteilt: ${sourceTitle(source)}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
+    await invoke('switch_source', { sources: selected })
+    $('code-btn').title = `${sharedTitle() ? `Geteilt: ${sharedTitle()}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
     openPanel(null)
-    toast(`Jetzt geteilt: ${source ? sourceTitle(source) : 'neue Quelle'}`)
+    toast(`Jetzt geteilt: ${sharedTitle() || 'neue Auswahl'}`)
   } catch (e) {
     error(String(e))
   } finally {
-    $('start').disabled = !selected
+    updateStart()
   }
 }
 
@@ -295,7 +324,7 @@ $('switch-btn').addEventListener('click', () => {
 function showLive(live) {
   sharing = live
   document.body.classList.toggle('sharing', live)
-  $('start-label').textContent = live ? 'Wechseln' : 'Freigabe starten'
+  updateStart()
   $('name').hidden = live
   $('bar-idle').hidden = live
   $('bar-live').hidden = !live
@@ -507,14 +536,13 @@ async function startRecording() {
   // created inside the click so the browser lets it start
   const ctx = new AudioContext({ sampleRate: 16000 })
   const now = new Date()
-  const source = sources.find((s) => s.id === selected)
   let engine
   try {
     engine = await invoke('start_recording', {
       local: $('local-stt').checked,
       key: $('openai-key').value.trim() || null,
       useEnv: $('use-env').checked,
-      title: source ? sourceTitle(source) : 'Bildschirmfreigabe',
+      title: sharedTitle() || 'Bildschirmfreigabe',
       startedLabel: now.toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' }),
       fileStamp: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`,
     })
@@ -592,7 +620,7 @@ async function restoreUi() {
   if (ui.panel) {
     openPanel(ui.panel)
     if (ui.panel === 'picker') {
-      selected = ui.selected
+      selected = Array.isArray(ui.selected) ? ui.selected : ui.selected ? [ui.selected] : []
       await loadSources()
     }
   }
@@ -602,7 +630,7 @@ invoke('resume')
   .then(async (hosted) => {
     if (!hosted) return restoreUi()
     if (hosted.site) $('site').value = hosted.site
-    selected = hosted.source
+    selected = hosted.sources ?? (hosted.source ? [hosted.source] : [])
     sources = await invoke('list_sources').catch(() => [])
     goLive(hosted, hosted.mode)
     const justGranted = await permissionCheck.catch(() => false)

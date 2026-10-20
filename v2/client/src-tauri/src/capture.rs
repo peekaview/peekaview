@@ -1,5 +1,5 @@
-//! Session housekeeping loop: tracks the shared area (position, size, visibility), keeps the
-//! overlay on top of it, drives the video pipeline and reports the presenter's own pointer.
+//! Session housekeeping loop: tracks every shared window (position, size, visibility), keeps
+//! its red frame on top of it, drives the video pipelines and reports the presenter's own pointer.
 
 use std::{
     sync::{atomic::Ordering, Arc},
@@ -16,7 +16,7 @@ use crate::{
     guard::{self, Rect},
     input,
     recording::Recorder,
-    session::{self, Shared},
+    session::{self, Shared, Stream},
     video::{Source, Video},
 };
 
@@ -40,80 +40,115 @@ pub fn geometry(source: &Source) -> Option<(Rect, bool)> {
     }
 }
 
-pub fn run(app: AppHandle, shared: Arc<Shared>, mut source: Source, video: Video, frames: mpsc::Sender<Vec<u8>>) {
-    let mut video = Some(video);
+/// Takes over a new set of streams: pipelines of windows that stay keep running, new ones start
+/// (each with a keyframe), removed ones stop. On failure nothing changes.
+fn switch(app: &AppHandle, shared: &Arc<Shared>, videos: &mut Vec<(u8, Video)>, next: Vec<Stream>, frames: &mpsc::Sender<Vec<u8>>) -> Result<(), String> {
+    let mut started = Vec::new();
+    for s in next.iter().filter(|s| !videos.iter().any(|(slot, _)| *slot == s.slot)) {
+        started.push((s.slot, Video::start(s.source.clone(), s.rect, s.ctl.clone(), frames.clone())?));
+    }
+    videos.retain(|(slot, _)| next.iter().any(|s| s.slot == *slot));
+    videos.extend(started);
+    for (slot, _) in videos.iter() {
+        if let Some(s) = next.iter().find(|s| s.slot == *slot) {
+            session::place_overlay(app, s.slot, s.rect, s.visible());
+        }
+    }
+    let old: Vec<u8> = shared.streams.lock().unwrap().iter().map(|s| s.slot).collect();
+    for slot in old.into_iter().filter(|o| !next.iter().any(|s| s.slot == *o)) {
+        session::hide_overlay(app, slot);
+    }
+    *shared.streams.lock().unwrap() = next;
+    shared.send_state();
+    Ok(())
+}
+
+pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, frames: mpsc::Sender<Vec<u8>>) {
     let pointer = Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }).ok();
-    let mut last_geom: Option<(Rect, bool)> = None;
     let mut last_check = Instant::now() - GEOMETRY_EVERY;
     let mut last_reach_check = Instant::now() - REACHABLE_EVERY;
-    let mut last_ptr: Option<(i32, i32)> = None;
+    // presenter's pointer: (slot, x, y)
+    let mut last_ptr: Option<(u8, i32, i32)> = None;
     let mut probe = Probe::default();
     let mut last_saved = Instant::now();
+    // overlays whose badge currently takes clicks
+    let mut clickable: Vec<u8> = Vec::new();
+    for s in shared.streams.lock().unwrap().iter() {
+        session::place_overlay(&app, s.slot, s.rect, s.visible());
+    }
 
     while !shared.stop.load(Ordering::Relaxed) {
         let started = Instant::now();
 
-        // switch to another source: stop the old pipeline first (its encoder flushes), so
-        // viewers never get frames of both; the new one starts with a keyframe
         let pending = shared.pending.lock().unwrap().take();
         if let Some((next, reply)) = pending {
-            let result = geometry(&next).ok_or_else(|| "Quelle nicht mehr vorhanden".to_string()).and_then(|(rect, _)| {
-                video = None;
-                shared.need_key.store(true, Ordering::Relaxed);
-                Video::start(next.clone(), rect, shared.clone(), frames.clone())
-            });
-            match result {
-                Ok(v) => {
-                    video = Some(v);
-                    source = next;
-                    last_geom = None;
-                    last_check = Instant::now() - GEOMETRY_EVERY;
-                    last_ptr = None;
-                    let _ = reply.send(Ok(()));
-                }
-                Err(e) => {
-                    // keep sharing the previous source
-                    if video.is_none() {
-                        if let Some((rect, _)) = geometry(&source) {
-                            video = Video::start(source.clone(), rect, shared.clone(), frames.clone()).ok();
-                        }
-                    }
-                    let _ = reply.send(Err(e));
-                }
-            }
+            let _ = reply.send(switch(&app, &shared, &mut videos, next, &frames));
+            last_ptr = None;
         }
 
         if last_check.elapsed() >= GEOMETRY_EVERY {
             last_check = Instant::now();
-            let Some((rect, visible)) = geometry(&source) else {
-                session::stop(&app, Some("Das geteilte Fenster wurde geschlossen."), true);
-                break;
-            };
-            if last_geom != Some((rect, visible)) {
-                *shared.rect.lock().unwrap() = rect;
-                shared.visible.store(visible, Ordering::Relaxed);
-                session::place_overlay(&app, rect, visible);
-                if let Some(video) = video.as_mut() {
-                    video.update(rect);
+            let streams = shared.streams.lock().unwrap().clone();
+            let mut gone = Vec::new();
+            let mut changed_visibility = false;
+            for s in &streams {
+                let Some((rect, visible)) = geometry(&s.source) else {
+                    gone.push(s.slot);
+                    continue;
+                };
+                if rect != s.rect || visible != s.visible() {
+                    changed_visibility |= visible != s.visible();
+                    s.ctl.visible.store(visible, Ordering::Relaxed);
+                    if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
+                        stream.rect = rect;
+                    }
+                    session::place_overlay(&app, s.slot, rect, visible);
+                    if let Some((_, video)) = videos.iter_mut().find(|(slot, _)| *slot == s.slot) {
+                        video.update(rect);
+                    }
                 }
-                if last_geom.map(|g| g.1) != Some(visible) {
-                    shared.send_state();
-                }
-                last_geom = Some((rect, visible));
             }
-        }
-
-        // viewers are told when remote control is paused because the window is covered completely
-        if let (Some(id), true) = (shared.window_id(), last_reach_check.elapsed() >= REACHABLE_EVERY) {
-            last_reach_check = Instant::now();
-            let rect = *shared.rect.lock().unwrap();
-            let reachable = guard::reachable(Some(id), rect);
-            if shared.reachable.swap(reachable, Ordering::Relaxed) != reachable {
+            if !gone.is_empty() {
+                // a shared window was closed: the others go on; nothing left ends the share
+                if gone.len() == streams.len() {
+                    let reason = if streams.len() > 1 { "Die geteilten Fenster wurden geschlossen." } else { "Das geteilte Fenster wurde geschlossen." };
+                    session::stop(&app, Some(reason), true);
+                    break;
+                }
+                videos.retain(|(slot, _)| !gone.contains(slot));
+                shared.streams.lock().unwrap().retain(|s| !gone.contains(&s.slot));
+                for slot in &gone {
+                    session::hide_overlay(&app, *slot);
+                }
+                let ids: Vec<String> = shared.streams.lock().unwrap().iter().map(|s| s.id.clone()).collect();
+                crate::resume::update(&app, "sources", json!(ids));
+                changed_visibility = true;
+            }
+            if changed_visibility {
                 shared.send_state();
             }
         }
 
-        if let Some(video) = video.as_mut() {
+        // viewers are told when remote control of a window is paused because it is covered completely
+        if last_reach_check.elapsed() >= REACHABLE_EVERY {
+            last_reach_check = Instant::now();
+            let streams = shared.streams.lock().unwrap().clone();
+            let mut changed = false;
+            for s in streams.iter().filter(|s| s.window_id.is_some()) {
+                let reachable = guard::reachable(s.target(), s.rect);
+                if reachable != s.reachable {
+                    changed = true;
+                    if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
+                        stream.reachable = reachable;
+                    }
+                }
+            }
+            if changed {
+                shared.send_state();
+            }
+        }
+
+        for (_, video) in videos.iter_mut() {
             video.tick();
         }
 
@@ -126,26 +161,62 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut source: Source, video: Video
             crate::resume::touch(&app);
         }
 
-        // presenter's own mouse pointer, only while it is inside the shared area
-        let rect = *shared.rect.lock().unwrap();
-        let ptr = pointer
-            .as_ref()
-            .filter(|_| shared.visible.load(Ordering::Relaxed))
-            .and_then(|e| e.location().ok())
-            .filter(|&(x, y)| rect.contains(x, y));
+        // presenter's own mouse pointer, in the shared window it is over
+        let location = pointer.as_ref().and_then(|e| e.location().ok());
+
+        // the red frame's badge (top centre) has a button: its overlay takes clicks while the
+        // pointer is over it
+        let over_badge: Vec<u8> = location
+            .map(|(x, y)| {
+                shared
+                    .streams
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|s| s.window_id.is_some() && s.visible() && badge_rect(s.rect).contains(x, y))
+                    .map(|s| s.slot)
+                    .collect()
+            })
+            .unwrap_or_default();
+        for slot in over_badge.iter().filter(|s| !clickable.contains(s)) {
+            session::overlay_clickable(&app, *slot, true);
+        }
+        for slot in clickable.iter().filter(|s| !over_badge.contains(s)) {
+            session::overlay_clickable(&app, *slot, false);
+        }
+        clickable = over_badge;
+        let ptr = location.and_then(|(x, y)| under(&shared, x, y).map(|s| (s.slot, x, y)));
         if ptr != last_ptr {
-            match ptr {
-                Some((x, y)) => shared.send(json!({
-                    "t": "ptr", "from": 0,
-                    "x": (x - rect.x) as f64 / rect.w as f64,
-                    "y": (y - rect.y) as f64 / rect.h as f64,
-                })),
-                None => shared.send(json!({ "t": "hide", "from": 0 })),
+            if let Some((old, ..)) = last_ptr.filter(|(old, ..)| ptr.is_none_or(|(slot, ..)| slot != *old)) {
+                shared.send(json!({ "t": "hide", "from": 0, "w": old }));
+            }
+            if let Some((slot, x, y)) = ptr {
+                if let Some(s) = shared.stream(slot) {
+                    let (nx, ny) = s.normalize(x, y);
+                    shared.send(json!({ "t": "ptr", "from": 0, "w": slot, "x": nx, "y": ny }));
+                }
             }
             last_ptr = ptr;
         }
 
         thread::sleep(TICK.saturating_sub(started.elapsed()));
+    }
+}
+
+/// Where the overlay's badge sits (overlay.html: top centre, at most 300 × 26).
+fn badge_rect(r: Rect) -> Rect {
+    let w = 300.min(r.w);
+    Rect { x: r.x + (r.w - w) / 2, y: r.y, w, h: 26 }
+}
+
+/// The visible shared window at a screen point (the topmost one if they overlap).
+fn under(shared: &Shared, x: i32, y: i32) -> Option<Stream> {
+    let streams = shared.streams.lock().unwrap();
+    let candidates: Vec<&Stream> = streams.iter().filter(|s| s.visible() && s.rect.contains(x, y)).collect();
+    match candidates.as_slice() {
+        [] => None,
+        [one] => Some((*one).clone()),
+        many => many.iter().find(|s| guard::input_allowed(s.target(), x, y)).or(many.first()).map(|s| (*s).clone()),
     }
 }
 
@@ -158,15 +229,15 @@ struct Probe {
 /// The presenter's own clicks and text entries for the recording (viewer input is recorded where
 /// it is injected; screenshots closer than a moment apart are merged).
 fn record_presenter_input(shared: &Shared, rec: &Recorder, probe: &mut Probe, pointer: Option<&Enigo>) {
-    let rect = *shared.rect.lock().unwrap();
-    let in_front = shared.window_id().is_none_or(guard::focused);
+    let streams = shared.streams.lock().unwrap().clone();
+    let in_front = streams.iter().any(|s| s.target().is_none_or(guard::focused));
 
     let button = input::left_button();
     if button && !probe.button {
         if let Some((x, y)) = pointer.and_then(|e| e.location().ok()) {
-            if rect.contains(x, y) && in_front && guard::input_allowed(shared.window_id(), x, y) {
-                let pos = ((x - rect.x) as f64 / rect.w as f64, (y - rect.y) as f64 / rect.h as f64);
-                rec.shot(format!("Klick – {}", rec.name(0)), Some(pos));
+            if let Some(s) = under(shared, x, y).filter(|s| guard::input_allowed(s.target(), x, y)) {
+                rec.set_source(s.source.clone());
+                rec.shot(format!("Klick – {}", rec.name(0)), Some(s.normalize(x, y)));
             }
         }
     }

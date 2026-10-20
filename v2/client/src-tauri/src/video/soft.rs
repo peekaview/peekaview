@@ -16,16 +16,21 @@ use tokio::sync::mpsc;
 use xcap::image::RgbaImage;
 
 use super::{output_size, packet, Source, KEY_GAP};
-use crate::{guard::Rect, session::Shared};
+use super::StreamCtl;
+use crate::guard::Rect;
 
 const SOFT_FPS: u32 = 15;
 
-pub struct Video;
+pub struct Video {
+    stop: Arc<std::sync::atomic::AtomicBool>,
+}
 
 impl Video {
-    pub fn start(source: Source, _rect: Rect, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
-        thread::spawn(move || run(source, shared, frames));
-        Ok(Video)
+    pub fn start(source: Source, _rect: Rect, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stop.clone();
+        thread::spawn(move || run(source, shared, flag, frames));
+        Ok(Video { stop })
     }
 
     pub fn update(&mut self, _rect: Rect) {}
@@ -33,13 +38,19 @@ impl Video {
     pub fn tick(&mut self) {}
 }
 
-fn run(source: Source, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) {
+impl Drop for Video {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+fn run(source: Source, shared: Arc<StreamCtl>, stop: Arc<std::sync::atomic::AtomicBool>, frames: mpsc::Sender<Vec<u8>>) {
     let interval = Duration::from_millis(1000 / SOFT_FPS as u64);
     let mut encoder: Option<(Encoder, usize, usize)> = None;
     let mut last_key = Instant::now() - KEY_GAP;
     let mut last: Option<Vec<u8>> = None;
 
-    while !shared.stop.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Relaxed) {
         let started = Instant::now();
         let image = shared.visible.load(Ordering::Relaxed).then(|| match &source {
             Source::Screen(m) => m.capture_image(),
@@ -73,7 +84,7 @@ fn run(source: Source, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) {
                         if key {
                             last_key = Instant::now();
                         }
-                        if frames.blocking_send(packet(&data, key, w, h)).is_err() {
+                        if frames.blocking_send(packet(shared.slot, &data, key, w, h)).is_err() {
                             return;
                         }
                     }

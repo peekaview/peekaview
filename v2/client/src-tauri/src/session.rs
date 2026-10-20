@@ -1,12 +1,17 @@
-//! A sharing session: peer-to-peer hub, capture thread, control thread and the overlay window.
+//! A sharing session: peer-to-peer hub, capture thread, control thread and the overlay windows.
+//! One or several windows (or a screen) are shared at once; each is a [`Stream`] with its own
+//! capture + encoder pipeline, video track slot and red frame.
 
-use std::sync::{
-    atomic::{AtomicBool, AtomicU8, Ordering},
-    mpsc as std_mpsc, Arc, Mutex,
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, AtomicU8, Ordering},
+        mpsc as std_mpsc, Arc, Mutex,
+    },
 };
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, EventTarget, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -16,7 +21,7 @@ use crate::{
     control::{self, Cmd},
     guard::Rect,
     p2p::{hub::Hub, signal, turn},
-    video::{Source, Video},
+    video::{Source, StreamCtl, Video, MAX_STREAMS},
     OVERLAY_TITLE,
 };
 
@@ -49,28 +54,58 @@ impl Mode {
     }
 }
 
+/// One shared window or screen.
+#[derive(Clone)]
+pub struct Stream {
+    /// video track slot (0..MAX_STREAMS) – also how viewers address it ("w")
+    pub slot: u8,
+    pub ctl: Arc<StreamCtl>,
+    pub source: Source,
+    /// source id from the picker ("window:123")
+    pub id: String,
+    /// `Some(id)` for a window: input is confined to it (and its own dialogs)
+    pub window_id: Option<u32>,
+    pub pid: Option<i32>,
+    pub kind: &'static str,
+    pub title: String,
+    pub app: String,
+    pub rect: Rect,
+    /// some part of it is not covered – remote control is paused otherwise
+    pub reachable: bool,
+}
+
+impl Stream {
+    pub fn visible(&self) -> bool {
+        self.ctl.visible.load(Ordering::Relaxed)
+    }
+
+    /// For the input guard: the window and its app (dialogs of the app count as part of it).
+    pub fn target(&self) -> crate::guard::Target {
+        self.window_id.map(|id| (id, self.pid.unwrap_or(-1)))
+    }
+
+    /// Normalized (0..1) coordinates of a screen point inside it.
+    pub fn normalize(&self, x: i32, y: i32) -> (f64, f64) {
+        ((x - self.rect.x) as f64 / self.rect.w.max(1) as f64, (y - self.rect.y) as f64 / self.rect.h.max(1) as f64)
+    }
+}
+
 /// State shared between the session threads.
 pub struct Shared {
     mode: AtomicU8,
     pub stop: AtomicBool,
-    pub need_key: AtomicBool,
-    pub visible: AtomicBool,
-    /// some part of the shared window is not covered – remote control is paused otherwise
-    pub reachable: AtomicBool,
-    /// `Some(id)` when a single window is shared – input is then confined to it
-    window_id: Mutex<Option<u32>>,
-    /// a new source requested while sharing, taken over by the capture loop
-    pub pending: Mutex<Option<(Source, std_mpsc::Sender<Result<(), String>>)>>,
-    pub rect: Mutex<Rect>,
+    pub streams: Mutex<Vec<Stream>>,
+    /// a new set of sources requested while sharing, taken over by the capture loop
+    pub pending: Mutex<Option<(Vec<Stream>, std_mpsc::Sender<Result<(), String>>)>>,
     pub recorder: Mutex<Option<Arc<Recorder>>>,
     /// last time remote control injected keys (to tell viewer and presenter typing apart)
     pub injected_at: Mutex<Option<std::time::Instant>>,
-    /// (kind, title) of the shared source
-    info: Mutex<(&'static str, String)>,
     /// messages for every viewer (state, own pointer)
     out: mpsc::UnboundedSender<String>,
     /// the shared clipboard of this session
     pub clip: crate::clip::Store,
+    /// room viewers have for a window (device pixels), for the "best size" button: id → (w, h)
+    pub viewports: Mutex<HashMap<u32, (u32, u32)>>,
 }
 
 impl Shared {
@@ -82,8 +117,24 @@ impl Shared {
         }
     }
 
-    pub fn window_id(&self) -> Option<u32> {
-        *self.window_id.lock().unwrap()
+    pub fn stream(&self, slot: u8) -> Option<Stream> {
+        self.streams.lock().unwrap().iter().find(|s| s.slot == slot).cloned()
+    }
+
+    /// The stream a viewer message refers to (`"w": slot`; the first one if missing).
+    pub fn stream_of(&self, v: &Value) -> Option<Stream> {
+        let streams = self.streams.lock().unwrap();
+        match v["w"].as_u64() {
+            Some(slot) => streams.iter().find(|s| u64::from(s.slot) == slot).cloned(),
+            None => streams.first().cloned(),
+        }
+    }
+
+    /// Every pipeline sends a keyframe soon.
+    pub fn request_key(&self) {
+        for s in self.streams.lock().unwrap().iter() {
+            s.ctl.need_key.store(true, Ordering::Relaxed);
+        }
     }
 
     pub fn send(&self, v: Value) {
@@ -91,14 +142,25 @@ impl Shared {
     }
 
     pub fn state(&self) -> Value {
-        let (kind, title) = self.info.lock().unwrap().clone();
+        let streams = self.streams.lock().unwrap();
+        let windows: Vec<Value> = streams
+            .iter()
+            .map(|s| {
+                json!({
+                    "w": s.slot, "kind": s.kind, "title": s.title, "app": s.app,
+                    "paused": !s.visible(), "reachable": s.reachable,
+                })
+            })
+            .collect();
+        let first = streams.first();
         json!({
             "t": "state",
             "mode": self.mode().as_str(),
-            "kind": kind,
-            "title": title,
-            "paused": !self.visible.load(Ordering::Relaxed),
-            "reachable": self.reachable.load(Ordering::Relaxed),
+            "windows": windows,
+            "kind": first.map(|s| s.kind).unwrap_or("screen"),
+            "title": first.map(|s| if streams.len() > 1 { format!("{} Fenster", streams.len()) } else { s.title.clone() }).unwrap_or_default(),
+            "paused": !streams.iter().any(Stream::visible),
+            "reachable": streams.iter().any(|s| s.reachable),
             "recording": self.recorder.lock().unwrap().is_some(),
         })
     }
@@ -115,15 +177,14 @@ impl Shared {
 pub struct Session {
     shared: Arc<Shared>,
     ctrl: std_mpsc::Sender<Cmd>,
-    source: Source,
     hub: Arc<Hub>,
 }
 
-/// Brings a shared window to the front (a shared screen needs nothing).
-fn focus_source(source: &Source) {
-    if let Source::Window(w) = source {
-        if let (Ok(pid), Ok(id)) = (w.pid(), w.id()) {
-            crate::focus::bring_to_front(pid, id);
+/// Brings shared windows to the front, the first one last (a shared screen needs nothing).
+fn focus_streams(streams: &[Stream]) {
+    for s in streams.iter().rev() {
+        if let (Some(pid), Some(id)) = (s.pid, s.window_id) {
+            crate::focus::bring_to_front(pid as u32, id);
         }
     }
 }
@@ -131,30 +192,58 @@ fn focus_source(source: &Source) {
 #[derive(Default)]
 pub struct SessionState(Mutex<Option<Session>>);
 
-fn resolve(source: &str) -> Result<(Source, Option<u32>, &'static str, String), String> {
-    let (kind, id) = source.split_once(':').ok_or("Ungültige Quelle")?;
-    let id: u32 = id.parse().map_err(|_| "Ungültige Quelle")?;
-    match kind {
+/// A source picked in the UI ("screen:1", "window:123") as a stream in `slot`.
+fn open_stream(id: &str, slot: u8) -> Result<Stream, String> {
+    let (kind, num) = id.split_once(':').ok_or("Ungültige Quelle")?;
+    let num: u32 = num.parse().map_err(|_| "Ungültige Quelle")?;
+    let (source, window_id, pid, kind, title, app) = match kind {
         "screen" => {
             let m = xcap::Monitor::all()
                 .map_err(|e| e.to_string())?
                 .into_iter()
-                .find(|m| m.id().ok() == Some(id))
+                .find(|m| m.id().ok() == Some(num))
                 .ok_or("Bildschirm nicht gefunden")?;
             let title = m.friendly_name().or_else(|_| m.name()).unwrap_or_default();
-            Ok((Source::Screen(m), None, "screen", title))
+            (Source::Screen(m), None, None, "screen", title, String::new())
         }
         "window" => {
             let w = xcap::Window::all()
                 .map_err(|e| e.to_string())?
                 .into_iter()
-                .find(|w| w.id().ok() == Some(id))
+                .find(|w| w.id().ok() == Some(num))
                 .ok_or("Fenster nicht gefunden")?;
-            let title = w.title().unwrap_or_default();
-            Ok((Source::Window(w), Some(id), "window", title))
+            let title = crate::sources::clean_name(&w.title().unwrap_or_default());
+            let app = crate::sources::clean_name(&w.app_name().unwrap_or_default());
+            let pid = w.pid().ok().map(|p| p as i32);
+            (Source::Window(w), Some(num), pid, "window", title, app)
         }
-        _ => Err("Ungültige Quelle".into()),
+        _ => return Err("Ungültige Quelle".into()),
+    };
+    let (rect, visible) = capture::geometry(&source).ok_or("Quelle nicht mehr vorhanden")?;
+    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true })
+}
+
+/// Picker ids → streams; ids already shared keep their slot (and running pipeline).
+fn open_streams(ids: &[String], current: &[Stream]) -> Result<Vec<Stream>, String> {
+    let mut ids: Vec<&String> = ids.iter().filter(|i| !i.is_empty()).collect();
+    ids.dedup();
+    if ids.is_empty() {
+        return Err("Bitte ein Fenster oder einen Bildschirm wählen.".into());
     }
+    if ids.len() > MAX_STREAMS {
+        return Err(format!("Höchstens {MAX_STREAMS} Fenster gleichzeitig."));
+    }
+    let mut used: Vec<u8> = ids.iter().filter_map(|id| current.iter().find(|s| &s.id == *id).map(|s| s.slot)).collect();
+    ids.iter()
+        .map(|id| match current.iter().find(|s| &s.id == *id) {
+            Some(s) => Ok(s.clone()),
+            None => {
+                let slot = (0..MAX_STREAMS as u8).find(|n| !used.contains(n)).ok_or("zu viele Fenster")?;
+                used.push(slot);
+                open_stream(id, slot)
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -162,7 +251,8 @@ pub struct StartOptions {
     /// address of the static viewer website (for the link)
     pub site: String,
     pub name: String,
-    pub source: String,
+    /// one screen, or one or more windows ("screen:1", "window:123")
+    pub sources: Vec<String>,
     /// room secret to share into (e.g. handed over by an integration); a new one otherwise
     pub room: Option<String>,
     pub color: Option<String>,
@@ -190,8 +280,7 @@ fn valid_secret(s: &str) -> bool {
 /// Returns {room, link, ice, secret, signingKey}.
 pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> {
     stop(&app, None, false);
-    let (source, window_id, kind, title) = resolve(&opts.source)?;
-    let (rect, visible) = capture::geometry(&source).ok_or("Quelle nicht mehr vorhanden")?;
+    let streams = open_streams(&opts.sources, &[])?;
     let secret = opts.room.clone().filter(|r| valid_secret(r)).unwrap_or_else(signal::new_room_secret);
     let signing_key = opts.signing_key.as_deref().and_then(parse_key).unwrap_or_else(signal::new_signing_key);
     let key_hex: String = signing_key.iter().map(|b| format!("{b:02x}")).collect();
@@ -203,42 +292,42 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
     let shared = Arc::new(Shared {
         mode: AtomicU8::new(Mode::View as u8),
         stop: AtomicBool::new(false),
-        need_key: AtomicBool::new(true),
-        visible: AtomicBool::new(visible),
-        reachable: AtomicBool::new(true),
-        window_id: Mutex::new(window_id),
+        streams: Mutex::new(streams.clone()),
         pending: Mutex::new(None),
-        rect: Mutex::new(rect),
         recorder: Mutex::new(None),
         injected_at: Mutex::new(None),
-        info: Mutex::new((kind, title)),
         out: out_tx,
         clip: Default::default(),
+        viewports: Mutex::default(),
     });
 
-    let video = Video::start(source.clone(), rect, shared.clone(), frame_tx.clone())?;
-    create_overlay(&app).map_err(|e| e.to_string())?;
+    let mut videos = Vec::new();
+    for s in &streams {
+        videos.push((s.slot, Video::start(s.source.clone(), s.rect, s.ctl.clone(), frame_tx.clone())?));
+        create_overlay(&app, s.slot).map_err(|e| e.to_string())?;
+    }
+    hide_overlays(&app, &streams);
     to_overlay(&app, r#"{"t":"frame","live":true}"#);
     let ctrl = control::spawn(shared.clone());
     let host_color = opts.color.clone().unwrap_or_else(|| "#ffffff".into());
     let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx, opts.admitted.clone());
 
     {
-        let (app, shared, source) = (app.clone(), shared.clone(), source.clone());
-        std::thread::spawn(move || capture::run(app, shared, source, video, frame_tx));
+        let (app, shared) = (app.clone(), shared.clone());
+        std::thread::spawn(move || capture::run(app, shared, videos, frame_tx));
     }
-    focus_source(&source);
+    focus_streams(&streams);
 
     shared.send_state();
     resume::save(
         &app,
         json!({
-            "site": opts.site, "name": opts.name, "source": opts.source, "room": secret, "color": opts.color,
+            "site": opts.site, "name": opts.name, "sources": opts.sources, "room": secret, "color": opts.color,
             "relays": relays, "ice": opts.ice, "turn_urls": opts.turn_urls, "turn_secret": opts.turn_secret, "mode": "view",
             "signing_key": key_hex, "admitted": opts.admitted,
         }),
     );
-    *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, source, hub });
+    *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, hub });
     let site = opts.site.trim().trim_end_matches('/');
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
@@ -266,10 +355,13 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
             }
             let _ = ctrl.send(Cmd::Input(v.clone()));
         }
-        "draw" | "ping" | "clear" if annotations => {
+        "draw" | "ping" | "clear" | "hide" if annotations => {
             if let (Some(rec), "ping") = (shared.recorder(), v["t"].as_str().unwrap_or("")) {
                 let from = v["from"].as_u64().unwrap_or(0);
                 let pos = v["x"].as_f64().zip(v["y"].as_f64());
+                if let Some(stream) = shared.stream_of(v) {
+                    rec.set_source(stream.source);
+                }
                 rec.shot(format!("Zeigen – {}", rec.name(from)), pos);
             }
             to_overlay(app, raw);
@@ -311,34 +403,25 @@ pub fn set_mode(app: &AppHandle, mode: Mode) {
     resume::update(app, "mode", json!(mode.as_str()));
 }
 
-/// Switches the running share to another screen or window – room, viewers, voice and recording
-/// continue. Blocks until the capture loop has taken over the new source.
-pub fn switch_source(app: &AppHandle, source_id: &str) -> Result<Value, String> {
-    let (source, window_id, kind, title) = resolve(source_id)?;
+/// Switches the running share to other windows / another screen – room, viewers, voice and
+/// recording continue; windows that stay keep their pipeline. Blocks until the capture loop
+/// has taken over.
+pub fn switch_sources(app: &AppHandle, ids: &[String]) -> Result<Value, String> {
     let (reply_tx, reply_rx) = std_mpsc::channel();
-    let shared = {
+    let streams = {
         let guard = app.state::<SessionState>();
         let guard = guard.0.lock().unwrap();
         let session = guard.as_ref().ok_or("Keine laufende Freigabe")?;
+        let streams = open_streams(ids, &session.shared.streams.lock().unwrap())?;
         let _ = session.ctrl.send(Cmd::Release);
-        *session.shared.pending.lock().unwrap() = Some((source.clone(), reply_tx));
-        session.shared.clone()
+        *session.shared.pending.lock().unwrap() = Some((streams.clone(), reply_tx));
+        streams
     };
     reply_rx.recv_timeout(std::time::Duration::from_secs(10)).map_err(|_| "Quellwechsel dauerte zu lange")??;
-
-    *shared.window_id.lock().unwrap() = window_id;
-    *shared.info.lock().unwrap() = (kind, title.clone());
-    shared.reachable.store(true, Ordering::Relaxed);
-    if let Some(rec) = shared.recorder() {
-        rec.set_source(source.clone());
-    }
-    if let Some(session) = app.state::<SessionState>().0.lock().unwrap().as_mut() {
-        session.source = source.clone();
-    }
-    shared.send_state();
-    resume::update(app, "source", json!(source_id));
-    focus_source(&source);
-    Ok(json!({ "kind": kind, "title": title }))
+    resume::update(app, "sources", json!(ids));
+    focus_streams(&streams);
+    let titles: Vec<String> = streams.iter().map(|s| if s.kind == "window" && !s.app.is_empty() { format!("{} – {}", s.app, s.title) } else { s.title.clone() }).collect();
+    Ok(json!({ "titles": titles }))
 }
 
 /// Starts recording the running session.
@@ -346,7 +429,8 @@ pub fn start_recording(app: &AppHandle, opts: crate::recording::Options) -> Resu
     let guard = app.state::<SessionState>();
     let guard = guard.0.lock().unwrap();
     let session = guard.as_ref().ok_or("Keine laufende Freigabe")?;
-    let rec = Recorder::new(session.source.clone(), opts);
+    let source = session.shared.streams.lock().unwrap().first().map(|s| s.source.clone()).ok_or("Keine Quelle")?;
+    let rec = Recorder::new(source, opts);
     let label = rec.engine_label();
     *session.shared.recorder.lock().unwrap() = Some(rec);
     session.shared.send_state();
@@ -374,25 +458,19 @@ pub fn stop_recording(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     rec.finish()
 }
 
-/// Shows the red frame around a source picked in the UI; `None` hides it.
-pub fn highlight(app: &AppHandle, source: Option<&str>) {
+/// Shows red frames around the sources picked in the UI; an empty list hides them.
+pub fn highlight(app: &AppHandle, ids: &[String]) {
     if app.state::<SessionState>().0.lock().unwrap().is_some() {
         return;
     }
-    let geometry = source.and_then(|s| resolve(s).ok()).and_then(|(source, ..)| capture::geometry(&source));
-    match geometry {
-        Some((rect, visible)) => {
-            if create_overlay(app).is_ok() {
-                to_overlay(app, r#"{"t":"frame","live":false}"#);
-                place_overlay(app, rect, visible);
-            }
-        }
-        None => {
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.hide();
-            }
+    let streams: Vec<Stream> = ids.iter().take(MAX_STREAMS).enumerate().filter_map(|(i, id)| open_stream(id, i as u8).ok()).collect();
+    for s in &streams {
+        if create_overlay(app, s.slot).is_ok() {
+            place_overlay(app, s.slot, s.rect, s.visible());
         }
     }
+    to_overlay(app, r#"{"t":"frame","live":false}"#);
+    hide_overlays(app, &streams);
 }
 
 /// Ends the running session (if any). `reason` is shown in the main window. `forget` drops the
@@ -421,10 +499,8 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     if let Some(window) = app.get_webview_window("clipboard") {
         let _ = window.destroy();
     }
-    // the overlay window is kept for the next session, just hidden and wiped
-    if let Some(overlay) = app.get_webview_window("overlay") {
-        let _ = overlay.hide();
-    }
+    // the overlay windows are kept for the next session, just hidden and wiped
+    hide_overlays(app, &[]);
     to_overlay(app, r#"{"t":"reset"}"#);
     let _ = app.emit_to("main", "ended", reason);
 }
@@ -452,7 +528,10 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
     let opts = StartOptions {
         site: text("site").unwrap_or_default(),
         name: text("name").unwrap_or_default(),
-        source: text("source").unwrap_or_default(),
+        sources: {
+            let list: Vec<String> = list("sources");
+            if list.is_empty() { text("source").into_iter().collect() } else { list }
+        },
         room: text("room"),
         color: text("color"),
         relays: list("relays"),
@@ -467,7 +546,7 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
             let mode = text("mode").and_then(|m| Mode::parse(&m)).unwrap_or(Mode::View);
             set_mode(&app, mode);
             hosted["mode"] = json!(mode.as_str());
-            hosted["source"] = json!(opts.source);
+            hosted["sources"] = json!(opts.sources);
             hosted["site"] = json!(opts.site);
             Ok(Some(hosted))
         }
@@ -478,15 +557,22 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
     }
 }
 
-fn to_overlay(app: &AppHandle, raw: &str) {
-    let _ = app.emit_to("overlay", "pv", raw);
+/// To every overlay window (each picks the messages of its own window, `"w"`).
+pub fn to_overlay(app: &AppHandle, raw: &str) {
+    let _ = app.emit_filter("pv", raw, |target| matches!(target, EventTarget::WebviewWindow { label } if label.starts_with("overlay-")));
 }
 
-fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
-    if app.get_webview_window("overlay").is_some() {
+fn overlay_label(slot: u8) -> String {
+    format!("overlay-{slot}")
+}
+
+/// The click-through window with the red frame (and annotations) on top of a shared window.
+fn create_overlay(app: &AppHandle, slot: u8) -> tauri::Result<()> {
+    let label = overlay_label(slot);
+    if app.get_webview_window(&label).is_some() {
         return Ok(());
     }
-    let overlay = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("desktop/overlay.html".into()))
+    let overlay = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(format!("desktop/overlay.html?w={slot}").into()))
         .title(OVERLAY_TITLE)
         .transparent(true)
         .decorations(false)
@@ -497,6 +583,8 @@ fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
         .visible_on_all_workspaces(true)
         .focused(false)
         .focusable(false)
+        // the badge's button works with the first click
+        .accept_first_mouse(true)
         // never part of any screen capture – neither ours nor e.g. a video call
         .content_protected(true)
         .visible(false)
@@ -508,14 +596,26 @@ fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
         let ns = ns as usize;
         let _ = app.run_on_main_thread(move || {
             let id = unsafe { crate::macos::window_number(ns as *mut std::ffi::c_void) };
-            crate::guard::OVERLAY_WINDOW.store(id, Ordering::Relaxed);
+            crate::guard::OVERLAY_WINDOWS.lock().unwrap().push(id);
         });
     }
     Ok(())
 }
 
-pub fn place_overlay(app: &AppHandle, rect: Rect, visible: bool) {
-    let Some(overlay) = app.get_webview_window("overlay") else { return };
+/// Hides the overlays of windows that are not (or no longer) shared.
+fn hide_overlays(app: &AppHandle, keep: &[Stream]) {
+    for (label, window) in app.webview_windows() {
+        if label.starts_with("overlay-") && !keep.iter().any(|s| overlay_label(s.slot) == label) {
+            let _ = window.hide();
+        }
+    }
+}
+
+pub fn place_overlay(app: &AppHandle, slot: u8, rect: Rect, visible: bool) {
+    if create_overlay(app, slot).is_err() {
+        return;
+    }
+    let Some(overlay) = app.get_webview_window(&overlay_label(slot)) else { return };
     if !visible || rect.w <= 0 || rect.h <= 0 {
         let _ = overlay.hide();
         return;
@@ -536,6 +636,12 @@ pub fn place_overlay(app: &AppHandle, rect: Rect, visible: bool) {
     let _ = overlay.show();
 }
 
+pub fn hide_overlay(app: &AppHandle, slot: u8) {
+    if let Some(overlay) = app.get_webview_window(&overlay_label(slot)) {
+        let _ = overlay.hide();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549,25 +655,9 @@ mod tests {
         let monitor = xcap::Monitor::all().unwrap().into_iter().find(|m| m.is_primary().unwrap_or(false)).unwrap();
         let source = Source::Screen(monitor);
         let (rect, _) = capture::geometry(&source).unwrap();
-        let (out, _out_rx) = mpsc::unbounded_channel();
-        let shared = Arc::new(Shared {
-            mode: AtomicU8::new(0),
-            stop: AtomicBool::new(false),
-            need_key: AtomicBool::new(true),
-            visible: AtomicBool::new(true),
-            reachable: AtomicBool::new(true),
-            window_id: Mutex::new(None),
-            pending: Mutex::new(None),
-            rect: Mutex::new(rect),
-            recorder: Mutex::new(None),
-            injected_at: Mutex::new(None),
-            info: Mutex::new(("screen", String::new())),
-            out,
-            clip: Default::default(),
-        });
         let (tx, mut rx) = mpsc::channel(256);
         let started = std::time::Instant::now();
-        let mut video = Video::start(source, rect, shared.clone(), tx).expect("capture start");
+        let mut video = Video::start(source, rect, StreamCtl::new(0, true), tx).expect("capture start");
         let mut packets = Vec::new();
         while started.elapsed() < std::time::Duration::from_secs(2) {
             video.tick();
@@ -578,11 +668,11 @@ mod tests {
         }
         drop(video);
         let first = packets.first().expect("no frames captured");
-        let (w, h) = (u16::from_le_bytes([first[2], first[3]]), u16::from_le_bytes([first[4], first[5]]));
-        println!("{} packets, {w}x{h}, first key={}, {} KB", packets.len(), first[1] & 1, packets.iter().map(|p| p.len()).sum::<usize>() / 1024);
-        assert_eq!(first[1] & 1, 1, "stream must start with a keyframe");
+        let (w, h) = (u16::from_le_bytes([first[3], first[4]]), u16::from_le_bytes([first[5], first[6]]));
+        println!("{} packets, {w}x{h}, first key={}, {} KB", packets.len(), first[2] & 1, packets.iter().map(|p| p.len()).sum::<usize>() / 1024);
+        assert_eq!(first[2] & 1, 1, "stream must start with a keyframe");
         if let Ok(path) = std::env::var("PV_DUMP") {
-            std::fs::write(path, packets.iter().flat_map(|p| p[6..].to_vec()).collect::<Vec<_>>()).unwrap();
+            std::fs::write(path, packets.iter().flat_map(|p| p[7..].to_vec()).collect::<Vec<_>>()).unwrap();
         }
     }
 }
@@ -727,5 +817,51 @@ pub fn admit(app: &AppHandle, peer: Option<String>, allow: bool) {
     let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
     if let Some(hub) = hub {
         tauri::async_runtime::spawn(hub.admit(peer, allow));
+    }
+}
+
+// ------------------------------------------------------------------ best size for the viewers
+
+/// Resizes a shared window on the presenter's screen so it fits the viewers' room 1:1 – one
+/// picture pixel per screen pixel, so text stays sharp. Viewers report the room they have for
+/// a window; the smallest one counts.
+pub fn fit_window(app: &AppHandle, slot: u8) -> Result<(), String> {
+    let shared = running(app)?;
+    let stream = shared.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
+    let (Some(window_id), Some(pid)) = (stream.window_id, stream.pid) else {
+        return Err("Nur für geteilte Fenster".into());
+    };
+    let (tw, th) = shared
+        .viewports
+        .lock()
+        .unwrap()
+        .values()
+        .copied()
+        .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1)))
+        .ok_or("Noch kein Zuschauer verbunden")?;
+    let r = stream.rect;
+    let monitor = xcap::Monitor::from_point(r.x + r.w / 2, r.y + r.h / 2).map_err(|e| e.to_string())?;
+    // window coordinates: points on macOS (pixels = points × scale), pixels elsewhere
+    let scale = if cfg!(target_os = "macos") { monitor.scale_factor().unwrap_or(1.0) as f64 } else { 1.0 };
+    let (mx, my) = (monitor.x().unwrap_or(0) as f64, monitor.y().unwrap_or(0) as f64);
+    let (mw, mh) = (monitor.width().unwrap_or(0) as f64, monitor.height().unwrap_or(0) as f64);
+    // the encoder's limit, then what fits on the presenter's screen (room for menu bar / taskbar)
+    let (ew, eh) = crate::video::output_size(tw as f64, th as f64);
+    let w = (ew as f64 / scale).min(mw).round();
+    let h = (eh as f64 / scale).min(mh - 48.0).round();
+    let x = (r.x as f64).clamp(mx, (mx + mw - w).max(mx));
+    let y = (r.y as f64).clamp(my + 24.0, (my + mh - h).max(my + 24.0));
+    if crate::focus::set_frame(pid as u32, window_id, x, y, w, h) {
+        Ok(())
+    } else {
+        Err("Größe ließ sich nicht ändern – ist „Bedienungshilfen“ für PeekaView erlaubt?".into())
+    }
+}
+
+/// The overlay's badge takes clicks while the presenter's pointer is over it (the rest of the
+/// overlay stays click-through).
+pub fn overlay_clickable(app: &AppHandle, slot: u8, on: bool) {
+    if let Some(overlay) = app.get_webview_window(&overlay_label(slot)) {
+        let _ = overlay.set_ignore_cursor_events(!on);
     }
 }

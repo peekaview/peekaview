@@ -1,5 +1,5 @@
 //! The presenter is the hub of a star of peer-to-peer WebRTC connections – one per viewer, each
-//! carrying the H.264 video track, a data channel ("pv") and a second one for the shared
+//! carrying one H.264 video track per shared-window slot, a data channel ("pv") and a second one for the shared
 //! clipboard's files ("pvfile", so big transfers never hold up pointers and input). It takes over
 //! what a relay server would do: participant list, colors, routing by mode, the clipboard store
 //! and voice-chat signaling between viewers.
@@ -59,6 +59,13 @@ fn h264() -> RTCRtpCodec {
     RTCRtpCodec { mime_type: MIME_TYPE_H264.to_owned(), clock_rate: 90000, channels: 0, sdp_fmtp_line: H264_FMTP.to_owned(), rtcp_feedback: vec![] }
 }
 
+struct OutTrack {
+    track: Arc<TrackLocalStaticSample>,
+    sender: Arc<dyn RtpSender>,
+    ssrc: u32,
+    payload_type: Option<u8>,
+}
+
 struct Viewer {
     peer: String,
     name: String,
@@ -68,10 +75,9 @@ struct Viewer {
     dc: Option<Arc<dyn DataChannel>>,
     /// clipboard previews this viewer already has (they are sent once, separately)
     previews: HashSet<String>,
-    track: Arc<TrackLocalStaticSample>,
-    sender: Arc<dyn RtpSender>,
-    ssrc: u32,
-    payload_type: Option<u8>,
+    /// one video track per shared-window slot (`video::MAX_STREAMS`): a window joining or leaving
+    /// only changes which slot carries what, the connection is never renegotiated
+    tracks: Vec<OutTrack>,
     /// remote ICE candidates that arrived before the answer
     pending: Vec<RTCIceCandidateInit>,
     answered: bool,
@@ -332,29 +338,34 @@ impl Hub {
             .map_err(|e| e.to_string())?;
         let pc: Arc<dyn PeerConnection> = Arc::new(pc);
 
-        let ssrc: u32 = {
-            let mut b = [0u8; 4];
-            getrandom::fill(&mut b).map_err(|e| e.to_string())?;
-            u32::from_le_bytes(b)
-        };
-        let track = Arc::new(
-            TrackLocalStaticSample::new(
-                Instant::now(),
-                MediaStreamTrack::new(
-                    "peekaview".into(),
-                    "screen".into(),
-                    "screen".into(),
-                    RtpCodecKind::Video,
-                    vec![RTCRtpEncodingParameters {
-                        rtp_coding_parameters: RTCRtpCodingParameters { ssrc: Some(ssrc), ..Default::default() },
-                        codec: h264(),
-                        ..Default::default()
-                    }],
-                ),
-            )
-            .map_err(|e| e.to_string())?,
-        );
-        let sender = pc.add_track(track.clone() as Arc<dyn TrackLocal>).await.map_err(|e| e.to_string())?;
+        let mut tracks = Vec::new();
+        for slot in 0..crate::video::MAX_STREAMS {
+            let ssrc: u32 = {
+                let mut b = [0u8; 4];
+                getrandom::fill(&mut b).map_err(|e| e.to_string())?;
+                u32::from_le_bytes(b)
+            };
+            // the stream id tells the viewer which slot a track is ("w0", "w1", …)
+            let track = Arc::new(
+                TrackLocalStaticSample::new(
+                    Instant::now(),
+                    MediaStreamTrack::new(
+                        format!("w{slot}"),
+                        format!("w{slot}"),
+                        format!("w{slot}"),
+                        RtpCodecKind::Video,
+                        vec![RTCRtpEncodingParameters {
+                            rtp_coding_parameters: RTCRtpCodingParameters { ssrc: Some(ssrc), ..Default::default() },
+                            codec: h264(),
+                            ..Default::default()
+                        }],
+                    ),
+                )
+                .map_err(|e| e.to_string())?,
+            );
+            let sender = pc.add_track(track.clone() as Arc<dyn TrackLocal>).await.map_err(|e| e.to_string())?;
+            tracks.push(OutTrack { track, sender, ssrc, payload_type: None });
+        }
         let dc = pc
             .create_data_channel("pv", Some(RTCDataChannelInit { ordered: true, ..Default::default() }))
             .await
@@ -374,10 +385,7 @@ impl Hub {
                 pc: pc.clone(),
                 dc: Some(dc.clone()),
                 previews: HashSet::new(),
-                track,
-                sender,
-                ssrc,
-                payload_type: None,
+                tracks,
                 pending: vec![],
                 answered: false,
             },
@@ -398,16 +406,16 @@ impl Hub {
     }
 
     async fn connected(&self, id: u32) {
-        let sender = self.viewers.lock().unwrap().get(&id).map(|v| v.sender.clone());
-        if let Some(sender) = sender {
+        let senders: Vec<_> = self.viewers.lock().unwrap().get(&id).map(|v| v.tracks.iter().map(|t| t.sender.clone()).collect()).unwrap_or_default();
+        for (slot, sender) in senders.into_iter().enumerate() {
             if let Ok(params) = sender.get_parameters().await {
                 let pt = params.rtp_parameters.codecs.first().map(|c| c.payload_type);
-                if let Some(v) = self.viewers.lock().unwrap().get_mut(&id) {
-                    v.payload_type = pt;
+                if let Some(t) = self.viewers.lock().unwrap().get_mut(&id).and_then(|v| v.tracks.get_mut(slot)) {
+                    t.payload_type = pt;
                 }
             }
         }
-        self.shared.need_key.store(true, Ordering::Relaxed);
+        self.shared.request_key();
     }
 
     pub async fn remove(&self, id: u32) {
@@ -433,7 +441,7 @@ impl Hub {
                     let _ = dc.send_text(&self.shared.state().to_string()).await;
                     self.announce_peers().await;
                     self.announce_clip().await;
-                    self.shared.need_key.store(true, Ordering::Relaxed);
+                    self.shared.request_key();
                 }
                 DataChannelEvent::OnMessage(msg) => {
                     if msg.data.len() <= 64 * 1024 {
@@ -470,7 +478,14 @@ impl Hub {
                     self.send_to(to as u32, &v).await;
                 }
             }
-            "keyframe" => self.shared.need_key.store(true, Ordering::Relaxed),
+            "keyframe" => self.shared.request_key(),
+            // how much room the viewer has for a window (device pixels) – for "best size"
+            "viewport" => {
+                let (w, h) = (v["w"].as_u64().unwrap_or(0).min(16384) as u32, v["h"].as_u64().unwrap_or(0).min(16384) as u32);
+                if w >= 200 && h >= 150 {
+                    self.shared.viewports.lock().unwrap().insert(id, (w, h));
+                }
+            }
             "clip-del" => {
                 if self.shared.clip.remove(v["id"].as_str().unwrap_or(""), id) {
                     self.shared.clip.changed.notify_one();
@@ -486,7 +501,7 @@ impl Hub {
                 self.broadcast(&v, Some(id)).await;
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
-            "ptr" | "draw" | "ping" | "clear" if mode != Mode::View => {
+            "ptr" | "draw" | "ping" | "clear" | "hide" if mode != Mode::View => {
                 self.broadcast(&v, Some(id)).await;
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
@@ -770,20 +785,23 @@ impl Hub {
 
     /// Encoded frames ([2, key, w, h] + Annex B) to every connected viewer's track.
     async fn video(self: Arc<Self>, mut frames: mpsc::Receiver<Vec<u8>>) {
-        let mut last = Instant::now();
+        let mut last = vec![Instant::now(); crate::video::MAX_STREAMS];
         while let Some(packet) = frames.recv().await {
-            if packet.len() < 7 || packet[0] != 2 {
+            if packet.len() < 8 || packet[0] != 3 {
                 continue;
             }
-            let duration = last.elapsed().min(Duration::from_millis(200));
-            last = Instant::now();
-            let data = Bytes::copy_from_slice(&packet[6..]);
+            let slot = packet[1] as usize;
+            let duration = last[slot.min(last.len() - 1)].elapsed().min(Duration::from_millis(200));
+            if let Some(l) = last.get_mut(slot) {
+                *l = Instant::now();
+            }
+            let data = Bytes::copy_from_slice(&packet[7..]);
             let targets: Vec<_> = self
                 .viewers
                 .lock()
                 .unwrap()
                 .values()
-                .filter_map(|v| v.payload_type.map(|pt| (v.track.clone(), v.ssrc, pt)))
+                .filter_map(|v| v.tracks.get(slot).and_then(|t| t.payload_type.map(|pt| (t.track.clone(), t.ssrc, pt))))
                 .collect();
             for (track, ssrc, pt) in targets {
                 let sample = Sample { data: data.clone(), duration, ..Sample::new(Instant::now()) };

@@ -1,7 +1,8 @@
 //! ScreenCaptureKit capture feeding the VideoToolbox encoder.
 //!
-//! A shared window is captured with a single-window filter: other windows, the desktop,
-//! notifications etc. are never part of the picture – even when they overlap the window.
+//! A shared window is captured as its area on the display with only its own app's windows in
+//! the filter: its dialogs, sheets and menus are part of the picture, while other apps' windows,
+//! the desktop, notifications etc. never are – even when they overlap the window.
 
 use std::{
     ffi::c_void,
@@ -17,7 +18,8 @@ use super::{
     vt::{RetainedBuffer, VtEncoder},
     Source, FPS, KEY_GAP,
 };
-use crate::{guard::Rect, session::Shared};
+use super::StreamCtl;
+use crate::guard::Rect;
 
 struct EncState {
     encoder: Option<VtEncoder>,
@@ -26,7 +28,7 @@ struct EncState {
     last_key: Instant,
     last_frame: Instant,
     frames: mpsc::Sender<Vec<u8>>,
-    shared: Arc<Shared>,
+    shared: Arc<StreamCtl>,
 }
 
 impl EncState {
@@ -36,7 +38,7 @@ impl EncState {
             let (frames, shared) = (self.frames.clone(), self.shared.clone());
             let sink = Box::new(move |data: Vec<u8>, key: bool| {
                 // network congested: drop, and recover with a fresh keyframe
-                if frames.try_send(packet(&data, key, w, h)).is_err() {
+                if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                     shared.need_key.store(true, Ordering::Relaxed);
                 }
             });
@@ -76,6 +78,40 @@ pub struct Video {
     stream: SCStream,
     state: Arc<Mutex<EncState>>,
     size: (u32, u32),
+    /// a shared window: its app (filter) and the display the area is cut from
+    window: Option<WindowArea>,
+}
+
+struct WindowArea {
+    id: u32,
+    display: Rect,
+    crop: Rect,
+}
+
+fn display_rect(d: &SCDisplay) -> Rect {
+    let f = d.frame();
+    Rect { x: f.origin.x as i32, y: f.origin.y as i32, w: f.size.width as i32, h: f.size.height as i32 }
+}
+
+/// Filter for a window: the display under its centre, only the window's app on it.
+fn window_filter(id: u32, rect: Rect) -> Result<(SCContentFilter, Rect), String> {
+    let content = SCShareableContent::get().map_err(|e| e.to_string())?;
+    let window = content.windows().into_iter().find(|w| w.window_id() == id).ok_or("Fenster nicht gefunden")?;
+    let app = window.owning_application().ok_or("Anwendung des Fensters nicht gefunden")?;
+    let (cx, cy) = (rect.x + rect.w / 2, rect.y + rect.h / 2);
+    let displays = content.displays();
+    let display = displays
+        .iter()
+        .find(|d| display_rect(d).contains(cx, cy))
+        .or(displays.first())
+        .ok_or("Bildschirm nicht gefunden")?;
+    let filter = SCContentFilter::create().with_display(display).with_including_applications(&[&app], &[]).build().map_err(|e| e.to_string())?;
+    Ok((filter, display_rect(display)))
+}
+
+/// The window's area relative to its display (points).
+fn crop(rect: Rect, display: Rect) -> Rect {
+    Rect { x: rect.x - display.x, y: rect.y - display.y, w: rect.w, h: rect.h }
 }
 
 fn scale_at(rect: Rect) -> f64 {
@@ -85,10 +121,12 @@ fn scale_at(rect: Rect) -> f64 {
         .unwrap_or(2.0)
 }
 
-fn config(size: (u32, u32)) -> Result<SCStreamConfiguration, String> {
-    SCStreamConfiguration::new()
-        .with_width(size.0)
-        .with_height(size.1)
+fn config(size: (u32, u32), crop: Option<Rect>) -> Result<SCStreamConfiguration, String> {
+    let mut cfg = SCStreamConfiguration::new().with_width(size.0).with_height(size.1);
+    if let Some(c) = crop {
+        cfg = cfg.with_source_rect(CGRect::new(c.x as f64, c.y as f64, c.w as f64, c.h as f64));
+    }
+    cfg
         .with_pixel_format(PixelFormat::YCbCr_420v)
         .with_fps(FPS)
         .with_queue_depth(6)
@@ -99,9 +137,10 @@ fn config(size: (u32, u32)) -> Result<SCStreamConfiguration, String> {
 }
 
 impl Video {
-    pub fn start(source: Source, rect: Rect, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
+    pub fn start(source: Source, rect: Rect, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
         let err = |e: SCError| format!("Bildschirmaufnahme nicht möglich ({e}). Bitte Bildschirmaufnahme in den Systemeinstellungen erlauben.");
         let content = SCShareableContent::get().map_err(err)?;
+        let mut area: Option<WindowArea> = None;
         let filter = match &source {
             Source::Screen(m) => {
                 let id = m.id().map_err(|e| e.to_string())?;
@@ -120,8 +159,9 @@ impl Video {
             }
             Source::Window(w) => {
                 let id = w.id().map_err(|e| e.to_string())?;
-                let window = content.windows().into_iter().find(|w| w.window_id() == id).ok_or("Fenster nicht gefunden")?;
-                SCContentFilter::create().with_window(&window).build()
+                let (filter, display) = window_filter(id, rect)?;
+                area = Some(WindowArea { id, display, crop: crop(rect, display) });
+                Ok(filter)
             }
         }
         .map_err(err)?;
@@ -136,10 +176,10 @@ impl Video {
             frames,
             shared,
         }));
-        let mut stream = SCStream::new(&filter, &config(size)?).map_err(err)?;
+        let mut stream = SCStream::new(&filter, &config(size, area.as_ref().map(|a| a.crop))?).map_err(err)?;
         stream.add_output_handler(Handler(state.clone()), SCStreamOutputType::Screen).map_err(err)?;
         stream.start_capture().map_err(err)?;
-        Ok(Video { stream, state, size })
+        Ok(Video { stream, state, size, window: area })
     }
 
     /// The shared area moved or was resized.
@@ -149,8 +189,24 @@ impl Video {
         }
         let scale = scale_at(rect);
         let size = output_size(rect.w as f64 * scale, rect.h as f64 * scale);
-        if size != self.size {
-            if let Ok(cfg) = config(size) {
+        // a shared window: follow it on its display (and to another display)
+        let mut crop_now = None;
+        if let Some(area) = self.window.as_mut() {
+            if !area.display.contains(rect.x + rect.w / 2, rect.y + rect.h / 2) {
+                if let Ok((filter, display)) = window_filter(area.id, rect) {
+                    if self.stream.update_content_filter(&filter).is_ok() {
+                        area.display = display;
+                    }
+                }
+            }
+            let c = crop(rect, area.display);
+            if c != area.crop {
+                area.crop = c;
+                crop_now = Some(c);
+            }
+        }
+        if size != self.size || crop_now.is_some() {
+            if let Ok(cfg) = config(size, self.window.as_ref().map(|a| a.crop)) {
                 if self.stream.update_configuration(&cfg).is_ok() {
                     self.size = size;
                 }

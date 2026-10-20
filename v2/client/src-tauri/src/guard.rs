@@ -1,4 +1,7 @@
-//! Keeps viewer input inside the shared window.
+//! Keeps viewer input inside the shared windows.
+//!
+//! A target is a shared window plus the process that owns it: the app's own dialogs, sheets and
+//! menus on top of the window count as part of it.
 //!
 //! Before any injected click/scroll we verify that the shared window is the topmost window
 //! at that screen point – it may lie in the background, but that spot must not be covered –
@@ -44,19 +47,23 @@ pub fn normal_window_ids() -> Option<std::collections::HashSet<u32>> {
     None
 }
 
-/// CGWindowID of our click-through overlay (macOS), which never blocks input.
+/// CGWindowIDs of our click-through overlays (macOS), which never block input.
 #[cfg(target_os = "macos")]
-pub static OVERLAY_WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+pub static OVERLAY_WINDOWS: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
+
+/// A shared window: (window id, owning process id).
+pub type Target = Option<(u32, i32)>;
 
 /// May viewer input land at screen point (x, y)? Never on one of PeekaView's own windows
-/// (toolbar, helpers); with a shared window (`target`) only if that window is topmost there.
-pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
-    imp::input_allowed(target, x, y)
+/// (toolbar, helpers); with a shared window (`target`) only if that window – or a dialog / menu
+/// of its app – is topmost there.
+pub fn input_allowed(target: Target, x: i32, y: i32) -> bool {
+    imp::any_allowed(target, &[(x, y)])
 }
 
 /// Can viewers reach the shared window at all, i.e. is some part of it not covered?
 /// Samples a grid over `rect`; always true for a shared screen.
-pub fn reachable(target: Option<u32>, rect: Rect) -> bool {
+pub fn reachable(target: Target, rect: Rect) -> bool {
     if target.is_none() {
         return true;
     }
@@ -69,9 +76,9 @@ pub fn reachable(target: Option<u32>, rect: Rect) -> bool {
 
 const GRID: usize = 5;
 
-/// Does `window_id` currently receive keyboard input?
-pub fn focused(window_id: u32) -> bool {
-    imp::focused(window_id)
+/// Does the shared window (or a dialog of its app on top of it) receive keyboard input?
+pub fn focused(target: (u32, i32)) -> bool {
+    imp::focused(target)
 }
 
 #[cfg(target_os = "macos")]
@@ -168,32 +175,30 @@ mod imp {
             .collect()
     }
 
-    pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
-        any_allowed(target, &[(x, y)])
-    }
-
     /// Is input allowed at any of the points? One window list for all of them.
-    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
+    pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
         let me = std::process::id() as i32;
-        let overlay = super::OVERLAY_WINDOW.load(std::sync::atomic::Ordering::Relaxed);
+        let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();
+        let is_overlay = |id: u32| overlays.contains(&id);
         let windows = list(false);
         let displays = if target.is_some() { displays() } else { Vec::new() };
         points.iter().any(|&(x, y)| {
             // never on one of our own windows (toolbar, helpers) – the overlay is click-through
-            if windows.iter().any(|w| w.pid == me && w.id != overlay && w.alpha > 0.0 && w.rect.contains(x, y)) {
+            if windows.iter().any(|w| w.pid == me && !is_overlay(w.id) && w.alpha > 0.0 && w.rect.contains(x, y)) {
                 return false;
             }
-            let Some(id) = target else { return true };
-            // front to back: the first visible window at that point must be the shared one
+            let Some((id, pid)) = target else { return true };
+            // front to back: the first visible window at that point must be the shared one or
+            // one of its app's dialogs / menus
             windows
                 .iter()
-                .filter(|w| w.alpha > 0.0 && w.id != overlay && !is_screen_overlay(w, &displays))
+                .filter(|w| w.alpha > 0.0 && !is_overlay(w.id) && !is_screen_overlay(w, &displays))
                 .find(|w| w.rect.contains(x, y))
-                .is_some_and(|w| w.id == id)
+                .is_some_and(|w| w.id == id || w.pid == pid)
         })
     }
 
-    pub fn focused(window_id: u32) -> bool {
+    pub fn focused((window_id, _): (u32, i32)) -> bool {
         let windows = list(false);
         let Some(target) = windows.iter().find(|w| w.id == window_id) else { return false };
         // the owning app must be the active one …
@@ -202,13 +207,16 @@ mod imp {
             .and_then(|all| all.into_iter().find(|w| w.id().ok() == Some(window_id)))
             .and_then(|w| w.is_focused().ok())
             .unwrap_or(false);
-        // … and within that app the shared window must be the frontmost normal window
+        // … and within that app the frontmost window must be the shared one or a dialog on it
         active
             && windows
                 .iter()
-                .find(|w| w.pid == target.pid && w.layer == 0 && w.alpha > 0.0 && w.rect.w > 50 && w.rect.h > 50)
-                .map(|w| w.id)
-                == Some(window_id)
+                .find(|w| w.pid == target.pid && w.layer >= 0 && w.alpha > 0.0 && w.rect.w > 50 && w.rect.h > 50)
+                .is_some_and(|w| w.id == window_id || overlaps(&w.rect, &target.rect))
+    }
+
+    fn overlaps(a: &Rect, b: &Rect) -> bool {
+        a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
     }
 }
 
@@ -226,7 +234,7 @@ mod imp {
         Some((rect, !win.is_minimized().unwrap_or(true)))
     }
 
-    pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
+    fn input_allowed(target: super::Target, x: i32, y: i32) -> bool {
         // WindowFromPoint skips click-through (layered + transparent) windows like our overlay.
         let root = unsafe { GetAncestor(WindowFromPoint(POINT { x, y }), GA_ROOT) };
         if root.is_null() {
@@ -234,16 +242,22 @@ mod imp {
         }
         let mut pid = 0u32;
         unsafe { GetWindowThreadProcessId(root, &mut pid) };
-        pid != std::process::id() && target.is_none_or(|id| root as usize as u32 == id)
+        // the shared window itself or a dialog / menu of its process
+        pid != std::process::id() && target.is_none_or(|(id, owner)| root as usize as u32 == id || pid as i32 == owner)
     }
 
-    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
+    pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
         points.iter().any(|&(x, y)| input_allowed(target, x, y))
     }
 
-    pub fn focused(window_id: u32) -> bool {
+    pub fn focused((window_id, owner): (u32, i32)) -> bool {
         let fg = unsafe { GetForegroundWindow() };
-        !fg.is_null() && fg as usize as u32 == window_id
+        if fg.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(fg, &mut pid) };
+        fg as usize as u32 == window_id || pid as i32 == owner
     }
 }
 
@@ -256,7 +270,7 @@ mod imp {
         Some((rect, !win.is_minimized().unwrap_or(true)))
     }
 
-    pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
+    fn input_allowed(target: super::Target, x: i32, y: i32) -> bool {
         let me = std::process::id();
         let Ok(mut all) = xcap::Window::all() else { return false };
         all.sort_by_key(|w| std::cmp::Reverse(w.z().unwrap_or(i32::MIN)));
@@ -275,15 +289,15 @@ mod imp {
             });
         match top {
             None => target.is_none(),
-            Some(w) => w.pid().ok() != Some(me) && target.is_none_or(|id| w.id().ok() == Some(id)),
+            Some(w) => w.pid().ok() != Some(me) && target.is_none_or(|(id, owner)| w.id().ok() == Some(id) || w.pid().ok() == Some(owner as u32)),
         }
     }
 
-    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
+    pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
         points.iter().any(|&(x, y)| input_allowed(target, x, y))
     }
 
-    pub fn focused(window_id: u32) -> bool {
+    pub fn focused((window_id, _): (u32, i32)) -> bool {
         xcap::Window::all()
             .ok()
             .and_then(|all| all.into_iter().find(|w| w.id().ok() == Some(window_id)))
@@ -312,8 +326,9 @@ mod tests {
         println!("app={:?} title={:?} pid={:?} xcap focused={:?}", win.app_name(), win.title(), win.pid(), win.is_focused());
         let (rect, visible) = super::window_geometry(&win).unwrap();
         let (cx, cy) = rect.point(0.5, 0.6);
-        println!("window {id} {rect:?} visible={visible} focused={}", super::focused(id));
-        println!("input_allowed(center)={} reachable={}", super::input_allowed(Some(id), cx, cy), super::reachable(Some(id), rect));
+        let target = (id, win.pid().unwrap_or(0) as i32);
+        println!("window {id} {rect:?} visible={visible} focused={}", super::focused(target));
+        println!("input_allowed(center)={} reachable={}", super::input_allowed(Some(target), cx, cy), super::reachable(Some(target), rect));
         for w in super::imp::list(false).iter().filter(|w| w.rect.contains(cx, cy)) {
             println!("  at center: id={} pid={} layer={} alpha={} {:?}", w.id, w.pid, w.layer, w.alpha, w.rect);
         }

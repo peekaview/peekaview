@@ -6,23 +6,60 @@
 </head>
 <body class="overlay">
   <div id="root"></div>
-  <div id="badge" class="badge" hidden></div>
+  <div id="badge" class="badge" hidden>
+    <span id="badge-label"></span>
+    <button id="fit" class="fit" title="Fenster auf die beste Größe für die Zuschauer bringen – ohne Skalierung, Schrift bleibt scharf" hidden></button>
+  </div>
   <script type="module">
+    // Red frame + annotations on top of one shared window (?w=<slot>). Click-through, except the
+    // badge's button while the pointer is over it.
     import { Annotations } from '../annotate.js'
     import { icon } from '../icons.js'
 
+    const { invoke } = window.__TAURI__.core
+    const slot = Number(new URLSearchParams(location.search).get('w') ?? 0)
     const ann = new Annotations(document.getElementById('root'))
     const badge = document.getElementById('badge')
-    badge.innerHTML = `${icon('share', 13)}Wird geteilt`
+    const label = document.getElementById('badge-label')
+    const fit = document.getElementById('fit')
+    fit.innerHTML = icon('fit', 13)
+    let live = false
+    let recording = false
+    let kind = 'window'
+
+    const paint = (text) => {
+      label.innerHTML = `${icon(recording ? 'record' : 'share', 13)}<span></span>`
+      label.querySelector('span').textContent = text ?? (recording ? 'Wird geteilt · Aufnahme läuft' : 'Wird geteilt')
+      badge.hidden = !live
+      fit.hidden = !live || kind !== 'window'
+    }
+
+    fit.addEventListener('click', async () => {
+      try {
+        await invoke('fit_window', { w: slot })
+        paint('Größe angepasst')
+      } catch (e) {
+        paint(String(e))
+      }
+      setTimeout(() => paint(), 3500)
+    })
 
     window.__TAURI__.event.listen('pv', (e) => {
       try {
         const m = JSON.parse(e.payload)
+        // messages about one window carry its slot
+        if (m.w != null && m.w !== slot) return
         if (m.t === 'frame') {
-          badge.hidden = !m.live
-          badge.innerHTML = m.recording ? `${icon('record', 13)}Wird geteilt · Aufnahme läuft` : `${icon('share', 13)}Wird geteilt`
+          live = !!m.live
+          recording = !!m.recording
+          paint()
+        } else if (m.t === 'state') {
+          kind = (m.windows ?? []).find((w) => w.w === slot)?.kind ?? kind
+          paint()
+        } else if (m.t === 'reset') {
+          live = false
+          paint()
         }
-        else if (m.t === 'reset') badge.hidden = true
         ann.handle(m)
       } catch (err) {
         console.error(err)

@@ -46,7 +46,8 @@ use windows::{
 };
 
 use super::{output_size, packet, Source, FPS, KEY_GAP};
-use crate::{guard::Rect, session::Shared};
+use super::StreamCtl;
+use crate::guard::Rect;
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -60,7 +61,7 @@ pub struct Video {
 }
 
 impl Video {
-    pub fn start(source: Source, _rect: Rect, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self> {
+    pub fn start(source: Source, _rect: Rect, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = std_mpsc::channel();
         let thread = {
@@ -113,7 +114,7 @@ struct Pipeline {
     pool_size: SizeInt32,
     converter: Option<Converter>,
     encoder: Option<Encoder>,
-    shared: Arc<Shared>,
+    shared: Arc<StreamCtl>,
     frames: mpsc::Sender<Vec<u8>>,
     dirty: bool,
     have_frame: bool,
@@ -165,7 +166,7 @@ fn capture_item(source: &Source) -> Result<GraphicsCaptureItem> {
 }
 
 impl Pipeline {
-    fn new(source: &Source, shared: Arc<Shared>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self> {
+    fn new(source: &Source, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self> {
         let (device, context) = create_device()?;
         let dxgi: IDXGIDevice = device.cast().map_err(err("DXGI"))?;
         let winrt_device: IDirect3DDevice = unsafe { CreateDirect3D11DeviceFromDXGIDevice(&dxgi) }
@@ -269,7 +270,7 @@ impl Pipeline {
         let (frames, shared) = (&self.frames, &self.shared);
         let (w, h) = (encoder.width as usize, encoder.height as usize);
         let mut sink = |data: Vec<u8>, key: bool| {
-            if frames.try_send(packet(&data, key, w, h)).is_err() {
+            if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                 shared.need_key.store(true, Ordering::Relaxed);
             }
         };
@@ -285,7 +286,7 @@ impl Pipeline {
         let (frames, shared) = (&self.frames, &self.shared);
         let (w, h) = (encoder.width as usize, encoder.height as usize);
         let mut sink = |data: Vec<u8>, key: bool| {
-            if frames.try_send(packet(&data, key, w, h)).is_err() {
+            if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                 shared.need_key.store(true, Ordering::Relaxed);
             }
         };

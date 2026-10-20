@@ -1,6 +1,7 @@
-//! Injects viewer input – only in control mode and only into the shared area.
+//! Injects viewer input – only in control mode and only into the shared windows.
 //!
-//! * Coordinates are clamped to the shared rect, so a drag can never leave it.
+//! * Every message names the shared window it is meant for ("w"); coordinates are relative to
+//!   it and clamped to its rect, so a drag can never leave it.
 //! * For a shared window, a click/scroll is only performed if that window is the topmost one at
 //!   that point (it may lie in the background, but that spot must not be covered), and keystrokes
 //!   only if the shared window has the keyboard focus – which a viewer's click into it gives it.
@@ -24,7 +25,7 @@ use serde_json::{json, Value};
 
 use crate::{
     clip::os,
-    guard,
+    guard::{self, Target},
     session::{Mode, Shared},
 };
 
@@ -45,8 +46,8 @@ pub enum Cmd {
 struct Controller {
     shared: Arc<Shared>,
     enigo: Option<Enigo>,
-    /// viewer id + button currently held down on their behalf
-    pressed: Option<(u64, Button)>,
+    /// viewer id + button currently held down on their behalf + the window (slot) it is in
+    pressed: Option<(u64, Button, u8)>,
     /// last "blocked" notice per viewer (at most one every NOTICE_GAP)
     noticed: std::collections::HashMap<u64, Instant>,
 }
@@ -61,10 +62,7 @@ pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
             match cmd {
                 Cmd::Release => c.release(),
                 Cmd::Input(v) => {
-                    if c.shared.mode() != Mode::Control
-                        || c.shared.stop.load(Ordering::Relaxed)
-                        || !c.shared.visible.load(Ordering::Relaxed)
-                    {
+                    if c.shared.mode() != Mode::Control || c.shared.stop.load(Ordering::Relaxed) {
                         c.release();
                     } else {
                         c.handle(&v);
@@ -93,7 +91,7 @@ impl Controller {
     }
 
     fn release(&mut self) {
-        if let Some((_, button)) = self.pressed.take() {
+        if let Some((_, button, _)) = self.pressed.take() {
             if let Some(e) = self.enigo() {
                 let _ = e.button(button, Direction::Release);
             }
@@ -127,8 +125,8 @@ impl Controller {
     }
 
     /// May a click / scroll of viewer `from` land at screen point (x, y)?
-    fn point_allowed(&mut self, from: u64, x: i32, y: i32) -> bool {
-        let ok = guard::input_allowed(self.shared.window_id(), x, y);
+    fn point_allowed(&mut self, from: u64, target: Target, x: i32, y: i32) -> bool {
+        let ok = guard::input_allowed(target, x, y);
         if !ok {
             crate::log(&format!("control: dropped at {x},{y} – covered or outside the shared window"));
             self.notice(from, "covered");
@@ -136,8 +134,8 @@ impl Controller {
         ok
     }
 
-    fn keyboard_allowed(&mut self, from: u64) -> bool {
-        let ok = self.shared.window_id().is_none_or(guard::focused);
+    fn keyboard_allowed(&mut self, from: u64, target: Target) -> bool {
+        let ok = target.is_none_or(guard::focused);
         if !ok {
             crate::log("control: keyboard dropped – shared window has no focus");
             self.notice(from, "focus");
@@ -150,9 +148,18 @@ impl Controller {
         if from == 0 {
             return;
         }
-        let rect = *self.shared.rect.lock().unwrap();
+        // the window the message is about; a drag stays in the window it started in
+        let pressed_by_sender = self.pressed.is_some_and(|(id, ..)| id == from);
+        let stream = match self.pressed.filter(|_| pressed_by_sender) {
+            Some((_, _, slot)) => self.shared.stream(slot),
+            None => self.shared.stream_of(v),
+        };
+        let Some(stream) = stream.filter(|s| s.visible()) else {
+            self.release();
+            return;
+        };
+        let (rect, target) = (stream.rect, stream.target());
         let point = || rect.point(v["x"].as_f64().unwrap_or(f64::NAN), v["y"].as_f64().unwrap_or(f64::NAN));
-        let pressed_by_sender = self.pressed.is_some_and(|(id, _)| id == from);
 
         match v["t"].as_str().unwrap_or("") {
             "ptr" if pressed_by_sender => {
@@ -160,26 +167,26 @@ impl Controller {
                 self.move_to(x, y);
             }
             "left" => {
-                if self.pressed.is_some_and(|(id, _)| Some(id) == v["id"].as_u64()) {
+                if self.pressed.is_some_and(|(id, ..)| Some(id) == v["id"].as_u64()) {
                     self.release();
                 }
             }
             "mouse" => match v["a"].as_str() {
                 Some("down") if self.pressed.is_none() => {
                     let (x, y) = point();
-                    if !self.point_allowed(from, x, y) {
+                    if !self.point_allowed(from, target, x, y) {
                         return;
                     }
                     let button = if v["b"].as_u64() == Some(2) { Button::Right } else { Button::Left };
                     self.move_to(x, y);
                     if let Some(e) = self.enigo() {
                         if e.button(button, Direction::Press).is_ok() {
-                            self.pressed = Some((from, button));
+                            self.pressed = Some((from, button, stream.slot));
                         }
                     }
                     if let Some(rec) = self.shared.recorder() {
-                        let pos = ((x - rect.x) as f64 / rect.w.max(1) as f64, (y - rect.y) as f64 / rect.h.max(1) as f64);
-                        rec.shot(format!("Klick – {}", rec.name(from)), Some(pos));
+                        rec.set_source(stream.source.clone());
+                        rec.shot(format!("Klick – {}", rec.name(from)), Some(stream.normalize(x, y)));
                     }
                 }
                 Some("up") if pressed_by_sender => {
@@ -191,7 +198,7 @@ impl Controller {
             },
             "wheel" if self.pressed.is_none() => {
                 let (x, y) = point();
-                if !self.point_allowed(from, x, y) {
+                if !self.point_allowed(from, target, x, y) {
                     return;
                 }
                 self.move_to(x, y);
@@ -206,11 +213,11 @@ impl Controller {
                     }
                 }
             }
-            "paste" => self.paste(from, v),
-            "copy" => self.copy(from, v),
+            "paste" => self.paste(from, target, v),
+            "copy" => self.copy(from, target, v),
             "text" => {
                 let text: String = v["s"].as_str().unwrap_or("").chars().take(MAX_TEXT).collect();
-                if !text.is_empty() && self.keyboard_allowed(from) {
+                if !text.is_empty() && self.keyboard_allowed(from, target) {
                     self.injected();
                     if let Some(e) = self.enigo() {
                         let _ = e.text(&text);
@@ -228,7 +235,7 @@ impl Controller {
                     return;
                 }
                 let Some(key) = key_of(name) else { return };
-                if !self.keyboard_allowed(from) {
+                if !self.keyboard_allowed(from, target) {
                     return;
                 }
                 let mut mods = Vec::new();
@@ -277,8 +284,8 @@ impl Controller {
     }
 
     /// `{t:'paste', text?, html?, textItem?, items?: [clipboard ids]}`: onto the clipboard, then ⌘V / Ctrl+V.
-    fn paste(&mut self, from: u64, v: &Value) {
-        if !self.keyboard_allowed(from) {
+    fn paste(&mut self, from: u64, target: Target, v: &Value) {
+        if !self.keyboard_allowed(from, target) {
             return;
         }
         let ids: Vec<&str> = v["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str()).collect();
@@ -307,7 +314,7 @@ impl Controller {
 
     /// `{t:'copy', req, cut}`: ⌘C / ⌘X (Ctrl elsewhere) in the shared window, then the
     /// clipboard content back to that viewer as `{t:'copied', req, …}`.
-    fn copy(&mut self, from: u64, v: &Value) {
+    fn copy(&mut self, from: u64, target: Target, v: &Value) {
         let req = v["req"].clone();
         let reply = |shared: &Shared, body: Value| {
             let mut msg = json!({ "t": "copied", "to": from, "req": req });
@@ -316,7 +323,7 @@ impl Controller {
             }
             shared.send(msg);
         };
-        if !self.keyboard_allowed(from) {
+        if !self.keyboard_allowed(from, target) {
             return reply(&self.shared, json!({ "empty": true }));
         }
         let before = os::change_count();

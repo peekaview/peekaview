@@ -15,7 +15,7 @@ const PREVIEW_MAX = 46 * 1024
 const STYLE = `
 .pv-clip {
   --c-bg: #09090b; --c-raised: #27272a; --c-fg: #fafafa; --c-muted: #a1a1aa; --c-line: rgba(255, 255, 255, .09); --c-accent: #ef4444;
-  position: absolute; z-index: 5; display: flex; flex-direction: column; width: 340px; max-width: calc(100% - 24px); height: 440px; max-height: calc(100% - 24px);
+  position: absolute; z-index: 100001; display: flex; flex-direction: column; width: 340px; max-width: calc(100% - 24px); height: 440px; max-height: calc(100% - 24px);
   border-radius: 16px; background: rgba(24, 24, 27, .92); border: 1px solid var(--c-line); color: var(--c-fg);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 16px 40px rgba(0, 0, 0, .45);
   font: 500 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; user-select: none; outline: none;

@@ -81,10 +81,20 @@ Everybody can join the **voice chat** from the microphone button. The label next
 
 Cursors and strokes appear for every viewer. They also appear on the presenter's desktop in a click-through overlay that never shows up in captures.
 
+**Sharing several windows**
+- In the picker, click several windows to share them together, up to six. A screen is always shared on its own.
+- **Separate pictures:** each window is its own video stream with its own red frame. Pointing, drawing and control always refer to one window.
+- **Viewer layout:** viewers get a small window manager, only in their browser. They can move windows, scale them proportionally, minimize, maximize and arrange them side by side. The dock lists all windows for switching between them. The presenter's windows stay as they are.
+- **Sharp pictures:** pictures are never enlarged beyond one video pixel per screen pixel, so text stays sharp. They only get smaller when the browser window is too small.
+- **Best size:** the badge of each red frame has a button that resizes the window on the presenter's screen to the room the viewers have. The picture then needs no scaling.
+- **Windows can change while sharing:** joining or leaving windows never interrupt the connection. Every connection carries one video track per slot.
+
 **Sharing a single window**
-- **Picture:** only that window is captured (ScreenCaptureKit single-window filter / Windows.Graphics.Capture for the window).
+- **Picture:** only that window is captured, together with its own dialogs, sheets and menus. Other apps' windows never show, even when they lie on top of it.
+  - macOS: ScreenCaptureKit, the window's area with only its app in the filter.
+  - Windows: Windows.Graphics.Capture for the window; dialogs are separate windows there and are not part of the picture yet.
 - **Input:** lands only **inside the window** and only where it is **not covered**. The window may lie in the background.
-  - A click goes through only where the shared window is the topmost window at that spot. Clicks never land on other windows or on PeekaView's own windows.
+  - A click goes through only where the shared window is the topmost window at that spot, or a dialog or menu of the same app. Clicks never land on other apps' windows or on PeekaView's own windows.
   - Drags are clamped to the window.
   - Keystrokes go through only while it has the focus. A viewer's click into the window gives it the focus.
   - Shortcuts that switch apps are dropped.

@@ -8,7 +8,8 @@
 // encrypted with the room secret), then video (WebRTC H.264, decoded in hardware), pointer, ink,
 // remote control and voice flow directly between the participants. No server of our own.
 
-import { Annotations, injectStyle } from './annotate.js'
+import { injectStyle } from './annotate.js'
+import { WindowManager } from './windows.js'
 import { icon } from './icons.js'
 import { Voice } from './voice.js'
 import { Signaling, parseRoom } from './signal.js'
@@ -35,7 +36,7 @@ const CSS = `
 .pv-glass { background: var(--pv-glass); border: 1px solid var(--pv-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
 .pv-stage { position: absolute; inset: 0; display: grid; place-items: center; }
 .pv-view { position: relative; touch-action: none; }
-.pv-view[data-tool="draw"] { cursor: crosshair; }
+.pv-viewer[data-tool="draw"] .pv-view { cursor: crosshair; }
 .pv-screen, .pv-ann { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pv-screen { object-fit: fill; background: #000; pointer-events: none; }
 .pv-top { position: absolute; top: 12px; left: 12px; right: 140px; display: flex; gap: 8px; pointer-events: none; }
@@ -54,6 +55,8 @@ const CSS = `
 .pv-dock button.live { background: #16a34a; color: #fff; }
 .pv-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 14px; }
 .pv-dock.placed { transform: none; bottom: auto; }
+/* controls always above the shared windows (they climb up when focused) */
+.pv-top, .pv-peers, .pv-dock, .pv-toast, .pv-notice { z-index: 100000; }
 .pv-dock.collapsed > :not(.pv-grip):not(.pv-fold) { display: none !important; }
 .pv-dock .pv-grip { width: 18px; margin-right: -2px; color: var(--pv-muted); cursor: grab; touch-action: none; }
 .pv-dock .pv-grip:active { cursor: grabbing; }
@@ -63,6 +66,12 @@ const CSS = `
 .pv-dock.dragging button::after { display: none; }
 .pv-dock button[data-count]::before { content: attr(data-count); position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--pv-accent); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; }
 .pv-dock button.open { background: rgba(255, 255, 255, .14); }
+.pv-tasks { display: flex; align-items: center; gap: 3px; }
+.pv-dock .pv-task { width: auto; max-width: 150px; gap: 7px; padding: 0 10px 0 7px; grid-auto-flow: column; color: var(--pv-muted); }
+.pv-dock .pv-task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.pv-dock .pv-task i { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; color: #fff; font: 700 9px/1 system-ui, sans-serif; font-style: normal; }
+.pv-dock .pv-task.active { color: var(--pv-fg); background: rgba(255, 255, 255, .1); }
+.pv-dock .pv-task.min { opacity: .5; }
 .pv-toast { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); color: #fde68a; pointer-events: none; animation: pv-in .2s ease-out; }
 @keyframes pv-in { from { opacity: 0; transform: translate(-50%, -4px); } }
 .pv-dock button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--pv-fg); cursor: pointer; transition: background .15s, color .15s, opacity .15s; }
@@ -91,7 +100,6 @@ export function mountViewer(el, options) {
   el.classList.add('pv-viewer')
   el.innerHTML = `
     <div class="pv-stage">
-      <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-ann"></div></div>
       <div class="pv-notice pv-glass"><span class="pv-spinner"></span><span class="pv-notice-text"></span></div>
     </div>
     <div class="pv-top">
@@ -104,6 +112,9 @@ export function mountViewer(el, options) {
     <ul class="pv-peers"></ul>
     <div class="pv-dock pv-glass">
       <button class="pv-grip" data-tip="Verschieben">${icon('grip', 16)}</button>
+      <span class="pv-tasks"></span>
+      <button data-tile data-tip="Fenster nebeneinander">${icon('tile')}</button>
+      <span class="pv-sep pv-tasks-sep"></span>
       <button data-tool="point" data-tip="Zeigen">${icon('point')}</button>
       <button data-tool="draw" data-tip="Malen">${icon('draw')}</button>
       <button data-tool="control" data-tip="Steuern">${icon('control')}</button>
@@ -116,10 +127,20 @@ export function mountViewer(el, options) {
     <textarea class="pv-keys" aria-hidden="true" tabindex="-1" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>`
   const q = (s) => el.querySelector(s)
   const stage = q('.pv-stage')
-  const view = q('.pv-view')
-  const screen = q('.pv-screen')
+
   const keys = q('.pv-keys')
-  const ann = new Annotations(q('.pv-ann'), { voice: voiceEnabled })
+  // every shared window in a frame of its own (or alone, as large as possible)
+  const wm = new WindowManager(stage, {
+    voice: voiceEnabled,
+    onChange: () => renderTasks(),
+    onFrame: () => {
+      if (!hasFrame) {
+        hasFrame = true
+        update()
+      }
+      reportViewport()
+    },
+  })
   q('.pv-top').hidden = !toolbar
   q('.pv-dock').hidden = !toolbar
   q('.pv-peers').hidden = !peers
@@ -237,9 +258,11 @@ export function mountViewer(el, options) {
     pc = new RTCPeerConnection({ iceServers: Array.isArray(m.ice) ? m.ice : [] })
     // trickle ICE: candidates go out as soon as they are found
     pc.onicecandidate = (e) => e.candidate && signaling.send({ type: 'candidate', from: peerId, to: 'host', candidate: e.candidate.toJSON() })
+    // one video track per shared-window slot, stream id "w<slot>"
     pc.ontrack = (e) => {
-      screen.srcObject = e.streams[0] ?? new MediaStream([e.track])
-      screen.play().catch(() => {})
+      const stream = e.streams[0] ?? new MediaStream([e.track])
+      const slot = Number(/^w(\d+)$/.exec(stream.id)?.[1] ?? 0)
+      wm.setStream(slot, stream)
     }
     pc.ondatachannel = (e) => (e.channel.label === 'pvfile' ? (files = new FileChannel(e.channel)) : channel(e.channel))
     pc.onconnectionstatechange = () => {
@@ -260,6 +283,8 @@ export function mountViewer(el, options) {
   function channel(channel) {
     dc = channel
     dc.onopen = () => {
+      lastViewport = ''
+      reportViewport()
       clearInterval(helloTimer)
       clearTimeout(blockTimer)
       blocked = false
@@ -308,7 +333,7 @@ export function mountViewer(el, options) {
     state = { mode: 'view' }
     voice.stop()
     resetVideo()
-    ann.reset()
+    wm.setWindows([])
     clipItems = []
     clipPanel?.setItems([])
     update()
@@ -328,7 +353,8 @@ export function mountViewer(el, options) {
         // when remote control is granted, switch straight to the control tool
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
-        ann.handle(m)
+        wm.setWindows(m.windows ?? [], { control: m.mode === 'control' })
+        wm.handle(m)
         break
       case 'peers':
         hostPresent = m.list.some((p) => p.host)
@@ -337,7 +363,7 @@ export function mountViewer(el, options) {
         renderPeers(m.list)
         voice.setPeers(m.list)
         onPeers?.(m.list)
-        ann.handle(m)
+        wm.handle(m)
         break
       case 'end':
         lost()
@@ -362,7 +388,7 @@ export function mountViewer(el, options) {
         toast(m.why === 'focus' ? 'Zum Tippen zuerst in das geteilte Fenster klicken.' : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.')
         return
       default:
-        ann.handle(m)
+        wm.handle(m)
     }
     update()
   }
@@ -371,18 +397,56 @@ export function mountViewer(el, options) {
 
   function resetVideo() {
     hasFrame = false
-    screen.srcObject = null
   }
 
-  const firstFrame = () => {
-    fit()
-    if (!hasFrame) {
+  // the presenter can size a shared window to the room we have (sharp, unscaled picture)
+  let viewportTimer
+  let lastViewport = ''
+  function reportViewport() {
+    clearTimeout(viewportTimer)
+    viewportTimer = setTimeout(() => {
+      const v = wm.viewport()
+      const key = `${v.w}x${v.h}`
+      if (key !== lastViewport && dc?.readyState === 'open') {
+        lastViewport = key
+        send({ t: 'viewport', ...v })
+      }
+    }, 400)
+  }
+  const stageObserver = new ResizeObserver(reportViewport)
+  stageObserver.observe(stage)
+
+  function renderTasks() {
+    const wins = wm.list
+    const many = wins.length > 1
+    q('.pv-tasks').hidden = !many
+    q('[data-tile]').hidden = !many
+    q('.pv-tasks-sep').hidden = !many
+    q('.pv-tasks').replaceChildren(
+      ...(many ? wins : []).map((win) => {
+        const b = document.createElement('button')
+        b.className = 'pv-task'
+        b.classList.toggle('active', wm.active === win.slot && !win.min)
+        b.classList.toggle('min', win.min)
+        const name = win.info.kind === 'window' ? win.info.app || win.info.title : win.info.title
+        b.innerHTML = '<i></i><span></span>'
+        b.querySelector('i').textContent = (name || '?').slice(0, 1).toUpperCase()
+        b.querySelector('i').style.background = win.el.querySelector('.pv-win-app').style.background
+        b.querySelector('span').textContent = name || 'Fenster'
+        b.dataset.tip = win.info.kind === 'window' ? `${win.info.app} – ${win.info.title}` : win.info.title
+        b.addEventListener('click', () => {
+          wm.toggle(win.slot)
+          renderTasks()
+        })
+        return b
+      }),
+    )
+    if (!hasFrame && wm.hasFrame) {
       hasFrame = true
       update()
     }
   }
-  screen.addEventListener('loadeddata', firstFrame)
-  screen.addEventListener('resize', firstFrame)
+  q('[data-tile]').addEventListener('click', () => wm.tile())
 
   // ------------------------------------------------------------ ui
 
@@ -466,7 +530,7 @@ export function mountViewer(el, options) {
 
   function setTool(t) {
     tool = t
-    view.dataset.tool = t
+    el.dataset.tool = t
     for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.classList.toggle('active', b.dataset.tool === t)
     if (t === 'control') keys.focus({ preventScroll: true })
     else keys.blur()
@@ -475,7 +539,7 @@ export function mountViewer(el, options) {
   function clear() {
     if (!me) return
     send({ t: 'clear' })
-    ann.clear(me.id)
+    wm.clearOwn(me.id)
   }
 
   function renderPeers(list) {
@@ -491,19 +555,6 @@ export function mountViewer(el, options) {
       }),
     )
   }
-
-  function fit() {
-    const W = screen.videoWidth || 16
-    const H = screen.videoHeight || 9
-    const r = stage.getBoundingClientRect()
-    // never enlarged beyond one video pixel per screen pixel (sharp text), only made smaller
-    // when the browser window is too small
-    const s = Math.min(r.width / W, r.height / H, 1 / (window.devicePixelRatio || 1))
-    view.style.width = `${Math.floor(W * s)}px`
-    view.style.height = `${Math.floor(H * s)}px`
-  }
-  const resizeObserver = new ResizeObserver(fit)
-  resizeObserver.observe(stage)
 
   for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool))
   q('[data-clear]').addEventListener('click', clear)
@@ -589,7 +640,7 @@ export function mountViewer(el, options) {
         resolve({ empty: true, timeout: true })
       }, 5000)
     })
-    send({ t: 'copy', req, cut })
+    send({ t: 'copy', req, cut, w: wm.active })
     const text = reply.then(async (r) => {
       if (r.text != null) return r.text
       if (r.textItem && files) return (await files.download({ id: r.textItem, size: 0, mime: 'text/plain' })).text()
@@ -634,15 +685,15 @@ export function mountViewer(el, options) {
       if (text || html) {
         if (text.length > 60000 && files) {
           const id = await files.upload(new File([text], 'Text.txt', { type: 'text/plain' }), { hidden: true })
-          return send({ t: 'paste', textItem: id })
+          return send({ t: 'paste', textItem: id, w: wm.active })
         }
-        return send({ t: 'paste', text, html: html && html.length <= 60000 ? html : undefined })
+        return send({ t: 'paste', text, html: html && html.length <= 60000 ? html : undefined, w: wm.active })
       }
       if (list.length && files) {
         toast(list.length === 1 ? `„${list[0].name}“ wird übertragen …` : `${list.length} Dateien werden übertragen …`)
         const items = []
         for (const file of list) items.push(await files.upload(file, { hidden: true }))
-        send({ t: 'paste', items })
+        send({ t: 'paste', items, w: wm.active })
       }
     } catch (err) {
       toast(String(err?.message ?? err))
@@ -721,69 +772,74 @@ export function mountViewer(el, options) {
 
   // ------------------------------------------------------------ pointer
 
-  const pos = (e) => {
-    const r = view.getBoundingClientRect()
-    const c = (v) => Math.min(1, Math.max(0, v))
-    return { x: c((e.clientX - r.left) / r.width), y: c((e.clientY - r.top) / r.height) }
-  }
   const active = () => me && hostPresent && (TOOLS[state.mode] ?? []).includes(tool)
-  let down = false
+  // the window a press started in keeps the gesture (drawing, dragging) until release
+  let down = null
+  let hover = null
   let lastMove = 0
 
-  view.addEventListener('pointerdown', (e) => {
-    if (!active()) return
+  stage.addEventListener('pointerdown', (e) => {
+    const win = wm.at(e)
+    if (!win || !active()) return
     e.preventDefault()
-    view.setPointerCapture(e.pointerId)
-    down = true
-    const p = pos(e)
+    e.target.setPointerCapture?.(e.pointerId)
+    down = win
+    const p = { ...wm.pos(win, e), w: win.slot }
     if (tool === 'point') {
       send({ t: 'ping', ...p })
-      ann.ping(me.id, p.x, p.y)
+      win.ann.ping(me.id, p.x, p.y)
     } else if (tool === 'draw') {
       send({ t: 'draw', s: 'start', ...p })
-      ann.draw(me.id, 'start', p.x, p.y)
+      win.ann.draw(me.id, 'start', p.x, p.y)
     } else {
       keys.focus({ preventScroll: true })
       send({ t: 'mouse', a: 'down', b: e.button === 2 ? 2 : 0, ...p })
     }
   })
 
-  view.addEventListener('pointermove', (e) => {
+  stage.addEventListener('pointermove', (e) => {
     if (!active()) return
+    const win = down ?? wm.at(e)
+    // left a window: its cursor disappears there
+    if (!down && hover && hover !== win) send({ t: 'hide', w: hover.slot })
+    hover = down ? hover : win
+    if (!win) return
     const now = performance.now()
     if (now - lastMove < (tool === 'draw' && down ? 16 : 33)) return
     lastMove = now
-    const p = pos(e)
+    const p = { ...wm.pos(win, e), w: win.slot }
     if (tool === 'draw' && down) {
       send({ t: 'draw', s: 'move', ...p })
-      ann.draw(me.id, 'move', p.x, p.y)
+      win.ann.draw(me.id, 'move', p.x, p.y)
     } else {
       send({ t: 'ptr', ...p })
     }
   })
 
   const release = (e) => {
-    if (!down) return
-    down = false
+    const win = down
+    if (!win) return
+    down = null
     if (!active()) return
-    const p = pos(e)
+    const p = { ...wm.pos(win, e), w: win.slot }
     if (tool === 'draw') {
       send({ t: 'draw', s: 'end', ...p })
-      ann.draw(me.id, 'end', p.x, p.y)
+      win.ann.draw(me.id, 'end', p.x, p.y)
     } else if (tool === 'control') {
       send({ t: 'mouse', a: 'up', ...p })
     }
   }
-  view.addEventListener('pointerup', release)
-  view.addEventListener('pointercancel', release)
-  view.addEventListener('contextmenu', (e) => active() && e.preventDefault())
+  stage.addEventListener('pointerup', release)
+  stage.addEventListener('pointercancel', release)
+  stage.addEventListener('contextmenu', (e) => active() && wm.at(e) && e.preventDefault())
 
   let wheelX = 0
   let wheelY = 0
-  view.addEventListener(
+  stage.addEventListener(
     'wheel',
     (e) => {
-      if (!active() || tool !== 'control') return
+      const win = wm.at(e)
+      if (!win || !active() || tool !== 'control') return
       e.preventDefault()
       const f = e.deltaMode === 1 ? 40 : 1
       wheelX += e.deltaX * f
@@ -793,7 +849,7 @@ export function mountViewer(el, options) {
       if (!dx && !dy) return
       wheelX -= dx * 50
       wheelY -= dy * 50
-      send({ t: 'wheel', dx, dy, ...pos(e) })
+      send({ t: 'wheel', dx, dy, ...wm.pos(win, e), w: win.slot })
     },
     { passive: false },
   )
@@ -815,12 +871,12 @@ export function mountViewer(el, options) {
     if ((cmd && key === 'v') || (!isMac && e.shiftKey && key === 'insert')) return
     if (!cmd && e.key.length === 1) return
     e.preventDefault()
-    send({ t: 'key', key: e.key.length === 1 ? e.key.toLowerCase() : e.key, cmd, shift: e.shiftKey, alt: e.altKey })
+    send({ t: 'key', key: e.key.length === 1 ? e.key.toLowerCase() : e.key, cmd, shift: e.shiftKey, alt: e.altKey, w: wm.active })
   })
   const flushText = () => {
     const s = keys.value
     keys.value = ''
-    if (s && tool === 'control') send({ t: 'text', s })
+    if (s && tool === 'control') send({ t: 'text', s, w: wm.active })
   }
   keys.addEventListener('input', (e) => !e.isComposing && flushText())
   keys.addEventListener('compositionend', flushText)
@@ -845,11 +901,12 @@ export function mountViewer(el, options) {
       closePeer()
       signaling?.close()
       resetVideo()
-      resizeObserver.disconnect()
+      stageObserver.disconnect()
+      clearTimeout(viewportTimer)
       dockObserver.disconnect()
       clipPanel?.destroy()
       clearTimeout(toastTimer)
-      ann.destroy()
+      wm.destroy()
       el.replaceChildren()
       el.classList.remove('pv-viewer')
     },

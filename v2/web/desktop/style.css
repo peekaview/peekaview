@@ -121,6 +121,7 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 .card:hover { background: var(--raised); }
 .thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; background: var(--bg) center / contain no-repeat; outline: 1px solid var(--line); transition: outline-color .15s, box-shadow .15s; }
 .card.selected .thumb { outline: 2px solid var(--accent); box-shadow: 0 0 0 5px rgba(239, 68, 68, .18); }
+.thumb .pick { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
 .thumb .pv-icon { position: absolute; inset: 0; margin: auto; color: var(--raised); }
 .meta { min-width: 0; padding: 0 2px; }
 .meta strong, .meta span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -139,7 +140,10 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 /* ------------------------------------------------ overlay: red frame around the shared area */
 body.overlay { background: transparent; overflow: hidden; }
 .overlay #root { position: fixed; inset: 0; border: 3px solid var(--accent); border-radius: 4px; }
-.overlay .badge { position: fixed; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 3px 10px 4px; border-radius: 0 0 8px 8px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 650; }
+.overlay .badge { position: fixed; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; max-width: 300px; height: 24px; padding: 0 4px 0 10px; border-radius: 0 0 8px 8px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 650; white-space: nowrap; }
+.overlay .badge > span { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; }
+.overlay .fit { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .18); color: #fff; cursor: pointer; }
+.overlay .fit:hover { background: rgba(255, 255, 255, .34); }
 
 /* ------------------------------------------------ permission helper */
 body.permission { height: 100vh; overflow: hidden; background: var(--bg); }

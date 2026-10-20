@@ -38,10 +38,10 @@ async fn list_sources() -> Vec<sources::SourceInfo> {
     sources::list()
 }
 
-/// Red frame around the source picked in the UI (before sharing starts). `None` hides it.
+/// Red frames around the sources picked in the UI (before sharing starts); empty hides them.
 #[tauri::command]
-async fn highlight(app: AppHandle, source: Option<String>) {
-    session::highlight(&app, source.as_deref());
+async fn highlight(app: AppHandle, sources: Vec<String>) {
+    session::highlight(&app, &sources);
 }
 
 #[tauri::command]
@@ -50,7 +50,7 @@ async fn start_share(
     app: AppHandle,
     site: String,
     name: String,
-    source: String,
+    sources: Vec<String>,
     room: Option<String>,
     color: Option<String>,
     relays: Option<Vec<String>>,
@@ -64,7 +64,7 @@ async fn start_share(
     let opts = session::StartOptions {
         site,
         name,
-        source,
+        sources,
         room,
         color,
         relays: clean(relays),
@@ -329,10 +329,16 @@ fn set_mode(app: AppHandle, mode: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Shares another screen or window in the running session.
+/// The overlay's "best size" button: resize a shared window for the viewers.
 #[tauri::command]
-async fn switch_source(app: AppHandle, source: String) -> Result<serde_json::Value, String> {
-    tauri::async_runtime::spawn_blocking(move || session::switch_source(&app, &source)).await.map_err(|e| e.to_string())?
+fn fit_window(app: AppHandle, w: u8) -> Result<(), String> {
+    session::fit_window(&app, w)
+}
+
+/// Shares other windows / another screen in the running session.
+#[tauri::command]
+async fn switch_source(app: AppHandle, sources: Vec<String>) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || session::switch_sources(&app, &sources)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -373,7 +379,7 @@ fn main() {
                     let opts = session::StartOptions {
                         site: "http://localhost:8090".into(),
                         name: "Dev".into(),
-                        source,
+                        sources: source.split(',').map(str::to_string).collect(),
                         room: std::env::var("PEEKAVIEW_DEV_ROOM").ok(),
                         color: None,
                         relays: vec![],
@@ -420,6 +426,7 @@ fn main() {
             dismiss_permission,
             toolbar_resize,
             toolbar_drag,
+            fit_window,
             drag_window,
             peers,
             admit,

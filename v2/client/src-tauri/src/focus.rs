@@ -1,4 +1,5 @@
-//! Brings a shared window to the front when sharing starts (or switches to it).
+//! Brings a shared window to the front when sharing starts (or switches to it), and gives it
+//! a new frame ("best size for the viewers").
 
 #[cfg(target_os = "macos")]
 mod imp {
@@ -15,6 +16,8 @@ mod imp {
         fn AXUIElementCreateApplication(pid: i32) -> CFTypeRef;
         fn AXUIElementCopyAttributeValue(element: CFTypeRef, attribute: CFTypeRef, value: *mut CFTypeRef) -> i32;
         fn AXUIElementPerformAction(element: CFTypeRef, action: CFTypeRef) -> i32;
+        fn AXUIElementSetAttributeValue(element: CFTypeRef, attribute: CFTypeRef, value: CFTypeRef) -> i32;
+        fn AXValueCreate(kind: u32, value: *const c_void) -> CFTypeRef;
         // widely used private API: CGWindowID of an AX window
         fn _AXUIElementGetWindow(element: CFTypeRef, id: *mut u32) -> i32;
     }
@@ -30,14 +33,15 @@ mod imp {
         CFString::from_str(s)
     }
 
-    /// Raises exactly this window (needs the accessibility permission).
-    unsafe fn raise(pid: i32, window_id: u32) {
+    /// Runs `f` on the AX element of exactly this window (needs the accessibility permission).
+    unsafe fn with_window(pid: i32, window_id: u32, f: impl FnOnce(CFTypeRef)) -> bool {
         if !AXIsProcessTrusted() {
-            return;
+            return false;
         }
+        let mut found = false;
         let app = AXUIElementCreateApplication(pid);
         if app.is_null() {
-            return;
+            return false;
         }
         let mut windows: CFTypeRef = std::ptr::null();
         let attr = cf("AXWindows");
@@ -46,14 +50,42 @@ mod imp {
                 let window = CFArrayGetValueAtIndex(windows, i);
                 let mut id = 0u32;
                 if _AXUIElementGetWindow(window, &mut id) == 0 && id == window_id {
-                    let action = cf("AXRaise");
-                    AXUIElementPerformAction(window, (&*action as *const CFString).cast());
+                    f(window);
+                    found = true;
                     break;
                 }
             }
             CFRelease(windows);
         }
         CFRelease(app);
+        found
+    }
+
+    unsafe fn raise(pid: i32, window_id: u32) {
+        with_window(pid, window_id, |window| {
+            let action = cf("AXRaise");
+            AXUIElementPerformAction(window, (&*action as *const CFString).cast());
+        });
+    }
+
+    /// Moves / resizes a window (screen points, top-left origin).
+    pub fn set_frame(pid: u32, window_id: u32, x: f64, y: f64, w: f64, h: f64) -> bool {
+        #[repr(C)]
+        struct Pair(f64, f64);
+        const POINT: u32 = 1;
+        const SIZE: u32 = 2;
+        unsafe {
+            with_window(pid as i32, window_id, |window| {
+                for (attr, kind, value) in [("AXPosition", POINT, Pair(x, y)), ("AXSize", SIZE, Pair(w, h)), ("AXPosition", POINT, Pair(x, y))] {
+                    let v = AXValueCreate(kind, (&value as *const Pair).cast());
+                    if !v.is_null() {
+                        let attr = cf(attr);
+                        AXUIElementSetAttributeValue(window, (&*attr as *const CFString).cast(), v);
+                        CFRelease(v);
+                    }
+                }
+            })
+        }
     }
 
     pub fn bring_to_front(pid: u32, window_id: u32) {
@@ -67,7 +99,13 @@ mod imp {
 
 #[cfg(target_os = "windows")]
 mod imp {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{IsIconic, SetForegroundWindow, SetWindowPos, ShowWindow, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE};
+
+    /// Moves / resizes a window (physical pixels).
+    pub fn set_frame(_pid: u32, window_id: u32, x: f64, y: f64, w: f64, h: f64) -> bool {
+        let hwnd = window_id as usize as windows_sys::Win32::Foundation::HWND;
+        unsafe { SetWindowPos(hwnd, std::ptr::null_mut(), x as i32, y as i32, w as i32, h as i32, SWP_NOZORDER | SWP_NOACTIVATE) != 0 }
+    }
 
     pub fn bring_to_front(_pid: u32, window_id: u32) {
         let hwnd = window_id as usize as windows_sys::Win32::Foundation::HWND;
@@ -83,6 +121,10 @@ mod imp {
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod imp {
     pub fn bring_to_front(_pid: u32, _window_id: u32) {}
+
+    pub fn set_frame(_pid: u32, _window_id: u32, _x: f64, _y: f64, _w: f64, _h: f64) -> bool {
+        false
+    }
 }
 
-pub use imp::bring_to_front;
+pub use imp::{bring_to_front, set_frame};
