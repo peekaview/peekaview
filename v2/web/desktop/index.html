@@ -40,6 +40,8 @@
       <button id="fold-btn" class="icon-btn fold" title="Einklappen" data-icon="collapse"></button>
     </div>
 
+    <div id="requests" class="requests" hidden></div>
+
     <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
 
     <div id="panel" class="panel glass" hidden>
@@ -64,6 +66,9 @@
         </div>
         <div id="grid" class="grid"></div>
         <div class="panel-foot">
+          <label class="check keep" title="Der Link bleibt bei jeder Freigabe derselbe – praktisch für feste Termine. Wer ihn kennt, muss trotzdem erst zugelassen werden.">
+            <input type="checkbox" id="keep-link"> Link beibehalten
+          </label>
           <input id="name" maxlength="32" placeholder="Dein Name">
           <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>
         </div>

@@ -55,9 +55,15 @@ Screen sharing with **pointing, drawing, remote control, voice and session recor
 - From it the client derives short-lived credentials for each session and passes them to the viewers inside the encrypted signaling. The website never contains a secret.
 - If a viewer cannot connect, they get a clear message after 15 s saying that a TURN server is needed.
 
+**Who gets in**
+- Every viewer has to be **let in by the presenter**. The toolbar shows each request with "Zulassen" or "Ablehnen", and "Alle zulassen" when several are waiting.
+- Until then the viewer sees "Warte, bis die teilende Person dich hereinlässt …".
+- Viewers who were let in come back by themselves after a page reload or a restart of the app.
+- **Link beibehalten** (in the picker) keeps the same link for every share, e.g. for regular meetings. People who know it still have to be let in.
+
 **What relays and others can see**
 - Relays see IP addresses, timing and a pseudonymous room hash. They do not see content, names or IP candidates; those are encrypted.
-- Anybody with the link can join, just like a meeting link without a password.
+- Anybody with the link can ask to join; the presenter decides.
 - Viewer names and colors are self-declared.
 - Inside an integration (e.g. meetzi), the integration decides who gets the room secret.
 
@@ -100,6 +106,20 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - Nostr relays
   - TURN servers and TURN secret
   - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
+
+## Shared clipboard
+
+Everybody in the session, the presenter included, can open a small **Zwischenablage** panel and drag it anywhere.
+- **Adding items:** drop files there or paste text and images with your usual shortcut. Each item gets a preview: a thumbnail for images and PDFs, the beginning for text, a file icon otherwise.
+- **Using items:** hover an item to copy it to your own clipboard or save it as a file.
+  - Browsers can only put text and images on the clipboard; other files are saved instead.
+  - The presenter copies files as real files.
+- **Size:** up to 100 MB per file. Uploads and downloads show an animated progress ring.
+- **Where items live:** they travel over a separate data channel, so a big transfer never slows down pointers or input. The presenter keeps them until the share ends.
+
+**Copy & paste under remote control** (⌘ or Ctrl + C, X, V, everybody with their own shortcuts, also between Mac and Windows) works without emulating keystrokes:
+- **Paste:** the viewer's clipboard content (text with formatting, images or files) is put on the presenter's real clipboard. Then the presenter's own paste shortcut is pressed. Nothing gets swallowed, keyboard layouts don't matter (no y/z mix-up), and long texts arrive in full.
+- **Copy and cut:** the presenter's own copy shortcut is pressed in the shared window, and the result lands on the viewer's clipboard. Copied files show up in the shared clipboard.
 
 ## Session recording
 
@@ -178,7 +198,7 @@ const viewer = mountViewer(element, {
   color: peerColor(sessionId),
   voice: true,                       // built-in voice chat; off if the host app has audio
   relays: ['wss://relay.example.com'], // optional, default: public relays
-  onStatus: (s) => {},               // connecting | waiting | loading | live | paused | blocked | error
+  onStatus: (s) => {},               // connecting | waiting | admission | denied | loading | live | paused | blocked | error
 })
 viewer.destroy()
 ```

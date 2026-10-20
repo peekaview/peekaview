@@ -73,6 +73,48 @@ function setCollapsed(collapsed) {
 }
 $('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
 
+// ------------------------------------------------------------------ keep the link
+
+$('keep-link').checked = store.get('pv-keep') === '1'
+$('keep-link').addEventListener('change', () => {
+  store.set('pv-keep', $('keep-link').checked ? '1' : '')
+  if (!$('keep-link').checked) {
+    store.set('pv-keep-room', '')
+    store.set('pv-keep-key', '')
+  }
+})
+
+// ------------------------------------------------------------------ join requests
+
+function renderRequests(list) {
+  const box = $('requests')
+  box.hidden = !list.length
+  if (list.length) setCollapsed(false)
+  box.replaceChildren(
+    ...list.map((r) => {
+      const row = document.createElement('div')
+      row.className = 'request glass'
+      row.innerHTML = '<span class="who"></span><div><strong></strong><span>möchte zusehen</span></div><button class="pill secondary" data-deny>Ablehnen</button><button class="pill primary" data-allow>Zulassen</button>'
+      const who = row.querySelector('.who')
+      who.textContent = initials(r.name || 'Gast')
+      who.style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'
+      row.querySelector('strong').textContent = r.name || 'Gast'
+      row.querySelector('[data-allow]').addEventListener('click', () => invoke('admit', { peer: r.peer, allow: true }))
+      row.querySelector('[data-deny]').addEventListener('click', () => invoke('admit', { peer: r.peer, allow: false }))
+      return row
+    }),
+  )
+  if (list.length > 1) {
+    const all = document.createElement('button')
+    all.className = 'pill secondary all'
+    all.textContent = `Alle ${list.length} zulassen`
+    all.addEventListener('click', () => invoke('admit', { allow: true }))
+    box.append(all)
+  }
+}
+listen('join-requests', (e) => renderRequests(e.payload ?? []))
+listen('ended', () => renderRequests([]))
+
 // ------------------------------------------------------------------ shared clipboard (own window)
 
 $('clip-btn').addEventListener('click', () => invoke('clip_window', {}).catch((e) => error(String(e))))
@@ -187,17 +229,25 @@ async function start() {
   store.set('pv-name', $('name').value.trim())
   $('start').disabled = true
   try {
+    // "Link beibehalten": the same room secret and presenter key as last time
+    const keep = $('keep-link').checked && !invite
+    const kept = keep ? { room: store.get('pv-keep-room'), key: store.get('pv-keep-key') } : {}
     const hosted = await invoke('start_share', {
       site: site(),
       name,
       source: selected,
-      room: $('room').value.trim() || null,
+      room: $('room').value.trim() || kept.room || null,
+      signingKey: kept.key || null,
       color: invite?.color ?? null,
       relays: invite?.relays ?? lines('relays'),
       ice: invite?.ice ?? null,
       turnUrls: lines('turn-urls'),
       turnSecret: $('turn-secret').value.trim() || null,
     })
+    if (keep) {
+      store.set('pv-keep-room', hosted.secret)
+      store.set('pv-keep-key', hosted.signingKey)
+    }
     goLive(hosted, 'view')
   } catch (e) {
     error(String(e))

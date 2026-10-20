@@ -96,6 +96,17 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 @keyframes blink { 50% { opacity: .35; } }
 .toast.info { background: var(--panel); border: 1px solid var(--line); }
 
+/* join requests: nobody watches without the presenter's OK */
+.requests { display: flex; flex-direction: column; gap: 6px; width: 340px; }
+.request { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); animation: toast-in .25s ease-out; }
+.request .who { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; }
+.request div { flex: 1; min-width: 0; }
+.request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.request span { color: var(--muted); font-size: 12px; }
+.request .pill { height: 30px; padding: 0 11px; }
+.requests .all { align-self: flex-end; height: 28px; font-size: 12px; }
+.panel-foot .keep { flex: none; margin: 0 4px 0 2px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
 /* ------------------------------------------------ panel (picker / settings) */
 .panel { width: 640px; padding: 14px; border-radius: 16px; box-shadow: 0 10px 24px rgba(0, 0, 0, .48); }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }

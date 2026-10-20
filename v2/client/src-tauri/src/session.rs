@@ -174,6 +174,8 @@ pub struct StartOptions {
     pub turn_secret: Option<String>,
     /// presenter key of a resumed room (hex), so existing links stay valid
     pub signing_key: Option<String>,
+    /// viewers the presenter already let in (a share continued after a restart)
+    pub admitted: Vec<String>,
 }
 
 fn parse_key(hex: &str) -> Option<[u8; 32]> {
@@ -185,7 +187,7 @@ fn valid_secret(s: &str) -> bool {
     (16..=64).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_".contains(c))
 }
 
-/// Returns {room, link, ice}.
+/// Returns {room, link, ice, secret, signingKey}.
 pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> {
     stop(&app, None, false);
     let (source, window_id, kind, title) = resolve(&opts.source)?;
@@ -219,7 +221,7 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
     to_overlay(&app, r#"{"t":"frame","live":true}"#);
     let ctrl = control::spawn(shared.clone());
     let host_color = opts.color.clone().unwrap_or_else(|| "#ffffff".into());
-    let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx);
+    let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx, opts.admitted.clone());
 
     {
         let (app, shared, source) = (app.clone(), shared.clone(), source.clone());
@@ -233,14 +235,15 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         json!({
             "site": opts.site, "name": opts.name, "source": opts.source, "room": secret, "color": opts.color,
             "relays": relays, "ice": opts.ice, "turn_urls": opts.turn_urls, "turn_secret": opts.turn_secret, "mode": "view",
-            "signing_key": key_hex,
+            "signing_key": key_hex, "admitted": opts.admitted,
         }),
     );
     *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, source, hub });
     let site = opts.site.trim().trim_end_matches('/');
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
-    Ok(json!({ "room": room, "link": format!("{site}/#{room}"), "ice": ice }))
+    // secret + signing key let the UI keep the same link for the next share
+    Ok(json!({ "room": room, "link": format!("{site}/#{room}"), "ice": ice, "secret": secret, "signingKey": key_hex }))
 }
 
 /// The presenter's own handling of a (routed) message: overlay, remote control, recording, UI.
@@ -457,6 +460,7 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
         turn_urls: list("turn_urls"),
         turn_secret: text("turn_secret"),
         signing_key: text("signing_key"),
+        admitted: list("admitted"),
     };
     match start(app.clone(), opts.clone()).await {
         Ok(mut hosted) => {
@@ -716,4 +720,12 @@ pub fn clip_window(app: &AppHandle, open: Option<bool>) -> Result<bool, String> 
     }
     let _ = app.emit_to("main", "clip-window", open);
     Ok(open)
+}
+
+/// Lets a waiting viewer in or turns them away; `peer: None` = everybody waiting.
+pub fn admit(app: &AppHandle, peer: Option<String>, allow: bool) {
+    let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
+    if let Some(hub) = hub {
+        tauri::async_runtime::spawn(hub.admit(peer, allow));
+    }
 }

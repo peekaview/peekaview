@@ -1,4 +1,4 @@
-export type ViewerStatus = 'connecting' | 'waiting' | 'loading' | 'live' | 'paused' | 'blocked' | 'error'
+export type ViewerStatus = 'connecting' | 'waiting' | 'admission' | 'denied' | 'loading' | 'live' | 'paused' | 'blocked' | 'error'
 
 export interface Peer {
   id: number

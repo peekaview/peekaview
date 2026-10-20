@@ -87,7 +87,15 @@ pub struct Hub {
     host: Mutex<(String, String, bool)>,
     viewers: Mutex<HashMap<u32, Viewer>>,
     next_id: AtomicU32,
+    /// nobody gets in without the presenter's OK: admitted / turned away signaling peer ids,
+    /// and open requests (their hello, last seen)
+    admitted: Mutex<HashSet<String>>,
+    denied: Mutex<HashSet<String>>,
+    requests: Mutex<Vec<(String, Value, Instant)>>,
 }
+
+/// A request disappears when its viewer stops asking (closed the page).
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 
 struct Events {
     hub: Arc<Hub>,
@@ -128,6 +136,7 @@ impl Hub {
         host: (String, String),
         out: mpsc::UnboundedReceiver<String>,
         frames: mpsc::Receiver<Vec<u8>>,
+        admitted: Vec<String>,
     ) -> Arc<Hub> {
         let (signaling, incoming) = Signaling::open(secret, relays, signing_key);
         let ice_servers = ice
@@ -154,6 +163,9 @@ impl Hub {
             host: Mutex::new((host.0, host.1, false)),
             viewers: Mutex::default(),
             next_id: AtomicU32::new(1),
+            admitted: Mutex::new(admitted.into_iter().collect()),
+            denied: Mutex::default(),
+            requests: Mutex::default(),
         });
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
@@ -166,6 +178,21 @@ impl Hub {
             while !beacon.shared.stop.load(Ordering::Relaxed) {
                 tokio::time::sleep(Duration::from_secs(15)).await;
                 beacon.signaling.send(&json!({ "type": "host" }));
+            }
+        });
+        let sweeper = hub.clone();
+        tauri::async_runtime::spawn(async move {
+            while !sweeper.shared.stop.load(Ordering::Relaxed) {
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                let expired = {
+                    let mut requests = sweeper.requests.lock().unwrap();
+                    let before = requests.len();
+                    requests.retain(|(_, _, seen)| seen.elapsed() < REQUEST_TIMEOUT);
+                    requests.len() != before
+                };
+                if expired {
+                    sweeper.announce_requests();
+                }
             }
         });
         hub
@@ -194,11 +221,36 @@ impl Hub {
             }
             let from = msg["from"].as_str().unwrap_or_default().to_string();
             match msg["type"].as_str() {
-                Some("hello") if !from.is_empty() => {
+                Some("hello") if !from.is_empty() && from.len() <= 64 => {
                     let known = self.viewers.lock().unwrap().values().any(|v| v.peer == from);
-                    if !known {
+                    if known {
+                        continue;
+                    }
+                    if self.admitted.lock().unwrap().contains(&from) {
                         if let Err(e) = self.clone().invite(from, &msg).await {
                             crate::log(&format!("p2p: invite failed: {e}"));
+                        }
+                    } else if self.denied.lock().unwrap().contains(&from) {
+                        self.signaling.send(&json!({ "type": "denied", "from": "host", "to": from }));
+                    } else {
+                        // the presenter decides; the viewer waits
+                        let new = {
+                            let mut requests = self.requests.lock().unwrap();
+                            match requests.iter_mut().find(|(p, _, _)| *p == from) {
+                                Some(r) => {
+                                    r.2 = Instant::now();
+                                    false
+                                }
+                                None => {
+                                    requests.push((from.clone(), msg.clone(), Instant::now()));
+                                    true
+                                }
+                            }
+                        };
+                        self.signaling.send(&json!({ "type": "waiting", "from": "host", "to": from }));
+                        if new {
+                            crate::log("p2p: join request");
+                            self.announce_requests();
                         }
                     }
                 }
@@ -494,6 +546,48 @@ impl Hub {
         let msg = json!({ "t": "peers", "list": list });
         self.broadcast(&msg, None).await;
         session::route_local(&self.app, &self.shared, &self.ctrl, &msg);
+    }
+
+    // ------------------------------------------------------------------ admission
+
+    /// Open join requests to the toolbar: [{peer, name, color}].
+    fn announce_requests(&self) {
+        let list: Vec<Value> = self
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(peer, hello, _)| {
+                let name: String = hello["name"].as_str().unwrap_or("Gast").trim().chars().filter(|c| !c.is_control()).take(32).collect();
+                json!({ "peer": peer, "name": if name.is_empty() { "Gast".to_string() } else { name }, "color": hello["color"] })
+            })
+            .collect();
+        let _ = self.app.emit_to("main", "join-requests", list);
+    }
+
+    /// The presenter lets a viewer in (or turns them away); `None` = everybody waiting.
+    pub async fn admit(self: Arc<Self>, peer: Option<String>, allow: bool) {
+        let chosen: Vec<(String, Value)> = {
+            let mut requests = self.requests.lock().unwrap();
+            let (take, keep): (Vec<_>, Vec<_>) = requests.drain(..).partition(|(p, _, _)| peer.as_ref().is_none_or(|peer| p == peer));
+            *requests = keep;
+            take.into_iter().map(|(p, hello, _)| (p, hello)).collect()
+        };
+        self.announce_requests();
+        for (p, hello) in chosen {
+            if allow {
+                self.admitted.lock().unwrap().insert(p.clone());
+                if let Err(e) = self.clone().invite(p, &hello).await {
+                    crate::log(&format!("p2p: invite failed: {e}"));
+                }
+            } else {
+                self.denied.lock().unwrap().insert(p.clone());
+                self.signaling.send(&json!({ "type": "denied", "from": "host", "to": p }));
+            }
+        }
+        // admitted viewers get back in by themselves after a restart of the app
+        let list: Vec<String> = self.admitted.lock().unwrap().iter().cloned().collect();
+        crate::resume::update(&self.app, "admitted", json!(list));
     }
 
     // ------------------------------------------------------------------ shared clipboard

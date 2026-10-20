@@ -160,8 +160,23 @@ export function mountViewer(el, options) {
   let offerId
   // presenter candidates may overtake their offer on the relays
   let early = []
-  // who we are on the signaling channel (the presenter answers with an offer addressed to it)
-  const peerId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
+  // the presenter has to let us in first: waiting for that, or turned away
+  let admission = false
+  let denied = false
+  // who we are on the signaling channel (the presenter answers with an offer addressed to it);
+  // kept for this tab and room, so a reload does not have to be let in again
+  const peerKey = `pv-peer-${String(room ?? '').slice(0, 12)}`
+  const peerId = (() => {
+    try {
+      const saved = sessionStorage.getItem(peerKey)
+      if (saved && /^[0-9a-f]{16}$/.test(saved)) return saved
+    } catch {}
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
+    try {
+      sessionStorage.setItem(peerKey, id)
+    } catch {}
+    return id
+  })()
 
   const send = (m) => dc?.readyState === 'open' && dc.send(JSON.stringify(m))
 
@@ -189,6 +204,19 @@ export function mountViewer(el, options) {
   async function onSignal(m) {
     if (m.type === 'host' && !dc) signaling.send({ type: 'hello', from: peerId, name, color })
     if (m.to !== peerId) return
+    if (m.type === 'waiting') {
+      if (!admission && !dc) {
+        admission = true
+        update()
+      }
+      return
+    }
+    if (m.type === 'denied') {
+      denied = true
+      admission = false
+      clearInterval(helloTimer)
+      return update()
+    }
     if (m.type === 'candidate') {
       if (pc?.remoteDescription && m.id === offerId) pc.addIceCandidate(m.candidate).catch(() => {})
       else early.push(m)
@@ -196,6 +224,7 @@ export function mountViewer(el, options) {
     }
     if (m.type !== 'offer') return
     offered = true
+    admission = false
     closePeer()
     offerId = m.id
     // no data channel after a while: direct connections are blocked in this network
@@ -360,12 +389,31 @@ export function mountViewer(el, options) {
   let lastStatus
   function update(forced) {
     const status =
-      forced ?? (blocked && !me ? 'blocked' : !me ? (offered ? 'connecting' : 'waiting') : !hostPresent ? 'waiting' : state.paused ? 'paused' : hasFrame ? 'live' : 'loading')
+      forced ??
+      (denied
+        ? 'denied'
+        : blocked && !me
+          ? 'blocked'
+          : !me
+            ? offered
+              ? 'connecting'
+              : admission
+                ? 'admission'
+                : 'waiting'
+            : !hostPresent
+              ? 'waiting'
+              : state.paused
+                ? 'paused'
+                : hasFrame
+                  ? 'live'
+                  : 'loading')
     const texts = {
       connecting: 'Verbinde direkt mit der Freigabe …',
       blocked: 'Direkte Verbindung nicht möglich – in diesem Netz wird ein TURN-Server benötigt. Bitte die teilende Person, einen in PeekaView einzutragen.',
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
+      admission: 'Warte, bis die teilende Person dich hereinlässt …',
+      denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
       live: '',
@@ -375,7 +423,7 @@ export function mountViewer(el, options) {
       : texts[status]
     q('.pv-notice-text').textContent = notice
     q('.pv-notice').hidden = !notice
-    q('.pv-spinner').hidden = !['connecting', 'waiting', 'loading'].includes(status)
+    q('.pv-spinner').hidden = !['connecting', 'waiting', 'loading', 'admission'].includes(status)
 
     q('.pv-live').hidden = !hostPresent
     q('.pv-title').textContent = state.title || 'Bildschirmfreigabe'

@@ -57,6 +57,7 @@ async fn start_share(
     ice: Option<serde_json::Value>,
     turn_urls: Option<Vec<String>>,
     turn_secret: Option<String>,
+    signing_key: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let room = room.filter(|r| !r.trim().is_empty());
     let clean = |l: Option<Vec<String>>| l.unwrap_or_default().into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
@@ -70,7 +71,8 @@ async fn start_share(
         ice,
         turn_urls: clean(turn_urls),
         turn_secret: turn_secret.filter(|s| !s.is_empty()),
-        signing_key: None,
+        signing_key: signing_key.filter(|k| !k.is_empty()),
+        admitted: vec![],
     };
     session::start(app, opts).await
 }
@@ -149,6 +151,12 @@ fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 // ------------------------------------------------------------------ shared clipboard
+
+/// Join requests: let a viewer in or turn them away (`peer` missing = everybody waiting).
+#[tauri::command]
+fn admit(app: AppHandle, peer: Option<String>, allow: bool) {
+    session::admit(&app, peer, allow);
+}
 
 #[tauri::command]
 fn peers() -> serde_json::Value {
@@ -372,13 +380,21 @@ fn main() {
                         ice: None,
                         turn_urls: vec![],
                         turn_secret: None,
-                        signing_key: None,
+                        signing_key: std::env::var("PEEKAVIEW_DEV_KEY").ok(),
+                        admitted: vec![],
                     };
                     let result = session::start(handle.clone(), opts).await;
                     crate::log(&format!("dev share: {result:?}"));
                     if let Ok(mode) = std::env::var("PEEKAVIEW_DEV_MODE") {
                         if let Some(mode) = session::Mode::parse(&mode) {
                             session::set_mode(&handle, mode);
+                        }
+                    }
+                    // PEEKAVIEW_DEV_ADMIT=<seconds>: lets every waiting viewer in after that delay
+                    if let Some(delay) = std::env::var("PEEKAVIEW_DEV_ADMIT").ok().and_then(|d| d.parse::<u64>().ok()) {
+                        loop {
+                            tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                            session::admit(&handle, None, true);
                         }
                     }
                 });
@@ -406,6 +422,7 @@ fn main() {
             toolbar_drag,
             drag_window,
             peers,
+            admit,
             clip_list,
             clip_add_paths,
             clip_from_os,
