@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Local UI (main window, overlay, permission helper). Remote viewer windows get no IPC access.",
-  "windows": ["main", "overlay", "permission"],
+  "windows": ["main", "overlay", "permission", "clipboard"],
   "permissions": ["core:default"]
 }

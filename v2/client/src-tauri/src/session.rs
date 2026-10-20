@@ -69,6 +69,8 @@ pub struct Shared {
     info: Mutex<(&'static str, String)>,
     /// messages for every viewer (state, own pointer)
     out: mpsc::UnboundedSender<String>,
+    /// the shared clipboard of this session
+    pub clip: crate::clip::Store,
 }
 
 impl Shared {
@@ -209,6 +211,7 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         injected_at: Mutex::new(None),
         info: Mutex::new((kind, title)),
         out: out_tx,
+        clip: Default::default(),
     });
 
     let video = Video::start(source.clone(), rect, shared.clone(), frame_tx.clone())?;
@@ -250,7 +253,8 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
             if let Some(rec) = shared.recorder() {
                 rec.set_peers(&v["list"]);
             }
-            let _ = app.emit_to("main", "peers", &v["list"]);
+            *LAST_PEERS.lock().unwrap() = v["list"].clone();
+            let _ = app.emit("peers", &v["list"]);
             to_overlay(app, raw);
         }
         "ptr" => {
@@ -272,7 +276,7 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
             to_overlay(app, raw);
             let _ = ctrl.send(Cmd::Input(v.clone()));
         }
-        "mouse" | "wheel" | "key" | "text" => {
+        "mouse" | "wheel" | "key" | "text" | "copy" | "paste" => {
             let _ = ctrl.send(Cmd::Input(v.clone()));
         }
         _ => {}
@@ -408,6 +412,12 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     session.shared.stop.store(true, Ordering::Relaxed);
     let _ = session.ctrl.send(Cmd::Release);
     session.hub.close();
+    // the shared clipboard ends with the share
+    session.shared.clip.changed.notify_one();
+    session.shared.clip.clear();
+    if let Some(window) = app.get_webview_window("clipboard") {
+        let _ = window.destroy();
+    }
     // the overlay window is kept for the next session, just hidden and wiped
     if let Some(overlay) = app.get_webview_window("overlay") {
         let _ = overlay.hide();
@@ -549,6 +559,7 @@ mod tests {
             injected_at: Mutex::new(None),
             info: Mutex::new(("screen", String::new())),
             out,
+            clip: Default::default(),
         });
         let (tx, mut rx) = mpsc::channel(256);
         let started = std::time::Instant::now();
@@ -570,4 +581,139 @@ mod tests {
             std::fs::write(path, packets.iter().flat_map(|p| p[6..].to_vec()).collect::<Vec<_>>()).unwrap();
         }
     }
+}
+
+// ------------------------------------------------------------------ shared clipboard (presenter)
+
+fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
+    app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.shared.clone()).ok_or_else(|| "Keine laufende Freigabe".into())
+}
+
+/// Latest participant list (for windows opened later, e.g. the clipboard panel).
+static LAST_PEERS: Mutex<Value> = Mutex::new(Value::Null);
+
+pub fn peers() -> Value {
+    LAST_PEERS.lock().unwrap().clone()
+}
+
+pub fn clip_list(app: &AppHandle) -> Vec<crate::clip::Meta> {
+    running(app).map(|s| s.clip.list()).unwrap_or_default()
+}
+
+/// Files dropped onto the presenter's clipboard panel.
+pub fn clip_add_paths(app: &AppHandle, paths: &[String]) -> Result<(), String> {
+    let shared = running(app)?;
+    let errors: Vec<String> = paths
+        .iter()
+        .filter_map(|p| {
+            let path = std::path::Path::new(p);
+            shared.clip.add_file(path, 0).err().map(|e| format!("{}: {e}", path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()))
+        })
+        .collect();
+    shared.clip.changed.notify_one();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("\n"))
+    }
+}
+
+/// ⌘V / Ctrl+V in the presenter's clipboard panel: whatever is on the OS clipboard becomes an item.
+pub fn clip_from_os(app: &AppHandle) -> Result<(), String> {
+    use crate::clip::os::{read, Content};
+    let shared = running(app)?;
+    match read() {
+        Content::Files(paths) => {
+            for p in paths.iter().take(20) {
+                shared.clip.add_file(p, 0)?;
+            }
+        }
+        Content::Png(png) => {
+            shared.clip.add_bytes("Bild.png", "image/png", &png, 0, false)?;
+        }
+        Content::Text { text, .. } => {
+            shared.clip.add_bytes("Text.txt", "text/plain", text.as_bytes(), 0, false)?;
+        }
+        Content::Empty => return Err("Die Zwischenablage ist leer.".into()),
+    }
+    shared.clip.changed.notify_one();
+    Ok(())
+}
+
+fn clip_item(app: &AppHandle, id: &str) -> Result<(crate::clip::Meta, std::path::PathBuf), String> {
+    running(app)?.clip.get(id).ok_or_else(|| "Element nicht mehr vorhanden".into())
+}
+
+/// Bytes of an item (the panel renders PDF previews from them).
+pub fn clip_read(app: &AppHandle, id: &str) -> Result<Vec<u8>, String> {
+    let (_, path) = clip_item(app, id)?;
+    std::fs::read(path).map_err(|e| e.to_string())
+}
+
+pub fn clip_set_preview(app: &AppHandle, id: &str, preview: &str) {
+    if let Ok(shared) = running(app) {
+        shared.clip.set_preview(id, preview);
+        shared.clip.changed.notify_one();
+    }
+}
+
+/// Onto the presenter's OS clipboard – files as files, images as images, text as text.
+pub fn clip_copy(app: &AppHandle, id: &str) -> Result<(), String> {
+    let (meta, path) = clip_item(app, id)?;
+    crate::clip::os::write_item(&meta, &path)
+}
+
+pub fn clip_save(app: &AppHandle, id: &str) -> Result<String, String> {
+    let (meta, path) = clip_item(app, id)?;
+    crate::clip::save_to_downloads(&meta, &path).map(|p| p.display().to_string())
+}
+
+pub fn clip_remove(app: &AppHandle, id: &str) {
+    if let Ok(shared) = running(app) {
+        if shared.clip.remove(id, 0) {
+            shared.clip.changed.notify_one();
+        }
+    }
+}
+
+/// Opens or closes the presenter's clipboard panel – a small window of its own that can be
+/// dragged anywhere. Returns whether it is open now.
+pub fn clip_window(app: &AppHandle, open: Option<bool>) -> Result<bool, String> {
+    let existing = app.get_webview_window("clipboard");
+    let open = open.unwrap_or(existing.is_none());
+    match (existing, open) {
+        (Some(window), false) => {
+            let _ = window.destroy();
+        }
+        (None, true) => {
+            running(app)?;
+            let (w, h) = (384.0, 484.0);
+            let mut builder = WebviewWindowBuilder::new(app, "clipboard", WebviewUrl::App("desktop/clipboard.html".into()))
+                .title("PeekaView – Zwischenablage")
+                .inner_size(w, h)
+                .transparent(true)
+                .decorations(false)
+                .shadow(false)
+                .resizable(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .visible_on_all_workspaces(true);
+            // below the toolbar, right-aligned with it
+            if let Some(main) = app.get_webview_window("main") {
+                if let (Ok(pos), Ok(size), Ok(scale)) = (main.outer_position(), main.outer_size(), main.scale_factor()) {
+                    let x = (pos.x + size.width as i32) as f64 / scale - w;
+                    let y = (pos.y + size.height as i32) as f64 / scale + 6.0;
+                    builder = builder.position(x.max(0.0), y);
+                }
+            }
+            let window = builder.build().map_err(|e| e.to_string())?;
+            // keep it out of screen captures (macOS: the capture filter excludes our windows)
+            #[cfg(not(target_os = "macos"))]
+            let _ = window.set_content_protected(true);
+            let _ = window;
+        }
+        _ => {}
+    }
+    let _ = app.emit_to("main", "clip-window", open);
+    Ok(open)
 }

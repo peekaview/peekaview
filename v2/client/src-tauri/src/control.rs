@@ -5,6 +5,10 @@
 //!   that point (it may lie in the background, but that spot must not be covered), and keystrokes
 //!   only if the shared window has the keyboard focus – which a viewer's click into it gives it.
 //! * Dropped input is reported back to the viewer, so they know why nothing happens.
+//! * Copy & paste never emulate typing: the viewer's clipboard content is put on the presenter's
+//!   clipboard and the platform's own paste shortcut is pressed (⌘V / Ctrl+V); for copy the
+//!   platform's copy shortcut is pressed and the result goes back to the viewer's clipboard.
+//!   Everybody keeps their own shortcuts – the viewer sends "paste" / "copy", not keys.
 //! * Combos that switch apps or open system UI (app switcher, Spotlight, …) are dropped.
 
 use std::{
@@ -19,11 +23,18 @@ use enigo::{Axis, Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use serde_json::{json, Value};
 
 use crate::{
+    clip::os,
     guard,
     session::{Mode, Shared},
 };
 
 const MAX_TEXT: usize = 10_000;
+/// pasted text (the clipboard takes far more than typing ever could)
+const MAX_PASTE: usize = 10 * 1024 * 1024;
+/// copied text up to this size goes back inline, larger text as a clipboard transfer
+const INLINE_COPY: usize = 48 * 1024;
+/// how long an app may take to put the copied content on the clipboard
+const COPY_WAIT: Duration = Duration::from_millis(1500);
 
 pub enum Cmd {
     Input(Value),
@@ -195,6 +206,8 @@ impl Controller {
                     }
                 }
             }
+            "paste" => self.paste(from, v),
+            "copy" => self.copy(from, v),
             "text" => {
                 let text: String = v["s"].as_str().unwrap_or("").chars().take(MAX_TEXT).collect();
                 if !text.is_empty() && self.keyboard_allowed(from) {
@@ -248,6 +261,124 @@ impl Controller {
             }
             _ => {}
         }
+    }
+}
+
+impl Controller {
+    /// The platform's own shortcut with the primary modifier (⌘ on macOS, Ctrl elsewhere).
+    fn shortcut(&mut self, key: char) {
+        let modifier = if cfg!(target_os = "macos") { Key::Meta } else { Key::Control };
+        self.injected();
+        if let Some(e) = self.enigo() {
+            let _ = e.key(modifier, Direction::Press);
+            let _ = e.key(Key::Unicode(key), Direction::Click);
+            let _ = e.key(modifier, Direction::Release);
+        }
+    }
+
+    /// `{t:'paste', text?, html?, textItem?, items?: [clipboard ids]}`: onto the clipboard, then ⌘V / Ctrl+V.
+    fn paste(&mut self, from: u64, v: &Value) {
+        if !self.keyboard_allowed(from) {
+            return;
+        }
+        let ids: Vec<&str> = v["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str()).collect();
+        let items: Vec<_> = ids.iter().filter_map(|id| self.shared.clip.get(id)).collect();
+        // long text comes as a clipboard transfer
+        let text_item = v["textItem"].as_str().and_then(|id| self.shared.clip.get(id)).and_then(|(_, p)| std::fs::read_to_string(p).ok());
+        let text: Option<String> = v["text"].as_str().map(str::to_string).or(text_item).map(|t| t.chars().take(MAX_PASTE).collect());
+        let html = v["html"].as_str().filter(|h| h.len() <= MAX_PASTE).map(str::to_string);
+        // a single image is pasted as an image (documents, chats), anything else as files
+        let single_image = match items.as_slice() {
+            [(meta, path)] if meta.mime.starts_with("image/") && meta.mime != "image/svg+xml" => Some(path.clone()),
+            _ => None,
+        };
+        let files: Vec<_> = if single_image.is_some() { vec![] } else { items.iter().map(|(_, p)| p.clone()).collect() };
+        let result = if text.is_some() || html.is_some() { os::write(text, html, None, &[]) } else { os::write(None, None, single_image.as_deref(), &files) };
+        if let Err(e) = result {
+            crate::log(&format!("control: paste failed – {e}"));
+            self.notice(from, "paste");
+            return;
+        }
+        self.shortcut('v');
+        if let Some(rec) = self.shared.recorder() {
+            rec.typed(rec.name(from));
+        }
+    }
+
+    /// `{t:'copy', req, cut}`: ⌘C / ⌘X (Ctrl elsewhere) in the shared window, then the
+    /// clipboard content back to that viewer as `{t:'copied', req, …}`.
+    fn copy(&mut self, from: u64, v: &Value) {
+        let req = v["req"].clone();
+        let reply = |shared: &Shared, body: Value| {
+            let mut msg = json!({ "t": "copied", "to": from, "req": req });
+            if let (Some(m), Some(b)) = (msg.as_object_mut(), body.as_object()) {
+                m.extend(b.clone());
+            }
+            shared.send(msg);
+        };
+        if !self.keyboard_allowed(from) {
+            return reply(&self.shared, json!({ "empty": true }));
+        }
+        let before = os::change_count();
+        let before_content = if before.is_none() { Some(content_key()) } else { None };
+        self.shortcut(if v["cut"] == true { 'x' } else { 'c' });
+        let start = Instant::now();
+        let changed = loop {
+            thread::sleep(Duration::from_millis(30));
+            let changed = match before {
+                Some(before) => os::change_count() != Some(before),
+                None => before_content.as_ref() != Some(&content_key()),
+            };
+            if changed || start.elapsed() > COPY_WAIT {
+                break changed;
+            }
+        };
+        if !changed {
+            return reply(&self.shared, json!({ "empty": true }));
+        }
+        // apps add their formats one after another
+        thread::sleep(Duration::from_millis(60));
+        let clip = &self.shared.clip;
+        let body = match os::read() {
+            os::Content::Files(paths) => {
+                let files: Vec<Value> = paths
+                    .iter()
+                    .take(20)
+                    .filter_map(|p| clip.add_file(p, 0).map_err(|e| crate::log(&format!("control: copy {p:?} – {e}"))).ok())
+                    .map(|m| json!({ "id": m.id, "name": m.name }))
+                    .collect();
+                clip.changed.notify_one();
+                json!({ "files": files })
+            }
+            os::Content::Png(png) => match clip.add_bytes("Bild.png", "image/png", &png, 0, true) {
+                Ok(m) => json!({ "image": m.id }),
+                Err(_) => json!({ "empty": true }),
+            },
+            os::Content::Text { text, html } => {
+                if text.len() + html.as_ref().map_or(0, String::len) <= INLINE_COPY {
+                    json!({ "text": text, "html": html })
+                } else if text.len() <= INLINE_COPY {
+                    json!({ "text": text })
+                } else {
+                    match clip.add_bytes("Text.txt", "text/plain", text.as_bytes(), 0, true) {
+                        Ok(m) => json!({ "textItem": m.id }),
+                        Err(_) => json!({ "empty": true }),
+                    }
+                }
+            }
+            os::Content::Empty => json!({ "empty": true }),
+        };
+        reply(&self.shared, body);
+    }
+}
+
+/// Clipboard text where the platform has no change counter.
+fn content_key() -> String {
+    match os::read() {
+        os::Content::Text { text, .. } => text,
+        os::Content::Files(f) => format!("{f:?}"),
+        os::Content::Png(p) => format!("png:{}", p.len()),
+        os::Content::Empty => String::new(),
     }
 }
 

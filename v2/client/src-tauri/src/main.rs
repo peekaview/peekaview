@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod capture;
+mod clip;
 mod control;
 mod guard;
 mod focus;
@@ -139,6 +140,71 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
     window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())
+}
+
+/// Grip of a frameless panel (e.g. the clipboard): move its window with the mouse.
+#[tauri::command]
+fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+// ------------------------------------------------------------------ shared clipboard
+
+#[tauri::command]
+fn peers() -> serde_json::Value {
+    session::peers()
+}
+
+#[tauri::command]
+fn clip_list(app: AppHandle) -> Vec<clip::Meta> {
+    session::clip_list(&app)
+}
+
+#[tauri::command]
+async fn clip_add_paths(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || session::clip_add_paths(&app, &paths)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn clip_from_os(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || session::clip_from_os(&app)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn clip_read(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+    session::clip_read(&app, &id).map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
+fn clip_set_preview(app: AppHandle, id: String, preview: String) {
+    session::clip_set_preview(&app, &id, &preview);
+}
+
+#[tauri::command]
+async fn clip_copy(app: AppHandle, id: String) -> Result<(), String> {
+    session::clip_copy(&app, &id)
+}
+
+#[tauri::command]
+async fn clip_save(app: AppHandle, id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || session::clip_save(&app, &id)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn clip_remove(app: AppHandle, id: String) {
+    session::clip_remove(&app, &id);
+}
+
+#[tauri::command]
+fn clip_window(app: AppHandle, open: Option<bool>) -> Result<bool, String> {
+    session::clip_window(&app, open)
+}
+
+/// Shows a saved file in Finder / Explorer.
+#[tauri::command]
+fn reveal(path: String) {
+    let path = std::path::Path::new(&path);
+    open_path(path.parent().unwrap_or(path));
 }
 
 /// The toolbar's grip: move the frameless window with the mouse.
@@ -338,6 +404,18 @@ fn main() {
             dismiss_permission,
             toolbar_resize,
             toolbar_drag,
+            drag_window,
+            peers,
+            clip_list,
+            clip_add_paths,
+            clip_from_os,
+            clip_read,
+            clip_set_preview,
+            clip_copy,
+            clip_save,
+            clip_remove,
+            clip_window,
+            reveal,
             quit,
             restart_app,
             resume,

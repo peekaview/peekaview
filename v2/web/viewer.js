@@ -12,6 +12,7 @@ import { Annotations, injectStyle } from './annotate.js'
 import { icon } from './icons.js'
 import { Voice } from './voice.js'
 import { Signaling, parseRoom } from './signal.js'
+import { ClipPanel, FileChannel, MAX_SIZE, browserCopyable, filesFromClipboard, newId, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
 
 export { peerColor } from './icons.js'
 
@@ -60,6 +61,8 @@ const CSS = `
 .pv-dock .pv-fold { width: 26px; color: var(--pv-muted); }
 .pv-dock .pv-fold:hover:not(:disabled) { color: var(--pv-fg); }
 .pv-dock.dragging button::after { display: none; }
+.pv-dock button[data-count]::before { content: attr(data-count); position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--pv-accent); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; }
+.pv-dock button.open { background: rgba(255, 255, 255, .14); }
 .pv-toast { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); color: #fde68a; pointer-events: none; animation: pv-in .2s ease-out; }
 @keyframes pv-in { from { opacity: 0; transform: translate(-50%, -4px); } }
 .pv-dock button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--pv-fg); cursor: pointer; transition: background .15s, color .15s, opacity .15s; }
@@ -106,6 +109,7 @@ export function mountViewer(el, options) {
       <button data-tool="control" data-tip="Steuern">${icon('control')}</button>
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
+      <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
       <button data-voice data-tip="Sprechen">${icon('micOff')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
@@ -139,6 +143,14 @@ export function mountViewer(el, options) {
   let signaling
   let pc
   let dc
+  // shared clipboard: file channel, item list (previews arrive separately), panel when open
+  let files
+  let clipItems = []
+  const clipPreviews = new Map()
+  let clipPanel
+  let peerList = new Map()
+  let copyReq = 0
+  const pendingCopies = new Map()
   let helloTimer
   let statsTimer
   let lastPli = 0
@@ -200,7 +212,7 @@ export function mountViewer(el, options) {
       screen.srcObject = e.streams[0] ?? new MediaStream([e.track])
       screen.play().catch(() => {})
     }
-    pc.ondatachannel = (e) => channel(e.channel)
+    pc.ondatachannel = (e) => (e.channel.label === 'pvfile' ? (files = new FileChannel(e.channel)) : channel(e.channel))
     pc.onconnectionstatechange = () => {
       if (['failed', 'closed'].includes(pc?.connectionState)) lost()
     }
@@ -253,6 +265,7 @@ export function mountViewer(el, options) {
     pc?.close()
     dc = undefined
     pc = undefined
+    files = undefined
     lastPli = 0
   }
 
@@ -267,6 +280,8 @@ export function mountViewer(el, options) {
     voice.stop()
     resetVideo()
     ann.reset()
+    clipItems = []
+    clipPanel?.setItems([])
     update()
     hello()
   }
@@ -288,6 +303,8 @@ export function mountViewer(el, options) {
         break
       case 'peers':
         hostPresent = m.list.some((p) => p.host)
+        peerList = new Map(m.list.map((p) => [p.id, p]))
+        clipPanel?.render()
         renderPeers(m.list)
         voice.setPeers(m.list)
         onPeers?.(m.list)
@@ -295,6 +312,22 @@ export function mountViewer(el, options) {
         break
       case 'end':
         lost()
+        return
+      case 'clip':
+        clipItems = m.items ?? []
+        for (const it of clipItems) if (clipPreviews.has(it.id)) it.preview = clipPreviews.get(it.id)
+        clipPanel?.setItems(clipItems)
+        break
+      case 'clip-preview':
+        clipPreviews.set(m.id, m.preview)
+        clipPanel?.setPreview(m.id, m.preview)
+        return
+      case 'clip-progress':
+        clipPanel?.received(m.id, m.received)
+        return
+      case 'copied':
+        pendingCopies.get(m.req)?.(m)
+        pendingCopies.delete(m.req)
         return
       case 'blocked':
         toast(m.why === 'focus' ? 'Zum Tippen zuerst in das geteilte Fenster klicken.' : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.')
@@ -354,11 +387,17 @@ export function mountViewer(el, options) {
     const allowed = hostPresent ? TOOLS[state.mode] ?? [] : []
     q('.pv-rec').hidden = !hostPresent || !state.recording
     q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false
-    q('.pv-dock').hidden = !toolbar || (!allowed.length && !(voiceEnabled && me))
+    q('.pv-dock').hidden = !toolbar || (!allowed.length && !me)
     for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.hidden = !allowed.includes(b.dataset.tool)
     q('[data-clear]').hidden = !allowed.length
-    q('.pv-tools-sep').hidden = !allowed.length || !voiceEnabled
+    q('.pv-tools-sep').hidden = !allowed.length || !me
     q('[data-voice]').hidden = !voiceEnabled || !me
+    const clipButton = q('[data-clip]')
+    clipButton.hidden = !me || !hostPresent
+    if (clipItems.length) clipButton.dataset.count = String(clipItems.length)
+    else delete clipButton.dataset.count
+    clipButton.classList.toggle('open', !!clipPanel)
+    if (clipPanel && (!me || !hostPresent)) closeClip()
     // (the state can arrive before the participant list says the presenter is there)
     if (hostPresent && !allowed.includes(tool) && tool !== 'point') setTool('point')
 
@@ -409,7 +448,9 @@ export function mountViewer(el, options) {
     const W = screen.videoWidth || 16
     const H = screen.videoHeight || 9
     const r = stage.getBoundingClientRect()
-    const s = Math.min(r.width / W, r.height / H)
+    // never enlarged beyond one video pixel per screen pixel (sharp text), only made smaller
+    // when the browser window is too small
+    const s = Math.min(r.width / W, r.height / H, 1 / (window.devicePixelRatio || 1))
     view.style.width = `${Math.floor(W * s)}px`
     view.style.height = `${Math.floor(H * s)}px`
   }
@@ -422,6 +463,143 @@ export function mountViewer(el, options) {
     if (voice.on) voice.stop()
     else voice.start().catch(() => (q('[data-voice]').dataset.tip = 'Kein Zugriff auf das Mikrofon'))
   })
+
+  // ------------------------------------------------------------ shared clipboard
+
+  function clipNotice(err) {
+    clipPanel?.toast(String(err?.message ?? err), { error: true })
+  }
+
+  function share(list) {
+    if (!files) return clipNotice('Noch nicht verbunden.')
+    for (const file of list) {
+      if (file.size > MAX_SIZE) {
+        clipNotice(`„${file.name}“ ist größer als 100 MB.`)
+        continue
+      }
+      const id = newId()
+      clipPanel?.progress(id, 0, 'up')
+      files
+        .upload(file, { id, onProgress: (f) => clipPanel?.progress(id, f, 'up') })
+        .then(() => clipPanel?.progress(id, null))
+        .catch((err) => {
+          clipPanel?.progress(id, null)
+          clipNotice(err)
+        })
+    }
+  }
+
+  const download = (item) => files.download(item, (f) => clipPanel?.progress(item.id, f, 'down')).finally(() => clipPanel?.progress(item.id, null))
+
+  function openClip() {
+    if (clipPanel) return clipPanel.focus()
+    clipPanel = new ClipPanel(el, {
+      peer: (id) => peerList.get(id) ?? {},
+      mine: (item) => item.from === me?.id,
+      canCopy: browserCopyable,
+      onClose: closeClip,
+      actions: {
+        add: share,
+        addFromPaste: (data) => share(filesFromClipboard(data)),
+        paste: () =>
+          readSystemClipboard()
+            .then((list) => (list.length ? share(list) : clipNotice('Die Zwischenablage ist leer.')))
+            .catch(() => clipNotice(`Bitte im Panel ${isMac ? '⌘V' : 'Strg+V'} drücken.`)),
+        copy: (item) => {
+          if (!files) return
+          // the clipboard write starts right in the click (Safari), the content follows
+          const blob = download(item).then((b) => (item.mime.startsWith('image/') ? asPng(b) : new Blob([b], { type: 'text/plain' })))
+          navigator.clipboard
+            .write([new ClipboardItem({ [item.mime.startsWith('image/') ? 'image/png' : 'text/plain']: blob })])
+            .then(() => clipPanel?.toast('In die Zwischenablage kopiert'))
+            .catch(() => clipNotice('Kopieren nicht möglich – bitte speichern.'))
+        },
+        save: (item) => files && download(item).then((b) => saveBlob(b, item.name)).catch(clipNotice),
+        remove: (item) => send({ t: 'clip-del', id: item.id }),
+      },
+    })
+    clipPanel.setItems(clipItems)
+    clipPanel.focus()
+    update()
+  }
+
+  function closeClip() {
+    clipPanel?.destroy()
+    clipPanel = undefined
+    update()
+  }
+
+  q('[data-clip]').addEventListener('click', () => (clipPanel ? closeClip() : openClip()))
+
+  // remote copy: the presenter presses its own copy shortcut, the result lands on our clipboard
+  function remoteCopy(cut) {
+    const req = ++copyReq
+    const reply = new Promise((resolve) => {
+      pendingCopies.set(req, resolve)
+      setTimeout(() => {
+        pendingCopies.delete(req)
+        resolve({ empty: true, timeout: true })
+      }, 5000)
+    })
+    send({ t: 'copy', req, cut })
+    const text = reply.then(async (r) => {
+      if (r.text != null) return r.text
+      if (r.textItem && files) return (await files.download({ id: r.textItem, size: 0, mime: 'text/plain' })).text()
+      throw new Error('kein Text')
+    })
+    if (typeof ClipboardItem === 'function') {
+      // started inside the key press, so every browser lets us write once the content arrives
+      const escape = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
+      navigator.clipboard
+        .write([
+          new ClipboardItem({
+            'text/plain': text.then((t) => new Blob([t], { type: 'text/plain' })),
+            'text/html': Promise.all([text, reply]).then(([t, r]) => new Blob([r.html ?? `<pre>${escape(t)}</pre>`], { type: 'text/html' })),
+          }),
+        ])
+        .catch(() => {})
+    }
+    reply.then(async (r) => {
+      if (r.image && files) {
+        try {
+          const blob = await files.download({ id: r.image, size: 0, mime: 'image/png' })
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+          toast('Bild in die Zwischenablage kopiert.')
+        } catch {
+          toast('Das Bild konnte nicht in die Zwischenablage gelegt werden.')
+        }
+      } else if (r.files?.length) {
+        toast(r.files.length === 1 ? `„${r.files[0].name}“ liegt in der gemeinsamen Zwischenablage.` : `${r.files.length} Dateien liegen in der gemeinsamen Zwischenablage.`)
+        openClip()
+      } else if (r.timeout) {
+        toast('Kopieren hat nicht geklappt – keine Antwort vom Host.')
+      }
+    })
+  }
+
+  // remote paste: our clipboard content goes onto the presenter's clipboard, which pastes natively
+  async function remotePaste(data) {
+    const text = data?.getData('text/plain') ?? ''
+    const html = data?.getData('text/html') ?? ''
+    const list = [...(data?.files ?? [])]
+    try {
+      if (text || html) {
+        if (text.length > 60000 && files) {
+          const id = await files.upload(new File([text], 'Text.txt', { type: 'text/plain' }), { hidden: true })
+          return send({ t: 'paste', textItem: id })
+        }
+        return send({ t: 'paste', text, html: html && html.length <= 60000 ? html : undefined })
+      }
+      if (list.length && files) {
+        toast(list.length === 1 ? `„${list[0].name}“ wird übertragen …` : `${list.length} Dateien werden übertragen …`)
+        const items = []
+        for (const file of list) items.push(await files.upload(file, { hidden: true }))
+        send({ t: 'paste', items })
+      }
+    } catch (err) {
+      toast(String(err?.message ?? err))
+    }
+  }
 
   // ------------------------------------------------------------ dock: drag & collapse
   // Position (as a fraction of the viewer) and collapsed state are remembered per browser.
@@ -579,7 +757,14 @@ export function mountViewer(el, options) {
   keys.addEventListener('keydown', (e) => {
     if (tool !== 'control' || e.isComposing || e.key === 'Dead' || e.key === 'Process' || MODIFIERS.includes(e.key)) return
     const cmd = isMac ? e.metaKey : e.ctrlKey
-    if (cmd && e.key.toLowerCase() === 'v') return
+    // each viewer's own shortcuts: ⌘C/⌘X on a Mac, Ctrl+C/Ctrl+X (or Ctrl+Insert / Shift+Delete) elsewhere
+    const key = e.key.toLowerCase()
+    if ((cmd && (key === 'c' || key === 'x')) || (!isMac && e.ctrlKey && key === 'insert') || (!isMac && e.shiftKey && key === 'delete')) {
+      e.preventDefault()
+      return remoteCopy(key === 'x' || key === 'delete')
+    }
+    // ⌘V / Ctrl+V / Shift+Insert: the browser's paste event follows
+    if ((cmd && key === 'v') || (!isMac && e.shiftKey && key === 'insert')) return
     if (!cmd && e.key.length === 1) return
     e.preventDefault()
     send({ t: 'key', key: e.key.length === 1 ? e.key.toLowerCase() : e.key, cmd, shift: e.shiftKey, alt: e.altKey })
@@ -593,8 +778,7 @@ export function mountViewer(el, options) {
   keys.addEventListener('compositionend', flushText)
   keys.addEventListener('paste', (e) => {
     e.preventDefault()
-    const s = e.clipboardData?.getData('text') ?? ''
-    if (s && tool === 'control') send({ t: 'text', s: s.slice(0, 10000) })
+    if (tool === 'control') remotePaste(e.clipboardData)
   })
 
   setTool('point')
@@ -615,6 +799,7 @@ export function mountViewer(el, options) {
       resetVideo()
       resizeObserver.disconnect()
       dockObserver.disconnect()
+      clipPanel?.destroy()
       clearTimeout(toastTimer)
       ann.destroy()
       el.replaceChildren()

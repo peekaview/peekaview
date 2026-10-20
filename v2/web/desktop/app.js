@@ -73,6 +73,15 @@ function setCollapsed(collapsed) {
 }
 $('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
 
+// ------------------------------------------------------------------ shared clipboard (own window)
+
+$('clip-btn').addEventListener('click', () => invoke('clip_window', {}).catch((e) => error(String(e))))
+listen('clip-window', (e) => $('clip-btn').classList.toggle('open', !!e.payload))
+listen('clip', (e) => {
+  const n = e.payload?.length ?? 0
+  $('clip-btn').title = n ? `Gemeinsame Zwischenablage (${n})` : 'Gemeinsame Zwischenablage'
+})
+
 function error(msg) {
   $('error').textContent = msg ?? ''
   $('error').hidden = !msg

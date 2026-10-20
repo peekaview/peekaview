@@ -1,9 +1,12 @@
 //! The presenter is the hub of a star of peer-to-peer WebRTC connections – one per viewer, each
-//! carrying the H.264 video track and a data channel. It takes over what a relay server would
-//! do: participant list, colors, routing by mode, and voice-chat signaling between viewers.
+//! carrying the H.264 video track, a data channel ("pv") and a second one for the shared
+//! clipboard's files ("pvfile", so big transfers never hold up pointers and input). It takes over
+//! what a relay server would do: participant list, colors, routing by mode, the clipboard store
+//! and voice-chat signaling between viewers.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
+    io::Read,
     sync::{
         atomic::{AtomicU32, Ordering},
         mpsc as std_mpsc, Arc, Mutex,
@@ -11,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
@@ -37,8 +40,14 @@ use rtc::{
 use super::signal::Signaling;
 use crate::{
     control::Cmd,
+    clip::Meta,
     session::{self, Mode, Shared},
 };
+
+/// Clipboard file chunks: small enough for every browser's data channel.
+const CHUNK: usize = 16 * 1024;
+/// Data a viewer's channel may buffer before sending waits (back-pressure for big files).
+const SEND_BUFFER: usize = 4 << 20;
 
 const COLORS: [&str; 10] = [
     "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6", "#d946ef", "#ec4899",
@@ -57,6 +66,8 @@ struct Viewer {
     voice: bool,
     pc: Arc<dyn PeerConnection>,
     dc: Option<Arc<dyn DataChannel>>,
+    /// clipboard previews this viewer already has (they are sent once, separately)
+    previews: HashSet<String>,
     track: Arc<TrackLocalStaticSample>,
     sender: Arc<dyn RtpSender>,
     ssrc: u32,
@@ -147,6 +158,7 @@ impl Hub {
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
         tauri::async_runtime::spawn(hub.clone().video(frames));
+        tauri::async_runtime::spawn(hub.clone().clip_changes());
         // viewers already waiting answer right away
         hub.signaling.send(&json!({ "type": "host" }));
         let beacon = hub.clone();
@@ -262,6 +274,7 @@ impl Hub {
             .with_interceptor_registry(registry)
             .with_handler(Arc::new(Events { hub: self.clone(), id, peer: peer.clone() }))
             .with_udp_addrs(vec!["0.0.0.0:0".to_string()])
+            .with_data_channel_send_buffer_limit(SEND_BUFFER)
             .build()
             .await
             .map_err(|e| e.to_string())?;
@@ -294,6 +307,10 @@ impl Hub {
             .create_data_channel("pv", Some(RTCDataChannelInit { ordered: true, ..Default::default() }))
             .await
             .map_err(|e| e.to_string())?;
+        let files = pc
+            .create_data_channel("pvfile", Some(RTCDataChannelInit { ordered: true, ..Default::default() }))
+            .await
+            .map_err(|e| e.to_string())?;
 
         self.viewers.lock().unwrap().insert(
             id,
@@ -304,6 +321,7 @@ impl Hub {
                 voice: false,
                 pc: pc.clone(),
                 dc: Some(dc.clone()),
+                previews: HashSet::new(),
                 track,
                 sender,
                 ssrc,
@@ -313,6 +331,7 @@ impl Hub {
             },
         );
         tauri::async_runtime::spawn(self.clone().channel(id, dc));
+        tauri::async_runtime::spawn(self.clone().files(id, files));
 
         let offer = pc.create_offer(None).await.map_err(|e| e.to_string())?;
         pc.set_local_description(offer).await.map_err(|e| e.to_string())?;
@@ -361,6 +380,7 @@ impl Hub {
                     let _ = dc.send_text(&json!({ "t": "welcome", "id": id, "name": name, "color": color, "ice": self.ice_json }).to_string()).await;
                     let _ = dc.send_text(&self.shared.state().to_string()).await;
                     self.announce_peers().await;
+                    self.announce_clip().await;
                     self.shared.need_key.store(true, Ordering::Relaxed);
                 }
                 DataChannelEvent::OnMessage(msg) => {
@@ -399,6 +419,15 @@ impl Hub {
                 }
             }
             "keyframe" => self.shared.need_key.store(true, Ordering::Relaxed),
+            "clip-del" => {
+                if self.shared.clip.remove(v["id"].as_str().unwrap_or(""), id) {
+                    self.shared.clip.changed.notify_one();
+                }
+            }
+            // remote copy & paste go to the controller like keystrokes
+            "copy" | "paste" if mode == Mode::Control => {
+                session::route_local(&self.app, &self.shared, &self.ctrl, &v);
+            }
             // microphone level of a voice participant, for the speaking indicator at their cursor
             "level" => {
                 v["v"] = json!(v["v"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0));
@@ -465,6 +494,171 @@ impl Hub {
         let msg = json!({ "t": "peers", "list": list });
         self.broadcast(&msg, None).await;
         session::route_local(&self.app, &self.shared, &self.ctrl, &msg);
+    }
+
+    // ------------------------------------------------------------------ shared clipboard
+
+    async fn clip_changes(self: Arc<Self>) {
+        while !self.shared.stop.load(Ordering::Relaxed) {
+            self.shared.clip.changed.notified().await;
+            self.announce_clip().await;
+        }
+    }
+
+    /// Item list to everybody: viewers get it without previews, which follow once per item
+    /// (data channel messages stay small); the presenter's windows get everything.
+    pub async fn announce_clip(&self) {
+        let items = self.shared.clip.list();
+        let _ = self.app.emit("clip", &items);
+        let bare: Vec<Value> = items
+            .iter()
+            .map(|m| {
+                let mut v = json!(m);
+                v.as_object_mut().map(|o| o.remove("preview"));
+                v
+            })
+            .collect();
+        let text = json!({ "t": "clip", "items": bare }).to_string();
+        let targets: Vec<(Arc<dyn DataChannel>, Vec<String>)> = {
+            let mut viewers = self.viewers.lock().unwrap();
+            viewers
+                .values_mut()
+                .filter_map(|v| {
+                    let dc = v.dc.clone()?;
+                    let mut missing = Vec::new();
+                    for m in items.iter().filter(|m| m.preview.is_some()) {
+                        if v.previews.insert(m.id.clone()) {
+                            missing.push(json!({ "t": "clip-preview", "id": m.id, "preview": m.preview }).to_string());
+                        }
+                    }
+                    Some((dc, missing))
+                })
+                .collect()
+        };
+        for (dc, previews) in targets {
+            let _ = dc.send_text(&text).await;
+            for p in previews {
+                let _ = dc.send_text(&p).await;
+            }
+        }
+    }
+
+    async fn clip_progress(&self, id: &str, received: u64) {
+        let msg = json!({ "t": "clip-progress", "id": id, "received": received });
+        let _ = self.app.emit("clip-progress", &msg);
+        self.broadcast(&msg, None).await;
+    }
+
+    /// The viewer's file channel: uploads arrive as `{t:'put', …}` followed by binary chunks;
+    /// `{t:'get', id, req}` asks for an item, served in order by [`serve`](Self::serve).
+    async fn files(self: Arc<Self>, id: u32, dc: Arc<dyn DataChannel>) {
+        let (get_tx, get_rx) = mpsc::unbounded_channel::<Value>();
+        tauri::async_runtime::spawn(self.clone().serve(dc.clone(), get_rx));
+        // current upload: item id, hidden (a transfer for remote paste)
+        let mut upload: Option<(String, bool)> = None;
+        let mut last_progress = Instant::now();
+        let reply = |v: Value| {
+            let dc = dc.clone();
+            async move {
+                let _ = dc.send_text(&v.to_string()).await;
+            }
+        };
+        while let Some(event) = dc.poll().await {
+            match event {
+                DataChannelEvent::OnMessage(msg) if msg.is_string => {
+                    let Ok(v) = serde_json::from_slice::<Value>(&msg.data) else { continue };
+                    match v["t"].as_str() {
+                        Some("put") => {
+                            if let Some((old, _)) = upload.take() {
+                                self.shared.clip.abort(&old);
+                            }
+                            let started = Meta::from_json(&v, id).and_then(|m| {
+                                let (item, hidden, empty) = (m.id.clone(), m.hidden, m.size == 0);
+                                self.shared.clip.begin(m).map(|_| (item, hidden, empty))
+                            });
+                            match started {
+                                Ok((item, hidden, true)) => {
+                                    reply(json!({ "t": "stored", "id": item })).await;
+                                    if !hidden {
+                                        self.shared.clip.changed.notify_one();
+                                    }
+                                }
+                                Ok((item, hidden, false)) => {
+                                    if !hidden {
+                                        self.shared.clip.changed.notify_one();
+                                    }
+                                    upload = Some((item, hidden));
+                                }
+                                Err(e) => reply(json!({ "t": "error", "id": v["id"], "error": e })).await,
+                            }
+                        }
+                        Some("get") => {
+                            let _ = get_tx.send(v);
+                        }
+                        _ => {}
+                    }
+                }
+                DataChannelEvent::OnMessage(msg) => {
+                    let Some((item, hidden)) = upload.clone() else { continue };
+                    match self.shared.clip.append(&item, &msg.data) {
+                        Ok((_, true)) => {
+                            upload = None;
+                            reply(json!({ "t": "stored", "id": item })).await;
+                            if !hidden {
+                                self.shared.clip.changed.notify_one();
+                            }
+                        }
+                        Ok((received, false)) => {
+                            if !hidden && last_progress.elapsed() >= Duration::from_millis(250) {
+                                last_progress = Instant::now();
+                                self.clip_progress(&item, received).await;
+                            }
+                        }
+                        Err(e) => {
+                            self.shared.clip.abort(&item);
+                            upload = None;
+                            reply(json!({ "t": "error", "id": item, "error": e })).await;
+                            self.shared.clip.changed.notify_one();
+                        }
+                    }
+                }
+                DataChannelEvent::OnClose => {
+                    if let Some((item, _)) = upload.take() {
+                        self.shared.clip.abort(&item);
+                        self.shared.clip.changed.notify_one();
+                    }
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Streams requested items to a viewer: `{t:'data', id, req, size}`, chunks, `{t:'end'}`.
+    async fn serve(self: Arc<Self>, dc: Arc<dyn DataChannel>, mut requests: mpsc::UnboundedReceiver<Value>) {
+        while let Some(v) = requests.recv().await {
+            let (item, req) = (v["id"].as_str().unwrap_or("").to_string(), v["req"].clone());
+            let Some((meta, path)) = self.shared.clip.get(&item) else {
+                let _ = dc.send_text(&json!({ "t": "error", "id": item, "req": req, "error": "nicht mehr vorhanden" }).to_string()).await;
+                continue;
+            };
+            let Ok(mut file) = std::fs::File::open(&path) else { continue };
+            if dc.send_text(&json!({ "t": "data", "id": item, "req": req, "size": meta.size }).to_string()).await.is_err() {
+                return;
+            }
+            let mut buf = vec![0u8; CHUNK];
+            loop {
+                let n = match file.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => n,
+                };
+                // waits while the channel's buffer is full
+                if dc.send(BytesMut::from(&buf[..n])).await.is_err() {
+                    return;
+                }
+            }
+            let _ = dc.send_text(&json!({ "t": "end", "id": item, "req": req }).to_string()).await;
+        }
     }
 
     // ------------------------------------------------------------------ outgoing

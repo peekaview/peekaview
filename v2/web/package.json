@@ -9,7 +9,7 @@
     ".": { "types": "./index.d.ts", "default": "./viewer.js" },
     "./react": { "types": "./react.d.ts", "default": "./react.js" }
   },
-  "files": ["viewer.js", "annotate.js", "icons.js", "voice.js", "signal.js", "vendor/noble-schnorr.js", "react.js", "index.d.ts", "react.d.ts"],
+  "files": ["viewer.js", "annotate.js", "icons.js", "voice.js", "signal.js", "clipboard.js", "vendor/noble-schnorr.js", "vendor/pdfjs/", "react.js", "index.d.ts", "react.d.ts"],
   "peerDependencies": { "react": ">=17" },
   "peerDependenciesMeta": { "react": { "optional": true } }
 }

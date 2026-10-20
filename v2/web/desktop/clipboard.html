@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de" style="background: transparent">
+<head>
+  <meta charset="utf-8">
+  <title>PeekaView – Zwischenablage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="clipwin">
+  <script type="module">
+    // The presenter's clipboard panel: a window of its own that can be dragged anywhere.
+    // Items live on this computer; files dropped here are copied in, ⌘V / Strg+V takes whatever
+    // is on the system clipboard, and "copy" puts an item on the system clipboard natively
+    // (files as files, images as images).
+    import { ClipPanel, pdfPreview } from '../clipboard.js'
+
+    const { invoke } = window.__TAURI__.core
+    const { listen } = window.__TAURI__.event
+
+    let peers = new Map()
+    const setPeers = (list) => (peers = new Map((Array.isArray(list) ? list : []).map((p) => [p.id, p])))
+    const previewing = new Set()
+
+    const fail = (err) => panel.toast(String(err?.message ?? err), { error: true })
+    const panel = new ClipPanel(document.body, {
+      fill: true,
+      nativeDrop: true,
+      peer: (id) => peers.get(id) ?? (id === 0 ? { name: 'Du' } : {}),
+      mine: () => true,
+      onGrip: (e) => {
+        if (e.button === 0) invoke('drag_window')
+      },
+      onClose: () => invoke('clip_window', { open: false }),
+      actions: {
+        add: (paths) => invoke('clip_add_paths', { paths }).catch(fail),
+        paste: () => invoke('clip_from_os').catch(fail),
+        copy: (item) => invoke('clip_copy', { id: item.id }).then(() => panel.toast('In die Zwischenablage kopiert')).catch(fail),
+        save: (item) =>
+          invoke('clip_save', { id: item.id })
+            .then((path) => panel.toast('In „Downloads“ gespeichert – anzeigen', { onClick: () => invoke('reveal', { path }) }))
+            .catch(fail),
+        remove: (item) => invoke('clip_remove', { id: item.id }),
+      },
+    })
+    panel.focus()
+
+    // PDF previews of the presenter's own items are rendered here (the store only does images)
+    async function previews(items) {
+      for (const item of items) {
+        if (item.mime !== 'application/pdf' || item.preview || item.received < item.size || previewing.has(item.id)) continue
+        previewing.add(item.id)
+        try {
+          const preview = await pdfPreview(await invoke('clip_read', { id: item.id }))
+          if (preview) invoke('clip_set_preview', { id: item.id, preview })
+        } catch {}
+      }
+    }
+
+    const show = (items) => {
+      panel.setItems(items)
+      previews(items)
+    }
+
+    setPeers(await invoke('peers'))
+    show(await invoke('clip_list'))
+    listen('clip', (e) => show(e.payload))
+    listen('clip-progress', (e) => panel.received(e.payload.id, e.payload.received))
+    listen('peers', (e) => {
+      setPeers(e.payload)
+      panel.render()
+    })
+    listen('tauri://drag-enter', () => panel.showDrop(true))
+    listen('tauri://drag-leave', () => panel.showDrop(false))
+    listen('tauri://drag-drop', (e) => {
+      panel.showDrop(false)
+      const paths = e.payload?.paths ?? []
+      if (paths.length) panel.options.actions.add(paths)
+    })
+  </script>
+</body>
+</html>
