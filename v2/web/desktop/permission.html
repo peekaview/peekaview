@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>PeekaView – Berechtigung</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="permission">
+  <main>
+    <div class="perm-head">
+      <span class="perm-icon" id="perm-icon"></span>
+      <div>
+        <h1 id="title"></h1>
+        <p class="muted small" id="lead"></p>
+      </div>
+    </div>
+
+    <div id="drag" class="drag-tile" title="In die Liste der Systemeinstellungen ziehen">
+      <img src="app-icon.png" alt="" id="app-icon" draggable="false">
+      <div><strong>PeekaView</strong><span>In die Liste ziehen</span></div>
+      <i data-icon="point"></i>
+    </div>
+
+    <ol class="steps" id="steps"></ol>
+
+    <div id="done" class="perm-done" hidden><i data-icon="check"></i><span></span></div>
+    <p id="note" class="perm-note">Dieses Fenster bleibt im Vordergrund, bis die Berechtigung erteilt ist.</p>
+
+    <div class="perm-actions">
+      <button id="open" class="pill secondary"><i data-icon="settings"></i>Einstellungen öffnen</button>
+      <button id="restart" class="pill primary" hidden><i data-icon="refresh"></i>Neu starten</button>
+    </div>
+  </main>
+  <script type="module" src="permission.js"></script>
+</body>
+</html>

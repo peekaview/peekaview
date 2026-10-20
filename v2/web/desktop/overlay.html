@@ -1,0 +1,33 @@
+<!doctype html>
+<html style="background: transparent; color-scheme: normal">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="overlay">
+  <div id="root"></div>
+  <div id="badge" class="badge" hidden></div>
+  <script type="module">
+    import { Annotations } from '../annotate.js'
+    import { icon } from '../icons.js'
+
+    const ann = new Annotations(document.getElementById('root'))
+    const badge = document.getElementById('badge')
+    badge.innerHTML = `${icon('share', 13)}Wird geteilt`
+
+    window.__TAURI__.event.listen('pv', (e) => {
+      try {
+        const m = JSON.parse(e.payload)
+        if (m.t === 'frame') {
+          badge.hidden = !m.live
+          badge.innerHTML = m.recording ? `${icon('record', 13)}Wird geteilt · Aufnahme läuft` : `${icon('share', 13)}Wird geteilt`
+        }
+        else if (m.t === 'reset') badge.hidden = true
+        ann.handle(m)
+      } catch (err) {
+        console.error(err)
+      }
+    })
+  </script>
+</body>
+</html>
