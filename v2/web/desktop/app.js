@@ -17,7 +17,8 @@ const renderIcons = (root = document) => {
 const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const site = () => $('site').value.trim().replace(/\/+$/, '')
 const lines = (id) => $(id).value.split(/\s+/).map((l) => l.trim()).filter(Boolean)
-const DEFAULT_SITE = 'http://localhost:8090'
+// empty: the viewer site is served over Nostr (nsite), published by this app itself
+const DEFAULT_SITE = ''
 
 let sources = []
 let kind = 'screen'
@@ -43,7 +44,7 @@ const voice = new Voice({
 })
 
 renderIcons()
-$('site').value = store.get('pv-site') ?? DEFAULT_SITE
+$('site').value = (store.get('pv-site') ?? DEFAULT_SITE).replace(/^http:\/\/localhost:8090\/?$/, '')
 $('relays').value = store.get('pv-relays') ?? ''
 $('turn-urls').value = store.get('pv-turn-urls') ?? ''
 $('turn-secret').value = store.get('pv-turn-secret') ?? ''
@@ -89,6 +90,23 @@ listen('settings', (e) => {
   renderRoomChoice()
 })
 listen('toast', (e) => toast(String(e.payload)))
+
+// the viewer site on Nostr: address and publishing state
+function renderNsite(st) {
+  const el = $('nsite')
+  el.hidden = !!site() || !st?.url
+  if (el.hidden) return
+  const states = { publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${st.error ?? ''}`, idle: 'noch nicht veröffentlicht' }
+  el.innerHTML = 'Über Nostr: <code></code> · <span></span> <button class="link" type="button">jetzt veröffentlichen</button>'
+  el.querySelector('code').textContent = st.url.replace(/^https:\/\//, '')
+  el.querySelector('span').textContent = states[st.state] ?? ''
+  el.classList.toggle('error', st.state === 'error')
+  el.querySelector('button').hidden = st.state === 'publishing'
+  el.querySelector('button').addEventListener('click', () => invoke('nsite_publish'))
+}
+listen('nsite', (e) => renderNsite(e.payload))
+invoke('nsite_status').then(renderNsite)
+$('site').addEventListener('input', () => invoke('nsite_status').then(renderNsite))
 
 // ------------------------------------------------------------------ which room to share into
 // a new link, the last one again ("Raumlink beibehalten", also in the tray menu), or a permanent room
@@ -338,6 +356,13 @@ async function start() {
       store.set('pv-keep-key', hosted.signingKey)
     }
     goLive(hosted, 'view')
+    // the link is ready to paste right away
+    invoke('copy_text', { text: hosted.link })
+      .then(() => {
+        markCopied()
+        toast('Link in der Zwischenablage – einfach einfügen und verschicken.')
+      })
+      .catch(() => {})
   } catch (e) {
     error(String(e))
     if (String(e).includes('Bildschirmaufnahme')) invoke('request_permission', { kind: 'screen' })
@@ -434,6 +459,10 @@ $('code-btn').addEventListener('click', async () => {
     document.execCommand('copy')
     tmp.remove()
   }
+  markCopied()
+})
+
+function markCopied() {
   const chip = $('code-btn')
   chip.classList.add('copied')
   chip.lastElementChild.outerHTML = icon('check', 17)
@@ -441,7 +470,7 @@ $('code-btn').addEventListener('click', async () => {
     chip.classList.remove('copied')
     chip.lastElementChild.outerHTML = icon('link', 17)
   }, 1500)
-})
+}
 
 listen('peers', (e) => {
   renderAvatars(e.payload)

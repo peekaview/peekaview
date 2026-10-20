@@ -61,6 +61,21 @@ pub fn public_key_b64(signing_key: [u8; 32]) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(keypair.x_only_public_key().0.to_byte_array())
 }
 
+/// A signed Nostr event (NIP-01) – e.g. for publishing the viewer site (nsite).
+pub fn sign_event(secret_key: [u8; 32], kind: u64, tags: Value, content: &str) -> Value {
+    let keypair = Keypair::from_secret_bytes(secret_key).unwrap_or_else(|_| Keypair::from_secret_bytes(new_signing_key()).expect("valid key"));
+    let pubkey = hex(&keypair.x_only_public_key().0.to_byte_array());
+    let created_at = now();
+    let id = sha256(json!([0, pubkey, created_at, kind, tags, content]).to_string());
+    let sig = schnorr::sign_no_aux_rand(&id, &keypair).to_byte_array();
+    json!({ "id": hex(&id), "pubkey": pubkey, "created_at": created_at, "kind": kind, "tags": tags, "content": content, "sig": hex(&sig) })
+}
+
+/// x-only public key of a secret key.
+pub fn public_key(secret_key: [u8; 32]) -> [u8; 32] {
+    Keypair::from_secret_bytes(secret_key).expect("valid key").x_only_public_key().0.to_byte_array()
+}
+
 #[derive(Clone)]
 pub struct Signaling {
     topic: String,

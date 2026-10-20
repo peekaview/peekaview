@@ -26,6 +26,7 @@ const STYLE = `
 .pv-clip-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 6px; }
 .pv-clip-head strong { flex: 1; font-weight: 650; }
 .pv-clip-head strong small { margin-left: 6px; color: var(--c-muted); font-weight: 500; }
+.pv-clip button { margin: 0; box-sizing: border-box; line-height: 1; }
 .pv-clip button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--c-muted); cursor: pointer; transition: background .15s, color .15s; }
 .pv-clip button:hover { background: var(--c-raised); color: var(--c-fg); }
 .pv-clip .pv-clip-grip { width: 18px; cursor: grab; touch-action: none; }

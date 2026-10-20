@@ -191,11 +191,14 @@ pub struct Session {
     hub: Arc<Hub>,
 }
 
-/// Brings shared windows to the front, the first one last (a shared screen needs nothing).
+/// Brings all shared windows to the front, the first one last so it ends up on top (a shared
+/// screen needs nothing).
 fn focus_streams(streams: &[Stream]) {
     for s in streams.iter().rev() {
         if let (Some(pid), Some(id)) = (s.pid, s.window_id) {
             crate::focus::bring_to_front(pid as u32, id);
+            // let the window server settle before the next app comes forward
+            std::thread::sleep(std::time::Duration::from_millis(80));
         }
     }
 }
@@ -346,7 +349,8 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
     *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, hub });
     // a permanent room waiting for remote access is this share now
     lobby::sync(&app, false);
-    let site = opts.site.trim().trim_end_matches('/');
+    // the viewer site: configured, or served over Nostr (nsite)
+    let site = crate::nsite::resolve(&app, &opts.site);
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
     // secret + signing key let the UI keep the same link for the next share
@@ -922,7 +926,7 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
     if active_secret(app).is_some() {
         return Err("Es läuft schon eine Freigabe".into());
     }
-    let site = crate::settings::text(app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    let site = crate::settings::text(app, "site").unwrap_or_default();
     let opts = StartOptions {
         site,
         name: crate::settings::text(app, "name").unwrap_or_else(|| "Host".into()),

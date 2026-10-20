@@ -73,9 +73,10 @@
       </section>
 
       <section id="settings" hidden>
-        <label>Zuschauer-Website <span class="muted">statische Seite, zu der der Link führt</span>
-          <input id="site" spellcheck="false" autocomplete="off">
+        <label>Zuschauer-Website <span class="muted">leer = über Nostr, ganz ohne eigenen Webserver</span>
+          <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
         </label>
+        <p id="nsite" class="hint nsite"></p>
         <label>Raum <span class="muted">optional, Raum-Schlüssel einer Integration</span>
           <input id="room" spellcheck="false" autocomplete="off" placeholder="wird automatisch erzeugt">
         </label>

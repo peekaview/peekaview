@@ -85,7 +85,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                 }
                 other => {
                     if let Some(room) = other.strip_prefix("copy:").and_then(|id| crate::rooms::get(app, id)) {
-                        let site = crate::settings::text(app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+                        let site = crate::nsite::resolve(app, &crate::settings::text(app, "site").unwrap_or_default());
                         let link = room.view(&site)["link"].as_str().unwrap_or_default().to_string();
                         if crate::clip::os::write(Some(link), None, None, &[]).is_ok() {
                             let _ = app.emit_to("main", "toast", format!("Link von „{}“ kopiert", room.name));

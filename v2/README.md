@@ -17,6 +17,17 @@ Screen sharing with **pointing, drawing, remote control, voice and session recor
                      STUN for direct connections · optional own TURN (coturn) for strict firewalls
 ```
 
+## The viewer site comes over Nostr
+
+Share links point to `https://<npub>.nsite.lol/#…`, not to a web server of our own.
+- **Publishing:** the desktop client carries the viewer site and publishes it itself as an **nsite** (NIP-5A), under a key of its own:
+  - the files go to public Blossom servers, addressed by their SHA-256;
+  - a signed manifest (kind 15128) maps each path to its hash;
+  - its server list (10063) and relay list (10002) let gateways find everything.
+- **When:** again whenever the bundled site changes, and otherwise once a week.
+- **Serving:** any nsite gateway serves the same files and checks their hashes. The gateway is the https origin of the page, so it is trusted like any web host.
+- **Own site:** an address entered under Einstellungen → Zuschauer-Website (e.g. your own static hosting) replaces the nsite.
+
 ## Layout
 
 | Path | What |

@@ -210,3 +210,7 @@ body.rooms main { max-width: 760px; margin: 0 auto; padding: 22px 22px 40px; }
 body.rooms .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); }
 .toast.error { background: #b91c1c; }
 .armed { background: rgba(239, 68, 68, .2) !important; color: #fca5a5 !important; width: auto !important; padding: 0 10px !important; }
+.nsite { margin-top: 6px; line-height: 1.5; }
+.nsite code { color: var(--fg); font: 11.5px ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
+.nsite.error span { color: #fca5a5; }
+.nsite .link { padding: 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }

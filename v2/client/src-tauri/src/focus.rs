@@ -27,6 +27,7 @@ mod imp {
         fn CFArrayGetCount(array: CFTypeRef) -> isize;
         fn CFArrayGetValueAtIndex(array: CFTypeRef, index: isize) -> CFTypeRef;
         fn CFRelease(value: CFTypeRef);
+        static kCFBooleanTrue: CFTypeRef;
     }
 
     fn cf(s: &str) -> objc2_core_foundation::CFRetained<CFString> {
@@ -61,11 +62,25 @@ mod imp {
         found
     }
 
-    unsafe fn raise(pid: i32, window_id: u32) {
-        with_window(pid, window_id, |window| {
+    /// Raises exactly this window and makes its app the frontmost one – through the accessibility
+    /// API, which (unlike activating an app) also works when PeekaView is not the active app
+    /// itself, e.g. for the second of several shared windows.
+    unsafe fn raise(pid: i32, window_id: u32) -> bool {
+        let raised = with_window(pid, window_id, |window| {
+            let main = cf("AXMain");
+            AXUIElementSetAttributeValue(window, (&*main as *const CFString).cast(), kCFBooleanTrue);
             let action = cf("AXRaise");
             AXUIElementPerformAction(window, (&*action as *const CFString).cast());
         });
+        if raised {
+            let app = AXUIElementCreateApplication(pid);
+            if !app.is_null() {
+                let front = cf("AXFrontmost");
+                AXUIElementSetAttributeValue(app, (&*front as *const CFString).cast(), kCFBooleanTrue);
+                CFRelease(app);
+            }
+        }
+        raised
     }
 
     /// Moves / resizes a window (screen points, top-left origin).
@@ -89,9 +104,12 @@ mod imp {
     }
 
     pub fn bring_to_front(pid: u32, window_id: u32) {
-        unsafe { raise(pid as i32, window_id) };
+        if unsafe { raise(pid as i32, window_id) } {
+            return;
+        }
+        // without the accessibility permission: activate the app (allowed while PeekaView is the
+        // active app, i.e. right after the user clicked its toolbar)
         if let Some(app) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid as i32) {
-            // allowed: PeekaView is the active app (the user just clicked its toolbar)
             app.activateWithOptions(NSApplicationActivationOptions(0));
         }
     }

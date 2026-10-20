@@ -9,6 +9,7 @@ mod invite;
 mod p2p;
 #[cfg(target_os = "macos")]
 mod macos;
+mod nsite;
 mod permissions;
 mod recording;
 mod resume;
@@ -158,6 +159,24 @@ fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
 
 // ------------------------------------------------------------------ settings & permanent rooms
 
+/// The viewer site on Nostr: {url, state: idle|publishing|ok|error, error?, published?}.
+#[tauri::command]
+fn nsite_status(app: AppHandle) -> serde_json::Value {
+    nsite::status(&app)
+}
+
+/// Publishes the viewer site on Nostr again now.
+#[tauri::command]
+fn nsite_publish(app: AppHandle) {
+    nsite::publish_if_needed(&app, true);
+}
+
+/// Puts text on the system clipboard (the share link right after starting).
+#[tauri::command]
+fn copy_text(text: String) -> Result<(), String> {
+    clip::os::write(Some(text), None, None, &[])
+}
+
 #[tauri::command]
 fn get_settings(app: AppHandle) -> serde_json::Value {
     settings::get(&app)
@@ -174,7 +193,7 @@ fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
 
 #[tauri::command]
 fn rooms_list(app: AppHandle) -> Vec<serde_json::Value> {
-    let site = settings::text(&app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    let site = nsite::resolve(&app, &settings::text(&app, "site").unwrap_or_default());
     rooms::all(&app).iter().map(|r| r.view(&site)).collect()
 }
 
@@ -188,7 +207,7 @@ fn rooms_changed(app: &AppHandle) {
 fn room_save(app: AppHandle, room: serde_json::Value) -> Result<serde_json::Value, String> {
     let saved = rooms::save(&app, &room)?;
     rooms_changed(&app);
-    let site = settings::text(&app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    let site = nsite::resolve(&app, &settings::text(&app, "site").unwrap_or_default());
     Ok(saved.view(&site))
 }
 
@@ -459,6 +478,8 @@ fn main() {
             }
             // permanent rooms with remote access wait for viewers
             p2p::lobby::sync(app.handle(), false);
+            // the viewer site, served over Nostr
+            nsite::publish_if_needed(app.handle(), false);
             // keep the toolbar out of screen captures (macOS: the capture filter excludes our windows)
             #[cfg(not(target_os = "macos"))]
             if let Some(main) = app.get_webview_window("main") {
@@ -533,6 +554,9 @@ fn main() {
             peers,
             admit,
             get_settings,
+            copy_text,
+            nsite_status,
+            nsite_publish,
             set_settings,
             rooms_list,
             room_save,

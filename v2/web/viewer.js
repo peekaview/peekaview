@@ -33,6 +33,9 @@ const CSS = `
   -webkit-font-smoothing: antialiased; user-select: none;
 }
 .pv-viewer [hidden] { display: none !important; }
+/* independent of the embedding page's styles */
+.pv-viewer button { margin: 0; box-sizing: border-box; font: inherit; line-height: 1; }
+.pv-viewer svg { flex: none; }
 .pv-glass { background: var(--pv-glass); border: 1px solid var(--pv-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
 .pv-stage { position: absolute; inset: 0; display: grid; place-items: center; }
 .pv-view { position: relative; touch-action: none; }

@@ -14,7 +14,7 @@ static SETTINGS: Mutex<Option<Value>> = Mutex::new(None);
 /// viewers may resize, arrange and activate shared windows on the presenter's screen (control mode)
 static ALLOW_RESIZE: AtomicBool = AtomicBool::new(false);
 
-const KEYS: [&str; 7] = ["site", "name", "relays", "turn_urls", "turn_secret", "keep_link", "allow_resize"];
+const KEYS: [&str; 8] = ["site", "name", "relays", "turn_urls", "turn_secret", "keep_link", "allow_resize", "nsite_gateway"];
 
 fn file(app: &AppHandle) -> Option<std::path::PathBuf> {
     let dir = app.path().app_data_dir().ok()?;
