@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["client/src-tauri"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# keep JPEG encoding / frame diffing usable in debug builds
+[profile.dev.package."*"]
+opt-level = 3

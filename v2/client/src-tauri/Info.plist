@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>PeekaView nutzt das Mikrofon für den Sprachkanal und – wenn du eine Sitzung aufzeichnest – für das Transkript.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>PeekaView wandelt das Gespräch einer aufgezeichneten Sitzung lokal auf deinem Mac in Text um.</string>
+</dict>
+</plist>

@@ -1,0 +1,204 @@
+# PeekaView v2
+
+Screen sharing with **pointing, drawing, remote control, voice and session recording**, peer-to-peer and without a server of its own.
+
+- Sharing always goes through the **native desktop client** (Rust/Tauri), a small toolbar at the top of the screen.
+- Watching only needs a **browser**: either a **static website** or the embeddable module / React component.
+
+```
+ Desktop client (Rust/Tauri)                                                  Browser (static page)
+ ┌──────────────────────────────┐   WebRTC, end-to-end encrypted, direct    ┌──────────────────────┐
+ │ SCK · WGC → HW H.264         │═══ video track ═══════════════════════════▶│ <video> (HW decode)  │
+ │ hub: peers, modes, routing   │◀══ data channel: pointer, ink, input ════▶│ point · draw · control│
+ │ overlay · input guard · rec. │◀══ voice (mesh) ══════════════════════════▶│ voice                │
+ └──────────────┬───────────────┘                                            └──────────┬───────────┘
+                │      connection setup only (encrypted, a few KB):                     │
+                └─────────────▶  public Nostr relays  ◀─────────────────────────────────┘
+                     STUN for direct connections · optional own TURN (coturn) for strict firewalls
+```
+
+## Layout
+
+| Path | What |
+|---|---|
+| `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
+| `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
+| `web/desktop/` | UI of the desktop client in the same design |
+| `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
+
+## How the connection works
+
+**The link**
+- A share link looks like `https://<viewer-site>/#<room secret>.<presenter key>`.
+- Everything after `#` stays in the browser and never reaches the web server.
+- The **room secret** (128 bit) addresses the room and encrypts the connection setup.
+- The **presenter key** pins who may act as presenter.
+
+**Signaling over Nostr**
+- Participants find each other through public Nostr relays (configurable).
+- Messages are ephemeral events: relays don't store them.
+- Each one is AES-256-GCM encrypted with a key derived from the room secret.
+- Participants sign with throw-away keys; the presenter signs with the key from the link.
+- Viewers accept presenter messages only with a valid signature of that key, so somebody who only knows the room secret cannot pose as the presenter.
+
+**After that, everything is P2P**
+- WebRTC runs as a star around the presenter: a video track and a data channel per viewer.
+- Voice runs as a mesh between participants, with the presenter forwarding its signaling.
+- ICE candidates trickle as soon as they are found. From opening the link to the first picture takes **about 0.5–0.8 s**, measured over public relays.
+- WebRTC is end-to-end encrypted (DTLS-SRTP). The presenter does what a server would otherwise do: participant list, colors, routing by mode.
+
+**Firewalls**
+- STUN usually gets a direct connection.
+- Where it does not, a TURN server relays the encrypted traffic. Typical cases are symmetric NAT on both sides or corporate firewalls blocking UDP.
+- TURN is optional; an existing coturn with `use-auth-secret` works, for example the one from v1.
+- The **TURN secret only lives in the desktop client** (settings), or an integration hands over ready-made credentials.
+- From it the client derives short-lived credentials for each session and passes them to the viewers inside the encrypted signaling. The website never contains a secret.
+- If a viewer cannot connect, they get a clear message after 15 s saying that a TURN server is needed.
+
+**What relays and others can see**
+- Relays see IP addresses, timing and a pseudonymous room hash. They do not see content, names or IP candidates; those are encrypted.
+- Anybody with the link can join, just like a meeting link without a password.
+- Viewer names and colors are self-declared.
+- Inside an integration (e.g. meetzi), the integration decides who gets the room secret.
+
+## Roles and permissions
+
+The presenter chooses what viewers may do:
+
+| Mode | Viewers can … |
+|---|---|
+| **Ansehen** | watch |
+| **Zeigen & Malen** | move their own colored, labelled cursor, send pings, draw fading strokes |
+| **Steuern** | additionally use mouse, wheel and keyboard (clipboard text is typed) |
+
+Everybody can join the **voice chat** from the microphone button.
+
+Cursors and strokes appear for every viewer. They also appear on the presenter's desktop in a click-through overlay that never shows up in captures.
+
+**Sharing a single window**
+- **Picture:** only that window is captured (ScreenCaptureKit single-window filter / Windows.Graphics.Capture for the window).
+- **Input:** works only while the window is **in the foreground** and only **inside it**.
+  - Clicks land only where it is the topmost normal window. They never land on PeekaView's own windows.
+  - Drags are clamped to the window.
+  - Keystrokes go through only while it has the focus.
+  - Shortcuts that switch apps are dropped.
+  - Viewers see a "Steuerung pausiert" hint while the window is not in front.
+- **macOS limitation:** macOS blocks synthetic keystrokes while any password field is focused ("Secure Input").
+
+## Desktop client
+
+- **Toolbar**
+  - Idle: Teilen (opens a picker with thumbnails) · settings · quit.
+  - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
+  - The selected source has a red frame on the desktop.
+- **Restarts:** after macOS restarts the app for a permission, the share continues automatically. It keeps the same room, the same link and the same mode, and viewers reconnect on their own.
+- **Permissions:** if screen recording or accessibility is missing, a helper stays next to System Settings until it is granted. It offers the app icon to drag into the list and explains each step.
+- **Settings**
+  - viewer website address
+  - Nostr relays
+  - TURN servers and TURN secret
+  - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
+
+## Session recording
+
+**Sitzung aufzeichnen** writes a self-contained HTML report to `~/Documents/PeekaView/`:
+- **Screenshots:** a screenshot of the shared source on every click or ping (position marked) and after text entry. Keystrokes themselves are never stored.
+- **Transcript:** the conversation, placed under the matching screenshot.
+  - macOS: on-device Apple speech recognition.
+  - Otherwise: OpenAI `gpt-4o-transcribe`.
+
+Viewers see that the session is being recorded.
+
+## Performance
+
+**macOS**
+- ScreenCaptureKit delivers GPU frames with zero copy.
+- VideoToolbox **hardware H.264** encodes them (Constrained Baseline, which every browser negotiates).
+- The resulting samples go straight into the WebRTC track. Only changed frames are sent.
+- Browsers request keyframes with PLI. The viewer forwards these over the data channel, and the presenter answers with a fresh keyframe.
+
+**Windows**
+- Windows.Graphics.Capture delivers the window or screen as a GPU texture (no yellow border, no cursor).
+- The D3D11 video processor converts it to NV12 and scales it on the GPU.
+- The **Media Foundation H.264 encoder** takes the texture directly. That is the hardware encoder of the GPU vendor: Intel Quick Sync, NVIDIA NVENC or AMD AMF.
+- Settings: Constrained Baseline, CBR, low latency, keyframes on request.
+- Without a hardware encoder, Microsoft's software MFT takes over.
+- Type-checked, but not yet run on real Windows hardware.
+
+**Linux:** software encoder (openh264) for now. The planned path is Wayland only: the ScreenCast portal with PipeWire, the RemoteDesktop portal for input, and VA-API for encoding.
+
+Each viewer gets its own upstream from the presenter. That suits support and team sessions; for large audiences an SFU would be the next step.
+
+## Running it
+
+Serve the viewer site with any static server. In production, use HTTPS and `Cache-Control: no-cache` for `.js`.
+
+```bash
+python3 -m http.server -d web 8090
+```
+
+Build the desktop client as an app bundle:
+
+```bash
+cd client && npx @tauri-apps/cli@2 build --debug --bundles app
+```
+
+CI (`.github/workflows/v2-client.yml`) runs the unit tests and builds Windows, macOS and Linux bundles.
+
+Run the unit tests: VideoToolbox encoder, TURN credentials, report helpers.
+
+```bash
+cargo test -p peekaview
+```
+
+The live tests need screen recording permission and network:
+
+```bash
+cargo test -p peekaview -- --ignored
+```
+
+For development, a debug build can start a share by itself:
+
+```bash
+PEEKAVIEW_DEV_SHARE=screen:<id> PEEKAVIEW_DEV_MODE=draw ./target/debug/peekaview
+```
+
+Debug builds are signed ad hoc, so macOS asks for permissions again after each build. A stable signing identity avoids that.
+
+## Embedding the viewer
+
+```js
+import { mountViewer, peerColor } from '@peekaview/viewer'
+
+const viewer = mountViewer(element, {
+  room: '<secret>.<presenterKey>',   // the "#…" part of a share link (or just the secret)
+  name: 'Anna',
+  color: peerColor(sessionId),
+  voice: true,                       // built-in voice chat; off if the host app has audio
+  relays: ['wss://relay.example.com'], // optional, default: public relays
+  onStatus: (s) => {},               // connecting | waiting | loading | live | paused | blocked | error
+})
+viewer.destroy()
+```
+
+React:
+
+```jsx
+import { PeekaViewer } from '@peekaview/viewer/react'
+
+<PeekaViewer room={room} name={me.name} color={me.color} voice={false} />
+```
+
+An integration can open the desktop client prepared for its room. The person still picks what to share.
+
+```
+peekaview://share?room=<secret>&name=Anna&color=%23ef4444&ice=<json>&relays=<json>&site=<viewer site>
+```
+
+## Not done yet / next steps
+
+- Windows: test on real hardware (Intel, NVIDIA, AMD; DPI scaling; input guard).
+- Linux: Wayland portals (ScreenCast, RemoteDesktop) and VA-API.
+- Popup menus of a shared *window* are separate OS windows. Viewers don't see them, and clicks on them are refused.
+- Bandwidth adaptation (congestion feedback → encoder bitrate).
+- Code signing / notarization, auto-update.

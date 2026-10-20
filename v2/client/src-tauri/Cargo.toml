@@ -1,0 +1,64 @@
+[package]
+name = "peekaview"
+version = "2.0.0"
+description = "PeekaView – minimal screen sharing with pointing, drawing and remote control"
+edition = "2021"
+license = "AGPL-3.0"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "macros"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+xcap = "0.9"
+enigo = "0.6"
+base64 = "0.22"
+ureq = "3"
+# peer-to-peer: WebRTC, Nostr signaling (Schnorr signatures, AES-GCM), TURN REST credentials
+webrtc = "0.21"
+rtc = "0.21"
+async-trait = "0.1"
+bytes = "1"
+secp256k1 = "0.33"
+aes-gcm = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+sha1 = "0.10"
+getrandom = "0.3"
+# same version as xcap uses; adds JPEG for the picker thumbnails
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = { version = "11", features = ["macos_14_2"] }
+drag = "2"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSRunningApplication"] }
+objc2-speech = "0.3"
+block2 = "0.6"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+openh264 = "0.9"
+# tauri-plugin-deep-link 2.6 builds ini::ParseOption with two fields; rust-ini 0.21.2 added more
+rust-ini = "=0.21.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+# capture + hardware encoding: Windows.Graphics.Capture, D3D11, Media Foundation (same version as xcap)
+windows = { version = "0.62", features = [
+  "Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11",
+  "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_System_Com",
+  "Win32_System_Ole", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
+] }
