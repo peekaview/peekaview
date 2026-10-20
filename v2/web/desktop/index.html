@@ -66,9 +66,7 @@
         </div>
         <div id="grid" class="grid"></div>
         <div class="panel-foot">
-          <label class="check keep" title="Der Link bleibt bei jeder Freigabe derselbe – praktisch für feste Termine. Wer ihn kennt, muss trotzdem erst zugelassen werden.">
-            <input type="checkbox" id="keep-link"> Link beibehalten
-          </label>
+          <select id="room-choice" class="room-choice" title="In welchen Raum geteilt wird – wer den Link kennt, muss trotzdem erst zugelassen werden"></select>
           <input id="name" maxlength="32" placeholder="Dein Name">
           <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>
         </div>
@@ -81,6 +79,8 @@
         <label>Raum <span class="muted">optional, Raum-Schlüssel einer Integration</span>
           <input id="room" spellcheck="false" autocomplete="off" placeholder="wird automatisch erzeugt">
         </label>
+
+        <button id="rooms-btn" class="pill secondary rooms-btn" type="button"><i data-icon="link"></i>Raumlinks &amp; Remote-Zugriff …</button>
 
         <h3>Verbindung</h3>
         <p class="hint">Bild, Ton und Steuerung laufen direkt zwischen den Rechnern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>

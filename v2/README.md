@@ -117,6 +117,26 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - TURN servers and TURN secret
   - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
 
+## Permanent room links and remote access
+
+The tray / menu bar icon shows or hides the toolbar with a click. Its menu offers:
+- **Raumlink beibehalten:** every share reuses the last link.
+- **Resize erlauben:** a viewer who resizes a window in their window manager resizes the real window on this screen, so it shows 1:1 for them. This needs remote control.
+- **Raumlink kopieren:** copies the link of one of the permanent rooms.
+- **Raumlinks & Remote-Zugriff …:** opens the room manager.
+
+**Permanent room links** never change unless you renew them. You can have as many as you like, each with:
+- **PIN (optional):** viewers wait for approval as usual, and below that they get a PIN field. If you are not at your desk, they can come in with the PIN instead.
+  - The PIN never travels: the viewer answers a one-time challenge with HMAC(PBKDF2(PIN)).
+  - After 5 wrong tries a viewer is turned away. After 20 wrong tries in 10 minutes the PIN is locked for everybody.
+  - Only the PBKDF2 key is stored.
+- **Remote-Zugriff:** the room waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
+  - a session in that room with remote control on;
+  - the room's chosen **applications** in the dock, marked as such, and **Gesamter Desktop** if enabled.
+  - Starting one launches it on this computer, or brings it forward if it runs already, and shares its window. The session ends a minute after the last viewer left.
+
+Sharing from the picker can also go into a permanent room ("Raum: …").
+
 ## Shared clipboard
 
 Everybody in the session, the presenter included, can open a small **Zwischenablage** panel and drag it anywhere.

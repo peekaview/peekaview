@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Raumlinks & Remote-Zugriff</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="rooms">
+  <main>
+    <header class="rooms-head">
+      <div>
+        <h1>Raumlinks &amp; Remote-Zugriff</h1>
+        <p class="muted">Dauerhafte Links bleiben immer gleich. Wer beitreten will, wird von dir zugelassen – oder kommt mit der PIN des Raums herein. Mit Remote-Zugriff wartet der Raum auch, wenn du gerade nichts teilst, und Zuschauer können die freigegebenen Anwendungen selbst starten.</p>
+      </div>
+      <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raumlink</button>
+    </header>
+    <div id="list" class="room-list"></div>
+    <p id="empty" class="empty" hidden>Noch keine dauerhaften Raumlinks.</p>
+  </main>
+
+  <div id="picker" class="app-picker" hidden>
+    <div class="app-picker-box glass">
+      <div class="panel-head"><strong>Anwendung freigeben</strong><button id="picker-close" class="icon-btn" data-icon="close"></button></div>
+      <input id="search" placeholder="Suchen …" autocomplete="off" spellcheck="false">
+      <div id="apps" class="app-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
+
+  <script type="module">
+    import { icon } from '../icons.js'
+
+    const { invoke } = window.__TAURI__.core
+    const { listen } = window.__TAURI__.event
+    const $ = (id) => document.getElementById(id)
+    const renderIcons = (root = document) => {
+      for (const el of root.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 16)
+    }
+    renderIcons()
+
+    let rooms = []
+    let installed = null
+    let pickingFor = null
+
+    function toast(text, error = false) {
+      const t = $('toast')
+      t.querySelector('span').textContent = text
+      t.classList.toggle('error', error)
+      t.hidden = false
+      clearTimeout(toast.timer)
+      toast.timer = setTimeout(() => (t.hidden = true), error ? 5000 : 2500)
+    }
+    const fail = (e) => toast(String(e), true)
+    // destructive actions want a second click (no dialogs in the app's web view)
+    function twice(button, question, action) {
+      button.addEventListener('click', () => {
+        if (button.dataset.armed) {
+          delete button.dataset.armed
+          return action()
+        }
+        const before = button.innerHTML
+        button.dataset.armed = '1'
+        button.classList.add('armed')
+        button.title = question
+        button.textContent = 'Sicher?'
+        setTimeout(() => {
+          delete button.dataset.armed
+          button.classList.remove('armed')
+          button.innerHTML = before
+        }, 3000)
+      })
+    }
+    const save = (room, patch) => invoke('room_save', { room: { ...room, ...patch } }).catch(fail)
+
+    function render() {
+      $('empty').hidden = rooms.length > 0
+      $('list').replaceChildren(...rooms.map(card))
+    }
+
+    function card(room) {
+      const el = document.createElement('section')
+      el.className = 'room-card glass'
+      el.innerHTML = `
+        <div class="room-top">
+          <input class="room-name" maxlength="60">
+          <button class="icon-btn" data-delete title="Raumlink löschen">${icon('trash', 16)}</button>
+        </div>
+        <div class="room-link"><code></code>
+          <button class="pill secondary" data-copy>${icon('copy', 15)}Kopieren</button>
+          <button class="pill secondary" data-renew title="Neuer Link – der alte funktioniert dann nicht mehr">${icon('refresh', 15)}Neu</button>
+        </div>
+        <div class="room-row">
+          <span class="room-label">PIN</span>
+          <span class="room-pin-state"></span>
+          <input class="room-pin" type="password" inputmode="numeric" placeholder="neue PIN" autocomplete="new-password">
+          <button class="pill secondary" data-pin>Setzen</button>
+          <button class="pill secondary" data-unpin>Entfernen</button>
+        </div>
+        <label class="check room-remote"><input type="checkbox" data-remote> Remote-Zugriff – der Raum wartet auch, wenn nichts geteilt wird; Zuschauer können freigegebene Anwendungen starten</label>
+        <div class="room-apps" hidden>
+          <div class="chips"></div>
+          <div class="room-row">
+            <button class="pill secondary" data-add-app>${icon('window', 15)}Anwendung hinzufügen</button>
+            <label class="check"><input type="checkbox" data-desktop> Gesamter Desktop</label>
+          </div>
+        </div>`
+      const q = (s) => el.querySelector(s)
+      q('.room-name').value = room.name
+      q('.room-name').addEventListener('change', () => save(room, { name: q('.room-name').value }))
+      q('code').textContent = room.link
+      q('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(room.link).then(() => toast('Link kopiert')).catch(fail))
+      twice(q('[data-renew]'), 'Der bisherige Link funktioniert dann nicht mehr.', () => invoke('room_renew', { id: room.id }).catch(fail))
+      twice(q('[data-delete]'), `Raumlink „${room.name}“ löschen`, () => invoke('room_delete', { id: room.id }).catch(fail))
+      q('.room-pin-state').textContent = room.pin ? 'gesetzt' : 'keine'
+      q('.room-pin-state').classList.toggle('on', room.pin)
+      q('[data-unpin]').hidden = !room.pin
+      q('[data-pin]').addEventListener('click', () => {
+        const pin = q('.room-pin').value.trim()
+        if (pin.length < 4) return fail('Die PIN braucht mindestens 4 Zeichen.')
+        q('[data-pin]').disabled = true
+        invoke('room_pin', { id: room.id, pin })
+          .then(() => toast('PIN gesetzt'))
+          .catch(fail)
+          .finally(() => (q('[data-pin]').disabled = false))
+      })
+      q('[data-unpin]').addEventListener('click', () => invoke('room_pin', { id: room.id, pin: null }).then(() => toast('PIN entfernt')).catch(fail))
+      const remote = q('[data-remote]')
+      remote.checked = room.remote
+      q('.room-apps').hidden = !room.remote
+      remote.addEventListener('change', () => save(room, { remote: remote.checked }))
+      q('[data-desktop]').checked = room.desktop
+      q('[data-desktop]').addEventListener('change', (e) => save(room, { desktop: e.target.checked }))
+      q('.chips').replaceChildren(
+        ...room.apps.map((app) => {
+          const chip = document.createElement('span')
+          chip.className = 'app-chip'
+          chip.innerHTML = '<span></span><button title="Entfernen"></button>'
+          chip.querySelector('span').textContent = app.name
+          chip.querySelector('button').innerHTML = icon('close', 12)
+          chip.querySelector('button').addEventListener('click', () => save(room, { apps: room.apps.filter((a) => a.id !== app.id) }))
+          return chip
+        }),
+      )
+      q('[data-add-app]').addEventListener('click', () => openPicker(room))
+      return el
+    }
+
+    async function openPicker(room) {
+      pickingFor = room
+      $('picker').hidden = false
+      $('search').value = ''
+      $('search').focus()
+      installed ??= await invoke('apps_installed')
+      renderApps()
+    }
+
+    function renderApps() {
+      const term = $('search').value.trim().toLowerCase()
+      const have = new Set(pickingFor?.apps.map((a) => a.path))
+      const list = (installed ?? []).filter((a) => !have.has(a.path) && a.name.toLowerCase().includes(term)).slice(0, 200)
+      $('apps').replaceChildren(
+        ...list.map((app) => {
+          const b = document.createElement('button')
+          b.className = 'app-item'
+          b.textContent = app.name
+          b.title = app.path
+          b.addEventListener('click', () => {
+            const room = pickingFor
+            $('picker').hidden = true
+            save(room, { apps: [...room.apps, { name: app.name, path: app.path }] })
+          })
+          return b
+        }),
+      )
+    }
+    $('search').addEventListener('input', renderApps)
+    $('picker-close').addEventListener('click', () => ($('picker').hidden = true))
+    $('picker').addEventListener('click', (e) => e.target === $('picker') && ($('picker').hidden = true))
+    $('add').addEventListener('click', () => invoke('room_save', { room: { name: '' } }).catch(fail))
+
+    listen('rooms', (e) => {
+      rooms = e.payload ?? []
+      if (pickingFor) pickingFor = rooms.find((r) => r.id === pickingFor.id) ?? null
+      render()
+    })
+    rooms = await invoke('rooms_list')
+    render()
+  </script>
+</body>
+</html>

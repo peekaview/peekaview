@@ -37,7 +37,10 @@ use rtc::{
     rtp_transceiver::rtp_sender::{RTCRtpCodec, RTCRtpCodecParameters, RTCRtpCodingParameters, RTCRtpEncodingParameters, RtpCodecKind},
 };
 
-use super::signal::Signaling;
+use super::{
+    admission::{Admission, Hello, PinResult},
+    signal::Signaling,
+};
 use crate::{
     control::Cmd,
     clip::Meta,
@@ -93,15 +96,9 @@ pub struct Hub {
     host: Mutex<(String, String, bool)>,
     viewers: Mutex<HashMap<u32, Viewer>>,
     next_id: AtomicU32,
-    /// nobody gets in without the presenter's OK: admitted / turned away signaling peer ids,
-    /// and open requests (their hello, last seen)
-    admitted: Mutex<HashSet<String>>,
-    denied: Mutex<HashSet<String>>,
-    requests: Mutex<Vec<(String, Value, Instant)>>,
+    /// nobody gets in without the presenter's OK (or the room's PIN)
+    admission: Mutex<Admission>,
 }
-
-/// A request disappears when its viewer stops asking (closed the page).
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 
 struct Events {
     hub: Arc<Hub>,
@@ -142,7 +139,7 @@ impl Hub {
         host: (String, String),
         out: mpsc::UnboundedReceiver<String>,
         frames: mpsc::Receiver<Vec<u8>>,
-        admitted: Vec<String>,
+        admission: Admission,
     ) -> Arc<Hub> {
         let (signaling, incoming) = Signaling::open(secret, relays, signing_key);
         let ice_servers = ice
@@ -169,9 +166,7 @@ impl Hub {
             host: Mutex::new((host.0, host.1, false)),
             viewers: Mutex::default(),
             next_id: AtomicU32::new(1),
-            admitted: Mutex::new(admitted.into_iter().collect()),
-            denied: Mutex::default(),
-            requests: Mutex::default(),
+            admission: Mutex::new(admission),
         });
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
@@ -190,14 +185,8 @@ impl Hub {
         tauri::async_runtime::spawn(async move {
             while !sweeper.shared.stop.load(Ordering::Relaxed) {
                 tokio::time::sleep(Duration::from_secs(3)).await;
-                let expired = {
-                    let mut requests = sweeper.requests.lock().unwrap();
-                    let before = requests.len();
-                    requests.retain(|(_, _, seen)| seen.elapsed() < REQUEST_TIMEOUT);
-                    requests.len() != before
-                };
-                if expired {
-                    sweeper.announce_requests();
+                if sweeper.admission.lock().unwrap().sweep() {
+                    session::announce_requests(&sweeper.app);
                 }
             }
         });
@@ -232,32 +221,41 @@ impl Hub {
                     if known {
                         continue;
                     }
-                    if self.admitted.lock().unwrap().contains(&from) {
-                        if let Err(e) = self.clone().invite(from, &msg).await {
-                            crate::log(&format!("p2p: invite failed: {e}"));
-                        }
-                    } else if self.denied.lock().unwrap().contains(&from) {
-                        self.signaling.send(&json!({ "type": "denied", "from": "host", "to": from }));
-                    } else {
-                        // the presenter decides; the viewer waits
-                        let new = {
-                            let mut requests = self.requests.lock().unwrap();
-                            match requests.iter_mut().find(|(p, _, _)| *p == from) {
-                                Some(r) => {
-                                    r.2 = Instant::now();
-                                    false
-                                }
-                                None => {
-                                    requests.push((from.clone(), msg.clone(), Instant::now()));
-                                    true
-                                }
+                    let decision = self.admission.lock().unwrap().hello(&from, &msg);
+                    match decision {
+                        Hello::Invite => {
+                            if let Err(e) = self.clone().invite(from, &msg).await {
+                                crate::log(&format!("p2p: invite failed: {e}"));
                             }
-                        };
-                        self.signaling.send(&json!({ "type": "waiting", "from": "host", "to": from }));
-                        if new {
-                            crate::log("p2p: join request");
-                            self.announce_requests();
                         }
+                        Hello::Denied => self.signaling.send(&json!({ "type": "denied", "from": "host", "to": from })),
+                        // the presenter decides (or the viewer enters the room's PIN)
+                        Hello::Waiting { new, reply } => {
+                            self.signaling.send(&reply);
+                            if new {
+                                crate::log("p2p: join request");
+                                session::announce_requests(&self.app);
+                            }
+                        }
+                    }
+                }
+                Some("pin") if msg["to"] == "host" && !from.is_empty() => {
+                    let result = self.admission.lock().unwrap().pin(&from, msg["response"].as_str().unwrap_or(""));
+                    match result {
+                        PinResult::Ok(hello) => {
+                            session::announce_requests(&self.app);
+                            self.remember_admitted();
+                            if let Err(e) = self.clone().invite(from, &hello).await {
+                                crate::log(&format!("p2p: invite failed: {e}"));
+                            }
+                        }
+                        PinResult::Wrong { left } => {
+                            self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "left": left }));
+                            if left == 0 {
+                                session::announce_requests(&self.app);
+                            }
+                        }
+                        PinResult::Locked => self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "locked": true })),
                     }
                 }
                 Some("answer") if msg["to"] == "host" => {
@@ -425,6 +423,9 @@ impl Hub {
         session::route_local(&self.app, &self.shared, &self.ctrl, &json!({ "t": "left", "id": id }));
         self.announce_peers().await;
         let _ = viewer.pc.close().await;
+        if self.viewers.lock().unwrap().is_empty() {
+            session::remote_viewers_gone(&self.app, &self.shared);
+        }
     }
 
     // ------------------------------------------------------------------ data channel
@@ -479,6 +480,26 @@ impl Hub {
                 }
             }
             "keyframe" => self.shared.request_key(),
+            // remote access: start one of the room's applications (or the desktop)
+            "launch" if mode == Mode::Control && self.shared.remote.is_some() => {
+                let (app, item, shared) = (self.app.clone(), v["app"].as_str().unwrap_or("").to_string(), self.shared.clone());
+                std::thread::spawn(move || {
+                    if let Err(e) = session::launch(&app, &item) {
+                        crate::log(&format!("launch: {e}"));
+                        shared.send(json!({ "t": "launch-error", "to": id, "app": item, "error": e }));
+                    }
+                });
+            }
+            // "Resize erlauben": the viewer resized a window in their window manager
+            "resize" if mode == Mode::Control && crate::settings::allow_resize() => {
+                let (app, slot) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8);
+                let (pw, ph) = (v["pw"].as_u64().unwrap_or(0) as u32, v["ph"].as_u64().unwrap_or(0) as u32);
+                std::thread::spawn(move || {
+                    if let Err(e) = session::resize_window(&app, slot, pw, ph) {
+                        crate::log(&format!("resize: {e}"));
+                    }
+                });
+            }
             // how much room the viewer has for a window (device pixels) – for "best size"
             "viewport" => {
                 let (w, h) = (v["w"].as_u64().unwrap_or(0).min(16384) as u32, v["h"].as_u64().unwrap_or(0).min(16384) as u32);
@@ -565,44 +586,39 @@ impl Hub {
 
     // ------------------------------------------------------------------ admission
 
-    /// Open join requests to the toolbar: [{peer, name, color}].
-    fn announce_requests(&self) {
-        let list: Vec<Value> = self
-            .requests
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(peer, hello, _)| {
-                let name: String = hello["name"].as_str().unwrap_or("Gast").trim().chars().filter(|c| !c.is_control()).take(32).collect();
-                json!({ "peer": peer, "name": if name.is_empty() { "Gast".to_string() } else { name }, "color": hello["color"] })
-            })
-            .collect();
-        let _ = self.app.emit_to("main", "join-requests", list);
+    /// Open join requests: [{peer, name, color}].
+    pub fn requests(&self) -> Vec<Value> {
+        self.admission.lock().unwrap().requests()
+    }
+
+    pub fn has_request(&self, peer: &str) -> bool {
+        self.admission.lock().unwrap().has_request(peer)
     }
 
     /// The presenter lets a viewer in (or turns them away); `None` = everybody waiting.
     pub async fn admit(self: Arc<Self>, peer: Option<String>, allow: bool) {
-        let chosen: Vec<(String, Value)> = {
-            let mut requests = self.requests.lock().unwrap();
-            let (take, keep): (Vec<_>, Vec<_>) = requests.drain(..).partition(|(p, _, _)| peer.as_ref().is_none_or(|peer| p == peer));
-            *requests = keep;
-            take.into_iter().map(|(p, hello, _)| (p, hello)).collect()
-        };
-        self.announce_requests();
+        let chosen = self.admission.lock().unwrap().decide(peer.as_deref(), allow);
+        session::announce_requests(&self.app);
         for (p, hello) in chosen {
             if allow {
-                self.admitted.lock().unwrap().insert(p.clone());
                 if let Err(e) = self.clone().invite(p, &hello).await {
                     crate::log(&format!("p2p: invite failed: {e}"));
                 }
             } else {
-                self.denied.lock().unwrap().insert(p.clone());
                 self.signaling.send(&json!({ "type": "denied", "from": "host", "to": p }));
             }
         }
-        // admitted viewers get back in by themselves after a restart of the app
-        let list: Vec<String> = self.admitted.lock().unwrap().iter().cloned().collect();
+        self.remember_admitted();
+    }
+
+    /// Admitted viewers get back in by themselves after a restart of the app.
+    fn remember_admitted(&self) {
+        let list = self.admission.lock().unwrap().admitted();
         crate::resume::update(&self.app, "admitted", json!(list));
+    }
+
+    pub fn viewer_count(&self) -> usize {
+        self.viewers.lock().unwrap().len()
     }
 
     // ------------------------------------------------------------------ shared clipboard

@@ -81,7 +81,18 @@ const CSS = `
 .pv-dock button::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 8px; background: #18181b; border: 1px solid var(--pv-line); white-space: nowrap; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .pv-dock button:hover::after { opacity: 1; transform: translate(-50%, 0); }
 .pv-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--pv-line); }
-.pv-notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px; max-width: min(420px, 80%); padding: 11px 16px; border-radius: 12px; color: var(--pv-fg); }
+.pv-notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: min(420px, 80%); padding: 11px 16px; border-radius: 12px; color: var(--pv-fg); }
+.pv-notice-text { flex: 1; min-width: 0; }
+.pv-pin { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--pv-line); }
+.pv-pin small { flex-basis: 100%; color: var(--pv-muted); }
+.pv-pin input { flex: 1; min-width: 0; height: 34px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--pv-line); background: var(--pv-bg); color: var(--pv-fg); font: inherit; letter-spacing: .2em; outline: none; user-select: text; }
+.pv-pin input:focus { border-color: var(--pv-accent); }
+.pv-pin button { height: 34px; padding: 0 13px; border: 0; border-radius: 9px; background: var(--pv-accent); color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+.pv-pin button:disabled { opacity: .5; cursor: default; }
+.pv-pin .pv-pin-error { color: #fca5a5; }
+.pv-dock .pv-task.launch { border: 1px dashed rgba(255, 255, 255, .22); color: var(--pv-muted); }
+.pv-dock .pv-task.launch:hover { border-color: var(--pv-accent); color: var(--pv-fg); }
+.pv-dock .pv-task.launch svg { flex: none; }
 .pv-spinner { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--pv-fg); border-radius: 50%; animation: pv-spin .8s linear infinite; }
 .pv-keys { position: absolute; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
 @keyframes pv-spin { to { transform: rotate(360deg); } }
@@ -100,7 +111,9 @@ export function mountViewer(el, options) {
   el.classList.add('pv-viewer')
   el.innerHTML = `
     <div class="pv-stage">
-      <div class="pv-notice pv-glass"><span class="pv-spinner"></span><span class="pv-notice-text"></span></div>
+      <div class="pv-notice pv-glass"><span class="pv-spinner"></span><span class="pv-notice-text"></span>
+        <form class="pv-pin" hidden><small>Nicht am Platz? Mit der PIN des Raums geht es auch ohne Bestätigung.</small><input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN"><button>Eintreten</button><small class="pv-pin-error" hidden></small></form>
+      </div>
     </div>
     <div class="pv-top">
       <div class="pv-chip pv-glass pv-live"><i class="pv-dot"></i><span class="pv-title"></span></div>
@@ -132,6 +145,9 @@ export function mountViewer(el, options) {
   // every shared window in a frame of its own (or alone, as large as possible)
   const wm = new WindowManager(stage, {
     voice: voiceEnabled,
+    // "Resize erlauben" on the presenter's side: a window resized here is resized there, too
+    canResize: () => state.mode === 'control' && state.resize === true,
+    onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
     onChange: () => renderTasks(),
     onFrame: () => {
       if (!hasFrame) {
@@ -184,6 +200,9 @@ export function mountViewer(el, options) {
   // the presenter has to let us in first: waiting for that, or turned away
   let admission = false
   let denied = false
+  // the room has a PIN: {salt, rounds, nonce} of the latest challenge
+  let pinChallenge = null
+  let busy = false
   // who we are on the signaling channel (the presenter answers with an offer addressed to it);
   // kept for this tab and room, so a reload does not have to be let in again
   const peerKey = `pv-peer-${String(room ?? '').slice(0, 12)}`
@@ -226,10 +245,25 @@ export function mountViewer(el, options) {
     if (m.type === 'host' && !dc) signaling.send({ type: 'hello', from: peerId, name, color })
     if (m.to !== peerId) return
     if (m.type === 'waiting') {
+      busy = false
+      pinChallenge = m.pin ?? null
       if (!admission && !dc) {
         admission = true
         update()
       }
+      return
+    }
+    if (m.type === 'busy') {
+      if (!busy && !dc) {
+        busy = true
+        update()
+      }
+      return
+    }
+    if (m.type === 'pin-wrong') {
+      pinError(m.locked ? 'Zu viele falsche Versuche – bitte später noch einmal.' : m.left ? `PIN falsch – noch ${m.left} ${m.left === 1 ? 'Versuch' : 'Versuche'}.` : 'PIN falsch.')
+      // a fresh challenge comes with the next answer to our hello
+      signaling.send({ type: 'hello', from: peerId, name, color })
       return
     }
     if (m.type === 'denied') {
@@ -246,6 +280,8 @@ export function mountViewer(el, options) {
     if (m.type !== 'offer') return
     offered = true
     admission = false
+    busy = false
+    pinChallenge = null
     closePeer()
     offerId = m.id
     // no data channel after a while: direct connections are blocked in this network
@@ -354,6 +390,7 @@ export function mountViewer(el, options) {
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
         wm.setWindows(m.windows ?? [], { control: m.mode === 'control' })
+        renderTasks()
         wm.handle(m)
         break
       case 'peers':
@@ -384,6 +421,9 @@ export function mountViewer(el, options) {
         pendingCopies.get(m.req)?.(m)
         pendingCopies.delete(m.req)
         return
+      case 'launch-error':
+        toast(`Start nicht möglich: ${m.error}`)
+        return
       case 'blocked':
         toast(m.why === 'focus' ? 'Zum Tippen zuerst in das geteilte Fenster klicken.' : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.')
         return
@@ -392,6 +432,38 @@ export function mountViewer(el, options) {
     }
     update()
   }
+
+  // ------------------------------------------------------------ PIN (instead of waiting for approval)
+  // PBKDF2 of the PIN as key, HMAC of the host's one-time challenge as answer: the PIN never travels
+
+  const pinForm = q('.pv-pin')
+  function pinError(text) {
+    const e = pinForm.querySelector('.pv-pin-error')
+    e.textContent = text ?? ''
+    e.hidden = !text
+    pinForm.querySelector('button').disabled = false
+  }
+  pinForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = pinForm.querySelector('input')
+    const pin = input.value.trim()
+    if (!pin || !pinChallenge) return
+    pinForm.querySelector('button').disabled = true
+    pinError()
+    try {
+      const enc = new TextEncoder()
+      const material = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits'])
+      const salt = Uint8Array.from(atob(pinChallenge.salt), (c) => c.charCodeAt(0))
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: pinChallenge.rounds }, material, 256)
+      const key = await crypto.subtle.importKey('raw', bits, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+      const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(pinChallenge.nonce)))
+      signaling.send({ type: 'pin', from: peerId, to: 'host', response: Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('') })
+      input.value = ''
+      setTimeout(() => (pinForm.querySelector('button').disabled = false), 1500)
+    } catch {
+      pinError('Das hat nicht geklappt.')
+    }
+  })
 
   // ------------------------------------------------------------ video
 
@@ -419,10 +491,25 @@ export function mountViewer(el, options) {
   function renderTasks() {
     const wins = wm.list
     const many = wins.length > 1
-    q('.pv-tasks').hidden = !many
+    // remote access: applications the viewer may start (not running in the share yet)
+    const shared = new Set(wins.map((w) => (w.info.kind === 'window' ? w.info.app : '')))
+    const launchers = state.mode === 'control' ? (state.apps ?? []).filter((a) => a.kind === 'desktop' ? !wins.some((w) => w.info.kind === 'screen') : !shared.has(a.name)) : []
+    q('.pv-tasks').hidden = !many && !launchers.length
     q('[data-tile]').hidden = !many
-    q('.pv-tasks-sep').hidden = !many
+    q('.pv-tasks-sep').hidden = !many && !launchers.length
     q('.pv-tasks').replaceChildren(
+      ...launchers.map((a) => {
+        const b = document.createElement('button')
+        b.className = 'pv-task launch'
+        b.innerHTML = `${icon(a.kind === 'desktop' ? 'screen' : 'share', 15)}<span></span>`
+        b.querySelector('span').textContent = a.name
+        b.dataset.tip = a.kind === 'desktop' ? 'Gesamten Desktop teilen' : `„${a.name}“ starten und teilen`
+        b.addEventListener('click', () => {
+          send({ t: 'launch', app: a.id })
+          toast(a.kind === 'desktop' ? 'Desktop wird geteilt …' : `„${a.name}“ wird gestartet …`)
+        })
+        return b
+      }),
       ...(many ? wins : []).map((win) => {
         const b = document.createElement('button')
         b.className = 'pv-task'
@@ -463,10 +550,14 @@ export function mountViewer(el, options) {
               ? 'connecting'
               : admission
                 ? 'admission'
-                : 'waiting'
+                : busy
+                  ? 'busy'
+                  : 'waiting'
             : !hostPresent
               ? 'waiting'
-              : state.paused
+              : state.remote && !(state.windows ?? []).length
+                ? 'pick'
+                : state.paused
                 ? 'paused'
                 : hasFrame
                   ? 'live'
@@ -477,6 +568,8 @@ export function mountViewer(el, options) {
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
+      busy: 'Gerade nicht verfügbar – auf diesem Rechner läuft schon eine andere Freigabe.',
+      pick: 'Remote-Zugriff: Starte unten im Dock eine Anwendung oder den Desktop.',
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
@@ -487,6 +580,7 @@ export function mountViewer(el, options) {
       : texts[status]
     q('.pv-notice-text').textContent = notice
     q('.pv-notice').hidden = !notice
+    q('.pv-pin').hidden = status !== 'admission' || !pinChallenge
     q('.pv-spinner').hidden = !['connecting', 'waiting', 'loading', 'admission'].includes(status)
 
     q('.pv-live').hidden = !hostPresent

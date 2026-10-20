@@ -12,14 +12,17 @@ mod macos;
 mod permissions;
 mod recording;
 mod resume;
+mod rooms;
 #[cfg(target_os = "macos")]
 mod speech;
 mod input;
 mod session;
+mod settings;
 mod sources;
+mod tray;
 mod video;
 
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 pub const OVERLAY_TITLE: &str = "PeekaView Overlay";
@@ -73,6 +76,7 @@ async fn start_share(
         turn_secret: turn_secret.filter(|s| !s.is_empty()),
         signing_key: signing_key.filter(|k| !k.is_empty()),
         admitted: vec![],
+        remote: None,
     };
     session::start(app, opts).await
 }
@@ -151,6 +155,97 @@ fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 // ------------------------------------------------------------------ shared clipboard
+
+// ------------------------------------------------------------------ settings & permanent rooms
+
+#[tauri::command]
+fn get_settings(app: AppHandle) -> serde_json::Value {
+    settings::get(&app)
+}
+
+/// The toolbar keeps the settings the Rust side needs (tray, rooms waiting for remote access).
+#[tauri::command]
+fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
+    let settings = settings::set(&app, &patch);
+    session::settings_changed(&app);
+    tray::refresh(&app);
+    settings
+}
+
+#[tauri::command]
+fn rooms_list(app: AppHandle) -> Vec<serde_json::Value> {
+    let site = settings::text(&app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    rooms::all(&app).iter().map(|r| r.view(&site)).collect()
+}
+
+fn rooms_changed(app: &AppHandle) {
+    p2p::lobby::sync(app, true);
+    tray::refresh(app);
+    let _ = app.emit("rooms", rooms_list(app.clone()));
+}
+
+#[tauri::command]
+fn room_save(app: AppHandle, room: serde_json::Value) -> Result<serde_json::Value, String> {
+    let saved = rooms::save(&app, &room)?;
+    rooms_changed(&app);
+    let site = settings::text(&app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    Ok(saved.view(&site))
+}
+
+#[tauri::command]
+async fn room_pin(app: AppHandle, id: String, pin: Option<String>) -> Result<(), String> {
+    // PBKDF2 takes a moment
+    let a = app.clone();
+    tauri::async_runtime::spawn_blocking(move || rooms::set_pin(&a, &id, pin.as_deref())).await.map_err(|e| e.to_string())??;
+    rooms_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn room_renew(app: AppHandle, id: String) -> Result<(), String> {
+    rooms::renew(&app, &id)?;
+    rooms_changed(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn room_delete(app: AppHandle, id: String) -> Result<(), String> {
+    rooms::delete(&app, &id)?;
+    rooms_changed(&app);
+    Ok(())
+}
+
+/// Room secret + presenter key of a permanent room – to share into it from the picker.
+#[tauri::command]
+fn room_keys(app: AppHandle, id: String) -> Result<serde_json::Value, String> {
+    let room = rooms::get(&app, &id).ok_or("Raum nicht gefunden")?;
+    Ok(serde_json::json!({ "secret": room.secret, "signingKey": room.key }))
+}
+
+#[tauri::command]
+async fn apps_installed() -> Vec<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(rooms::installed).await.unwrap_or_default()
+}
+
+#[tauri::command]
+fn rooms_window(app: AppHandle) {
+    open_rooms_window(&app);
+}
+
+/// The window to manage permanent room links, PINs and remote access.
+pub fn open_rooms_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("rooms") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return;
+    }
+    let _ = tauri::WebviewWindowBuilder::new(app, "rooms", tauri::WebviewUrl::App("desktop/rooms.html".into()))
+        .title("Raumlinks & Remote-Zugriff")
+        .inner_size(640.0, 680.0)
+        .min_inner_size(520.0, 480.0)
+        .theme(Some(tauri::Theme::Dark))
+        .build();
+}
 
 /// Join requests: let a viewer in or turn them away (`peer` missing = everybody waiting).
 #[tauri::command]
@@ -358,6 +453,12 @@ fn main() {
         .manage(session::SessionState::default())
         .manage(invite::PendingInvite::default())
         .setup(|app| {
+            settings::get(app.handle());
+            if let Err(e) = tray::create(app.handle()) {
+                log(&format!("tray: {e}"));
+            }
+            // permanent rooms with remote access wait for viewers
+            p2p::lobby::sync(app.handle(), false);
             // keep the toolbar out of screen captures (macOS: the capture filter excludes our windows)
             #[cfg(not(target_os = "macos"))]
             if let Some(main) = app.get_webview_window("main") {
@@ -388,6 +489,7 @@ fn main() {
                         turn_secret: None,
                         signing_key: std::env::var("PEEKAVIEW_DEV_KEY").ok(),
                         admitted: vec![],
+                        remote: None,
                     };
                     let result = session::start(handle.clone(), opts).await;
                     crate::log(&format!("dev share: {result:?}"));
@@ -430,6 +532,16 @@ fn main() {
             drag_window,
             peers,
             admit,
+            get_settings,
+            set_settings,
+            rooms_list,
+            room_save,
+            room_pin,
+            room_renew,
+            room_delete,
+            room_keys,
+            apps_installed,
+            rooms_window,
             clip_list,
             clip_add_paths,
             clip_from_os,

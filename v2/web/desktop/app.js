@@ -75,15 +75,66 @@ function setCollapsed(collapsed) {
 }
 $('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
 
-// ------------------------------------------------------------------ keep the link
+// ------------------------------------------------------------------ settings shared with the Rust side
+// (tray menu, permanent rooms waiting for remote access)
 
-$('keep-link').checked = store.get('pv-keep') === '1'
-$('keep-link').addEventListener('change', () => {
-  store.set('pv-keep', $('keep-link').checked ? '1' : '')
-  if (!$('keep-link').checked) {
-    store.set('pv-keep-room', '')
-    store.set('pv-keep-key', '')
+let settings = {}
+const pushSettings = () =>
+  invoke('set_settings', {
+    patch: { site: site(), name: $('name').value.trim(), relays: lines('relays'), turn_urls: lines('turn-urls'), turn_secret: $('turn-secret').value.trim() },
+  }).catch(() => {})
+for (const id of ['site', 'relays', 'turn-urls', 'turn-secret', 'name']) $(id).addEventListener('change', () => !invite && pushSettings())
+listen('settings', (e) => {
+  settings = e.payload ?? {}
+  renderRoomChoice()
+})
+listen('toast', (e) => toast(String(e.payload)))
+
+// ------------------------------------------------------------------ which room to share into
+// a new link, the last one again ("Raumlink beibehalten", also in the tray menu), or a permanent room
+
+let rooms = []
+function renderRoomChoice() {
+  const select = $('room-choice')
+  const value = select.value || (settings.keep_link ? 'keep' : 'new')
+  select.replaceChildren()
+  const add = (v, label) => select.append(Object.assign(document.createElement('option'), { value: v, textContent: label }))
+  add('new', 'Neuer Link')
+  add('keep', 'Letzten Link beibehalten')
+  for (const r of rooms) add(`room:${r.id}`, `Raum: ${r.name}${r.pin ? ' (PIN)' : ''}`)
+  add('manage', 'Raumlinks verwalten …')
+  select.value = [...select.options].some((o) => o.value === value) ? value : 'new'
+}
+$('room-choice').addEventListener('change', () => {
+  const v = $('room-choice').value
+  if (v === 'manage') {
+    invoke('rooms_window')
+    return renderRoomChoice()
   }
+  // "Letzten Link beibehalten" is the tray's "Raumlink beibehalten"
+  if ((v === 'keep') !== !!settings.keep_link) invoke('set_settings', { patch: { keep_link: v === 'keep' } }).then((s) => (settings = s))
+})
+$('rooms-btn').addEventListener('click', () => invoke('rooms_window'))
+listen('rooms', (e) => {
+  rooms = e.payload ?? []
+  renderRoomChoice()
+})
+Promise.all([invoke('get_settings'), invoke('rooms_list')]).then(([s, r]) => {
+  settings = s ?? {}
+  rooms = r ?? []
+  // settings from before they were kept on the Rust side
+  if (settings.keep_link == null && store.get('pv-keep') === '1') invoke('set_settings', { patch: { keep_link: true } }).then((x) => (settings = x))
+  renderRoomChoice()
+  pushSettings()
+})
+
+// a viewer was let into a permanent room with remote access: that share runs now
+listen('remote-started', (e) => {
+  const hosted = e.payload
+  selected = hosted.sources ?? []
+  goLive(hosted, 'control')
+  setCollapsed(false)
+  toast(`Remote-Zugriff in „${hosted.remote}“ – Fernsteuerung ist an.`, 'ok', 5000)
 })
 
 // ------------------------------------------------------------------ join requests
@@ -97,6 +148,11 @@ function renderRequests(list) {
       const row = document.createElement('div')
       row.className = 'request glass'
       row.innerHTML = '<span class="who"></span><div><strong></strong><span>möchte zusehen</span></div><button class="pill secondary" data-deny>Ablehnen</button><button class="pill primary" data-allow>Zulassen</button>'
+      if (r.room) {
+        const label = row.querySelector('div span')
+        label.textContent = 'möchte in „'
+        label.append(Object.assign(document.createElement('b'), { className: 'room', textContent: r.room }), '“ – Remote-Zugriff')
+      }
       const who = row.querySelector('.who')
       who.textContent = initials(r.name || 'Gast')
       who.style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'
@@ -256,9 +312,15 @@ async function start() {
   store.set('pv-name', $('name').value.trim())
   $('start').disabled = true
   try {
-    // "Link beibehalten": the same room secret and presenter key as last time
-    const keep = $('keep-link').checked && !invite
-    const kept = keep ? { room: store.get('pv-keep-room'), key: store.get('pv-keep-key') } : {}
+    // "Letzten Link beibehalten": the same room secret and presenter key as last time;
+    // a permanent room: its secret and key
+    const choice = invite ? 'new' : $('room-choice').value
+    const keep = choice === 'keep'
+    let kept = keep ? { room: store.get('pv-keep-room'), key: store.get('pv-keep-key') } : {}
+    if (choice.startsWith('room:')) {
+      const k = await invoke('room_keys', { id: choice.slice(5) })
+      kept = { room: k.secret, key: k.signingKey }
+    }
     const hosted = await invoke('start_share', {
       site: site(),
       name,

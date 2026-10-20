@@ -9,7 +9,7 @@ license = "AGPL-3.0"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "macros"] }
@@ -34,6 +34,8 @@ getrandom = "0.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 # native clipboard for the shared clipboard and remote copy/paste: text, html, image, files
 clipboard-rs = "0.3"
+# PIN of a permanent room: only a PBKDF2 key is stored
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

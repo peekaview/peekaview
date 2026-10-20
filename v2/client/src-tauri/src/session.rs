@@ -20,7 +20,8 @@ use crate::{
     resume,
     control::{self, Cmd},
     guard::Rect,
-    p2p::{hub::Hub, signal, turn},
+    p2p::{admission::Admission, hub::Hub, lobby, signal, turn},
+    rooms::Room,
     video::{Source, StreamCtl, Video, MAX_STREAMS},
     OVERLAY_TITLE,
 };
@@ -106,6 +107,10 @@ pub struct Shared {
     pub clip: crate::clip::Store,
     /// room viewers have for a window (device pixels), for the "best size" button: id → (w, h)
     pub viewports: Mutex<HashMap<u32, (u32, u32)>>,
+    /// room secret of this share
+    pub secret: String,
+    /// a remote session in a permanent room: viewers may start its applications
+    pub remote: Option<Room>,
 }
 
 impl Shared {
@@ -162,6 +167,11 @@ impl Shared {
             "paused": !streams.iter().any(Stream::visible),
             "reachable": streams.iter().any(|s| s.reachable),
             "recording": self.recorder.lock().unwrap().is_some(),
+            // remote access: what viewers can start themselves
+            "remote": self.remote.is_some(),
+            "apps": self.remote.as_ref().map(Room::launchers).unwrap_or_default(),
+            // viewers may resize shared windows on this screen (tray menu "Resize erlauben")
+            "resize": crate::settings::allow_resize(),
         })
     }
 
@@ -266,9 +276,11 @@ pub struct StartOptions {
     pub signing_key: Option<String>,
     /// viewers the presenter already let in (a share continued after a restart)
     pub admitted: Vec<String>,
+    /// remote session in a permanent room (started by a viewer that was let in)
+    pub remote: Option<Room>,
 }
 
-fn parse_key(hex: &str) -> Option<[u8; 32]> {
+pub fn parse_key(hex: &str) -> Option<[u8; 32]> {
     let bytes: Vec<u8> = (0..hex.len()).step_by(2).filter_map(|i| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok()).collect();
     bytes.try_into().ok()
 }
@@ -280,7 +292,8 @@ fn valid_secret(s: &str) -> bool {
 /// Returns {room, link, ice, secret, signingKey}.
 pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> {
     stop(&app, None, false);
-    let streams = open_streams(&opts.sources, &[])?;
+    // a remote session starts with nothing shared – the viewer picks what to start
+    let streams = if opts.sources.is_empty() && opts.remote.is_some() { vec![] } else { open_streams(&opts.sources, &[])? };
     let secret = opts.room.clone().filter(|r| valid_secret(r)).unwrap_or_else(signal::new_room_secret);
     let signing_key = opts.signing_key.as_deref().and_then(parse_key).unwrap_or_else(signal::new_signing_key);
     let key_hex: String = signing_key.iter().map(|b| format!("{b:02x}")).collect();
@@ -299,6 +312,8 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         out: out_tx,
         clip: Default::default(),
         viewports: Mutex::default(),
+        secret: secret.clone(),
+        remote: opts.remote.clone(),
     });
 
     let mut videos = Vec::new();
@@ -310,7 +325,7 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
     to_overlay(&app, r#"{"t":"frame","live":true}"#);
     let ctrl = control::spawn(shared.clone());
     let host_color = opts.color.clone().unwrap_or_else(|| "#ffffff".into());
-    let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx, opts.admitted.clone());
+    let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx, Admission::new(crate::rooms::by_secret(&app, &secret).and_then(|r| r.pin), opts.admitted.clone()));
 
     {
         let (app, shared) = (app.clone(), shared.clone());
@@ -324,10 +339,12 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         json!({
             "site": opts.site, "name": opts.name, "sources": opts.sources, "room": secret, "color": opts.color,
             "relays": relays, "ice": opts.ice, "turn_urls": opts.turn_urls, "turn_secret": opts.turn_secret, "mode": "view",
-            "signing_key": key_hex, "admitted": opts.admitted,
+            "signing_key": key_hex, "admitted": opts.admitted, "remote_room": opts.remote.as_ref().map(|r| r.id.clone()),
         }),
     );
     *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, hub });
+    // a permanent room waiting for remote access is this share now
+    lobby::sync(&app, false);
     let site = opts.site.trim().trim_end_matches('/');
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
@@ -503,6 +520,9 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     hide_overlays(app, &[]);
     to_overlay(app, r#"{"t":"reset"}"#);
     let _ = app.emit_to("main", "ended", reason);
+    announce_requests(app);
+    // permanent rooms with remote access wait again
+    lobby::sync(app, false);
 }
 
 /// Quit / restart: finishes a running recording right away (the process is about to end), then
@@ -540,6 +560,7 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
         turn_secret: text("turn_secret"),
         signing_key: text("signing_key"),
         admitted: list("admitted"),
+        remote: text("remote_room").and_then(|id| crate::rooms::get(&app, &id)),
     };
     match start(app.clone(), opts.clone()).await {
         Ok(mut hosted) => {
@@ -812,14 +833,6 @@ pub fn clip_window(app: &AppHandle, open: Option<bool>) -> Result<bool, String> 
     Ok(open)
 }
 
-/// Lets a waiting viewer in or turns them away; `peer: None` = everybody waiting.
-pub fn admit(app: &AppHandle, peer: Option<String>, allow: bool) {
-    let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
-    if let Some(hub) = hub {
-        tauri::async_runtime::spawn(hub.admit(peer, allow));
-    }
-}
-
 // ------------------------------------------------------------------ best size for the viewers
 
 /// Resizes a shared window on the presenter's screen so it fits the viewers' room 1:1 – one
@@ -827,10 +840,6 @@ pub fn admit(app: &AppHandle, peer: Option<String>, allow: bool) {
 /// a window; the smallest one counts.
 pub fn fit_window(app: &AppHandle, slot: u8) -> Result<(), String> {
     let shared = running(app)?;
-    let stream = shared.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
-    let (Some(window_id), Some(pid)) = (stream.window_id, stream.pid) else {
-        return Err("Nur für geteilte Fenster".into());
-    };
     let (tw, th) = shared
         .viewports
         .lock()
@@ -839,6 +848,17 @@ pub fn fit_window(app: &AppHandle, slot: u8) -> Result<(), String> {
         .copied()
         .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1)))
         .ok_or("Noch kein Zuschauer verbunden")?;
+    set_window_pixels(app, slot, tw, th)
+}
+
+/// Gives a shared window the size at which its picture has `tw` × `th` pixels (or fits the
+/// screen); it stays where it is as far as possible.
+fn set_window_pixels(app: &AppHandle, slot: u8, tw: u32, th: u32) -> Result<(), String> {
+    let shared = running(app)?;
+    let stream = shared.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
+    let (Some(window_id), Some(pid)) = (stream.window_id, stream.pid) else {
+        return Err("Nur für geteilte Fenster".into());
+    };
     let r = stream.rect;
     let monitor = xcap::Monitor::from_point(r.x + r.w / 2, r.y + r.h / 2).map_err(|e| e.to_string())?;
     // window coordinates: points on macOS (pixels = points × scale), pixels elsewhere
@@ -863,5 +883,150 @@ pub fn fit_window(app: &AppHandle, slot: u8) -> Result<(), String> {
 pub fn overlay_clickable(app: &AppHandle, slot: u8, on: bool) {
     if let Some(overlay) = app.get_webview_window(&overlay_label(slot)) {
         let _ = overlay.set_ignore_cursor_events(!on);
+    }
+}
+
+// ------------------------------------------------------------------ admission across rooms
+
+/// Room secret of the running share.
+pub fn active_secret(app: &AppHandle) -> Option<String> {
+    app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.shared.secret.clone())
+}
+
+/// All open join requests – of the running share and of permanent rooms waiting for remote
+/// access – to the toolbar: [{peer, name, color, room?}].
+pub fn announce_requests(app: &AppHandle) {
+    let mut list = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.requests()).unwrap_or_default();
+    list.extend(lobby::requests());
+    let _ = app.emit_to("main", "join-requests", list);
+}
+
+/// Lets a waiting viewer in or turns them away; `peer: None` = everybody waiting.
+pub fn admit(app: &AppHandle, peer: Option<String>, allow: bool) {
+    let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
+    if let Some(hub) = hub.filter(|h| peer.as_deref().is_none_or(|p| h.has_request(p))) {
+        tauri::async_runtime::spawn(hub.admit(peer.clone(), allow));
+        if peer.is_some() {
+            return;
+        }
+    }
+    lobby::admit(app, peer.as_deref(), allow);
+}
+
+// ------------------------------------------------------------------ remote access
+
+/// A viewer was let into a permanent room with remote access: share there (nothing yet, remote
+/// control on) – the viewer starts what they need.
+pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(), String> {
+    if active_secret(app).is_some() {
+        return Err("Es läuft schon eine Freigabe".into());
+    }
+    let site = crate::settings::text(app, "site").unwrap_or_else(|| "http://localhost:8090".into());
+    let opts = StartOptions {
+        site,
+        name: crate::settings::text(app, "name").unwrap_or_else(|| "Host".into()),
+        sources: vec![],
+        room: Some(room.secret.clone()),
+        color: None,
+        relays: crate::settings::lines(app, "relays"),
+        ice: None,
+        turn_urls: crate::settings::lines(app, "turn_urls"),
+        turn_secret: crate::settings::text(app, "turn_secret"),
+        signing_key: Some(room.key.clone()),
+        admitted: vec![peer],
+        remote: Some(room.clone()),
+    };
+    let mut hosted = start(app.clone(), opts).await?;
+    set_mode(app, Mode::Control);
+    hosted["mode"] = json!("control");
+    hosted["remote"] = json!(room.name);
+    hosted["sources"] = json!([]);
+    let _ = app.emit_to("main", "remote-started", hosted);
+    Ok(())
+}
+
+/// A remote session without viewers ends after a while (the room waits again).
+pub fn remote_viewers_gone(app: &AppHandle, shared: &Arc<Shared>) {
+    if shared.remote.is_none() {
+        return;
+    }
+    let (app, shared) = (app.clone(), shared.clone());
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        let current = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| (s.shared.clone(), s.hub.viewer_count()));
+        if let Some((current, 0)) = current {
+            if Arc::ptr_eq(&current, &shared) {
+                stop(&app, Some("Remote-Sitzung beendet – niemand mehr verbunden."), true);
+            }
+        }
+    });
+}
+
+/// A remote viewer starts one of the room's applications (or the whole desktop); its window
+/// joins the share.
+pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
+    let shared = running(app)?;
+    let room = shared.remote.clone().ok_or("Kein Remote-Zugriff")?;
+    if id == "desktop" {
+        if !room.desktop {
+            return Err("Nicht freigegeben".into());
+        }
+        let monitor = xcap::Monitor::all().map_err(|e| e.to_string())?.into_iter().find(|m| m.is_primary().unwrap_or(false)).ok_or("Kein Bildschirm")?;
+        return switch_sources(app, &[format!("screen:{}", monitor.id().map_err(|e| e.to_string())?)]).map(|_| ());
+    }
+    let entry = room.apps.iter().find(|a| a.id == id).ok_or("Anwendung nicht freigegeben")?.clone();
+    let normal = crate::guard::normal_window_ids();
+    let windows = || -> Vec<xcap::Window> {
+        xcap::Window::all()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|w| !w.is_minimized().unwrap_or(false))
+            .filter(|w| w.width().unwrap_or(0) > 120 && w.height().unwrap_or(0) > 80)
+            .filter(|w| w.pid().ok() != Some(std::process::id()))
+            .filter(|w| normal.as_ref().is_none_or(|ids| w.id().ok().is_some_and(|id| ids.contains(&id))))
+            .collect()
+    };
+    let before: Vec<u32> = windows().iter().filter_map(|w| w.id().ok()).collect();
+    crate::rooms::launch(&entry.path)?;
+    let started = std::time::Instant::now();
+    let found = loop {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let pids = crate::rooms::pids_of(&entry.path);
+        let now = windows();
+        // a new window of the app, or (it ran already) its frontmost window
+        let new = now.iter().find(|w| w.id().is_ok_and(|id| !before.contains(&id)) && (pids.is_empty() || w.pid().is_ok_and(|p| pids.contains(&p))));
+        let existing = (started.elapsed() > std::time::Duration::from_millis(2500)).then(|| now.iter().find(|w| w.pid().is_ok_and(|p| pids.contains(&p)))).flatten();
+        if let Some(w) = new.or(existing) {
+            break Some(w.id().map_err(|e| e.to_string())?);
+        }
+        if started.elapsed() > std::time::Duration::from_secs(15) {
+            break None;
+        }
+    };
+    let id = found.ok_or_else(|| format!("„{}“ hat kein Fenster geöffnet", entry.name))?;
+    let mut ids: Vec<String> = shared.streams.lock().unwrap().iter().filter(|s| s.kind == "window").map(|s| s.id.clone()).collect();
+    let new_id = format!("window:{id}");
+    if !ids.contains(&new_id) {
+        ids.push(new_id);
+    }
+    if ids.len() > MAX_STREAMS {
+        ids.remove(0);
+    }
+    switch_sources(app, &ids).map(|_| ())
+}
+
+/// A viewer resized a window in their window manager ("Resize erlauben"): the window on this
+/// screen follows, so it shows 1:1 there. `pw` × `ph` in the viewer's device pixels.
+pub fn resize_window(app: &AppHandle, slot: u8, pw: u32, ph: u32) -> Result<(), String> {
+    if !crate::settings::allow_resize() {
+        return Err("Größe ändern ist nicht erlaubt".into());
+    }
+    set_window_pixels(app, slot, pw.clamp(200, 8192), ph.clamp(150, 8192))
+}
+
+/// Settings that viewers see changed (e.g. "Resize erlauben").
+pub fn settings_changed(app: &AppHandle) {
+    if let Ok(shared) = running(app) {
+        shared.send_state();
     }
 }

@@ -47,7 +47,8 @@ const appColor = (name) => {
 export class WindowManager {
   /**
    * @param {HTMLElement} stage
-   * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void}} options
+   * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void,
+   *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void}} options
    */
   constructor(stage, options = {}) {
     injectStyle('pv-windows-style', STYLE)
@@ -151,6 +152,11 @@ export class WindowManager {
     const onFrame = () => {
       const first = !win.frame
       win.frame = true
+      // the presenter's window took the size we asked for: show it 1:1 now
+      if (win.resized) {
+        win.resized = false
+        win.s = 1
+      }
       // the presenter resized the window: keep the scale, the frame follows
       this.layout(first ? undefined : win)
       this.options.onFrame?.()
@@ -370,6 +376,13 @@ export class WindowManager {
       handle.removeEventListener('pointercancel', up)
       this.root.classList.remove('moving')
       this.arranged = true
+      // allowed by the presenter: their window gets this size (in our device pixels)
+      if (this.options.canResize?.()) {
+        const d = window.devicePixelRatio || 1
+        const n = this.native(win)
+        win.resized = true
+        this.options.onResize?.(win.slot, Math.round(n.w * win.s * d), Math.round(n.h * win.s * d))
+      }
     }
     handle.addEventListener('pointermove', move)
     handle.addEventListener('pointerup', up)
