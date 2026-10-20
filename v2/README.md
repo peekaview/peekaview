@@ -28,6 +28,7 @@ Share links point to `https://<npub>.nsite.lol/#…`, not to a web server of our
 - **Serving:** any nsite gateway serves the same files and checks their hashes. The gateway is the https origin of the page, so it is trusted like any web host.
 - **Cleanup:** after each new version, files of earlier versions are deleted from the Blossom servers.
 - **Own site:** an address entered under Einstellungen → Zuschauer-Website (e.g. your own static hosting) replaces the nsite. The nsite is then taken down: its files are deleted, and its manifest gets a NIP-09 deletion event.
+- **Development builds:** they never publish. Links point to `http://localhost:8090` (`python3 -m http.server -d web 8090`), and a site published by an earlier test is taken down.
 - **No room data on Blossom:** only the viewer site lives on the Blossom servers. Room keys, picture, sound and clipboard files never pass through them.
 
 ## Layout

@@ -507,7 +507,7 @@ fn main() {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     let opts = session::StartOptions {
-                        site: "http://localhost:8090".into(),
+                        site: String::new(),
                         name: "Dev".into(),
                         sources: source.split(',').map(str::to_string).collect(),
                         room: std::env::var("PEEKAVIEW_DEV_ROOM").ok(),

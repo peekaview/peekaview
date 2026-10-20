@@ -142,17 +142,26 @@ pub fn site_url(app: &AppHandle) -> String {
     format!("https://{}.{}", npub(signal::public_key(key(app))), gateway(app))
 }
 
-/// The viewer site for links: the configured address, or (empty / "nostr") the nsite.
+/// Development builds use the local test server instead of publishing over Nostr.
+pub const DEV_SITE: &str = "http://localhost:8090";
+
+/// The viewer site for links: the configured address, or (empty / "nostr") the nsite –
+/// in development builds the local test server.
 pub fn resolve(app: &AppHandle, site: &str) -> String {
     let site = site.trim().trim_end_matches('/');
-    if site.is_empty() || site.eq_ignore_ascii_case("nostr") {
+    if site.eq_ignore_ascii_case("nostr") || (site.is_empty() && !cfg!(debug_assertions)) {
         site_url(app)
+    } else if site.is_empty() {
+        DEV_SITE.to_string()
     } else {
         site.to_string()
     }
 }
 
 pub fn status(app: &AppHandle) -> Value {
+    if cfg!(debug_assertions) && crate::settings::text(app, "site").as_deref() != Some("nostr") {
+        return json!({ "url": DEV_SITE, "state": "dev" });
+    }
     STATUS.lock().unwrap().clone().unwrap_or_else(|| {
         let st = state(app);
         json!({ "url": site_url(app), "state": if st["published"].is_u64() { "ok" } else { "idle" }, "published": st["published"] })
@@ -269,11 +278,28 @@ pub fn unpublish(app: &AppHandle) {
     std::thread::spawn(move || {
         let st = state(&app);
         if st["published"].is_null() && st["blobs"].as_object().is_none_or(|b| b.is_empty()) {
+            *STATUS.lock().unwrap() = None;
+            let _ = app.emit("nsite", status(&app));
             return;
         }
         let secret = key(&app);
         let pubkey = hex(&signal::public_key(secret));
-        let leftovers = delete_except(&app, &[], &[]);
+        let mut leftovers = delete_except(&app, &[], &[]);
+        // files of the bundled site may be up from a publish that did not record them
+        if let Ok(files) = site_files(&app) {
+            for server in BLOSSOM {
+                for f in &files {
+                    if delete_blob(server, &f.sha, secret).is_err() {
+                        if let Some(map) = leftovers.as_object_mut() {
+                            let list = map.entry(server.to_string()).or_insert_with(|| json!([]));
+                            if let Some(a) = list.as_array_mut() {
+                                a.push(json!(f.sha));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         let deletion = signal::sign_event(secret, 5, json!([["a", format!("15128:{pubkey}:")], ["k", "15128"]]), "PeekaView viewer site taken down");
         let mut relays: Vec<String> = crate::settings::lines(&app, "relays");
         if relays.is_empty() {
@@ -361,7 +387,13 @@ fn publish(app: &AppHandle, files: &[File], hash: &str) -> Result<Vec<String>, S
 }
 
 /// Publishes the viewer site if it changed (or a week has passed); in the background.
+/// Development builds never publish (and take down what an earlier test published).
 pub fn publish_if_needed(app: &AppHandle, force: bool) {
+    if cfg!(debug_assertions) && crate::settings::text(app, "site").as_deref() != Some("nostr") {
+        let _ = force;
+        unpublish(app);
+        return;
+    }
     let app = app.clone();
     std::thread::spawn(move || {
         let files = match site_files(&app) {

@@ -96,12 +96,12 @@ function renderNsite(st) {
   const el = $('nsite')
   el.hidden = !!site() || !st?.url
   if (el.hidden) return
-  const states = { publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${st.error ?? ''}`, idle: 'noch nicht veröffentlicht' }
-  el.innerHTML = 'Über Nostr: <code></code> · <span></span> <button class="link" type="button">jetzt veröffentlichen</button>'
+  const states = { publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${st.error ?? ''}`, idle: 'noch nicht veröffentlicht', dev: 'Entwicklungs-Build: lokaler Testserver statt Nostr' }
+  el.innerHTML = `${st.state === 'dev' ? 'Viewer-Seite' : 'Über Nostr'}: <code></code> · <span></span> <button class="link" type="button">jetzt veröffentlichen</button>`
   el.querySelector('code').textContent = st.url.replace(/^https:\/\//, '')
   el.querySelector('span').textContent = states[st.state] ?? ''
   el.classList.toggle('error', st.state === 'error')
-  el.querySelector('button').hidden = st.state === 'publishing'
+  el.querySelector('button').hidden = st.state === 'publishing' || st.state === 'dev'
   el.querySelector('button').addEventListener('click', () => invoke('nsite_publish'))
 }
 listen('nsite', (e) => renderNsite(e.payload))
