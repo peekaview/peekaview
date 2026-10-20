@@ -86,6 +86,9 @@ struct WindowArea {
     id: u32,
     display: Rect,
     crop: Rect,
+    /// other windows of the app, left out of the picture
+    excepted: Vec<u32>,
+    checked: Instant,
 }
 
 fn display_rect(d: &SCDisplay) -> Rect {
@@ -93,10 +96,13 @@ fn display_rect(d: &SCDisplay) -> Rect {
     Rect { x: f.origin.x as i32, y: f.origin.y as i32, w: f.size.width as i32, h: f.size.height as i32 }
 }
 
-/// Filter for a window: the display under its centre, only the window's app on it.
-fn window_filter(id: u32, rect: Rect) -> Result<(SCContentFilter, Rect), String> {
+/// Filter for a window: the display under its centre, only the window's app on it – without the
+/// app's other windows (`guard::foreign_windows_of_app`).
+fn window_filter(id: u32, rect: Rect, excepted: &[u32]) -> Result<(SCContentFilter, Rect), String> {
     let content = SCShareableContent::get().map_err(|e| e.to_string())?;
-    let window = content.windows().into_iter().find(|w| w.window_id() == id).ok_or("Fenster nicht gefunden")?;
+    let all = content.windows();
+    let window = all.iter().find(|w| w.window_id() == id).ok_or("Fenster nicht gefunden")?;
+    let except: Vec<&SCWindow> = all.iter().filter(|w| excepted.contains(&w.window_id())).collect();
     let app = window.owning_application().ok_or("Anwendung des Fensters nicht gefunden")?;
     let (cx, cy) = (rect.x + rect.w / 2, rect.y + rect.h / 2);
     let displays = content.displays();
@@ -105,7 +111,7 @@ fn window_filter(id: u32, rect: Rect) -> Result<(SCContentFilter, Rect), String>
         .find(|d| display_rect(d).contains(cx, cy))
         .or(displays.first())
         .ok_or("Bildschirm nicht gefunden")?;
-    let filter = SCContentFilter::create().with_display(display).with_including_applications(&[&app], &[]).build().map_err(|e| e.to_string())?;
+    let filter = SCContentFilter::create().with_display(display).with_including_applications(&[&app], &except).build().map_err(|e| e.to_string())?;
     Ok((filter, display_rect(display)))
 }
 
@@ -159,8 +165,9 @@ impl Video {
             }
             Source::Window(w) => {
                 let id = w.id().map_err(|e| e.to_string())?;
-                let (filter, display) = window_filter(id, rect)?;
-                area = Some(WindowArea { id, display, crop: crop(rect, display) });
+                let excepted = crate::guard::foreign_windows_of_app(id);
+                let (filter, display) = window_filter(id, rect, &excepted)?;
+                area = Some(WindowArea { id, display, crop: crop(rect, display), excepted, checked: Instant::now() });
                 Ok(filter)
             }
         }
@@ -193,7 +200,7 @@ impl Video {
         let mut crop_now = None;
         if let Some(area) = self.window.as_mut() {
             if !area.display.contains(rect.x + rect.w / 2, rect.y + rect.h / 2) {
-                if let Ok((filter, display)) = window_filter(area.id, rect) {
+                if let Ok((filter, display)) = window_filter(area.id, rect, &area.excepted) {
                     if self.stream.update_content_filter(&filter).is_ok() {
                         area.display = display;
                     }
@@ -214,8 +221,21 @@ impl Video {
         }
     }
 
-    /// Called periodically: answers keyframe requests while the picture is static.
+    /// Called periodically: answers keyframe requests while the picture is static, and keeps
+    /// newly opened windows of the app out of the picture.
     pub fn tick(&mut self) {
+        if let Some(area) = self.window.as_mut().filter(|a| a.checked.elapsed() > Duration::from_secs(2)) {
+            area.checked = Instant::now();
+            let excepted = crate::guard::foreign_windows_of_app(area.id);
+            if excepted != area.excepted {
+                let rect = Rect { x: area.display.x + area.crop.x, y: area.display.y + area.crop.y, w: area.crop.w, h: area.crop.h };
+                if let Ok((filter, _)) = window_filter(area.id, rect, &excepted) {
+                    if self.stream.update_content_filter(&filter).is_ok() {
+                        area.excepted = excepted;
+                    }
+                }
+            }
+        }
         let mut state = self.state.lock().unwrap();
         let shared = state.shared.clone();
         if shared.need_key.load(Ordering::Relaxed)

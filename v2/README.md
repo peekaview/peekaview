@@ -99,12 +99,13 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 - In the picker, click several windows to share them together, up to six. A screen is always shared on its own.
 - **Separate pictures:** each window is its own video stream with its own red frame. Pointing, drawing and control always refer to one window.
 - **Viewer layout:** viewers get a small window manager, only in their browser. They can move windows, scale them proportionally, minimize, maximize and arrange them side by side. The dock lists all windows for switching between them. The presenter's windows stay as they are.
+- **Covered windows:** a shared window that is completely covered on the presenter's screen is shown greyed out and marked "verdeckt".
 - **Sharp pictures:** pictures are never enlarged beyond one video pixel per screen pixel, so text stays sharp. They only get smaller when the browser window is too small.
 - **Best size:** the badge of each red frame has a button that resizes the window on the presenter's screen to the room the viewers have. The picture then needs no scaling.
 - **Windows can change while sharing:** joining or leaving windows never interrupt the connection. Every connection carries one video track per slot.
 
 **Sharing a single window**
-- **Picture:** only that window is captured, together with its own dialogs, sheets and menus. Other apps' windows never show, even when they lie on top of it.
+- **Picture:** only that window is captured, together with its own dialogs, sheets and menus. Other windows of the same app (e.g. other Finder windows, the Finder desktop) and other apps' windows never show, even when they lie on top of it.
   - macOS: ScreenCaptureKit, the window's area with only its app in the filter.
   - Windows: Windows.Graphics.Capture for the window; dialogs are separate windows there and are not part of the picture yet.
 - **Input:** lands only **inside the window** and only where it is **not covered**. The window may lie in the background.
@@ -139,7 +140,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 
 The tray / menu bar icon shows or hides the toolbar with a click. Its menu offers:
 - **Raumlink beibehalten:** every share reuses the last link.
-- **Resize/Anordnen erlauben:** with remote control on, the viewer's window manager acts on the real windows on this screen.
+- **Resize/Anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
   - Resizing a window resizes it here, so it shows 1:1 for them.
   - Moving a window, or arranging all side by side, moves the windows to the same relative place on their screen.
   - Picking a window (click or dock) brings it to the front here.

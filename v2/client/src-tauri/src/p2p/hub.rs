@@ -495,7 +495,7 @@ impl Hub {
             // "Resize/Anordnen erlauben": the viewer activated / moved a window in their window manager
             "activate" | "arrange" if mode == Mode::Control && crate::settings::allow_resize() => {
                 let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());
-                let (nx, ny) = (v["x"].as_f64().unwrap_or(0.0), v["y"].as_f64().unwrap_or(0.0));
+                let (x, y, w, h) = (v["x"].as_f64(), v["y"].as_f64(), v["hw"].as_f64(), v["hh"].as_f64());
                 let shared = self.shared.clone();
                 std::thread::spawn(move || {
                     if !crate::guard::accessibility() {
@@ -503,7 +503,7 @@ impl Hub {
                         shared.need_permission();
                         return;
                     }
-                    let result = if kind == "activate" { session::activate_window(&app, slot) } else { session::arrange_window(&app, slot, nx, ny) };
+                    let result = if kind == "activate" { session::activate_window(&app, slot) } else { session::place_window(&app, slot, x, y, w, h) };
                     if let Err(e) = result {
                         crate::log(&format!("{kind}: {e}"));
                     }

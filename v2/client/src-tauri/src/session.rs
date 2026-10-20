@@ -73,6 +73,8 @@ pub struct Stream {
     pub rect: Rect,
     /// some part of it is not covered – remote control is paused otherwise
     pub reachable: bool,
+    /// place in the presenter's window stack (0 = frontmost)
+    pub z: u32,
 }
 
 impl Stream {
@@ -153,15 +155,30 @@ impl Shared {
             .map(|s| {
                 json!({
                     "w": s.slot, "kind": s.kind, "title": s.title, "app": s.app,
-                    "paused": !s.visible(), "reachable": s.reachable,
+                    "paused": !s.visible(), "reachable": s.reachable, "z": s.z,
+                    // where it is on the presenter's screen (viewers mirror the layout when
+                    // they may arrange the windows)
+                    "rect": { "x": s.rect.x, "y": s.rect.y, "w": s.rect.w, "h": s.rect.h },
                 })
             })
             .collect();
+        // the presenter's screens the shared windows are on
+        let mut screens: Vec<Value> = Vec::new();
+        for s in streams.iter() {
+            let (cx, cy) = (s.rect.x + s.rect.w / 2, s.rect.y + s.rect.h / 2);
+            if let Ok(m) = xcap::Monitor::from_point(cx, cy) {
+                let r = json!({ "x": m.x().unwrap_or(0), "y": m.y().unwrap_or(0), "w": m.width().unwrap_or(0), "h": m.height().unwrap_or(0) });
+                if !screens.contains(&r) {
+                    screens.push(r);
+                }
+            }
+        }
         let first = streams.first();
         json!({
             "t": "state",
             "mode": self.mode().as_str(),
             "windows": windows,
+            "screens": screens,
             "kind": first.map(|s| s.kind).unwrap_or("screen"),
             "title": first.map(|s| if streams.len() > 1 { format!("{} Fenster", streams.len()) } else { s.title.clone() }).unwrap_or_default(),
             "paused": !streams.iter().any(Stream::visible),
@@ -239,7 +256,7 @@ fn open_stream(id: &str, slot: u8) -> Result<Stream, String> {
         _ => return Err("Ungültige Quelle".into()),
     };
     let (rect, visible) = capture::geometry(&source).ok_or("Quelle nicht mehr vorhanden")?;
-    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true })
+    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true, z: 0 })
 }
 
 /// Picker ids → streams; ids already shared keep their slot (and running pipeline).
@@ -1054,9 +1071,10 @@ pub fn activate_window(app: &AppHandle, slot: u8) -> Result<(), String> {
     Ok(())
 }
 
-/// "Resize/Anordnen erlauben": a viewer moved a window in their window manager – it moves to the
-/// same relative place on its screen here (`nx`, `ny`: top-left corner, 0..1 of the viewer's area).
-pub fn arrange_window(app: &AppHandle, slot: u8, nx: f64, ny: f64) -> Result<(), String> {
+/// "Resize/Anordnen erlauben": a viewer moved / resized a window in their mirror of the
+/// presenter's screen – the real window follows. Screen coordinates of the presenter (points on
+/// macOS, pixels elsewhere); missing values keep the current ones. It stays on its screen.
+pub fn place_window(app: &AppHandle, slot: u8, x: Option<f64>, y: Option<f64>, w: Option<f64>, h: Option<f64>) -> Result<(), String> {
     if !crate::settings::allow_resize() {
         return Err("Nicht erlaubt".into());
     }
@@ -1065,15 +1083,19 @@ pub fn arrange_window(app: &AppHandle, slot: u8, nx: f64, ny: f64) -> Result<(),
         return Err("Nur für geteilte Fenster".into());
     };
     let r = stream.rect;
-    let monitor = xcap::Monitor::from_point(r.x + r.w / 2, r.y + r.h / 2).map_err(|e| e.to_string())?;
+    let (x, y) = (x.unwrap_or(r.x as f64), y.unwrap_or(r.y as f64));
+    let monitor = xcap::Monitor::from_point((x + 1.0) as i32, (y + 1.0) as i32)
+        .or_else(|_| xcap::Monitor::from_point(r.x + r.w / 2, r.y + r.h / 2))
+        .map_err(|e| e.to_string())?;
     let (mx, my) = (monitor.x().unwrap_or(0) as f64, monitor.y().unwrap_or(0) as f64);
     let (mw, mh) = (monitor.width().unwrap_or(0) as f64, monitor.height().unwrap_or(0) as f64);
-    let (w, h) = (r.w as f64, r.h as f64);
-    let x = (mx + nx.clamp(0.0, 1.0) * mw).clamp(mx, (mx + mw - w).max(mx));
-    let y = (my + 24.0 + ny.clamp(0.0, 1.0) * (mh - 24.0)).clamp(my + 24.0, (my + mh - h).max(my + 24.0));
-    if crate::focus::set_frame(pid as u32, window_id, x, y, w, h) {
+    let w = w.unwrap_or(r.w as f64).clamp(120.0, mw);
+    let h = h.unwrap_or(r.h as f64).clamp(80.0, mh - 24.0);
+    let x = x.clamp(mx, (mx + mw - w).max(mx));
+    let y = y.clamp(my + 24.0, (my + mh - h).max(my + 24.0));
+    if crate::focus::set_frame(pid as u32, window_id, x.round(), y.round(), w.round(), h.round()) {
         Ok(())
     } else {
-        Err("Fenster ließ sich nicht verschieben – ist „Bedienungshilfen“ für PeekaView erlaubt?".into())
+        Err("Fenster ließ sich nicht ändern – ist „Bedienungshilfen“ für PeekaView erlaubt?".into())
     }
 }

@@ -76,6 +76,31 @@ pub fn reachable(target: Target, rect: Rect) -> bool {
 
 const GRID: usize = 5;
 
+/// Windows of the shared window's app that are *not* part of it (other document windows, the
+/// Finder's desktop) – they are left out of the picture. Part of it: menus and panels above the
+/// normal window level, and windows lying within it (sheets, dialogs). macOS only.
+pub fn foreign_windows_of_app(window_id: u32) -> Vec<u32> {
+    #[cfg(target_os = "macos")]
+    {
+        let windows = imp::list(true);
+        let Some(target) = windows.iter().find(|w| w.id == window_id) else { return vec![] };
+        return windows.iter().filter(|w| w.pid == target.pid && w.id != window_id && !imp::part_of(w, &target.rect)).map(|w| w.id).collect();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window_id;
+        vec![]
+    }
+}
+
+/// Window ids front to back (where the platform tells).
+pub fn stack_order() -> Option<Vec<u32>> {
+    #[cfg(target_os = "macos")]
+    return Some(imp::list(false).into_iter().filter(|w| w.layer == 0).map(|w| w.id).collect());
+    #[cfg(not(target_os = "macos"))]
+    None
+}
+
 /// May PeekaView control mouse and keyboard (macOS "Bedienungshilfen")?
 pub fn accessibility() -> bool {
     crate::permissions::granted("accessibility")
@@ -193,13 +218,14 @@ mod imp {
                 return false;
             }
             let Some((id, pid)) = target else { return true };
+            let Some(own) = windows.iter().find(|w| w.id == id).map(|w| w.rect) else { return false };
             // front to back: the first visible window at that point must be the shared one or
-            // one of its app's dialogs / menus
+            // one of its own dialogs / menus (not another window of the same app)
             windows
                 .iter()
                 .filter(|w| w.alpha > 0.0 && !is_overlay(w.id) && !is_screen_overlay(w, &displays))
                 .find(|w| w.rect.contains(x, y))
-                .is_some_and(|w| w.id == id || w.pid == pid)
+                .is_some_and(|w| w.id == id || (w.pid == pid && part_of(w, &own)))
         })
     }
 
@@ -218,6 +244,19 @@ mod imp {
                 .iter()
                 .find(|w| w.pid == target.pid && w.layer >= 0 && w.alpha > 0.0 && w.rect.w > 50 && w.rect.h > 50)
                 .is_some_and(|w| w.id == window_id || overlaps(&w.rect, &target.rect))
+    }
+
+    /// A window of the shared window's app that belongs to it: a menu / panel (above the normal
+    /// level) or a sheet / dialog lying within it.
+    pub(super) fn part_of(w: &Info, target: &Rect) -> bool {
+        if w.layer < 0 {
+            return false; // e.g. the Finder's desktop
+        }
+        if w.layer > 0 {
+            return true;
+        }
+        let m = 40;
+        w.rect.x >= target.x - m && w.rect.y >= target.y - m && w.rect.x + w.rect.w <= target.x + target.w + m && w.rect.y + w.rect.h <= target.y + target.h + m
     }
 
     fn overlaps(a: &Rect, b: &Rect) -> bool {

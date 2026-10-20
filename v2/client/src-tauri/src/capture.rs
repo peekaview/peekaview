@@ -97,7 +97,8 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
                     continue;
                 };
                 if rect != s.rect || visible != s.visible() {
-                    changed_visibility |= visible != s.visible();
+                    // viewers mirroring the layout follow moves, too
+                    changed_visibility = true;
                     s.ctl.visible.store(visible, Ordering::Relaxed);
                     if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
                         stream.rect = rect;
@@ -134,6 +135,18 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             last_reach_check = Instant::now();
             let streams = shared.streams.lock().unwrap().clone();
             let mut changed = false;
+            // the presenter's window stack: which shared window is in front
+            if let Some(order) = guard::stack_order() {
+                for s in streams.iter() {
+                    let z = s.window_id.and_then(|id| order.iter().position(|o| *o == id)).unwrap_or(0) as u32;
+                    if z != s.z {
+                        changed = true;
+                        if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
+                            stream.z = z;
+                        }
+                    }
+                }
+            }
             for s in streams.iter().filter(|s| s.window_id.is_some()) {
                 let reachable = guard::reachable(s.target(), s.rect);
                 if reachable != s.reachable {

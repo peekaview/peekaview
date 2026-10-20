@@ -23,9 +23,9 @@ const STYLE = `
 .pv-win.active .pv-win-bar { background: #27272a; color: #fafafa; }
 .pv-win-bar:active { cursor: grabbing; }
 .pv-win-app { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; color: #fff; font-size: 9px; font-weight: 700; }
-.pv-win-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-win-title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv-win-title b { font-weight: 650; }
-.pv-win-flag { flex: none; color: #fde68a; font-size: 11px; }
+.pv-win-flag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fde68a; font-size: 11px; }
 .pv-win-bar button { flex: none; display: grid; place-items: center; width: 24px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
 .pv-win-bar button:hover { background: rgba(255, 255, 255, .12); }
 .pv-win .pv-view { position: relative; flex: none; overflow: hidden; border-radius: 0 0 10px 10px; }
@@ -46,6 +46,13 @@ const STYLE = `
 .pv-wins.solo .pv-win .pv-view { border-radius: 0; }
 .pv-wins.solo .pv-win-bar, .pv-wins.solo .pv-grab { display: none; }
 .pv-wins.moving .pv-view { pointer-events: none; }
+/* covered completely on the presenter's screen */
+.pv-win.covered .pv-view video { filter: grayscale(1) brightness(.5); transition: filter .3s; }
+.pv-win.covered .pv-win-bar { color: #71717a; }
+/* mirror of the presenter's screen ("Resize/Anordnen erlauben") */
+.pv-desk { position: absolute; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .14);
+  background: radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, .10), transparent 60%), linear-gradient(160deg, #1f1f24, #121215); }
+.pv-desk span { position: absolute; left: 10px; bottom: 7px; color: #52525b; font: 600 11px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .03em; }
 `
 
 const PALETTE = ['#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#06b6d4', '#ec4899', '#eab308', '#14b8a6']
@@ -60,14 +67,20 @@ export class WindowManager {
    * @param {HTMLElement} stage
    * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void,
    *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void,
-   *          onActivate?: (slot: number) => void, onArrange?: (slot: number, x: number, y: number) => void}} options
+   *          onActivate?: (slot: number) => void, onArrange?: (slot: number, x: number, y: number) => void,
+   *          onPlace?: (slot: number, frame: {x?: number, y?: number, hw?: number, hh?: number}) => void}} options
+   *   onPlace: mirror mode – the presenter's window gets this frame (their screen coordinates)
    */
   constructor(stage, options = {}) {
     injectStyle('pv-windows-style', STYLE)
     this.options = options
     this.root = document.createElement('div')
     this.root.className = 'pv-wins solo'
+    this.desks = document.createElement('div')
+    this.root.append(this.desks)
     stage.prepend(this.root)
+    this.mirror = false
+    this.screens = []
     this.wins = new Map() // slot -> win
     this.streams = new Map() // slot -> MediaStream
     this.active = null
@@ -101,8 +114,13 @@ export class WindowManager {
     }
   }
 
-  /** Shared windows from the presenter's state: [{w, kind, title, app, paused, reachable}]. */
-  setWindows(list, { control = false } = {}) {
+  /**
+   * Shared windows from the presenter's state: [{w, kind, title, app, paused, reachable, rect, z}].
+   * `mirror`: the viewer may arrange the presenter's windows – show them where they are on the
+   * presenter's `screens`.
+   */
+  setWindows(list, { control = false, mirror = false, screens = [] } = {}) {
+    const mirrored = !!mirror && list.length > 0 && list.every((w) => w.kind === 'window' && w.rect) && screens.length > 0
     const slots = new Set(list.map((w) => w.w))
     let changed = false
     for (const [slot, win] of this.wins) {
@@ -129,15 +147,25 @@ export class WindowManager {
       const badge = win.el.querySelector('.pv-win-app')
       badge.textContent = (name || '?').slice(0, 1).toUpperCase()
       badge.style.background = appColor(name)
-      win.el.querySelector('.pv-win-flag').textContent = control && info.reachable === false && !info.paused ? 'verdeckt' : ''
+      // covered completely on the presenter's screen: greyed out
+      const covered = info.reachable === false && !info.paused
+      win.el.classList.toggle('covered', covered)
+      win.el.querySelector('.pv-win-flag').textContent = covered ? 'verdeckt' : ''
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
       paused.textContent = 'Fenster ist beim Host gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
     })
-    this.root.classList.toggle('solo', this.wins.size <= 1)
+    if (mirrored !== this.mirror) changed = true
+    this.mirror = mirrored
+    this.screens = screens
+    this.root.classList.toggle('solo', !mirrored && this.wins.size <= 1)
+    this.root.classList.toggle('mirror', mirrored)
     if (!this.active || !this.wins.has(this.active)) this.focus(this.list[0]?.slot ?? null)
     if (changed) {
       this.arranged = false
+      this.layout()
+    } else if (mirrored) {
+      // the presenter moved / resized / restacked windows
       this.layout()
     }
     this.options.onChange?.()
@@ -215,6 +243,8 @@ export class WindowManager {
   layout(only) {
     const a = this.area()
     if (!a.w || !a.h) return
+    if (this.mirror) return this.layoutMirror()
+    this.desks.replaceChildren()
     const wins = this.list
     if (wins.length <= 1) {
       // a single window: centred, as large as allowed, no frame
@@ -239,6 +269,66 @@ export class WindowManager {
     }
   }
 
+  // ------------------------------------------------------------ mirror of the presenter's screen
+
+  /** Scale and offset that map the presenter's screen coordinates onto this view. */
+  mirrorMap() {
+    const a = this.area()
+    const xs = this.screens
+    const D = { x: Math.min(...xs.map((r) => r.x)), y: Math.min(...xs.map((r) => r.y)) }
+    D.w = Math.max(...xs.map((r) => r.x + r.w)) - D.x
+    D.h = Math.max(...xs.map((r) => r.y + r.h)) - D.y
+    const M = 14
+    let k = Math.min((a.w - 2 * M) / D.w, (a.h - 2 * M - BAR) / D.h)
+    // never enlarged beyond one video pixel per screen pixel
+    const d = window.devicePixelRatio || 1
+    for (const win of this.wins.values()) if (win.video.videoWidth && win.info.rect?.w) k = Math.min(k, win.video.videoWidth / win.info.rect.w / d)
+    return { D, k, ox: (a.w - D.w * k) / 2, oy: BAR + M + (a.h - 2 * M - BAR - D.h * k) / 2 }
+  }
+
+  layoutMirror() {
+    const { D, k, ox, oy } = (this.map = this.mirrorMap())
+    this.desks.replaceChildren(
+      ...this.screens.map((r, i) => {
+        const el = document.createElement('div')
+        el.className = 'pv-desk'
+        el.style.left = `${ox + (r.x - D.x) * k}px`
+        el.style.top = `${oy + (r.y - D.y) * k}px`
+        el.style.width = `${r.w * k}px`
+        el.style.height = `${r.h * k}px`
+        el.innerHTML = `<span>${this.screens.length > 1 ? `Bildschirm ${i + 1} des Hosts` : 'Bildschirm des Hosts'}</span>`
+        return el
+      }),
+    )
+    for (const win of this.wins.values()) {
+      if (win.busy) continue // being dragged / resized here
+      if (win.ghost && win.lastRect && (win.lastRect.w !== win.info.rect.w || win.lastRect.h !== win.info.rect.h)) win.ghost.remove()
+      win.lastRect = win.info.rect
+      const r = win.info.rect
+      const n = this.native(win)
+      win.max = false
+      win.s = (r.w * k) / n.w
+      win.x = ox + (r.x - D.x) * k
+      win.y = oy + (r.y - D.y) * k - BAR
+      // the presenter's stacking order
+      win.el.style.zIndex = String(1000 - (win.info.z ?? 0))
+      this.paint(win)
+    }
+  }
+
+  /** Mirror position of a window → the presenter's screen coordinates. */
+  toHost(win) {
+    const { D, k, ox, oy } = this.map ?? this.mirrorMap()
+    return { x: D.x + (win.x - ox) / k, y: D.y + (win.y + BAR - oy) / k }
+  }
+
+  screenOf(win) {
+    const r = win.info.rect
+    const cx = r.x + r.w / 2
+    const cy = r.y + r.h / 2
+    return this.screens.find((s) => cx >= s.x && cy >= s.y && cx < s.x + s.w && cy < s.y + s.h) ?? this.screens[0]
+  }
+
   /** "Resize/Anordnen erlauben": the presenter's window moves to the same relative place. */
   arrangeThere(win) {
     if (!this.options.canResize?.()) return
@@ -248,7 +338,7 @@ export class WindowManager {
 
   /** The viewer arranged everything side by side: the presenter's windows follow (if allowed). */
   tileThere() {
-    if (!this.options.canResize?.()) return
+    if (!this.options.canResize?.() || this.mirror) return
     const d = window.devicePixelRatio || 1
     for (const win of this.list.filter((w) => !w.min)) {
       const n = this.native(win)
@@ -260,6 +350,7 @@ export class WindowManager {
 
   /** Side by side in a grid, each as large as it may be in its cell. */
   tile() {
+    if (this.mirror) return this.tileHost()
     const a = this.area()
     const wins = this.list.filter((w) => !w.min)
     if (!wins.length) return
@@ -278,6 +369,24 @@ export class WindowManager {
       this.paint(win)
     })
     this.arranged = false
+  }
+
+  /** Mirror mode: the presenter's windows side by side on their screen. */
+  tileHost() {
+    const wins = this.list.filter((w) => !w.min)
+    if (!wins.length) return
+    const sc = this.screenOf(wins[0])
+    const top = 25 // menu bar
+    const cols = Math.ceil(Math.sqrt(wins.length * (sc.w / sc.h) / 1.6)) || 1
+    const rows = Math.ceil(wins.length / cols)
+    const g = 8
+    const cw = (sc.w - g * (cols + 1)) / cols
+    const ch = (sc.h - top - g * (rows + 1)) / rows
+    wins.forEach((win, i) => {
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      this.options.onPlace?.(win.slot, { x: sc.x + g + col * (cw + g), y: sc.y + top + g + row * (ch + g), hw: cw, hh: ch })
+    })
   }
 
   clamp(win) {
@@ -316,7 +425,8 @@ export class WindowManager {
     }
     this.active = win ? slot : null
     for (const w of this.wins.values()) w.el.classList.toggle('active', w === win)
-    if (win) win.el.style.zIndex = String(++this.z)
+    // in the mirror the presenter's stacking order rules
+    if (win && !this.mirror) win.el.style.zIndex = String(++this.z)
     this.options.onChange?.()
   }
 
@@ -347,6 +457,19 @@ export class WindowManager {
 
   toggleMax(slot) {
     const win = this.wins.get(slot)
+    if (win && this.mirror) {
+      // the presenter's window fills its screen (or gets its previous frame back)
+      const sc = this.screenOf(win)
+      if (win.hostPrev) {
+        this.options.onPlace?.(slot, win.hostPrev)
+        win.hostPrev = null
+      } else {
+        const r = win.info.rect
+        win.hostPrev = { x: r.x, y: r.y, hw: r.w, hh: r.h }
+        this.options.onPlace?.(slot, { x: sc.x, y: sc.y + 25, hw: sc.w, hh: sc.h - 25 })
+      }
+      return
+    }
     if (!win || this.wins.size <= 1) return
     const a = this.area()
     if (win.max && win.prev) {
@@ -365,7 +488,7 @@ export class WindowManager {
   }
 
   drag(win, e) {
-    if (this.wins.size <= 1) return
+    if (this.wins.size <= 1 && !this.mirror) return
     e.preventDefault()
     const bar = e.currentTarget
     try {
@@ -373,11 +496,12 @@ export class WindowManager {
     } catch {}
     const start = { x: e.clientX, y: e.clientY, wx: win.x, wy: win.y }
     this.root.classList.add('moving')
+    win.busy = true
     const move = (ev) => {
       win.x = start.wx + ev.clientX - start.x
       win.y = start.wy + ev.clientY - start.y
       win.max = false
-      this.clamp(win)
+      if (!this.mirror) this.clamp(win)
       this.paint(win)
     }
     const up = () => {
@@ -386,7 +510,10 @@ export class WindowManager {
       bar.removeEventListener('pointercancel', up)
       this.root.classList.remove('moving')
       this.arranged = true
-      if (win.x !== start.wx || win.y !== start.wy) this.arrangeThere(win)
+      win.busy = false
+      if (win.x === start.wx && win.y === start.wy) return
+      if (this.mirror) this.options.onPlace?.(win.slot, this.toHost(win))
+      else this.arrangeThere(win)
     }
     bar.addEventListener('pointermove', move)
     bar.addEventListener('pointerup', up)
@@ -417,6 +544,7 @@ export class WindowManager {
     win.el.append(ghost)
     win.el.classList.add('sizing')
     this.root.classList.add('moving')
+    win.busy = true
     let target = { w: r.width, h: r.height - BAR }
     const show = () => {
       ghost.style.width = `${Math.round(remote ? target.w : win.el.offsetWidth)}px`
@@ -424,7 +552,8 @@ export class WindowManager {
       const label = ghost.querySelector('span')
       if (remote) {
         label.innerHTML = '<b></b><small>neue Fenstergröße beim Host</small>'
-        label.querySelector('b').textContent = `${Math.round(target.w * d)} × ${Math.round(target.h * d)} px`
+        const k = this.mirror ? (this.map ?? this.mirrorMap()).k : 1 / d
+        label.querySelector('b').textContent = `${Math.round(target.w / k)} × ${Math.round(target.h / k)}`
       } else {
         label.textContent = `${Math.round(win.s * 100)} %`
       }
@@ -452,11 +581,17 @@ export class WindowManager {
       this.root.classList.remove('moving')
       win.el.classList.remove('sizing')
       this.arranged = true
+      win.busy = false
       if (!remote) return ghost.remove()
       // the presenter's window takes this size; the frame stays until the new picture arrives
-      win.resized = true
       win.ghost = ghost
       setTimeout(() => ghost.remove(), 4000)
+      if (this.mirror) {
+        const { k } = this.map ?? this.mirrorMap()
+        this.options.onPlace?.(win.slot, { hw: target.w / k, hh: target.h / k })
+        return
+      }
+      win.resized = true
       this.options.onResize?.(win.slot, Math.round(target.w * d), Math.round(target.h * d))
     }
     handle.addEventListener('pointermove', move)

@@ -152,8 +152,8 @@ export function mountViewer(el, options) {
     // here follow there
     canResize: () => state.mode === 'control' && state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
-    onArrange: (slot, x, y) => send({ t: 'arrange', w: slot, x, y }),
     onActivate: (slot) => send({ t: 'activate', w: slot }),
+    onPlace: (slot, f) => send({ t: 'arrange', w: slot, ...f }),
     onChange: () => renderTasks(),
     onFrame: () => {
       if (!hasFrame) {
@@ -395,7 +395,8 @@ export function mountViewer(el, options) {
         // when remote control is granted, switch straight to the control tool
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
-        wm.setWindows(m.windows ?? [], { control: m.mode === 'control' })
+        // "Resize/Anordnen erlauben": the windows where they are on the presenter's screen
+        wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode === 'control' && m.resize === true, screens: m.screens ?? [] })
         renderTasks()
         wm.handle(m)
         break
