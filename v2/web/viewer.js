@@ -145,9 +145,12 @@ export function mountViewer(el, options) {
   // every shared window in a frame of its own (or alone, as large as possible)
   const wm = new WindowManager(stage, {
     voice: voiceEnabled,
-    // "Resize erlauben" on the presenter's side: a window resized here is resized there, too
+    // "Resize/Anordnen erlauben" on the presenter's side: windows resized, moved or activated
+    // here follow there
     canResize: () => state.mode === 'control' && state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
+    onArrange: (slot, x, y) => send({ t: 'arrange', w: slot, x, y }),
+    onActivate: (slot) => send({ t: 'activate', w: slot }),
     onChange: () => renderTasks(),
     onFrame: () => {
       if (!hasFrame) {
@@ -533,7 +536,10 @@ export function mountViewer(el, options) {
       update()
     }
   }
-  q('[data-tile]').addEventListener('click', () => wm.tile())
+  q('[data-tile]').addEventListener('click', () => {
+    wm.tile()
+    wm.tileThere()
+  })
 
   // ------------------------------------------------------------ ui
 

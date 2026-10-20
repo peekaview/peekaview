@@ -44,7 +44,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &MenuItem::with_id(app, "toggle", "Toolbar ein-/ausblenden", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &CheckMenuItem::with_id(app, "keep_link", "Raumlink beibehalten", true, settings["keep_link"] == true, None::<&str>)?,
-            &CheckMenuItem::with_id(app, "allow_resize", "Resize erlauben", true, settings["allow_resize"] == true, None::<&str>)?,
+            &CheckMenuItem::with_id(app, "allow_resize", "Resize/Anordnen erlauben", true, settings["allow_resize"] == true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &copy,
             &MenuItem::with_id(app, "rooms", "Raumlinks & Remote-Zugriff …", true, None::<&str>)?,

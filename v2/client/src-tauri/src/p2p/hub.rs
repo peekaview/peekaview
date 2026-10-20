@@ -490,7 +490,18 @@ impl Hub {
                     }
                 });
             }
-            // "Resize erlauben": the viewer resized a window in their window manager
+            // "Resize/Anordnen erlauben": the viewer activated / moved a window in their window manager
+            "activate" | "arrange" if mode == Mode::Control && crate::settings::allow_resize() => {
+                let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());
+                let (nx, ny) = (v["x"].as_f64().unwrap_or(0.0), v["y"].as_f64().unwrap_or(0.0));
+                std::thread::spawn(move || {
+                    let result = if kind == "activate" { session::activate_window(&app, slot) } else { session::arrange_window(&app, slot, nx, ny) };
+                    if let Err(e) = result {
+                        crate::log(&format!("{kind}: {e}"));
+                    }
+                });
+            }
+            // … and resized it
             "resize" if mode == Mode::Control && crate::settings::allow_resize() => {
                 let (app, slot) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8);
                 let (pw, ph) = (v["pw"].as_u64().unwrap_or(0) as u32, v["ph"].as_u64().unwrap_or(0) as u32);

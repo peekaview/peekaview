@@ -48,7 +48,8 @@ export class WindowManager {
   /**
    * @param {HTMLElement} stage
    * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void,
-   *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void}} options
+   *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void,
+   *          onActivate?: (slot: number) => void, onArrange?: (slot: number, x: number, y: number) => void}} options
    */
   constructor(stage, options = {}) {
     injectStyle('pv-windows-style', STYLE)
@@ -163,7 +164,7 @@ export class WindowManager {
     }
     video.addEventListener('loadeddata', onFrame)
     video.addEventListener('resize', onFrame)
-    el.addEventListener('pointerdown', () => this.focus(slot), true)
+    el.addEventListener('pointerdown', () => this.focus(slot, true), true)
     el.querySelector('[data-min]').addEventListener('click', () => this.minimize(slot))
     el.querySelector('[data-max]').addEventListener('click', () => this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('dblclick', (e) => !e.target.closest('button') && this.toggleMax(slot))
@@ -226,6 +227,25 @@ export class WindowManager {
     }
   }
 
+  /** "Resize/Anordnen erlauben": the presenter's window moves to the same relative place. */
+  arrangeThere(win) {
+    if (!this.options.canResize?.()) return
+    const a = this.area()
+    this.options.onArrange?.(win.slot, Math.max(0, win.x / a.w), Math.max(0, win.y / a.h))
+  }
+
+  /** The viewer arranged everything side by side: the presenter's windows follow (if allowed). */
+  tileThere() {
+    if (!this.options.canResize?.()) return
+    const d = window.devicePixelRatio || 1
+    for (const win of this.list.filter((w) => !w.min)) {
+      const n = this.native(win)
+      win.resized = true
+      this.options.onResize?.(win.slot, Math.round(n.w * win.s * d), Math.round(n.h * win.s * d))
+      this.arrangeThere(win)
+    }
+  }
+
   /** Side by side in a grid, each as large as it may be in its cell. */
   tile() {
     const a = this.area()
@@ -275,8 +295,10 @@ export class WindowManager {
 
   // ------------------------------------------------------------ window actions
 
-  focus(slot) {
+  /** `byUser`: the viewer picked it – with "Resize/Anordnen erlauben" it comes to the front there, too. */
+  focus(slot, byUser = false) {
     const win = this.wins.get(slot)
+    if (byUser && win && this.active !== slot && this.wins.size > 1 && this.options.canResize?.()) this.options.onActivate?.(slot)
     this.active = win ? slot : null
     for (const w of this.wins.values()) w.el.classList.toggle('active', w === win)
     if (win) win.el.style.zIndex = String(++this.z)
@@ -300,11 +322,11 @@ export class WindowManager {
       win.min = false
       this.clamp(win)
       this.paint(win)
-      this.focus(slot)
+      this.focus(slot, true)
     } else if (this.active === slot) {
       this.minimize(slot)
     } else {
-      this.focus(slot)
+      this.focus(slot, true)
     }
   }
 
@@ -347,6 +369,7 @@ export class WindowManager {
       bar.removeEventListener('pointercancel', up)
       this.root.classList.remove('moving')
       this.arranged = true
+      if (win.x !== start.wx || win.y !== start.wy) this.arrangeThere(win)
     }
     bar.addEventListener('pointermove', move)
     bar.addEventListener('pointerup', up)

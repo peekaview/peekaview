@@ -121,7 +121,10 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 
 The tray / menu bar icon shows or hides the toolbar with a click. Its menu offers:
 - **Raumlink beibehalten:** every share reuses the last link.
-- **Resize erlauben:** a viewer who resizes a window in their window manager resizes the real window on this screen, so it shows 1:1 for them. This needs remote control.
+- **Resize/Anordnen erlauben:** with remote control on, the viewer's window manager acts on the real windows on this screen.
+  - Resizing a window resizes it here, so it shows 1:1 for them.
+  - Moving a window, or arranging all side by side, moves the windows to the same relative place on their screen.
+  - Picking a window (click or dock) brings it to the front here.
 - **Raumlink kopieren:** copies the link of one of the permanent rooms.
 - **Raumlinks & Remote-Zugriff …:** opens the room manager.
 

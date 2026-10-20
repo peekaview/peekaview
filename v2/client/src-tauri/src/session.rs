@@ -170,7 +170,8 @@ impl Shared {
             // remote access: what viewers can start themselves
             "remote": self.remote.is_some(),
             "apps": self.remote.as_ref().map(Room::launchers).unwrap_or_default(),
-            // viewers may resize shared windows on this screen (tray menu "Resize erlauben")
+            // viewers may resize, arrange and activate shared windows on this screen
+            // (tray menu "Resize/Anordnen erlauben")
             "resize": crate::settings::allow_resize(),
         })
     }
@@ -1015,7 +1016,7 @@ pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
     switch_sources(app, &ids).map(|_| ())
 }
 
-/// A viewer resized a window in their window manager ("Resize erlauben"): the window on this
+/// A viewer resized a window in their window manager ("Resize/Anordnen erlauben"): the window on this
 /// screen follows, so it shows 1:1 there. `pw` × `ph` in the viewer's device pixels.
 pub fn resize_window(app: &AppHandle, slot: u8, pw: u32, ph: u32) -> Result<(), String> {
     if !crate::settings::allow_resize() {
@@ -1024,9 +1025,46 @@ pub fn resize_window(app: &AppHandle, slot: u8, pw: u32, ph: u32) -> Result<(), 
     set_window_pixels(app, slot, pw.clamp(200, 8192), ph.clamp(150, 8192))
 }
 
-/// Settings that viewers see changed (e.g. "Resize erlauben").
+/// Settings that viewers see changed (e.g. "Resize/Anordnen erlauben").
 pub fn settings_changed(app: &AppHandle) {
     if let Ok(shared) = running(app) {
         shared.send_state();
+    }
+}
+
+/// "Resize/Anordnen erlauben": a viewer activated a window in their window manager – it comes
+/// to the front here, too.
+pub fn activate_window(app: &AppHandle, slot: u8) -> Result<(), String> {
+    if !crate::settings::allow_resize() {
+        return Err("Nicht erlaubt".into());
+    }
+    let stream = running(app)?.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
+    if let (Some(pid), Some(id)) = (stream.pid, stream.window_id) {
+        crate::focus::bring_to_front(pid as u32, id);
+    }
+    Ok(())
+}
+
+/// "Resize/Anordnen erlauben": a viewer moved a window in their window manager – it moves to the
+/// same relative place on its screen here (`nx`, `ny`: top-left corner, 0..1 of the viewer's area).
+pub fn arrange_window(app: &AppHandle, slot: u8, nx: f64, ny: f64) -> Result<(), String> {
+    if !crate::settings::allow_resize() {
+        return Err("Nicht erlaubt".into());
+    }
+    let stream = running(app)?.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
+    let (Some(window_id), Some(pid)) = (stream.window_id, stream.pid) else {
+        return Err("Nur für geteilte Fenster".into());
+    };
+    let r = stream.rect;
+    let monitor = xcap::Monitor::from_point(r.x + r.w / 2, r.y + r.h / 2).map_err(|e| e.to_string())?;
+    let (mx, my) = (monitor.x().unwrap_or(0) as f64, monitor.y().unwrap_or(0) as f64);
+    let (mw, mh) = (monitor.width().unwrap_or(0) as f64, monitor.height().unwrap_or(0) as f64);
+    let (w, h) = (r.w as f64, r.h as f64);
+    let x = (mx + nx.clamp(0.0, 1.0) * mw).clamp(mx, (mx + mw - w).max(mx));
+    let y = (my + 24.0 + ny.clamp(0.0, 1.0) * (mh - 24.0)).clamp(my + 24.0, (my + mh - h).max(my + 24.0));
+    if crate::focus::set_frame(pid as u32, window_id, x, y, w, h) {
+        Ok(())
+    } else {
+        Err("Fenster ließ sich nicht verschieben – ist „Bedienungshilfen“ für PeekaView erlaubt?".into())
     }
 }

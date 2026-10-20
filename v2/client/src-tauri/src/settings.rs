@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
 
 static SETTINGS: Mutex<Option<Value>> = Mutex::new(None);
-/// viewers may resize shared windows on the presenter's screen (control mode)
+/// viewers may resize, arrange and activate shared windows on the presenter's screen (control mode)
 static ALLOW_RESIZE: AtomicBool = AtomicBool::new(false);
 
 const KEYS: [&str; 7] = ["site", "name", "relays", "turn_urls", "turn_secret", "keep_link", "allow_resize"];
