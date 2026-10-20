@@ -26,7 +26,9 @@ Share links point to `https://<npub>.nsite.lol/#…`, not to a web server of our
   - its server list (10063) and relay list (10002) let gateways find everything.
 - **When:** again whenever the bundled site changes, and otherwise once a week.
 - **Serving:** any nsite gateway serves the same files and checks their hashes. The gateway is the https origin of the page, so it is trusted like any web host.
-- **Own site:** an address entered under Einstellungen → Zuschauer-Website (e.g. your own static hosting) replaces the nsite.
+- **Cleanup:** after each new version, files of earlier versions are deleted from the Blossom servers.
+- **Own site:** an address entered under Einstellungen → Zuschauer-Website (e.g. your own static hosting) replaces the nsite. The nsite is then taken down: its files are deleted, and its manifest gets a NIP-09 deletion event.
+- **No room data on Blossom:** only the viewer site lives on the Blossom servers. Room keys, picture, sound and clipboard files never pass through them.
 
 ## Layout
 

@@ -6,7 +6,9 @@
 //! list (kind 10002) so gateways find everything. Share links then point to
 //! `https://<npub>.nsite.lol/#…` – any nsite gateway serves the same, hash-checked files.
 //!
-//! Published again when the bundled site changed, or once a week (relays may forget).
+//! Published again when the bundled site changed, or once a week (relays may forget). Files of
+//! earlier versions are deleted from the Blossom servers afterwards; with an own viewer site
+//! configured, the nsite is taken down completely.
 
 use std::{
     sync::Mutex,
@@ -223,6 +225,73 @@ fn upload_with(server: &str, file: &File, secret: [u8; 32], typed: bool, url_saf
     Err(format!("{server}: {} {reason}", response.status().as_u16()))
 }
 
+/// Deletes a blob from a server (BUD-02 DELETE, BUD-11 auth with t=delete).
+fn delete_blob(server: &str, sha: &str, secret: [u8; 32]) -> Result<(), String> {
+    let attempt = |url_safe: bool| -> Result<(), String> {
+        let auth = signal::sign_event(secret, 24242, json!([["t", "delete"], ["x", sha], ["expiration", (now() + 600).to_string()]]), "Delete old PeekaView file");
+        let token = if url_safe { URL_SAFE_NO_PAD.encode(auth.to_string()) } else { base64::engine::general_purpose::STANDARD.encode(auth.to_string()) };
+        let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
+        let response = agent.delete(&format!("{server}/{sha}")).header("Authorization", &format!("Nostr {token}")).call().map_err(|e| e.to_string())?;
+        // gone already counts as done
+        if response.status().is_success() || response.status().as_u16() == 404 {
+            Ok(())
+        } else {
+            Err(format!("{server}: {}", response.status().as_u16()))
+        }
+    };
+    attempt(true).or_else(|_| attempt(false))
+}
+
+/// Blobs we have on servers: {server: [sha256 …]} – deletes those not in `keep`.
+fn delete_except(app: &AppHandle, keep: &[String], keep_servers: &[String]) -> Value {
+    let secret = key(app);
+    let st = state(app);
+    let mut left = serde_json::Map::new();
+    for (server, shas) in st["blobs"].as_object().cloned().unwrap_or_default() {
+        let mut remaining = Vec::new();
+        for sha in shas.as_array().into_iter().flatten().filter_map(|s| s.as_str()) {
+            let still_used = keep_servers.contains(&server) && keep.iter().any(|k| k == sha);
+            if !still_used && delete_blob(&server, sha, secret).is_err() {
+                remaining.push(json!(sha));
+            }
+        }
+        if !remaining.is_empty() {
+            left.insert(server, Value::Array(remaining));
+        }
+    }
+    Value::Object(left)
+}
+
+/// Takes the nsite down: all files off the servers, the manifest deleted (NIP-09) – used when
+/// an own viewer site is configured.
+pub fn unpublish(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let st = state(&app);
+        if st["published"].is_null() && st["blobs"].as_object().is_none_or(|b| b.is_empty()) {
+            return;
+        }
+        let secret = key(&app);
+        let pubkey = hex(&signal::public_key(secret));
+        let leftovers = delete_except(&app, &[], &[]);
+        let deletion = signal::sign_event(secret, 5, json!([["a", format!("15128:{pubkey}:")], ["k", "15128"]]), "PeekaView viewer site taken down");
+        let mut relays: Vec<String> = crate::settings::lines(&app, "relays");
+        if relays.is_empty() {
+            relays = signal::DEFAULT_RELAYS.iter().map(|r| r.to_string()).collect();
+        }
+        relays.extend(LOOKUP_RELAYS.iter().map(|r| r.to_string()));
+        tauri::async_runtime::block_on(futures_util::future::join_all(relays.iter().map(|r| publish_to(r, std::slice::from_ref(&deletion)))));
+        let mut st = state(&app);
+        st["blobs"] = leftovers;
+        st["published"] = Value::Null;
+        st["hash"] = Value::Null;
+        save_state(&app, &st);
+        crate::log("nsite: taken down");
+        *STATUS.lock().unwrap() = None;
+        let _ = app.emit("nsite", status(&app));
+    });
+}
+
 /// Sends events to a relay; true if it accepted all of them.
 async fn publish_to(relay: &str, events: &[Value]) -> bool {
     let Ok(Ok((mut ws, _))) = tokio::time::timeout(Duration::from_secs(6), tokio_tungstenite::connect_async(relay)).await else { return false };
@@ -250,7 +319,7 @@ async fn publish_to(relay: &str, events: &[Value]) -> bool {
     ok == events.len()
 }
 
-fn publish(app: &AppHandle, files: &[File], hash: &str) -> Result<(), String> {
+fn publish(app: &AppHandle, files: &[File], hash: &str) -> Result<Vec<String>, String> {
     let secret = key(app);
     let mut servers = Vec::new();
     let mut errors = Vec::new();
@@ -288,7 +357,7 @@ fn publish(app: &AppHandle, files: &[File], hash: &str) -> Result<(), String> {
         return Err("Kein Relay nahm die Seite an".into());
     }
     crate::log(&format!("nsite: published to {} servers ({}), {accepted} relays{}", servers.len(), servers.join(", "), if errors.is_empty() { String::new() } else { format!(" – refused: {}", errors.join("; ")) }));
-    Ok(())
+    Ok(servers)
 }
 
 /// Publishes the viewer site if it changed (or a week has passed); in the background.
@@ -307,10 +376,25 @@ pub fn publish_if_needed(app: &AppHandle, force: bool) {
         }
         set_status(&app, json!({ "url": site_url(&app), "state": "publishing" }));
         match publish(&app, &files, &hash) {
-            Ok(()) => {
+            Ok(servers) => {
+                // files of earlier versions are no longer needed
+                let shas: Vec<String> = files.iter().map(|f| f.sha.clone()).collect();
+                let mut blobs = delete_except(&app, &shas, &servers);
+                if let Some(map) = blobs.as_object_mut() {
+                    for server in &servers {
+                        let mut list: Vec<Value> = map.get(server).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+                        for sha in &shas {
+                            if !list.iter().any(|v| v == sha.as_str()) {
+                                list.push(json!(sha));
+                            }
+                        }
+                        map.insert(server.clone(), Value::Array(list));
+                    }
+                }
                 let mut st = state(&app);
                 st["hash"] = json!(hash);
                 st["published"] = json!(now());
+                st["blobs"] = blobs;
                 save_state(&app, &st);
                 set_status(&app, json!({ "url": site_url(&app), "state": "ok", "published": st["published"] }));
             }
@@ -340,9 +424,10 @@ mod tests {
         let file = File { path: "/test.txt".into(), sha: hex(&Sha256::digest(&bytes)), bytes, mime: "text/plain".into() };
         let key = signal::new_signing_key();
         for server in BLOSSOM {
-            for (typed, url_safe) in [(true, true), (false, true), (true, false), (false, false)] {
-                println!("{server} typed={typed} url_safe={url_safe}: {:?}", upload_with(server, &file, key, typed, url_safe));
-            }
+            let uploaded = upload(server, &file, key);
+            let deleted = uploaded.is_ok().then(|| delete_blob(server, &file.sha, key));
+            let gone = ureq::head(&format!("{server}/{}", file.sha)).call().is_err();
+            println!("{server}: upload {uploaded:?}, delete {deleted:?}, gone afterwards: {gone}");
         }
     }
 

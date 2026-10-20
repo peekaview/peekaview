@@ -185,7 +185,15 @@ fn get_settings(app: AppHandle) -> serde_json::Value {
 /// The toolbar keeps the settings the Rust side needs (tray, rooms waiting for remote access).
 #[tauri::command]
 fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
+    let own_site_before = settings::text(&app, "site").is_some();
     let settings = settings::set(&app, &patch);
+    // an own viewer site replaces the nsite (taken down); back to Nostr publishes it again
+    let own_site = settings::text(&app, "site").is_some();
+    if own_site && !own_site_before {
+        nsite::unpublish(&app);
+    } else if !own_site && own_site_before {
+        nsite::publish_if_needed(&app, true);
+    }
     session::settings_changed(&app);
     tray::refresh(&app);
     settings
