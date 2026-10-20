@@ -1,9 +1,9 @@
 //! Keeps viewer input inside the shared window.
 //!
 //! Before any injected click/scroll we verify that the shared window is the topmost window
-//! at that screen point (so nothing lying on top of it can be hit) and that it is none of
-//! PeekaView's own windows; before any injected keystroke we verify that the shared window owns
-//! the keyboard focus.
+//! at that screen point – it may lie in the background, but that spot must not be covered –
+//! and that it is none of PeekaView's own windows; before any injected keystroke we verify that
+//! the shared window owns the keyboard focus (a viewer's click into it gives it the focus).
 //! All coordinates are in the platform's input space (macOS: points, Windows: physical pixels).
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -53,6 +53,21 @@ pub static OVERLAY_WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::Ato
 pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
     imp::input_allowed(target, x, y)
 }
+
+/// Can viewers reach the shared window at all, i.e. is some part of it not covered?
+/// Samples a grid over `rect`; always true for a shared screen.
+pub fn reachable(target: Option<u32>, rect: Rect) -> bool {
+    if target.is_none() {
+        return true;
+    }
+    let points: Vec<(i32, i32)> = (0..GRID)
+        .flat_map(|i| (0..GRID).map(move |j| ((i as f64 + 0.5) / GRID as f64, (j as f64 + 0.5) / GRID as f64)))
+        .map(|(nx, ny)| rect.point(nx, ny))
+        .collect();
+    imp::any_allowed(target, &points)
+}
+
+const GRID: usize = 5;
 
 /// Does `window_id` currently receive keyboard input?
 pub fn focused(window_id: u32) -> bool {
@@ -154,21 +169,28 @@ mod imp {
     }
 
     pub fn input_allowed(target: Option<u32>, x: i32, y: i32) -> bool {
+        any_allowed(target, &[(x, y)])
+    }
+
+    /// Is input allowed at any of the points? One window list for all of them.
+    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
         let me = std::process::id() as i32;
         let overlay = super::OVERLAY_WINDOW.load(std::sync::atomic::Ordering::Relaxed);
         let windows = list(false);
-        // never on one of our own windows (toolbar, helpers) – the overlay is click-through
-        if windows.iter().any(|w| w.pid == me && w.id != overlay && w.alpha > 0.0 && w.rect.contains(x, y)) {
-            return false;
-        }
-        let Some(id) = target else { return true };
-        let displays = displays();
-        // front to back: the first visible window at that point must be the shared one
-        windows
-            .iter()
-            .filter(|w| w.alpha > 0.0 && w.id != overlay && !is_screen_overlay(w, &displays))
-            .find(|w| w.rect.contains(x, y))
-            .is_some_and(|w| w.id == id)
+        let displays = if target.is_some() { displays() } else { Vec::new() };
+        points.iter().any(|&(x, y)| {
+            // never on one of our own windows (toolbar, helpers) – the overlay is click-through
+            if windows.iter().any(|w| w.pid == me && w.id != overlay && w.alpha > 0.0 && w.rect.contains(x, y)) {
+                return false;
+            }
+            let Some(id) = target else { return true };
+            // front to back: the first visible window at that point must be the shared one
+            windows
+                .iter()
+                .filter(|w| w.alpha > 0.0 && w.id != overlay && !is_screen_overlay(w, &displays))
+                .find(|w| w.rect.contains(x, y))
+                .is_some_and(|w| w.id == id)
+        })
     }
 
     pub fn focused(window_id: u32) -> bool {
@@ -215,6 +237,10 @@ mod imp {
         pid != std::process::id() && target.is_none_or(|id| root as usize as u32 == id)
     }
 
+    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
+        points.iter().any(|&(x, y)| input_allowed(target, x, y))
+    }
+
     pub fn focused(window_id: u32) -> bool {
         let fg = unsafe { GetForegroundWindow() };
         !fg.is_null() && fg as usize as u32 == window_id
@@ -253,6 +279,10 @@ mod imp {
         }
     }
 
+    pub fn any_allowed(target: Option<u32>, points: &[(i32, i32)]) -> bool {
+        points.iter().any(|&(x, y)| input_allowed(target, x, y))
+    }
+
     pub fn focused(window_id: u32) -> bool {
         xcap::Window::all()
             .ok()
@@ -269,12 +299,21 @@ mod tests {
     #[ignore]
     fn live_window_checks() {
         let title = std::env::var("PV_WINDOW").unwrap_or_else(|_| "Ohne Titel".into());
-        let win = xcap::Window::all().unwrap().into_iter().find(|w| w.title().ok().as_deref() == Some(title.as_str())).expect("window");
+        let wanted: Option<u32> = std::env::var("PV_WINDOW_ID").ok().and_then(|v| v.parse().ok());
+        let win = xcap::Window::all()
+            .unwrap()
+            .into_iter()
+            .find(|w| match wanted {
+                Some(id) => w.id().ok() == Some(id),
+                None => w.title().ok().as_deref() == Some(title.as_str()),
+            })
+            .expect("window");
         let id = win.id().unwrap();
+        println!("app={:?} title={:?} pid={:?} xcap focused={:?}", win.app_name(), win.title(), win.pid(), win.is_focused());
         let (rect, visible) = super::window_geometry(&win).unwrap();
         let (cx, cy) = rect.point(0.5, 0.6);
         println!("window {id} {rect:?} visible={visible} focused={}", super::focused(id));
-        println!("input_allowed(center)={}", super::input_allowed(Some(id), cx, cy));
+        println!("input_allowed(center)={} reachable={}", super::input_allowed(Some(id), cx, cy), super::reachable(Some(id), rect));
         for w in super::imp::list(false).iter().filter(|w| w.rect.contains(cx, cy)) {
             println!("  at center: id={} pid={} layer={} alpha={} {:?}", w.id, w.pid, w.layer, w.alpha, w.rect);
         }

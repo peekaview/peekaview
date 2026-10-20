@@ -52,6 +52,16 @@ const CSS = `
 .pv-paused { color: #fde68a; }
 .pv-dock button.live { background: #16a34a; color: #fff; }
 .pv-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 14px; }
+.pv-dock.placed { transform: none; bottom: auto; }
+.pv-dock.collapsed > :not(.pv-grip):not(.pv-fold) { display: none !important; }
+.pv-dock .pv-grip { width: 18px; margin-right: -2px; color: var(--pv-muted); cursor: grab; touch-action: none; }
+.pv-dock .pv-grip:active { cursor: grabbing; }
+.pv-dock .pv-grip:hover:not(:disabled) { background: transparent; color: var(--pv-fg); }
+.pv-dock .pv-fold { width: 26px; color: var(--pv-muted); }
+.pv-dock .pv-fold:hover:not(:disabled) { color: var(--pv-fg); }
+.pv-dock.dragging button::after { display: none; }
+.pv-toast { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); color: #fde68a; pointer-events: none; animation: pv-in .2s ease-out; }
+@keyframes pv-in { from { opacity: 0; transform: translate(-50%, -4px); } }
 .pv-dock button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--pv-fg); cursor: pointer; transition: background .15s, color .15s, opacity .15s; }
 .pv-dock button:hover:not(:disabled) { background: rgba(255, 255, 255, .09); }
 .pv-dock button.active { background: var(--pv-fg); color: var(--pv-bg); }
@@ -85,16 +95,19 @@ export function mountViewer(el, options) {
       <div class="pv-chip pv-glass pv-live"><i class="pv-dot"></i><span class="pv-title"></span></div>
       <div class="pv-chip pv-glass pv-mode"></div>
       <div class="pv-chip pv-glass pv-rec" hidden><i class="pv-dot"></i><span>Wird aufgezeichnet</span></div>
-      <div class="pv-chip pv-glass pv-paused" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist nicht im Vordergrund</span></div>
+      <div class="pv-chip pv-glass pv-paused" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist beim Host verdeckt</span></div>
     </div>
+    <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
     <ul class="pv-peers"></ul>
     <div class="pv-dock pv-glass">
+      <button class="pv-grip" data-tip="Verschieben">${icon('grip', 16)}</button>
       <button data-tool="point" data-tip="Zeigen">${icon('point')}</button>
       <button data-tool="draw" data-tip="Malen">${icon('draw')}</button>
       <button data-tool="control" data-tip="Steuern">${icon('control')}</button>
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-voice data-tip="Sprechen">${icon('micOff')}</button>
+      <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
     <textarea class="pv-keys" aria-hidden="true" tabindex="-1" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>`
   const q = (s) => el.querySelector(s)
@@ -102,7 +115,7 @@ export function mountViewer(el, options) {
   const view = q('.pv-view')
   const screen = q('.pv-screen')
   const keys = q('.pv-keys')
-  const ann = new Annotations(q('.pv-ann'))
+  const ann = new Annotations(q('.pv-ann'), { voice: voiceEnabled })
   q('.pv-top').hidden = !toolbar
   q('.pv-dock').hidden = !toolbar
   q('.pv-peers').hidden = !peers
@@ -283,6 +296,9 @@ export function mountViewer(el, options) {
       case 'end':
         lost()
         return
+      case 'blocked':
+        toast(m.why === 'focus' ? 'Zum Tippen zuerst in das geteilte Fenster klicken.' : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.')
+        return
       default:
         ann.handle(m)
     }
@@ -337,18 +353,28 @@ export function mountViewer(el, options) {
     mode.querySelector('span').textContent = MODES[state.mode] ?? ''
     const allowed = hostPresent ? TOOLS[state.mode] ?? [] : []
     q('.pv-rec').hidden = !hostPresent || !state.recording
-    q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.foreground !== false
+    q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false
     q('.pv-dock').hidden = !toolbar || (!allowed.length && !(voiceEnabled && me))
     for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.hidden = !allowed.includes(b.dataset.tool)
     q('[data-clear]').hidden = !allowed.length
     q('.pv-tools-sep').hidden = !allowed.length || !voiceEnabled
     q('[data-voice]').hidden = !voiceEnabled || !me
-    if (!allowed.includes(tool) && tool !== 'point') setTool('point')
+    // (the state can arrive before the participant list says the presenter is there)
+    if (hostPresent && !allowed.includes(tool) && tool !== 'point') setTool('point')
 
     if (status !== lastStatus) {
       lastStatus = status
       onStatus?.(status)
     }
+  }
+
+  let toastTimer
+  function toast(text) {
+    const t = q('.pv-toast')
+    t.querySelector('span').textContent = text
+    t.hidden = false
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => (t.hidden = true), 3500)
   }
 
   function setTool(t) {
@@ -396,6 +422,76 @@ export function mountViewer(el, options) {
     if (voice.on) voice.stop()
     else voice.start().catch(() => (q('[data-voice]').dataset.tip = 'Kein Zugriff auf das Mikrofon'))
   })
+
+  // ------------------------------------------------------------ dock: drag & collapse
+  // Position (as a fraction of the viewer) and collapsed state are remembered per browser.
+
+  const dock = q('.pv-dock')
+  const DOCK_KEY = 'pv-dock'
+  const loadDock = () => {
+    try {
+      return JSON.parse(localStorage.getItem(DOCK_KEY)) ?? {}
+    } catch {
+      return {}
+    }
+  }
+  const saveDock = (patch) => {
+    try {
+      localStorage.setItem(DOCK_KEY, JSON.stringify({ ...loadDock(), ...patch }))
+    } catch {}
+  }
+  function placeDock(fx, fy) {
+    if (!Number.isFinite(fx) || !Number.isFinite(fy)) return
+    const r = el.getBoundingClientRect()
+    const d = dock.getBoundingClientRect()
+    dock.classList.add('placed')
+    dock.style.left = `${Math.round(Math.min(Math.max(0, r.width - d.width), Math.max(0, fx * r.width)))}px`
+    dock.style.top = `${Math.round(Math.min(Math.max(0, r.height - d.height), Math.max(0, fy * r.height)))}px`
+  }
+  function foldDock(collapsed) {
+    dock.classList.toggle('collapsed', collapsed)
+    const b = q('.pv-fold')
+    b.innerHTML = icon(collapsed ? 'expand' : 'collapse', 16)
+    b.dataset.tip = collapsed ? 'Ausklappen' : 'Einklappen'
+  }
+  {
+    const saved = loadDock()
+    foldDock(!!saved.collapsed)
+    if (saved.x != null) requestAnimationFrame(() => placeDock(saved.x, saved.y))
+  }
+  q('.pv-fold').addEventListener('click', () => {
+    const collapsed = !dock.classList.contains('collapsed')
+    foldDock(collapsed)
+    saveDock({ collapsed })
+  })
+  q('.pv-grip').addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    const grip = e.currentTarget
+    grip.setPointerCapture(e.pointerId)
+    const r = el.getBoundingClientRect()
+    const d = dock.getBoundingClientRect()
+    const dx = e.clientX - d.left
+    const dy = e.clientY - d.top
+    dock.classList.add('dragging')
+    const move = (ev) => placeDock((ev.clientX - dx - r.left) / r.width, (ev.clientY - dy - r.top) / r.height)
+    const up = () => {
+      grip.removeEventListener('pointermove', move)
+      grip.removeEventListener('pointerup', up)
+      grip.removeEventListener('pointercancel', up)
+      dock.classList.remove('dragging')
+      const now = el.getBoundingClientRect()
+      saveDock({ x: parseFloat(dock.style.left) / now.width, y: parseFloat(dock.style.top) / now.height })
+    }
+    grip.addEventListener('pointermove', move)
+    grip.addEventListener('pointerup', up)
+    grip.addEventListener('pointercancel', up)
+  })
+  // keep a placed dock inside the viewer when it gets smaller
+  const dockObserver = new ResizeObserver(() => {
+    const saved = loadDock()
+    if (dock.classList.contains('placed') && saved.x != null) placeDock(saved.x, saved.y)
+  })
+  dockObserver.observe(el)
 
   // ------------------------------------------------------------ pointer
 
@@ -518,6 +614,8 @@ export function mountViewer(el, options) {
       signaling?.close()
       resetVideo()
       resizeObserver.disconnect()
+      dockObserver.disconnect()
+      clearTimeout(toastTimer)
       ann.destroy()
       el.replaceChildren()
       el.classList.remove('pv-viewer')

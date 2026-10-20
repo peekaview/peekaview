@@ -71,23 +71,25 @@ The presenter chooses what viewers may do:
 | **Zeigen & Malen** | move their own colored, labelled cursor, send pings, draw fading strokes |
 | **Steuern** | additionally use mouse, wheel and keyboard (clipboard text is typed) |
 
-Everybody can join the **voice chat** from the microphone button.
+Everybody can join the **voice chat** from the microphone button. The label next to each cursor shows level bars while that person speaks, and a crossed-out microphone while their microphone is off.
 
 Cursors and strokes appear for every viewer. They also appear on the presenter's desktop in a click-through overlay that never shows up in captures.
 
 **Sharing a single window**
 - **Picture:** only that window is captured (ScreenCaptureKit single-window filter / Windows.Graphics.Capture for the window).
-- **Input:** works only while the window is **in the foreground** and only **inside it**.
-  - Clicks land only where it is the topmost normal window. They never land on PeekaView's own windows.
+- **Input:** lands only **inside the window** and only where it is **not covered**. The window may lie in the background.
+  - A click goes through only where the shared window is the topmost window at that spot. Clicks never land on other windows or on PeekaView's own windows.
   - Drags are clamped to the window.
-  - Keystrokes go through only while it has the focus.
+  - Keystrokes go through only while it has the focus. A viewer's click into the window gives it the focus.
   - Shortcuts that switch apps are dropped.
-  - Viewers see a "Steuerung pausiert" hint while the window is not in front.
+  - A dropped click or keystroke tells the viewer why.
+  - Viewers see a "Steuerung pausiert" hint while the window is covered completely.
 - **macOS limitation:** macOS blocks synthetic keystrokes while any password field is focused ("Secure Input").
 
 ## Desktop client
 
 - **Toolbar**
+  - Can be moved with the grip on its left and folded down to a small handle. The viewer's toolbar can do the same.
   - Idle: Teilen (opens a picker with thumbnails) · settings · quit.
   - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
   - The selected source has a red frame on the desktop.

@@ -8,7 +8,9 @@
 <body class="toolbar">
   <div id="shell">
     <div class="bar glass">
+      <button id="grip" class="grip" title="Verschieben" data-icon="grip"></button>
       <span class="logo" title="PeekaView"><i data-icon="logo"></i></span>
+      <i id="live-dot" class="dot" title="Freigabe läuft"></i>
 
       <div id="bar-idle" class="group">
         <button id="share-btn" class="pill primary"><i data-icon="share"></i>Teilen</button>
@@ -34,6 +36,7 @@
         <button id="rec-btn" class="icon-btn rec" title="Sitzung aufzeichnen"><i data-icon="record"></i><span id="rec-time" hidden></span></button>
         <button id="stop-btn" class="pill danger" title="Freigabe beenden"><i data-icon="stop"></i>Beenden</button>
       </div>
+      <button id="fold-btn" class="icon-btn fold" title="Einklappen" data-icon="collapse"></button>
     </div>
 
     <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>

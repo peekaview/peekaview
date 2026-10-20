@@ -52,10 +52,26 @@ $('name').value = store.get('pv-name') ?? ''
 
 // ------------------------------------------------------------------ window size follows the content
 
+// the bar's left edge stays where the user dragged it, also when the panel folds out below
 new ResizeObserver(() => {
   const shell = $('shell')
-  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight) })
+  const barLeft = shell.querySelector('.bar').offsetLeft
+  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight), barLeft })
 }).observe($('shell'))
+
+// ------------------------------------------------------------------ move & collapse
+
+$('grip').addEventListener('mousedown', (e) => e.button === 0 && invoke('toolbar_drag'))
+
+function setCollapsed(collapsed) {
+  document.body.classList.toggle('collapsed', collapsed)
+  store.set('pv-collapsed', collapsed ? '1' : '')
+  const b = $('fold-btn')
+  b.title = collapsed ? 'Ausklappen' : 'Einklappen'
+  b.innerHTML = icon(collapsed ? 'expand' : 'collapse', 17)
+  if (collapsed && currentPanel) openPanel(null)
+}
+$('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
 
 function error(msg) {
   $('error').textContent = msg ?? ''
@@ -66,8 +82,10 @@ function error(msg) {
 // ------------------------------------------------------------------ panel
 
 let currentPanel = null
+setTimeout(() => store.get('pv-collapsed') && setCollapsed(true))
 
 function openPanel(which) {
+  if (which && document.body.classList.contains('collapsed')) setCollapsed(false)
   currentPanel = which
   saveUi()
   $('panel').hidden = !which
@@ -217,6 +235,7 @@ $('switch-btn').addEventListener('click', () => {
 
 function showLive(live) {
   sharing = live
+  document.body.classList.toggle('sharing', live)
   $('start-label').textContent = live ? 'Wechseln' : 'Freigabe starten'
   $('name').hidden = live
   $('bar-idle').hidden = live

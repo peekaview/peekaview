@@ -22,7 +22,7 @@ use crate::{
 
 const TICK: Duration = Duration::from_millis(33);
 const GEOMETRY_EVERY: Duration = Duration::from_millis(150);
-const FOREGROUND_EVERY: Duration = Duration::from_millis(300);
+const REACHABLE_EVERY: Duration = Duration::from_millis(300);
 
 /// Current geometry of the source: `None` once a shared window is gone.
 pub fn geometry(source: &Source) -> Option<(Rect, bool)> {
@@ -45,7 +45,7 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut source: Source, video: Video
     let pointer = Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }).ok();
     let mut last_geom: Option<(Rect, bool)> = None;
     let mut last_check = Instant::now() - GEOMETRY_EVERY;
-    let mut last_focus_check = Instant::now() - FOREGROUND_EVERY;
+    let mut last_reach_check = Instant::now() - REACHABLE_EVERY;
     let mut last_ptr: Option<(i32, i32)> = None;
     let mut probe = Probe::default();
     let mut last_saved = Instant::now();
@@ -103,11 +103,12 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut source: Source, video: Video
             }
         }
 
-        // viewers are told when remote control is paused because the window isn't in front
-        if let (Some(id), true) = (shared.window_id(), last_focus_check.elapsed() >= FOREGROUND_EVERY) {
-            last_focus_check = Instant::now();
-            let focused = guard::focused(id);
-            if shared.foreground.swap(focused, Ordering::Relaxed) != focused {
+        // viewers are told when remote control is paused because the window is covered completely
+        if let (Some(id), true) = (shared.window_id(), last_reach_check.elapsed() >= REACHABLE_EVERY) {
+            last_reach_check = Instant::now();
+            let rect = *shared.rect.lock().unwrap();
+            let reachable = guard::reachable(Some(id), rect);
+            if shared.reachable.swap(reachable, Ordering::Relaxed) != reachable {
                 shared.send_state();
             }
         }

@@ -2,18 +2,21 @@
 //!
 //! * Coordinates are clamped to the shared rect, so a drag can never leave it.
 //! * For a shared window, a click/scroll is only performed if that window is the topmost one at
-//!   that point, and keystrokes only if the shared window has the keyboard focus.
+//!   that point (it may lie in the background, but that spot must not be covered), and keystrokes
+//!   only if the shared window has the keyboard focus – which a viewer's click into it gives it.
+//! * Dropped input is reported back to the viewer, so they know why nothing happens.
 //! * Combos that switch apps or open system UI (app switcher, Spotlight, …) are dropped.
 
 use std::{
     sync::{atomic::Ordering, mpsc, Arc},
     thread,
+    time::{Duration, Instant},
 };
 
 #[cfg(not(target_os = "windows"))]
 use enigo::Coordinate;
 use enigo::{Axis, Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::{
     guard,
@@ -33,12 +36,16 @@ struct Controller {
     enigo: Option<Enigo>,
     /// viewer id + button currently held down on their behalf
     pressed: Option<(u64, Button)>,
+    /// last "blocked" notice per viewer (at most one every NOTICE_GAP)
+    noticed: std::collections::HashMap<u64, Instant>,
 }
+
+const NOTICE_GAP: Duration = Duration::from_millis(1500);
 
 pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let mut c = Controller { shared, enigo: None, pressed: None };
+        let mut c = Controller { shared, enigo: None, pressed: None, noticed: Default::default() };
         for cmd in rx {
             match cmd {
                 Cmd::Release => c.release(),
@@ -98,28 +105,31 @@ impl Controller {
         *self.shared.injected_at.lock().unwrap() = Some(std::time::Instant::now());
     }
 
-    /// Is the shared window in the foreground (always true for a shared screen)?
-    fn foreground(&self) -> bool {
-        self.shared.window_id().is_none_or(guard::focused)
+    /// Tells viewer `to` why their input was dropped ("covered" | "focus").
+    fn notice(&mut self, to: u64, why: &str) {
+        let now = Instant::now();
+        if self.noticed.get(&to).is_some_and(|t| now.duration_since(*t) < NOTICE_GAP) {
+            return;
+        }
+        self.noticed.insert(to, now);
+        self.shared.send(json!({ "t": "blocked", "to": to, "why": why }));
     }
 
-    /// May a click / scroll land at screen point (x, y)?
-    fn point_allowed(&self, x: i32, y: i32) -> bool {
-        if !self.foreground() {
-            crate::log(&format!("control: dropped at {x},{y} – shared window not in foreground"));
-            return false;
-        }
+    /// May a click / scroll of viewer `from` land at screen point (x, y)?
+    fn point_allowed(&mut self, from: u64, x: i32, y: i32) -> bool {
         let ok = guard::input_allowed(self.shared.window_id(), x, y);
         if !ok {
             crate::log(&format!("control: dropped at {x},{y} – covered or outside the shared window"));
+            self.notice(from, "covered");
         }
         ok
     }
 
-    fn keyboard_allowed(&self) -> bool {
-        let ok = self.foreground();
+    fn keyboard_allowed(&mut self, from: u64) -> bool {
+        let ok = self.shared.window_id().is_none_or(guard::focused);
         if !ok {
-            crate::log("control: keyboard dropped – shared window not in foreground");
+            crate::log("control: keyboard dropped – shared window has no focus");
+            self.notice(from, "focus");
         }
         ok
     }
@@ -146,7 +156,7 @@ impl Controller {
             "mouse" => match v["a"].as_str() {
                 Some("down") if self.pressed.is_none() => {
                     let (x, y) = point();
-                    if !self.point_allowed(x, y) {
+                    if !self.point_allowed(from, x, y) {
                         return;
                     }
                     let button = if v["b"].as_u64() == Some(2) { Button::Right } else { Button::Left };
@@ -170,7 +180,7 @@ impl Controller {
             },
             "wheel" if self.pressed.is_none() => {
                 let (x, y) = point();
-                if !self.point_allowed(x, y) {
+                if !self.point_allowed(from, x, y) {
                     return;
                 }
                 self.move_to(x, y);
@@ -187,7 +197,7 @@ impl Controller {
             }
             "text" => {
                 let text: String = v["s"].as_str().unwrap_or("").chars().take(MAX_TEXT).collect();
-                if !text.is_empty() && self.keyboard_allowed() {
+                if !text.is_empty() && self.keyboard_allowed(from) {
                     self.injected();
                     if let Some(e) = self.enigo() {
                         let _ = e.text(&text);
@@ -205,7 +215,7 @@ impl Controller {
                     return;
                 }
                 let Some(key) = key_of(name) else { return };
-                if !self.keyboard_allowed() {
+                if !self.keyboard_allowed(from) {
                     return;
                 }
                 let mut mods = Vec::new();

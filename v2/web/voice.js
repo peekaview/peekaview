@@ -1,6 +1,10 @@
 // Voice chat: a WebRTC audio mesh between everybody in the room who switched their microphone on.
 // Signaling runs over the PeekaView relay ({t:'rtc', to, sdp|candidate}); for every pair the
 // participant with the lower id sends the offer (the presenter has id 0).
+// While the microphone is on, its level goes to everybody ({t:'level', v: 0..1}) for the speaking
+// indicator next to the cursor – also to participants who don't listen themselves.
+
+const LEVEL_EVERY = 100 // ms
 
 export class Voice {
   /**
@@ -31,6 +35,7 @@ export class Voice {
     })
     this.on = true
     this.send({ t: 'voice', on: true })
+    this.meter()
     this.sync()
     this.onChange?.()
   }
@@ -39,10 +44,45 @@ export class Voice {
     if (!this.on) return
     this.on = false
     this.send({ t: 'voice', on: false })
+    clearInterval(this.meterTimer)
+    this.meterCtx?.close().catch(() => {})
+    this.meterCtx = null
     for (const id of [...this.pcs.keys()]) this.close(id)
     this.local?.getTracks().forEach((t) => t.stop())
     this.local = null
     this.onChange?.()
+  }
+
+  /** Measures the own microphone and sends its level when it changes noticeably. */
+  meter() {
+    try {
+      const ctx = new AudioContext()
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 1024
+      ctx.createMediaStreamSource(this.local).connect(analyser)
+      const buf = new Float32Array(analyser.fftSize)
+      let last = 0
+      let sentAt = 0
+      this.meterCtx = ctx
+      this.meterTimer = setInterval(() => {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+        analyser.getFloatTimeDomainData(buf)
+        let sum = 0
+        for (const s of buf) sum += s * s
+        // -55 dB (quiet room) … -15 dB (loud speech) -> 0 … 1, in steps of .05
+        const db = 10 * Math.log10(sum / buf.length + 1e-12)
+        const v = Math.round(Math.min(1, Math.max(0, (db + 55) / 40)) * 20) / 20
+        const now = performance.now()
+        if (Math.abs(v - last) >= 0.1 || (v === 0) !== (last === 0) || (v > 0 && now - sentAt > 1000)) {
+          last = v
+          sentAt = now
+          this.level = v
+          this.send({ t: 'level', v })
+        }
+      }, LEVEL_EVERY)
+    } catch (err) {
+      console.warn('voice level', err)
+    }
   }
 
   /** Room participant list (with `voice` flags) changed. */

@@ -55,8 +55,8 @@ pub struct Shared {
     pub stop: AtomicBool,
     pub need_key: AtomicBool,
     pub visible: AtomicBool,
-    /// the shared window is in the foreground – remote control only works then
-    pub foreground: AtomicBool,
+    /// some part of the shared window is not covered – remote control is paused otherwise
+    pub reachable: AtomicBool,
     /// `Some(id)` when a single window is shared – input is then confined to it
     window_id: Mutex<Option<u32>>,
     /// a new source requested while sharing, taken over by the capture loop
@@ -96,7 +96,7 @@ impl Shared {
             "kind": kind,
             "title": title,
             "paused": !self.visible.load(Ordering::Relaxed),
-            "foreground": self.foreground.load(Ordering::Relaxed),
+            "reachable": self.reachable.load(Ordering::Relaxed),
             "recording": self.recorder.lock().unwrap().is_some(),
         })
     }
@@ -201,7 +201,7 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         stop: AtomicBool::new(false),
         need_key: AtomicBool::new(true),
         visible: AtomicBool::new(visible),
-        foreground: AtomicBool::new(true),
+        reachable: AtomicBool::new(true),
         window_id: Mutex::new(window_id),
         pending: Mutex::new(None),
         rect: Mutex::new(rect),
@@ -267,6 +267,7 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
             }
             to_overlay(app, raw);
         }
+        "level" => to_overlay(app, raw),
         "left" => {
             to_overlay(app, raw);
             let _ = ctrl.send(Cmd::Input(v.clone()));
@@ -278,9 +279,9 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
     }
 }
 
-/// Voice chat messages from the toolbar ({t:"voice"} / {t:"rtc"}) to the viewers.
+/// Voice chat messages from the toolbar ({t:"voice"} / {t:"rtc"} / {t:"level"}) to the viewers.
 pub fn signal(app: &AppHandle, msg: Value) {
-    if !matches!(msg["t"].as_str(), Some("voice" | "rtc")) {
+    if !matches!(msg["t"].as_str(), Some("voice" | "rtc" | "level")) {
         return;
     }
     let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
@@ -320,7 +321,7 @@ pub fn switch_source(app: &AppHandle, source_id: &str) -> Result<Value, String> 
 
     *shared.window_id.lock().unwrap() = window_id;
     *shared.info.lock().unwrap() = (kind, title.clone());
-    shared.foreground.store(true, Ordering::Relaxed);
+    shared.reachable.store(true, Ordering::Relaxed);
     if let Some(rec) = shared.recorder() {
         rec.set_source(source.clone());
     }
@@ -540,7 +541,7 @@ mod tests {
             stop: AtomicBool::new(false),
             need_key: AtomicBool::new(true),
             visible: AtomicBool::new(true),
-            foreground: AtomicBool::new(true),
+            reachable: AtomicBool::new(true),
             window_id: Mutex::new(None),
             pending: Mutex::new(None),
             rect: Mutex::new(rect),

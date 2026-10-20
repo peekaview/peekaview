@@ -56,6 +56,13 @@ body.toolbar { background: transparent; overflow: hidden; }
 .group { display: flex; align-items: center; gap: 6px; }
 .logo svg { box-sizing: content-box; padding: 5px; border-radius: 8px; background: var(--accent); color: #fff; }
 .sep { width: 1px; height: 22px; margin: 0 2px; background: var(--line); }
+.grip { display: grid; place-items: center; width: 16px; height: 32px; margin-right: -3px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: grab; }
+.grip:hover { color: var(--fg); }
+.grip:active { cursor: grabbing; }
+.fold { width: 24px; margin-left: -2px; }
+#live-dot { display: none; margin: 0 5px 0 3px; }
+body.collapsed.sharing #live-dot { display: block; }
+body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.collapsed #toast { display: none !important; }
 
 .chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; transition: background .15s; }
 .chip:hover { background: var(--raised); }

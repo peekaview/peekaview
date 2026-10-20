@@ -90,24 +90,71 @@ async fn drag_app(app: AppHandle) -> Result<(), String> {
     permissions::drag_app(&app)
 }
 
-/// The main window is a toolbar docked to the top edge of the screen; the UI reports the size
-/// it needs (bar only, or bar + picker / settings panel).
+/// Where the toolbar sits. Until the user drags it, it is centered at the top edge; afterwards the
+/// bar's left edge stays where it was put (physical pixels), also while the panel folds out.
+struct Toolbar {
+    /// left edge of the bar and top edge, set by dragging
+    anchor: Option<(i32, i32)>,
+    /// offset of the bar inside the window (logical px): the panel below may be wider
+    bar_left: f64,
+    /// the grip was grabbed: moves come from the user until the next resize (our own resizes
+    /// move the window too – Cocoa keeps the bottom-left corner)
+    dragging: bool,
+}
+
+static TOOLBAR: std::sync::Mutex<Toolbar> = std::sync::Mutex::new(Toolbar { anchor: None, bar_left: 0.0, dragging: false });
+
+/// The main window is the toolbar; the UI reports the size it needs (bar only, or bar + picker /
+/// settings panel) and where the bar starts inside it.
 #[tauri::command]
-fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64) -> Result<(), String> {
-    let monitor = window
-        .current_monitor()
-        .ok()
-        .flatten()
+fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>) -> Result<(), String> {
+    let mut toolbar = TOOLBAR.lock().unwrap();
+    toolbar.dragging = false;
+    toolbar.bar_left = bar_left.unwrap_or(0.0);
+    let monitors = window.available_monitors().unwrap_or_default();
+    let monitor = toolbar
+        .anchor
+        .and_then(|(ax, ay)| {
+            monitors.into_iter().find(|m| {
+                let (p, s) = (m.position(), m.size());
+                ax >= p.x && ay >= p.y && ax < p.x + s.width as i32 && ay < p.y + s.height as i32
+            })
+        })
+        .or_else(|| window.current_monitor().ok().flatten())
         .or_else(|| window.primary_monitor().ok().flatten())
         .ok_or("kein Bildschirm")?;
     let area = monitor.work_area();
     let scale = monitor.scale_factor();
-    let x = area.position.x + ((area.size.width as f64 - width * scale) / 2.0) as i32;
-    let y = area.position.y + (4.0 * scale) as i32;
+    let (w, h) = ((width * scale) as i32, (height * scale) as i32);
+    let (ax, ay, aw, ah) = (area.position.x, area.position.y, area.size.width as i32, area.size.height as i32);
+    let (x, y) = match toolbar.anchor {
+        None => (ax + (aw - w) / 2, ay + (4.0 * scale) as i32),
+        Some((left, top)) => (left - (toolbar.bar_left * scale) as i32, top),
+    };
+    // keep it on the screen (a panel folding out near the bottom pushes it up for a while)
+    let x = x.min(ax + aw - w).max(ax);
+    let y = y.min(ay + ah - h).max(ay);
+    drop(toolbar);
     // size before position (Cocoa keeps the bottom-left corner when resizing)
     window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
     window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())
+}
+
+/// The toolbar's grip: move the frameless window with the mouse.
+#[tauri::command]
+fn toolbar_drag(window: tauri::WebviewWindow) -> Result<(), String> {
+    TOOLBAR.lock().unwrap().dragging = true;
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+/// The main window moved: remember the bar's new place if the user is dragging it.
+fn toolbar_moved(window: &tauri::Window, pos: tauri::PhysicalPosition<i32>) {
+    let mut toolbar = TOOLBAR.lock().unwrap();
+    if toolbar.dragging {
+        let scale = window.scale_factor().unwrap_or(1.0);
+        toolbar.anchor = Some((pos.x + (toolbar.bar_left * scale) as i32, pos.y));
+    }
 }
 
 #[tauri::command]
@@ -290,6 +337,7 @@ fn main() {
             drag_app,
             dismiss_permission,
             toolbar_resize,
+            toolbar_drag,
             quit,
             restart_app,
             resume,
@@ -298,6 +346,10 @@ fn main() {
             recording_audio,
             stop_recording])
         .on_window_event(|window, event| {
+            if let (WindowEvent::Moved(pos), "main") = (event, window.label()) {
+                toolbar_moved(window, *pos);
+                return;
+            }
             let WindowEvent::CloseRequested { api, .. } = event else { return };
             match window.label() {
                 "main" => {

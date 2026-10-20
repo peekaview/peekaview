@@ -23,6 +23,9 @@ const paths = {
   record: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
   switch: '<rect x="2.5" y="4" width="11" height="8" rx="1.5"/><rect x="10.5" y="12" width="11" height="8" rx="1.5"/><path d="M17 4.5h1.5a2 2 0 0 1 2 2V8"/><path d="m22 6.5-1.5 1.5L19 6.5"/><path d="M7 19.5H5.5a2 2 0 0 1-2-2V16"/><path d="m2 17.5 1.5-1.5 1.5 1.5"/>',
   close: '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
+  grip: '<circle cx="9" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.1" fill="currentColor" stroke="none"/>',
+  collapse: '<path d="m14.5 6-6 6 6 6"/>',
+  expand: '<path d="m9.5 6 6 6-6 6"/>',
 }
 
 /** SVG markup for an icon. */

@@ -399,6 +399,12 @@ impl Hub {
                 }
             }
             "keyframe" => self.shared.need_key.store(true, Ordering::Relaxed),
+            // microphone level of a voice participant, for the speaking indicator at their cursor
+            "level" => {
+                v["v"] = json!(v["v"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0));
+                self.broadcast(&v, Some(id)).await;
+                session::route_local(&self.app, &self.shared, &self.ctrl, &v);
+            }
             "ptr" | "draw" | "ping" | "clear" if mode != Mode::View => {
                 self.broadcast(&v, Some(id)).await;
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
@@ -423,6 +429,7 @@ impl Hub {
                     self.send_to(to as u32, &v).await;
                 }
             }
+            Some("level") => self.broadcast(&v, None).await,
             _ => {}
         }
     }
@@ -462,10 +469,11 @@ impl Hub {
 
     // ------------------------------------------------------------------ outgoing
 
-    /// Presenter messages for everybody (state, own pointer).
+    /// Presenter messages (state, own pointer) – for everybody, or for one viewer with `"to"`.
     async fn outgoing(self: Arc<Self>, mut out: mpsc::UnboundedReceiver<String>) {
         while let Some(text) = out.recv().await {
-            let dcs: Vec<_> = self.viewers.lock().unwrap().values().filter_map(|v| v.dc.clone()).collect();
+            let to = text.contains("\"to\"").then(|| serde_json::from_str::<Value>(&text).ok()?["to"].as_u64()).flatten();
+            let dcs: Vec<_> = self.viewers.lock().unwrap().iter().filter(|(id, _)| to.is_none_or(|to| u64::from(**id) == to)).filter_map(|(_, v)| v.dc.clone()).collect();
             for dc in dcs {
                 let _ = dc.try_send_text(&text).await;
             }
