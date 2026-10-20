@@ -98,6 +98,7 @@ pub struct Hub {
     next_id: AtomicU32,
     /// nobody gets in without the presenter's OK (or the room's PIN)
     admission: Mutex<Admission>,
+    asked_permission: Mutex<Option<Instant>>,
 }
 
 struct Events {
@@ -167,6 +168,7 @@ impl Hub {
             viewers: Mutex::default(),
             next_id: AtomicU32::new(1),
             admission: Mutex::new(admission),
+            asked_permission: Mutex::new(None),
         });
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
@@ -494,7 +496,13 @@ impl Hub {
             "activate" | "arrange" if mode == Mode::Control && crate::settings::allow_resize() => {
                 let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());
                 let (nx, ny) = (v["x"].as_f64().unwrap_or(0.0), v["y"].as_f64().unwrap_or(0.0));
+                let shared = self.shared.clone();
                 std::thread::spawn(move || {
+                    if !crate::guard::accessibility() {
+                        shared.send(json!({ "t": "blocked", "to": id, "why": "permission" }));
+                        shared.need_permission();
+                        return;
+                    }
                     let result = if kind == "activate" { session::activate_window(&app, slot) } else { session::arrange_window(&app, slot, nx, ny) };
                     if let Err(e) = result {
                         crate::log(&format!("{kind}: {e}"));
@@ -802,6 +810,15 @@ impl Hub {
     /// Presenter messages (state, own pointer) – for everybody, or for one viewer with `"to"`.
     async fn outgoing(self: Arc<Self>, mut out: mpsc::UnboundedReceiver<String>) {
         while let Some(text) = out.recv().await {
+            // not for viewers: the presenter is asked for a missing permission (at most once a minute)
+            if text.contains("\"need-permission\"") {
+                let mut last = self.asked_permission.lock().unwrap();
+                if last.is_none_or(|t| t.elapsed() > Duration::from_secs(60)) {
+                    *last = Some(Instant::now());
+                    crate::permissions::request(&self.app, "accessibility");
+                }
+                continue;
+            }
             let to = text.contains("\"to\"").then(|| serde_json::from_str::<Value>(&text).ok()?["to"].as_u64()).flatten();
             let dcs: Vec<_> = self.viewers.lock().unwrap().iter().filter(|(id, _)| to.is_none_or(|to| u64::from(**id) == to)).filter_map(|(_, v)| v.dc.clone()).collect();
             for dc in dcs {

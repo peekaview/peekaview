@@ -183,6 +183,11 @@ impl Shared {
     pub fn send_state(&self) {
         self.send(self.state());
     }
+
+    /// Remote control lacks the accessibility permission: ask the presenter (helper window).
+    pub fn need_permission(&self) {
+        let _ = self.out.send(json!({ "t": "need-permission" }).to_string());
+    }
 }
 
 pub struct Session {

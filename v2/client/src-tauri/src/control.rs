@@ -124,9 +124,23 @@ impl Controller {
         self.shared.send(json!({ "t": "blocked", "to": to, "why": why }));
     }
 
-    /// May a click / scroll of viewer `from` land at screen point (x, y)?
+    /// May a click / scroll of viewer `from` land at screen point (x, y)? With "Resize/Anordnen
+    /// erlauben" a covered window is brought to the front first.
     fn point_allowed(&mut self, from: u64, target: Target, x: i32, y: i32) -> bool {
-        let ok = guard::input_allowed(target, x, y);
+        let mut ok = guard::input_allowed(target, x, y);
+        if !ok && crate::settings::allow_resize() {
+            if let Some((id, pid)) = target.filter(|_| guard::accessibility()) {
+                crate::focus::bring_to_front(pid as u32, id);
+                thread::sleep(Duration::from_millis(180));
+                ok = guard::input_allowed(target, x, y);
+            }
+        }
+        if !guard::accessibility() {
+            crate::log("control: accessibility permission missing");
+            self.notice(from, "permission");
+            self.shared.need_permission();
+            return false;
+        }
         if !ok {
             crate::log(&format!("control: dropped at {x},{y} – covered or outside the shared window"));
             self.notice(from, "covered");

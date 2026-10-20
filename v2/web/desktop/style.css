@@ -148,30 +148,28 @@ body.overlay { background: transparent; overflow: hidden; }
 .overlay .fit { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .18); color: #fff; cursor: pointer; }
 .overlay .fit:hover { background: rgba(255, 255, 255, .34); }
 
-/* ------------------------------------------------ permission helper */
+/* ------------------------------------------------ permission helper (docked to System Settings) */
 body.permission { height: 100vh; overflow: hidden; background: var(--bg); }
-body.permission main { display: flex; flex-direction: column; height: 100%; padding: 18px; }
-.perm-head { display: flex; gap: 12px; margin-bottom: 16px; }
-.perm-head h1 { margin: 2px 0 4px; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
-.perm-head p { margin: 0; line-height: 1.45; }
-.perm-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--accent); color: #fff; }
+body.permission main { display: flex; flex-direction: column; gap: 12px; height: 100%; padding: 14px; }
+.perm-art { display: block; width: 100%; height: auto; border-radius: 12px; background: radial-gradient(circle at 70% 30%, rgba(239, 68, 68, .12), transparent 60%), var(--panel); }
+.perm-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.perm-list li { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 10px; background: var(--panel); color: var(--muted); transition: background .2s, color .2s; }
+.perm-list li span { flex: 1; }
+.perm-list li b { display: grid; place-items: center; width: 18px; height: 18px; }
+.perm-list li.now { background: var(--raised); color: var(--fg); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .5); }
+.perm-list li.ok { color: var(--fg); }
+.perm-list li.ok b { color: #86efac; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
 .drag-tile { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: 14px; border: 1.5px dashed rgba(255, 255, 255, .22); background: var(--panel); cursor: grab; transition: border-color .15s, background .15s; }
 .drag-tile:hover { border-color: var(--accent); background: var(--raised); }
 .drag-tile:active { cursor: grabbing; }
-.drag-tile.granted { border-style: solid; border-color: rgba(34, 197, 94, .5); }
-.drag-tile img { width: 44px; height: 44px; pointer-events: none; }
+.drag-tile img { width: 40px; height: 40px; pointer-events: none; }
 .drag-tile div { flex: 1; }
 .drag-tile strong, .drag-tile span { display: block; }
 .drag-tile span { color: var(--muted); font-size: 12px; }
 .drag-tile svg { color: var(--muted); }
-.steps { margin: 16px 0 0; padding: 0; list-style: none; counter-reset: step; }
-.steps li { position: relative; margin: 0 0 10px; padding-left: 30px; color: var(--muted); line-height: 1.45; counter-increment: step; }
-.steps li::before { content: counter(step); position: absolute; left: 0; top: -1px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--raised); color: var(--fg); font-size: 11px; font-weight: 650; }
-.steps b { color: var(--fg); font-weight: 600; }
-.perm-done { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 9px 12px; border-radius: 10px; background: rgba(34, 197, 94, .1); color: #86efac; }
-.perm-note { margin: 10px 0 0; color: var(--muted); font-size: 11.5px; }
-.perm-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; }
-.perm-actions button { flex: 1; }
+.perm-done { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: rgba(34, 197, 94, .12); color: #86efac; font-weight: 600; }
+.perm-note { margin: auto 0 0; color: var(--muted); font-size: 11.5px; text-align: center; }
 
 /* ------------------------------------------------ clipboard window (room for the panel's shadow) */
 body.clipwin { height: 100vh; overflow: hidden; background: transparent; padding: 10px 22px 34px; box-sizing: border-box; }

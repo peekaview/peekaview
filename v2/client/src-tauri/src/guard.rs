@@ -76,6 +76,11 @@ pub fn reachable(target: Target, rect: Rect) -> bool {
 
 const GRID: usize = 5;
 
+/// May PeekaView control mouse and keyboard (macOS "Bedienungshilfen")?
+pub fn accessibility() -> bool {
+    crate::permissions::granted("accessibility")
+}
+
 /// Does the shared window (or a dialog of its app on top of it) receive keyboard input?
 pub fn focused(target: (u32, i32)) -> bool {
     imp::focused(target)

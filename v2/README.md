@@ -123,7 +123,11 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
   - The selected source has a red frame on the desktop.
 - **Restarts:** after macOS restarts the app for a permission, the share continues automatically. It keeps the same room, the same link and the same mode, and viewers reconnect on their own.
-- **Permissions:** if screen recording or accessibility is missing, a helper stays next to System Settings until it is granted. It offers the app icon to drag into the list and explains each step.
+- **Permissions:** screen recording and accessibility (remote control) are granted in one go.
+  - A small helper sticks to the System Settings window and follows it.
+  - It opens the pane of each missing permission in turn, accessibility first and screen recording last, because only that one needs a restart of the app.
+  - It shows the progress, offers the app icon to drag into the list, and explains the rest with an animation instead of text.
+- **Missing accessibility during a share:** if remote control finds the permission missing, the presenter is asked right away and the viewer gets a hint.
 - **Settings**
   - viewer website address
   - Nostr relays

@@ -298,7 +298,10 @@ export class WindowManager {
   /** `byUser`: the viewer picked it – with "Resize/Anordnen erlauben" it comes to the front there, too. */
   focus(slot, byUser = false) {
     const win = this.wins.get(slot)
-    if (byUser && win && this.active !== slot && this.wins.size > 1 && this.options.canResize?.()) this.options.onActivate?.(slot)
+    if (byUser && win && this.options.canResize?.() && Date.now() - (win.activated ?? 0) > 800) {
+      win.activated = Date.now()
+      this.options.onActivate?.(slot)
+    }
     this.active = win ? slot : null
     for (const w of this.wins.values()) w.el.classList.toggle('active', w === win)
     if (win) win.el.style.zIndex = String(++this.z)

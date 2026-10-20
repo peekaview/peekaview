@@ -431,7 +431,13 @@ export function mountViewer(el, options) {
         toast(`Start nicht möglich: ${m.error}`)
         return
       case 'blocked':
-        toast(m.why === 'focus' ? 'Zum Tippen zuerst in das geteilte Fenster klicken.' : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.')
+        toast(
+          m.why === 'permission'
+            ? 'Beim Host fehlt noch die Freigabe „Bedienungshilfen“ – er wurde gerade darum gebeten.'
+            : m.why === 'focus'
+              ? 'Zum Tippen zuerst in das geteilte Fenster klicken.'
+              : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.',
+        )
         return
       default:
         wm.handle(m)
