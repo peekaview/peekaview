@@ -74,6 +74,11 @@ pub fn list() -> Vec<SourceInfo> {
         }
     }
 
+    // without the screen recording permission any capture attempt brings up macOS's own prompt
+    // ("… möchte den Bildschirm aufnehmen") – the picker then shows icons, the helper does the rest
+    if !crate::permissions::granted("screen") {
+        return items.into_iter().map(|(info, _)| info).collect();
+    }
     // capturing is the slow part: do it in parallel
     let threads = thread::available_parallelism().map(|n| n.get()).unwrap_or(4).min(8);
     let chunk = items.len().div_ceil(threads).max(1);

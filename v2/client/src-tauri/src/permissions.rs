@@ -19,7 +19,6 @@ mod sys {
     #[link(name = "ApplicationServices", kind = "framework")]
     extern "C" {
         pub fn CGPreflightScreenCaptureAccess() -> bool;
-        pub fn CGRequestScreenCaptureAccess() -> bool;
         pub fn AXIsProcessTrusted() -> bool;
     }
 }
@@ -162,11 +161,9 @@ pub fn request(app: &AppHandle, _kind: &str) {
 /// allows that).
 #[cfg(target_os = "macos")]
 fn open_pane(kind: &str) {
+    // no CGRequestScreenCaptureAccess: its system prompt would get in the way – the helper's
+    // drag tile puts the app into the list instead
     let pane = if kind == "accessibility" { "Privacy_Accessibility" } else { "Privacy_ScreenCapture" };
-    if kind == "screen" {
-        // registers the app in the list (switched off) and shows the system prompt once
-        unsafe { sys::CGRequestScreenCaptureAccess() };
-    }
     let _ = std::process::Command::new("open").arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}")).status();
 }
 
