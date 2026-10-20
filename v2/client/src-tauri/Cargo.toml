@@ -49,6 +49,8 @@ objc2-core-graphics = "0.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 openh264 = "0.9"
+# tauri-plugin-deep-link 2.6 builds ini::ParseOption with two fields; rust-ini 0.21.2 added more
+rust-ini = "=0.21.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
