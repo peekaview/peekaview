@@ -775,6 +775,14 @@ fn main() {
             if in_dock(window.label()) && matches!(event, WindowEvent::Focused(_) | WindowEvent::Destroyed | WindowEvent::CloseRequested { .. }) {
                 sync_dock(window.app_handle());
             }
+            // the share and settings windows lie above the red frames while one works in them;
+            // once another app is in front they are ordinary windows again
+            #[cfg(target_os = "macos")]
+            if let (WindowEvent::Focused(focused), "main" | "rooms") = (event, window.label()) {
+                if let Ok(ns) = window.ns_window() {
+                    unsafe { macos::above_frames(ns, *focused) };
+                }
+            }
             if let (WindowEvent::Moved(pos), "toolbar") = (event, window.label()) {
                 toolbar_moved(window, *pos);
                 return;
