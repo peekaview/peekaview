@@ -259,10 +259,7 @@ class Host(
                 requests[peer] = Request(peer, name, color) to System.currentTimeMillis()
                 val waiting = JSONObject().put("type", "waiting").put("from", "host").put("to", peer)
                 // with a PIN: a challenge (PBKDF2 key, HMAC of a one-time nonce – the PIN never travels)
-                pin?.let { (salt, _) ->
-                    val nonce = nonces.getOrPut(peer) { Signaling.randomId() }
-                    waiting.put("pin", JSONObject().put("salt", android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)).put("rounds", Prefs.PIN_ROUNDS).put("nonce", nonce))
-                }
+                pin?.let { waiting.put("pin", Pin.challenge(it, nonces.getOrPut(peer) { Signaling.randomId() })) }
                 signaling.send(waiting)
                 if (isNew) changed()
             }
@@ -276,13 +273,9 @@ class Host(
 
     /** A viewer answered the PIN challenge: let in, or try again (5 tries, then turned away). */
     private fun pinAnswer(peer: String, response: String) {
-        val (_, key) = pin ?: return signaling.send(JSONObject().put("type", "pin-wrong").put("from", "host").put("to", peer).put("locked", true))
+        val pin = pin ?: return signaling.send(JSONObject().put("type", "pin-wrong").put("from", "host").put("to", peer).put("locked", true))
         val request = requests[peer]?.first
-        val nonce = nonces[peer]
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256").apply { init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256")) }
-        val expected = nonce?.let { mac.doFinal(it.toByteArray()) }
-        val given = runCatching { ByteArray(response.length / 2) { response.substring(it * 2, it * 2 + 2).toInt(16).toByte() } }.getOrNull()
-        if (request != null && expected != null && given != null && java.security.MessageDigest.isEqual(expected, given)) {
+        if (request != null && Pin.verify(pin, nonces[peer], response)) {
             requests.remove(peer)
             nonces.remove(peer)
             admitted += peer
@@ -290,8 +283,8 @@ class Host(
             changed()
             return
         }
-        val left = (5 - (tries[peer] ?: 0) - 1).coerceAtLeast(0)
-        tries[peer] = 5 - left
+        val left = (Pin.TRIES - (tries[peer] ?: 0) - 1).coerceAtLeast(0)
+        tries[peer] = Pin.TRIES - left
         // a new challenge for the next try (the viewer says hello again to get it)
         nonces.remove(peer)
         signaling.send(JSONObject().put("type", "pin-wrong").put("from", "host").put("to", peer).put("left", left))
