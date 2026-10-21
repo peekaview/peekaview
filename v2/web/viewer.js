@@ -59,7 +59,9 @@ const CSS = `
 .pv-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 14px; }
 .pv-dock.placed { transform: none; bottom: auto; }
 /* controls always above the shared windows (they climb up when focused) */
-.pv-top, .pv-peers, .pv-dock, .pv-toast, .pv-notice { z-index: 100000; }
+.pv-top, .pv-peers, .pv-dock, .pv-toast, .pv-notice, .pv-stats { z-index: 100000; }
+.pv-stats { position: absolute; left: 12px; top: 52px; max-width: calc(100% - 24px); padding: 8px 11px; border-radius: 10px; color: #d4d4d8; font: 11.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre; overflow: hidden; pointer-events: none; }
+.pv-stats b { color: #fafafa; font-weight: 650; }
 .pv-dock.collapsed > :not(.pv-grip):not(.pv-fold) { display: none !important; }
 .pv-dock .pv-grip { width: 18px; margin-right: -2px; color: var(--pv-muted); cursor: grab; touch-action: none; }
 .pv-dock .pv-grip:active { cursor: grabbing; }
@@ -124,6 +126,7 @@ export function mountViewer(el, options) {
       <div class="pv-chip pv-glass pv-rec" hidden><i class="pv-dot"></i><span>Wird aufgezeichnet</span></div>
       <div class="pv-chip pv-glass pv-paused" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist beim Host verdeckt</span></div>
     </div>
+    <div class="pv-stats pv-glass" hidden></div>
     <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
     <ul class="pv-peers"></ul>
     <div class="pv-dock pv-glass">
@@ -148,6 +151,8 @@ export function mountViewer(el, options) {
   // every shared window in a frame of its own (or alone, as large as possible)
   const wm = new WindowManager(stage, {
     voice: voiceEnabled,
+    // how large each window is shown here – the presenter encodes no more pixels than that
+    onSizes: (sizes) => send({ t: 'view-size', sizes }),
     // "Resize/Anordnen erlauben" on the presenter's side: windows resized, moved or activated
     // here follow there
     canResize: () => state.mode === 'control' && state.resize === true,
@@ -196,7 +201,6 @@ export function mountViewer(el, options) {
   const pendingCopies = new Map()
   let helloTimer
   let statsTimer
-  let lastPli = 0
   let offered = false
   let blocked = false
   let blockTimer
@@ -239,11 +243,18 @@ export function mountViewer(el, options) {
   }
 
   // say hello until the presenter offers a connection (also after the share ended)
+  // Asks at growing gaps (public relays throttle chatty clients): 3, 5, 8, then every 10 s;
+  // the presenter's own announcement brings an immediate hello (see onSignal).
   function hello() {
-    clearInterval(helloTimer)
-    const say = () => !destroyed && signaling?.send({ type: 'hello', from: peerId, name, color })
+    clearTimeout(helloTimer)
+    let gap = 3000
+    const say = () => {
+      if (destroyed || dc?.readyState === 'open') return
+      signaling?.send({ type: 'hello', from: peerId, name, color })
+      helloTimer = setTimeout(say, gap)
+      gap = Math.min(10000, Math.round(gap * 1.6))
+    }
     say()
-    helloTimer = setInterval(say, 4000)
     setTimeout(() => !offered && !destroyed && update(), 6000)
   }
 
@@ -275,7 +286,7 @@ export function mountViewer(el, options) {
     if (m.type === 'denied') {
       denied = true
       admission = false
-      clearInterval(helloTimer)
+      clearTimeout(helloTimer)
       return update()
     }
     if (m.type === 'candidate') {
@@ -304,6 +315,12 @@ export function mountViewer(el, options) {
     pc.ontrack = (e) => {
       const stream = e.streams[0] ?? new MediaStream([e.track])
       const slot = Number(/^w(\d+)$/.exec(stream.id)?.[1] ?? 0)
+      trackSlots.set(e.track.id, slot)
+      // play frames as soon as they are decoded – no extra jitter buffering (latency)
+      try {
+        e.receiver.jitterBufferTarget = 0
+      } catch {}
+      if ('playoutDelayHint' in e.receiver) e.receiver.playoutDelayHint = 0
       wm.setStream(slot, stream)
     }
     pc.ondatachannel = (e) => (e.channel.label === 'pvfile' ? (files = new FileChannel(e.channel)) : channel(e.channel))
@@ -327,7 +344,8 @@ export function mountViewer(el, options) {
     dc.onopen = () => {
       lastViewport = ''
       reportViewport()
-      clearInterval(helloTimer)
+      setTimeout(() => wm.reportSizes(), 500)
+      clearTimeout(helloTimer)
       clearTimeout(blockTimer)
       blocked = false
       watchStats()
@@ -341,19 +359,92 @@ export function mountViewer(el, options) {
   }
 
   // the browser asks for a fresh picture after losses (PLI) – forward it over the data channel
+  // Every second: keyframe requests (the browser's PLIs), the network for the presenter's
+  // congestion control (loss, round trip) and – Alt+Shift+S – the statistics overlay.
+  const trackSlots = new Map() // track id -> window slot
+  const prevRtp = new Map()
+  let hostStats = null
+  let statsOn = false
   function watchStats() {
     clearInterval(statsTimer)
+    prevRtp.clear()
     statsTimer = setInterval(async () => {
       if (!pc) return
       const stats = await pc.getStats().catch(() => null)
-      stats?.forEach((r) => {
-        if (r.type === 'inbound-rtp' && r.kind === 'video') {
-          if ((r.pliCount ?? 0) > lastPli) send({ t: 'keyframe' })
-          lastPli = r.pliCount ?? 0
-        }
+      if (!stats) return
+      let rtt = 0
+      stats.forEach((r) => {
+        if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded' && r.currentRoundTripTime != null) rtt = r.currentRoundTripTime * 1000
       })
+      let lost = 0
+      let received = 0
+      const lines = []
+      stats.forEach((r) => {
+        if (r.type !== 'inbound-rtp' || r.kind !== 'video') return
+        const p = prevRtp.get(r.id) ?? {}
+        if ((r.pliCount ?? 0) > (p.pli ?? 0)) send({ t: 'keyframe' })
+        const dl = Math.max(0, (r.packetsLost ?? 0) - (p.lost ?? r.packetsLost ?? 0))
+        const dr = Math.max(0, (r.packetsReceived ?? 0) - (p.received ?? r.packetsReceived ?? 0))
+        lost += dl
+        received += dr
+        if (statsOn && r.framesDecoded) {
+          const frames = r.framesDecoded - (p.decoded ?? r.framesDecoded)
+          const emitted = (r.jitterBufferEmittedCount ?? 0) - (p.jbn ?? 0)
+          lines.push({
+            slot: trackSlots.get(r.trackIdentifier),
+            size: `${r.frameWidth ?? '?'}×${r.frameHeight ?? '?'}`,
+            fps: r.framesPerSecond ?? 0,
+            kbps: p.bytes != null ? ((r.bytesReceived - p.bytes) * 8) / 1000 : 0,
+            decode: frames > 0 ? ((r.totalDecodeTime - p.decode) / frames) * 1000 : 0,
+            buffer: emitted > 0 ? (((r.jitterBufferDelay ?? 0) - (p.jb ?? 0)) / emitted) * 1000 : 0,
+            loss: dr + dl > 0 ? dl / (dr + dl) : 0,
+          })
+        }
+        prevRtp.set(r.id, { pli: r.pliCount ?? 0, lost: r.packetsLost ?? 0, received: r.packetsReceived ?? 0, bytes: r.bytesReceived, decoded: r.framesDecoded ?? 0, decode: r.totalDecodeTime ?? 0, jb: r.jitterBufferDelay ?? 0, jbn: r.jitterBufferEmittedCount ?? 0 })
+      })
+      const loss = received + lost > 0 ? lost / (received + lost) : 0
+      if (received + lost > 0 || rtt) send({ t: 'net', loss, rtt })
+      if (statsOn) renderStats(lines, rtt, loss)
     }, 1000)
   }
+
+  function renderStats(lines, rtt, loss) {
+    const box = q('.pv-stats')
+    const name = (slot) => {
+      const info = wm.wins.get(slot)?.info ?? {}
+      return (info.kind === 'window' ? info.app || info.title : info.title) || `Fenster ${slot + 1}`
+    }
+    const out = [`<b>Netz</b>   RTT ${Math.round(rtt)} ms · Verlust ${(loss * 100).toFixed(1)} % · Bitrate-Anteil ${Math.round((hostStats?.rate ?? 1) * 100)} %`]
+    for (const l of lines.filter((l) => l.slot != null).sort((a, b) => a.slot - b.slot)) {
+      const h = hostStats?.streams?.find((s) => s.w === l.slot)
+      out.push(`<b>${name(l.slot).replace(/[<&]/g, '')}</b>`)
+      out.push(`  hier  ${l.size} · ${Math.round(l.fps)} fps · ${Math.round(l.kbps)} kbit/s · Decode ${l.decode.toFixed(1)} ms · Puffer ${Math.round(l.buffer)} ms`)
+      if (h) out.push(`  Host  ${h.width}×${h.height} · ${h.fps.toFixed(0)} fps · ${h.kbps} kbit/s · Encoder ${h.enc_ms.toFixed(1)} ms · Ziel ${(h.bitrate / 1e6).toFixed(1)} Mbit/s${h.want_w ? ` · auf ${h.want_w} px reduziert` : ''}${h.idle ? ' · pausiert' : ''}`)
+    }
+    box.innerHTML = out.join('\n')
+  }
+
+  function toggleStats() {
+    statsOn = !statsOn
+    q('.pv-stats').hidden = !statsOn
+    if (statsOn) q('.pv-stats').textContent = 'Statistik wird gesammelt …'
+  }
+  // Alt+Shift+S, also while controlling (not passed on to the presenter)
+  el.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.altKey && e.shiftKey && e.code === 'KeyS') {
+        e.preventDefault()
+        e.stopPropagation()
+        toggleStats()
+      }
+    },
+    true,
+  )
+  const onGlobalKey = (e) => {
+    if (e.altKey && e.shiftKey && e.code === 'KeyS' && !el.contains(e.target)) toggleStats()
+  }
+  window.addEventListener('keydown', onGlobalKey)
 
   function closePeer() {
     clearInterval(statsTimer)
@@ -362,7 +453,6 @@ export function mountViewer(el, options) {
     dc = undefined
     pc = undefined
     files = undefined
-    lastPli = 0
   }
 
   // connection gone (share ended, network): back to waiting for the next share
@@ -427,6 +517,9 @@ export function mountViewer(el, options) {
       case 'copied':
         pendingCopies.get(m.req)?.(m)
         pendingCopies.delete(m.req)
+        return
+      case 'host-stats':
+        hostStats = m
         return
       case 'launch-error':
         toast(`Start nicht möglich: ${m.error}`)
@@ -546,6 +639,10 @@ export function mountViewer(el, options) {
       update()
     }
   }
+  // in a background tab nothing needs to be encoded for us
+  const onVisibility = () => wm.reportSizes()
+  document.addEventListener('visibilitychange', onVisibility)
+
   q('[data-tile]').addEventListener('click', () => {
     wm.tile()
     wm.tileThere()
@@ -1005,13 +1102,15 @@ export function mountViewer(el, options) {
     destroy() {
       destroyed = true
       voice.stop()
-      clearInterval(helloTimer)
+      clearTimeout(helloTimer)
       clearTimeout(blockTimer)
       if (pc) signaling?.send({ type: 'bye', from: peerId })
       closePeer()
       signaling?.close()
       resetVideo()
       stageObserver.disconnect()
+      window.removeEventListener('keydown', onGlobalKey)
+      document.removeEventListener('visibilitychange', onVisibility)
       clearTimeout(viewportTimer)
       dockObserver.disconnect()
       clipPanel?.destroy()

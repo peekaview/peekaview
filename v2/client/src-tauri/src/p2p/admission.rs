@@ -12,7 +12,8 @@ use serde_json::{json, Value};
 use crate::rooms::{Pin, PIN_ROUNDS};
 
 /// A request disappears when its viewer stops asking (closed the page).
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
+/// (viewers repeat their hello at most every 10 s)
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(25);
 /// Wrong PINs before a viewer is turned away / the PIN is locked for everybody for a while.
 const TRIES_PER_VIEWER: u32 = 5;
 const TRIES_PER_WINDOW: usize = 20;

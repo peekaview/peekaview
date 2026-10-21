@@ -192,6 +192,20 @@ Viewers see that the session is being recorded.
 - The resulting samples go straight into the WebRTC track. Only changed frames are sent.
 - Browsers request keyframes with PLI. The viewer forwards these over the data channel, and the presenter answers with a fresh keyframe.
 
+**Adapting to viewers and network** (all platforms unless noted)
+- **Only changes are encoded:** a frame identical to the previous one is skipped. On macOS a fingerprint of its brightness plane decides, in about 0.5 ms. A still window costs about 1 frame/s instead of 30.
+- **No more pixels than shown:** each viewer reports how large it displays each window. The presenter captures at the largest of these sizes, never above full size. A window nobody displays (minimized everywhere, viewer tab in the background) is not encoded at all.
+- **Bitrate follows the network:** viewers report packet loss and round trip every second. The worst one decides:
+  - on loss or a growing round trip the bitrate drops by a quarter (down to 10 %);
+  - otherwise it climbs back gently.
+  - Windows: the Media Foundation encoder takes the new bitrate live.
+- **Low latency:** VideoToolbox runs in its low-latency rate-control mode, and the capture queue holds 3 frames. Viewers play frames as soon as they are decoded (`jitterBufferTarget = 0`).
+- **Statistics:** **Alt+Shift+S** in the viewer shows per window:
+  - here: size, fps, bitrate, decode time, buffer;
+  - at the presenter: size, fps, bitrate, encoder time, target bitrate, reduction;
+  - plus round trip and loss.
+- **Signaling stays light:** viewers repeat their hello at growing gaps, and the start page checks rooms at most once a minute. Public relays throttle chatty clients; relay.damus.io banned us for a while during testing.
+
 **Windows**
 - Windows.Graphics.Capture delivers the window or screen as a GPU texture (no yellow border, no cursor).
 - The D3D11 video processor converts it to NV12 and scales it on the GPU.
@@ -284,5 +298,4 @@ peekaview://share?room=<secret>&name=Anna&color=%23ef4444&ice=<json>&relays=<jso
 - Windows: test on real hardware (Intel, NVIDIA, AMD; DPI scaling; input guard).
 - Linux: Wayland portals (ScreenCast, RemoteDesktop) and VA-API.
 - Popup menus of a shared *window* are separate OS windows. Viewers don't see them, and clicks on them are refused.
-- Bandwidth adaptation (congestion feedback → encoder bitrate).
 - Code signing / notarization, auto-update.

@@ -404,7 +404,18 @@ export class WindowManager {
     win.y = Math.min(Math.max(win.y, 0), a.h - BAR)
   }
 
+  /** Reports (debounced) how large each window is displayed – 0 when minimized or the tab is hidden. */
+  reportSizes(delay = 0) {
+    clearTimeout(this.sizeTimer)
+    this.sizeTimer = setTimeout(() => {
+      const d = window.devicePixelRatio || 1
+      const sizes = [...this.wins.values()].map((w) => ({ w: w.slot, pw: document.hidden || w.min ? 0 : Math.round(w.view.getBoundingClientRect().width * d) }))
+      if (sizes.length) this.options.onSizes?.(sizes)
+    }, delay)
+  }
+
   paint(win, bar = BAR) {
+    this.reportSizes(500)
     const n = this.native(win)
     const w = Math.round(n.w * win.s)
     const h = Math.round(n.h * win.s)

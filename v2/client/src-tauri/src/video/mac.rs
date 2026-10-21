@@ -10,7 +10,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use screencapturekit::{cm::SCFrameStatus, prelude::*};
+use screencapturekit::{
+    cm::SCFrameStatus,
+    prelude::*,
+};
 use tokio::sync::mpsc;
 
 use super::{
@@ -29,25 +32,48 @@ struct EncState {
     last_frame: Instant,
     frames: mpsc::Sender<Vec<u8>>,
     shared: Arc<StreamCtl>,
+    /// submit times of frames in the encoder (it returns them in order) – for the statistics
+    submitted: Arc<Mutex<std::collections::VecDeque<Instant>>>,
+    /// fingerprint of the last picture
+    fingerprint: Option<u64>,
 }
 
 impl EncState {
     fn encode(&mut self, pb: *const c_void, mut key: bool) {
         let (w, h) = unsafe { VtEncoder::buffer_size(pb) };
         if self.encoder.as_ref().is_none_or(|e| (e.width, e.height) != (w, h)) {
-            let (frames, shared) = (self.frames.clone(), self.shared.clone());
+            let (frames, shared, submitted) = (self.frames.clone(), self.shared.clone(), self.submitted.clone());
             let sink = Box::new(move |data: Vec<u8>, key: bool| {
+                if let Some(t) = submitted.lock().unwrap().pop_front() {
+                    shared.encode_time(t.elapsed());
+                }
+                shared.sent(data.len(), w, h);
                 // network congested: drop, and recover with a fresh keyframe
                 if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                     shared.need_key.store(true, Ordering::Relaxed);
                 }
             });
-            self.encoder = VtEncoder::new(w, h, FPS, sink);
+            self.submitted.lock().unwrap().clear();
+            self.encoder = VtEncoder::new(w, h, FPS, self.shared.target_bitrate(w, h), sink);
             key = true;
         }
         let Some(encoder) = self.encoder.as_mut() else { return };
+        // nobody watches this window right now (minimized in every viewer)
+        if self.shared.idle.load(Ordering::Relaxed) && !self.shared.need_key.load(Ordering::Relaxed) {
+            return;
+        }
+        // what the viewers' network takes
+        encoder.set_bitrate(self.shared.target_bitrate(w, h));
+        self.shared.bitrate.store(encoder.bitrate, Ordering::Relaxed);
         if self.last_key.elapsed() >= KEY_GAP && self.shared.need_key.swap(false, Ordering::Relaxed) {
             key = true;
+        }
+        {
+            let mut q = self.submitted.lock().unwrap();
+            if q.len() > 30 {
+                q.clear();
+            }
+            q.push_back(Instant::now());
         }
         if unsafe { encoder.encode(pb, key) } {
             self.last_key = Instant::now();
@@ -68,9 +94,16 @@ impl SCStreamOutputTrait for Handler {
         if pb.is_null() {
             return;
         }
+        // Capturing a window's area delivers every frame as "complete", also when nothing
+        // changed: the same picture again (equal fingerprint) is not encoded
+        let fingerprint = unsafe { VtEncoder::fingerprint(pb) };
         let mut state = self.0.lock().unwrap();
+        let unchanged = fingerprint.is_some() && fingerprint == state.fingerprint && state.last.is_some();
+        state.fingerprint = fingerprint;
         state.last = Some(unsafe { RetainedBuffer::new(pb) });
-        state.encode(pb, false);
+        if !unchanged {
+            state.encode(pb, false);
+        }
     }
 }
 
@@ -135,7 +168,8 @@ fn config(size: (u32, u32), crop: Option<Rect>) -> Result<SCStreamConfiguration,
     cfg
         .with_pixel_format(PixelFormat::YCbCr_420v)
         .with_fps(FPS)
-        .with_queue_depth(6)
+        // short queue: frames reach the encoder sooner (latency)
+        .with_queue_depth(3)
         .with_shows_cursor(false)
         .with_ignores_shadows_single_window(true)
         .and_then(|c| c.with_includes_child_windows(true))
@@ -174,14 +208,16 @@ impl Video {
         .map_err(err)?;
 
         let scale = scale_at(rect);
-        let size = output_size(rect.w as f64 * scale, rect.h as f64 * scale);
+        let size = super::fit_width(output_size(rect.w as f64 * scale, rect.h as f64 * scale), shared.want_w.load(Ordering::Relaxed));
         let state = Arc::new(Mutex::new(EncState {
             encoder: None,
             last: None,
             last_key: Instant::now() - KEY_GAP,
             last_frame: Instant::now(),
             frames,
-            shared,
+            shared: shared.clone(),
+            submitted: Arc::default(),
+            fingerprint: None,
         }));
         let mut stream = SCStream::new(&filter, &config(size, area.as_ref().map(|a| a.crop))?).map_err(err)?;
         stream.add_output_handler(Handler(state.clone()), SCStreamOutputType::Screen).map_err(err)?;
@@ -195,7 +231,9 @@ impl Video {
             return;
         }
         let scale = scale_at(rect);
-        let size = output_size(rect.w as f64 * scale, rect.h as f64 * scale);
+        // never more pixels than the viewers display
+        let want_w = self.state.lock().unwrap().shared.want_w.load(Ordering::Relaxed);
+        let size = super::fit_width(output_size(rect.w as f64 * scale, rect.h as f64 * scale), want_w);
         // a shared window: follow it on its display (and to another display)
         let mut crop_now = None;
         if let Some(area) = self.window.as_mut() {

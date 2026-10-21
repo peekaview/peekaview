@@ -36,23 +36,85 @@ const MAX_H: f64 = 1600.0;
 /// minimum gap between two requested keyframes
 const KEY_GAP: std::time::Duration = std::time::Duration::from_millis(500);
 
-/// What a pipeline shares with the rest of the session.
+/// What a pipeline shares with the rest of the session: requests from the viewers (keyframe,
+/// size they display, bitrate their network takes) and counters for the statistics.
 pub struct StreamCtl {
     pub slot: u8,
     /// a viewer needs a keyframe (joined, lost packets)
-    pub need_key: std::sync::atomic::AtomicBool,
+    pub need_key: AtomicBool,
     /// the window is on screen (not minimized / on another Space)
-    pub visible: std::sync::atomic::AtomicBool,
+    pub visible: AtomicBool,
+    /// widest picture any viewer displays (pixels); 0 = full size – fewer pixels, less bitrate
+    pub want_w: AtomicU32,
+    /// `want_w` changed: the capture size should follow
+    pub resize: AtomicBool,
+    /// nobody watches it (minimized in every viewer): no encoding
+    pub idle: AtomicBool,
+    /// share of the bitrate for the size the network allows, per mille (congestion control)
+    pub rate: AtomicU32,
+    // statistics
+    pub bytes: AtomicU64,
+    pub frames: AtomicU32,
+    pub encode_us: AtomicU64,
+    pub encoded: AtomicU32,
+    /// encoded picture size (w << 16 | h) and bitrate in use
+    pub size: AtomicU32,
+    pub bitrate: AtomicU32,
 }
+
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 impl StreamCtl {
     pub fn new(slot: u8, visible: bool) -> std::sync::Arc<Self> {
         std::sync::Arc::new(StreamCtl {
             slot,
-            need_key: std::sync::atomic::AtomicBool::new(true),
-            visible: std::sync::atomic::AtomicBool::new(visible),
+            need_key: AtomicBool::new(true),
+            visible: AtomicBool::new(visible),
+            want_w: AtomicU32::new(0),
+            resize: AtomicBool::new(false),
+            idle: AtomicBool::new(false),
+            rate: AtomicU32::new(1000),
+            bytes: AtomicU64::new(0),
+            frames: AtomicU32::new(0),
+            encode_us: AtomicU64::new(0),
+            encoded: AtomicU32::new(0),
+            size: AtomicU32::new(0),
+            bitrate: AtomicU32::new(0),
         })
     }
+
+    /// Bitrate for a picture size, scaled to what the network allows.
+    pub fn target_bitrate(&self, w: usize, h: usize) -> u32 {
+        let rate = self.rate.load(Ordering::Relaxed).clamp(100, 1000) as f64 / 1000.0;
+        (base_bitrate(w, h) * rate).max(250_000.0) as u32
+    }
+
+    /// The pipeline sent an encoded frame.
+    pub fn sent(&self, bytes: usize, w: usize, h: usize) {
+        self.bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.frames.fetch_add(1, Ordering::Relaxed);
+        self.size.store(((w as u32) << 16) | (h as u32 & 0xffff), Ordering::Relaxed);
+    }
+
+    pub fn encode_time(&self, d: std::time::Duration) {
+        self.encode_us.fetch_add(d.as_micros() as u64, Ordering::Relaxed);
+        self.encoded.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Screen content: ~0.05 bit per pixel and frame is plenty for sharp text.
+pub fn base_bitrate(w: usize, h: usize) -> f64 {
+    ((w * h) as f64 * FPS as f64 * 0.05).clamp(1.5e6, 12e6)
+}
+
+/// Shrinks a picture size to the width viewers actually display (never enlarges).
+pub fn fit_width((w, h): (u32, u32), want_w: u32) -> (u32, u32) {
+    if want_w == 0 || want_w >= w {
+        return (w, h);
+    }
+    let s = want_w as f64 / w as f64;
+    let even = |v: f64| ((v as u32) & !1).max(2);
+    (even(w as f64 * s), even(h as f64 * s))
 }
 
 #[derive(Clone)]

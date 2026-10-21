@@ -23,7 +23,9 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_tungstenite::tungstenite::Message;
 
 pub const KIND: u64 = 25050;
-pub const DEFAULT_RELAYS: [&str; 4] = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://offchain.pub"];
+/// Public relays that pass ephemeral events on quickly (checked 2026-10); several, so one that is
+/// down or throttling does not matter.
+pub const DEFAULT_RELAYS: [&str; 5] = ["wss://nos.lol", "wss://relay.primal.net", "wss://relay.snort.social", "wss://nostr.mom", "wss://relay.damus.io"];
 
 fn sha256(data: impl AsRef<[u8]>) -> [u8; 32] {
     Sha256::digest(data.as_ref()).into()

@@ -79,6 +79,7 @@ const GRID: usize = 5;
 /// Windows of the shared window's app that are *not* part of it (other document windows, the
 /// Finder's desktop) – they are left out of the picture. Part of it: menus and panels above the
 /// normal window level, and windows lying within it (sheets, dialogs). macOS only.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn foreign_windows_of_app(window_id: u32) -> Vec<u32> {
     #[cfg(target_os = "macos")]
     {

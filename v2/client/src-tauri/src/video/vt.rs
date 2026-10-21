@@ -75,11 +75,19 @@ extern "C" {
 extern "C" {
     fn CVPixelBufferGetWidth(pb: CFTypeRef) -> usize;
     fn CVPixelBufferGetHeight(pb: CFTypeRef) -> usize;
+    fn CVPixelBufferLockBaseAddress(pb: CFTypeRef, flags: u64) -> i32;
+    fn CVPixelBufferUnlockBaseAddress(pb: CFTypeRef, flags: u64) -> i32;
+    fn CVPixelBufferGetBaseAddressOfPlane(pb: CFTypeRef, plane: usize) -> *const c_void;
+    fn CVPixelBufferGetBytesPerRowOfPlane(pb: CFTypeRef, plane: usize) -> usize;
+    fn CVPixelBufferGetWidthOfPlane(pb: CFTypeRef, plane: usize) -> usize;
+    fn CVPixelBufferGetHeightOfPlane(pb: CFTypeRef, plane: usize) -> usize;
 }
 
 #[link(name = "VideoToolbox", kind = "framework")]
 extern "C" {
     static kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: CFTypeRef;
+    // macOS 11.3+: rate control made for video calls / screen sharing (low latency)
+    static kVTVideoEncoderSpecification_EnableLowLatencyRateControl: CFTypeRef;
     static kVTCompressionPropertyKey_RealTime: CFTypeRef;
     static kVTCompressionPropertyKey_ProfileLevel: CFTypeRef;
     static kVTCompressionPropertyKey_AllowFrameReordering: CFTypeRef;
@@ -126,6 +134,7 @@ struct Ctx {
 }
 
 pub struct VtEncoder {
+    pub bitrate: u32,
     session: CFTypeRef,
     ctx: *mut Ctx,
     force_key_props: CFTypeRef,
@@ -162,34 +171,51 @@ unsafe fn set_owned(session: CFTypeRef, key: CFTypeRef, value: CFTypeRef) {
     CFRelease(value);
 }
 
+/// Average bitrate; bursts (e.g. scrolling) may use 1.5× that within a second.
+unsafe fn apply_bitrate(session: CFTypeRef, bitrate: u32) {
+    set_owned(session, kVTCompressionPropertyKey_AverageBitRate, number_i32(bitrate as i32));
+    let limits = [number_f64(bitrate as f64 * 1.5 / 8.0), number_f64(1.0)];
+    let array = CFArrayCreate(ptr::null(), limits.as_ptr(), 2, &kCFTypeArrayCallBacks);
+    limits.iter().for_each(|v| CFRelease(*v));
+    set_owned(session, kVTCompressionPropertyKey_DataRateLimits, array);
+}
+
 impl VtEncoder {
-    pub fn new(width: usize, height: usize, fps: u32, sink: Sink) -> Option<Self> {
+    pub fn new(width: usize, height: usize, fps: u32, bitrate: u32, sink: Sink) -> Option<Self> {
         let broken = Arc::new(AtomicBool::new(false));
         let ctx = Box::into_raw(Box::new(Ctx { sink, broken: broken.clone() }));
         unsafe {
-            let spec = dict(&[kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder], &[kCFBooleanTrue]);
+            // low-latency rate control first, the normal hardware encoder as fallback
             let mut session: CFTypeRef = ptr::null();
-            let status = VTCompressionSessionCreate(
-                ptr::null(),
-                width as i32,
-                height as i32,
-                CODEC_H264,
-                spec,
-                ptr::null(),
-                ptr::null(),
-                output_callback,
-                ctx as *mut c_void,
-                &mut session,
-            );
-            CFRelease(spec);
-            if status != 0 || session.is_null() {
+            for low_latency in [true, false] {
+                let spec = if low_latency {
+                    dict(&[kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder, kVTVideoEncoderSpecification_EnableLowLatencyRateControl], &[kCFBooleanTrue, kCFBooleanTrue])
+                } else {
+                    dict(&[kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder], &[kCFBooleanTrue])
+                };
+                let status = VTCompressionSessionCreate(
+                    ptr::null(),
+                    width as i32,
+                    height as i32,
+                    CODEC_H264,
+                    spec,
+                    ptr::null(),
+                    ptr::null(),
+                    output_callback,
+                    ctx as *mut c_void,
+                    &mut session,
+                );
+                CFRelease(spec);
+                if status == 0 && !session.is_null() {
+                    break;
+                }
+                session = ptr::null();
+            }
+            if session.is_null() {
                 drop(Box::from_raw(ctx));
                 return None;
             }
 
-            // Screen content: ~0.05 bit per pixel and frame is plenty for sharp text; bursts
-            // (e.g. scrolling) may use 1.5× that within a second.
-            let bitrate = ((width * height) as f64 * fps as f64 * 0.05).clamp(1.5e6, 12e6);
             VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime, kCFBooleanTrue);
             VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
             // what every browser negotiates for WebRTC (profile-level-id 42e01f)
@@ -197,14 +223,11 @@ impl VtEncoder {
             set_owned(session, kVTCompressionPropertyKey_ExpectedFrameRate, number_i32(fps as i32));
             // keyframes are requested explicitly (new viewer / lost frame), so keep them rare
             set_owned(session, kVTCompressionPropertyKey_MaxKeyFrameInterval, number_i32(fps as i32 * 60));
-            set_owned(session, kVTCompressionPropertyKey_AverageBitRate, number_i32(bitrate as i32));
-            let limits = [number_f64(bitrate * 1.5 / 8.0), number_f64(1.0)];
-            let array = CFArrayCreate(ptr::null(), limits.as_ptr(), 2, &kCFTypeArrayCallBacks);
-            limits.iter().for_each(|v| CFRelease(*v));
-            set_owned(session, kVTCompressionPropertyKey_DataRateLimits, array);
+            apply_bitrate(session, bitrate);
             VTCompressionSessionPrepareToEncodeFrames(session);
 
             Some(VtEncoder {
+                bitrate,
                 session,
                 ctx,
                 force_key_props: dict(&[kVTEncodeFrameOptionKey_ForceKeyFrame], &[kCFBooleanTrue]),
@@ -216,12 +239,46 @@ impl VtEncoder {
         }
     }
 
+    /// New target bitrate (bit/s), e.g. when the network gets slower or faster.
+    pub fn set_bitrate(&mut self, bitrate: u32) {
+        if bitrate != self.bitrate {
+            unsafe { apply_bitrate(self.session, bitrate) };
+            self.bitrate = bitrate;
+        }
+    }
+
     /// Size of a CVPixelBuffer.
     ///
     /// # Safety
     /// `pixel_buffer` must be a valid CVPixelBufferRef.
     pub unsafe fn buffer_size(pixel_buffer: *const c_void) -> (usize, usize) {
         (CVPixelBufferGetWidth(pixel_buffer), CVPixelBufferGetHeight(pixel_buffer))
+    }
+
+    /// Fingerprint of a frame's brightness plane – equal fingerprints, same picture (a static
+    /// window is then not encoded again). About half a millisecond for 2560 × 1600.
+    ///
+    /// # Safety
+    /// `pixel_buffer` must be a valid bi-planar CVPixelBufferRef.
+    pub unsafe fn fingerprint(pixel_buffer: *const c_void) -> Option<u64> {
+        const READ_ONLY: u64 = 1;
+        if CVPixelBufferLockBaseAddress(pixel_buffer, READ_ONLY) != 0 {
+            return None;
+        }
+        let base = CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 0) as *const u8;
+        let (stride, width, height) = (CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 0), CVPixelBufferGetWidthOfPlane(pixel_buffer, 0), CVPixelBufferGetHeightOfPlane(pixel_buffer, 0));
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        if !base.is_null() {
+            for y in 0..height {
+                let row = base.add(y * stride);
+                for i in 0..width / 8 {
+                    let v = (row.add(i * 8) as *const u64).read_unaligned();
+                    hash = (hash ^ v).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(7);
+                }
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(pixel_buffer, READ_ONLY);
+        (!base.is_null()).then_some(hash)
     }
 
     /// Queue a frame. Returns whether a keyframe was requested.
@@ -368,7 +425,7 @@ mod tests {
         let (w, h) = (640usize, 480usize);
         let out = Arc::new(Mutex::new(Vec::<(Vec<u8>, bool)>::new()));
         let sink_out = out.clone();
-        let mut enc = VtEncoder::new(w, h, 30, Box::new(move |d, k| sink_out.lock().unwrap().push((d, k)))).expect("session");
+        let mut enc = VtEncoder::new(w, h, 30, 4_000_000, Box::new(move |d, k| sink_out.lock().unwrap().push((d, k)))).expect("session");
         for i in 0..30usize {
             unsafe {
                 let mut pb: CFTypeRef = ptr::null();

@@ -78,6 +78,13 @@ struct Viewer {
     dc: Option<Arc<dyn DataChannel>>,
     /// clipboard previews this viewer already has (they are sent once, separately)
     previews: HashSet<String>,
+    /// width (device pixels) at which it displays each shared window (slot → px, 0 = hidden)
+    sizes: HashMap<u8, u32>,
+    /// its network: packet loss (0..1), round trip (ms), when reported
+    net: Option<(f64, f64, Instant)>,
+    /// when it was invited / when its connection was up
+    invited: Instant,
+    connected_at: Option<Instant>,
     /// one video track per shared-window slot (`video::MAX_STREAMS`): a window joining or leaving
     /// only changes which slot carries what, the connection is never renegotiated
     tracks: Vec<OutTrack>,
@@ -99,6 +106,11 @@ pub struct Hub {
     /// nobody gets in without the presenter's OK (or the room's PIN)
     admission: Mutex<Admission>,
     asked_permission: Mutex<Option<Instant>>,
+    /// congestion control: share of the full bitrate (0.1..1), lowest round trip seen, last cut
+    rate: Mutex<(f64, f64, Instant)>,
+    /// peers invited again and again without ever connecting (e.g. an old link whose presenter
+    /// key no longer matches): count, last attempt – they are left alone for a while
+    failed: Mutex<HashMap<String, (u32, Instant)>>,
 }
 
 struct Events {
@@ -169,11 +181,14 @@ impl Hub {
             next_id: AtomicU32::new(1),
             admission: Mutex::new(admission),
             asked_permission: Mutex::new(None),
+            rate: Mutex::new((1.0, f64::MAX, Instant::now())),
+            failed: Mutex::default(),
         });
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
         tauri::async_runtime::spawn(hub.clone().video(frames));
         tauri::async_runtime::spawn(hub.clone().clip_changes());
+        tauri::async_runtime::spawn(hub.clone().congestion());
         // viewers already waiting answer right away
         hub.signaling.send(&json!({ "type": "host" }));
         let beacon = hub.clone();
@@ -219,8 +234,34 @@ impl Hub {
             let from = msg["from"].as_str().unwrap_or_default().to_string();
             match msg["type"].as_str() {
                 Some("hello") if !from.is_empty() && from.len() <= 64 => {
-                    let known = self.viewers.lock().unwrap().values().any(|v| v.peer == from);
-                    if known {
+                    // A connected viewer stops saying hello. One that says hello long after it was
+                    // invited / connected lost its connection (e.g. the page was reloaded): drop
+                    // the dead one and connect afresh. Hellos while connecting are just repeats.
+                    let known = self.viewers.lock().unwrap().iter().find(|(_, v)| v.peer == from).map(|(id, v)| {
+                        let stale = match v.connected_at {
+                            Some(t) => t.elapsed() > Duration::from_secs(5),
+                            None => v.invited.elapsed() > Duration::from_secs(10),
+                        };
+                        (*id, stale)
+                    });
+                    match known {
+                        Some((id, true)) => {
+                            let never_connected = self.viewers.lock().unwrap().get(&id).is_some_and(|v| v.connected_at.is_none());
+                            if never_connected {
+                                let mut failed = self.failed.lock().unwrap();
+                                let entry = failed.entry(from.clone()).or_insert((0, Instant::now()));
+                                entry.0 += 1;
+                                entry.1 = Instant::now();
+                            }
+                            crate::log(&format!("p2p: viewer {id} says hello again – reconnecting"));
+                            self.remove(id).await;
+                        }
+                        Some((_, false)) => continue,
+                        None => {}
+                    }
+                    // three invitations without a connection: leave it alone for two minutes
+                    let give_up = self.failed.lock().unwrap().get(&from).is_some_and(|(n, t)| *n >= 3 && t.elapsed() < Duration::from_secs(120));
+                    if give_up {
                         continue;
                     }
                     let decision = self.admission.lock().unwrap().hello(&from, &msg);
@@ -395,6 +436,10 @@ impl Hub {
                 pc: pc.clone(),
                 dc: Some(dc.clone()),
                 previews: HashSet::new(),
+                sizes: HashMap::new(),
+                net: None,
+                invited: Instant::now(),
+                connected_at: None,
                 tracks,
                 pending: vec![],
                 answered: false,
@@ -416,6 +461,10 @@ impl Hub {
     }
 
     async fn connected(&self, id: u32) {
+        if let Some(v) = self.viewers.lock().unwrap().get_mut(&id) {
+            v.connected_at = Some(Instant::now());
+            self.failed.lock().unwrap().remove(&v.peer);
+        }
         let senders: Vec<_> = self.viewers.lock().unwrap().get(&id).map(|v| v.tracks.iter().map(|t| t.sender.clone()).collect()).unwrap_or_default();
         for (slot, sender) in senders.into_iter().enumerate() {
             if let Ok(params) = sender.get_parameters().await {
@@ -438,6 +487,7 @@ impl Hub {
         if self.viewers.lock().unwrap().is_empty() {
             session::remote_viewers_gone(&self.app, &self.shared);
         }
+        self.apply_sizes();
     }
 
     // ------------------------------------------------------------------ data channel
@@ -492,6 +542,24 @@ impl Hub {
                 }
             }
             "keyframe" => self.shared.request_key(),
+            // how large the viewer displays each window: never encode more pixels than needed
+            "view-size" => {
+                if let Some(viewer) = self.viewers.lock().unwrap().get_mut(&id) {
+                    for s in v["sizes"].as_array().into_iter().flatten() {
+                        if let (Some(slot), Some(pw)) = (s["w"].as_u64(), s["pw"].as_u64()) {
+                            viewer.sizes.insert(slot as u8, pw.min(16384) as u32);
+                        }
+                    }
+                }
+                self.apply_sizes();
+            }
+            // the viewer's network (loss, round trip) – for the bitrate
+            "net" => {
+                let (loss, rtt) = (v["loss"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0), v["rtt"].as_f64().unwrap_or(0.0).clamp(0.0, 10_000.0));
+                if let Some(viewer) = self.viewers.lock().unwrap().get_mut(&id) {
+                    viewer.net = Some((loss, rtt, Instant::now()));
+                }
+            }
             // remote access: start one of the room's applications (or the desktop)
             "launch" if mode == Mode::Control && self.shared.remote.is_some() => {
                 let (app, item, shared) = (self.app.clone(), v["app"].as_str().unwrap_or("").to_string(), self.shared.clone());
@@ -611,6 +679,97 @@ impl Hub {
         let msg = json!({ "t": "peers", "list": list });
         self.broadcast(&msg, None).await;
         session::route_local(&self.app, &self.shared, &self.ctrl, &msg);
+    }
+
+    // ------------------------------------------------------------------ performance
+
+    /// Capture size per window: the widest any viewer displays it (until every viewer reported,
+    /// full size); a window nobody displays is not encoded at all.
+    fn apply_sizes(&self) {
+        // only viewers that are actually connected count
+        let viewers = self.viewers.lock().unwrap();
+        let connected: Vec<&Viewer> = viewers.values().filter(|v| v.connected_at.is_some()).collect();
+        let count = connected.len();
+        for stream in self.shared.streams.lock().unwrap().iter() {
+            let reports: Vec<u32> = connected.iter().filter_map(|v| v.sizes.get(&stream.slot).copied()).collect();
+            let ctl = &stream.ctl;
+            let idle = count > 0 && reports.len() == count && reports.iter().all(|p| *p == 0);
+            ctl.idle.store(idle, Ordering::Relaxed);
+            if idle {
+                continue;
+            }
+            let want = if reports.len() < count { 0 } else { reports.iter().copied().max().unwrap_or(0) };
+            // round up a little, and only follow real changes (no resize storm while dragging)
+            let want = if want == 0 { 0 } else { (want as f64 * 1.05) as u32 };
+            let now = ctl.want_w.load(Ordering::Relaxed);
+            let changed = (now == 0) != (want == 0) || (now > 0 && (want as f64 / now as f64 - 1.0).abs() > 0.08);
+            if changed {
+                ctl.want_w.store(want, Ordering::Relaxed);
+                ctl.resize.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Congestion control: every second the worst viewer network decides the share of the
+    /// bitrate (cut by a quarter on loss or a growing round trip, raised gently otherwise);
+    /// every two seconds the viewers get the presenter's statistics.
+    async fn congestion(self: Arc<Self>) {
+        let mut tick = 0u64;
+        while !self.shared.stop.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            tick += 1;
+            let reports: Vec<(f64, f64)> = self
+                .viewers
+                .lock()
+                .unwrap()
+                .values()
+                .filter_map(|v| v.net.filter(|n| n.2.elapsed() < Duration::from_secs(5)).map(|n| (n.0, n.1)))
+                .collect();
+            let factor = {
+                let mut rate = self.rate.lock().unwrap();
+                if !reports.is_empty() {
+                    let loss = reports.iter().map(|r| r.0).fold(0.0, f64::max);
+                    let rtt = reports.iter().map(|r| r.1).fold(0.0, f64::max);
+                    if rtt > 0.0 {
+                        rate.1 = rate.1.min(rtt);
+                    }
+                    let congested = loss > 0.04 || (rtt > 0.0 && rtt > rate.1 * 2.0 + 120.0);
+                    if congested && rate.2.elapsed() > Duration::from_secs(2) {
+                        rate.0 = (rate.0 * 0.75).max(0.1);
+                        rate.2 = Instant::now();
+                    } else if !congested && loss < 0.015 {
+                        rate.0 = (rate.0 * 1.06).min(1.0);
+                    }
+                }
+                rate.0
+            };
+            for s in self.shared.streams.lock().unwrap().iter() {
+                s.ctl.rate.store((factor * 1000.0) as u32, Ordering::Relaxed);
+            }
+            if tick % 2 == 0 {
+                let streams: Vec<Value> = self
+                    .shared
+                    .streams
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .map(|s| {
+                        let c = &s.ctl;
+                        let (bytes, frames) = (c.bytes.swap(0, Ordering::Relaxed), c.frames.swap(0, Ordering::Relaxed));
+                        let (us, n) = (c.encode_us.swap(0, Ordering::Relaxed), c.encoded.swap(0, Ordering::Relaxed));
+                        let size = c.size.load(Ordering::Relaxed);
+                        json!({
+                            "w": s.slot, "width": size >> 16, "height": size & 0xffff,
+                            "kbps": bytes * 8 / 2000, "fps": frames as f64 / 2.0,
+                            "enc_ms": if n > 0 { us as f64 / n as f64 / 1000.0 } else { 0.0 },
+                            "bitrate": c.bitrate.load(Ordering::Relaxed), "want_w": c.want_w.load(Ordering::Relaxed),
+                            "idle": c.idle.load(Ordering::Relaxed),
+                        })
+                    })
+                    .collect();
+                self.broadcast(&json!({ "t": "host-stats", "rate": factor, "streams": streams }), None).await;
+            }
+        }
     }
 
     // ------------------------------------------------------------------ admission

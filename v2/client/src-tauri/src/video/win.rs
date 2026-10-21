@@ -45,7 +45,7 @@ use windows::{
     },
 };
 
-use super::{output_size, packet, Source, FPS, KEY_GAP};
+use super::{fit_width, output_size, packet, Source, FPS, KEY_GAP};
 use super::StreamCtl;
 use crate::guard::Rect;
 
@@ -252,12 +252,13 @@ impl Pipeline {
 
     fn convert(&mut self, texture: &ID3D11Texture2D, size: SizeInt32) -> Result<()> {
         let (w, h) = (size.Width as u32, size.Height as u32);
-        let out = output_size(w as f64, h as f64);
+        // never more pixels than the viewers display
+        let out = fit_width(output_size(w as f64, h as f64), self.shared.want_w.load(Ordering::Relaxed));
         if self.converter.as_ref().is_none_or(|c| c.input != (w, h) || c.output != out) {
             self.converter = Some(Converter::new(&self.device, &self.context, (w, h), out)?);
         }
         if self.encoder.as_ref().is_none_or(|e| (e.width, e.height) != out) {
-            self.encoder = Some(Encoder::new(&self.device, out.0, out.1)?);
+            self.encoder = Some(Encoder::new(&self.device, out.0, out.1, self.shared.target_bitrate(out.0 as usize, out.1 as usize))?);
             self.shared.need_key.store(true, Ordering::Relaxed);
             self.last_key = Instant::now() - KEY_GAP;
         }
@@ -267,9 +268,19 @@ impl Pipeline {
     /// Feeds the current NV12 frame to the encoder. Returns whether it was taken.
     fn encode(&mut self, key: bool) -> Result<bool> {
         let (Some(converter), Some(encoder)) = (self.converter.as_mut(), self.encoder.as_mut()) else { return Ok(false) };
+        // nobody watches this window right now (minimized in every viewer)
+        if self.shared.idle.load(Ordering::Relaxed) && !key {
+            return Ok(false);
+        }
         let (frames, shared) = (&self.frames, &self.shared);
         let (w, h) = (encoder.width as usize, encoder.height as usize);
+        // what the viewers' network takes
+        encoder.set_bitrate(shared.target_bitrate(w, h));
+        shared.bitrate.store(encoder.bitrate, Ordering::Relaxed);
+        let started = Instant::now();
         let mut sink = |data: Vec<u8>, key: bool| {
+            shared.encode_time(started.elapsed());
+            shared.sent(data.len(), w, h);
             if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                 shared.need_key.store(true, Ordering::Relaxed);
             }
@@ -286,6 +297,7 @@ impl Pipeline {
         let (frames, shared) = (&self.frames, &self.shared);
         let (w, h) = (encoder.width as usize, encoder.height as usize);
         let mut sink = |data: Vec<u8>, key: bool| {
+            shared.sent(data.len(), w, h);
             if frames.try_send(packet(shared.slot, &data, key, w, h)).is_err() {
                 shared.need_key.store(true, Ordering::Relaxed);
             }
@@ -421,6 +433,7 @@ impl Converter {
 struct Encoder {
     width: u32,
     height: u32,
+    bitrate: u32,
     transform: IMFTransform,
     events: Option<IMFMediaEventGenerator>,
     codec: Option<ICodecAPI>,
@@ -464,7 +477,20 @@ fn find_encoder(flags: MFT_ENUM_FLAG) -> Option<IMFTransform> {
 }
 
 impl Encoder {
-    fn new(device: &ID3D11Device, width: u32, height: u32) -> Result<Self> {
+    /// New target bitrate (bit/s), e.g. when the network gets slower or faster.
+    fn set_bitrate(&mut self, bitrate: u32) {
+        if bitrate == self.bitrate {
+            return;
+        }
+        if let Some(codec) = &self.codec {
+            unsafe {
+                let _ = codec.SetValue(&CODECAPI_AVEncCommonMeanBitRate, &variant_u32(bitrate));
+            }
+        }
+        self.bitrate = bitrate;
+    }
+
+    fn new(device: &ID3D11Device, width: u32, height: u32, bitrate: u32) -> Result<Self> {
         // the GPU's hardware encoder; Windows' software encoder as fallback
         let (transform, hardware) = match find_encoder(MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER) {
             Some(t) => (t, true),
@@ -493,7 +519,6 @@ impl Encoder {
             unsafe { transform.ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, manager.as_raw() as usize) }.map_err(err("D3D-Manager"))?;
         }
 
-        let bitrate = ((width * height) as f64 * FPS as f64 * 0.05).clamp(1.5e6, 12e6) as u32;
         let codec = transform.cast::<ICodecAPI>().ok();
         if let Some(codec) = &codec {
             unsafe {
@@ -568,6 +593,7 @@ impl Encoder {
             _manager: manager,
             d3d_aware,
             provides_samples,
+            bitrate,
             output_size: info.cbSize.max(width * height),
             // a synchronous encoder always takes input
             need_input: if hardware { 0 } else { u32::MAX },

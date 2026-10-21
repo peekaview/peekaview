@@ -135,7 +135,7 @@ Peer-to-peer fails in a share of networks: symmetric NAT on both sides, or corpo
 ## 5. CSP
 
 The viewer opens WebSocket connections to the Nostr relays. In `packages/ui/src/proxy.ts:13`, add their origins to `connect-src`, e.g. via a new server env `PEEKAVIEW_RELAYS`:
-- default: `wss://relay.damus.io wss://nos.lol wss://relay.primal.net wss://offchain.pub`
+- default: `wss://nos.lol wss://relay.primal.net wss://relay.snort.social wss://nostr.mom wss://relay.damus.io`
 - or your own relay, passed to the viewer as `relays={[…]}`
 
 Nothing else is needed:

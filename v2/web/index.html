@@ -201,12 +201,12 @@
           render()
         },
       })
-      // ask a few times while the relays connect
-      for (let i = 0; i < 4 && !answered; i++) {
+      // ask twice while the relays connect (public relays throttle chatty clients)
+      for (let i = 0; i < 2 && !answered; i++) {
         signaling.send({ type: 'ping', from: me })
-        await new Promise((r) => setTimeout(r, 1500))
+        await new Promise((r) => setTimeout(r, 2500))
       }
-      await new Promise((r) => setTimeout(r, 1500))
+      await new Promise((r) => setTimeout(r, 2000))
       signaling.close()
       // a single lost answer (relays) does not make a room offline
       if (!answered) {
@@ -223,8 +223,9 @@
     // the room joined from this page (remembered once it turns out to be permanent)
     let joined = null
     function probeAll() {
-      for (const r of rooms()) probe(r.room)
-      probeTimer = setTimeout(probeAll, 30000)
+      // not while the page is in the background
+      if (!document.hidden) for (const r of rooms()) probe(r.room)
+      probeTimer = setTimeout(probeAll, 60000)
     }
 
     // ---------------------------------------------------------------- connect

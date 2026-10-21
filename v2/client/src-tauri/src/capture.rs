@@ -161,7 +161,11 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             }
         }
 
-        for (_, video) in videos.iter_mut() {
+        // viewers now display a window at another size: capture at that size
+        for (slot, video) in videos.iter_mut() {
+            if let Some(s) = shared.stream(*slot).filter(|s| s.ctl.resize.swap(false, Ordering::Relaxed)) {
+                video.update(s.rect);
+            }
             video.tick();
         }
 

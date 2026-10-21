@@ -15,7 +15,9 @@
 import { schnorr } from './vendor/noble-schnorr.js'
 
 export const KIND = 25050
-export const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://offchain.pub']
+// public relays that pass ephemeral events on quickly; several, so one that is down or
+// throttling does not matter
+export const DEFAULT_RELAYS = ['wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.snort.social', 'wss://nostr.mom', 'wss://relay.damus.io']
 
 const enc = new TextEncoder()
 const dec = new TextDecoder()

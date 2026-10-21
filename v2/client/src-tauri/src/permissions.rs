@@ -40,6 +40,7 @@ fn app_path() -> Option<std::path::PathBuf> {
 }
 
 const HELPER: &str = "permission";
+#[cfg(target_os = "macos")]
 const HELPER_SIZE: (f64, f64) = (300.0, 400.0);
 
 fn kind_of(kind: &str) -> &'static str {
@@ -53,6 +54,7 @@ pub fn granted(kind: &str) -> bool {
 
 /// Missing permissions in the order they are asked for: accessibility first (works right away),
 /// screen recording last (macOS applies it only after a restart of the app).
+#[cfg(target_os = "macos")]
 fn missing() -> Vec<&'static str> {
     let s = status();
     let mut list = Vec::new();
