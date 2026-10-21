@@ -1127,6 +1127,7 @@ export function mountViewer(el, options) {
   setTool('point')
   update('connecting')
   connect()
+  if (window.__PV_STATS__) toggleStats()
 
   return {
     setTool,

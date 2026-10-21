@@ -1,111 +1,54 @@
 <!doctype html>
-<html lang="de" style="background: transparent">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <title>PeekaView</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="toolbar">
-  <div id="shell">
-    <div class="bar glass">
-      <button id="grip" class="grip" title="Verschieben" data-icon="grip"></button>
-      <span id="logo" class="logo" title="PeekaView"></span>
-      <i id="live-dot" class="dot" title="Freigabe läuft"></i>
+<body class="app">
+  <header class="app-head">
+    <span id="logo" class="logo"></span>
+    <strong>PeekaView</strong>
+    <span id="live-badge" class="live-badge" hidden><i class="dot"></i>Freigabe läuft – Auswahl ändern</span>
+    <button id="settings-btn" class="icon-btn" title="Einstellungen &amp; Räume" data-icon="settings"></button>
+  </header>
 
-      <div id="bar-idle" class="group">
-        <button id="share-btn" class="pill primary"><i data-icon="share"></i>Teilen</button>
-        <button id="settings-btn" class="icon-btn" title="Einstellungen" data-icon="settings"></button>
-        <button id="quit-btn" class="icon-btn" title="Ausblenden – PeekaView läuft im Tray weiter" data-icon="close"></button>
-      </div>
-
-      <div id="bar-live" class="group" hidden>
-        <button id="code-btn" class="chip" title="Link zum Zuschauen kopieren">
-          <i class="dot"></i><span id="code"></span><i data-icon="link"></i>
-        </button>
-        <button id="switch-btn" class="icon-btn" title="Anderes Fenster oder anderen Bildschirm teilen" data-icon="switch"></button>
-        <span class="sep"></span>
-        <div class="modes" role="radiogroup" aria-label="Zuschauer dürfen">
-          <button data-mode="view" class="active" title="Zuschauer dürfen nur zusehen"><i data-icon="view"></i></button>
-          <button data-mode="draw" title="Zuschauer dürfen zeigen und malen"><i data-icon="draw"></i></button>
-          <button data-mode="control" title="Zuschauer dürfen steuern"><i data-icon="control"></i></button>
-        </div>
-        <span class="sep"></span>
-        <div id="avatars" class="avatars"></div>
-        <span class="sep"></span>
-        <button id="clip-btn" class="icon-btn" title="Gemeinsame Zwischenablage" data-icon="clipboard"></button>
-        <button id="mic-btn" class="icon-btn" title="Sprechen" data-icon="micOff"></button>
-        <button id="rec-btn" class="icon-btn rec" title="Sitzung aufzeichnen"><i data-icon="record"></i><span id="rec-time" hidden></span></button>
-        <button id="stop-btn" class="pill danger" title="Freigabe beenden"><i data-icon="stop"></i>Beenden</button>
-      </div>
-      <button id="fold-btn" class="icon-btn fold" title="Einklappen" data-icon="collapse"></button>
-    </div>
-
+  <main>
     <div id="requests" class="requests" hidden></div>
 
-    <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
-
-    <div id="panel" class="panel glass" hidden>
-      <div id="perm-banner" class="banner" hidden>
-        <i data-icon="screen"></i>
-        <div><strong>Bildschirmaufnahme nicht erlaubt</strong><span>macOS muss PeekaView das Teilen einmalig erlauben.</span></div>
-        <button id="perm-fix" class="pill secondary">Erlauben</button>
-      </div>
-      <div id="invite" class="banner" hidden>
-        <i data-icon="link"></i>
-        <div><strong id="invite-room"></strong><span id="invite-server"></span></div>
-        <button id="invite-clear" class="icon-btn" title="Einladung verwerfen" data-icon="close"></button>
-      </div>
-
-      <section id="picker" hidden>
-        <div class="panel-head">
-          <div class="tabs" role="tablist">
-            <button class="tab active" data-kind="screen"><i data-icon="screen"></i>Bildschirme</button>
-            <button class="tab" data-kind="window"><i data-icon="window"></i>Fenster</button>
-          </div>
-          <button id="refresh" class="icon-btn" title="Aktualisieren" data-icon="refresh"></button>
-        </div>
-        <div id="grid" class="grid"></div>
-        <div class="panel-foot">
-          <select id="room-choice" class="room-choice" title="In welchen Raum geteilt wird – wer den Link kennt, muss trotzdem erst zugelassen werden"></select>
-          <input id="name" maxlength="32" placeholder="Dein Name">
-          <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>
-        </div>
-      </section>
-
-      <section id="settings" hidden>
-        <label>Zuschauer-Website <span class="muted">leer = über Nostr, ganz ohne eigenen Webserver</span>
-          <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
-        </label>
-        <p id="nsite" class="hint nsite"></p>
-        <label>Raum <span class="muted">optional, Raum-Schlüssel einer Integration</span>
-          <input id="room" spellcheck="false" autocomplete="off" placeholder="wird automatisch erzeugt">
-        </label>
-
-        <button id="rooms-btn" class="pill secondary rooms-btn" type="button"><i data-icon="link"></i>Raumlinks &amp; Remote-Zugriff …</button>
-
-        <h3>Verbindung</h3>
-        <p class="hint">Bild, Ton und Steuerung laufen direkt zwischen den Rechnern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
-        <label>Nostr-Relays <span class="muted">eine Adresse pro Zeile, leer = Standard</span>
-          <textarea id="relays" rows="3" spellcheck="false"></textarea>
-        </label>
-        <label>TURN-Server <span class="muted">Fallback für strenge Firewalls, eine Adresse pro Zeile</span>
-          <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
-        </label>
-        <label>TURN-Secret <span class="muted">coturn static-auth-secret – bleibt auf diesem Rechner</span>
-          <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
-        </label>
-
-        <h3>Aufzeichnung &amp; Transkript</h3>
-        <label class="check" id="local-stt-row"><input type="checkbox" id="local-stt" checked> Lokale Spracherkennung von macOS verwenden (empfohlen)</label>
-        <label>OpenAI-API-Key <span class="muted">für das Transkript, falls lokal nicht möglich</span>
-          <input id="openai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…">
-        </label>
-        <label class="check"><input type="checkbox" id="use-env"> Key aus .env verwenden (OPENAI_API_KEY) <span id="env-status" class="muted"></span></label>
-      </section>
-
-      <p id="error" class="error" hidden></p>
+    <div id="perm-banner" class="banner" hidden>
+      <i data-icon="screen"></i>
+      <div><strong>Bildschirmaufnahme nicht erlaubt</strong><span>macOS muss PeekaView das Teilen einmalig erlauben.</span></div>
+      <button id="perm-fix" class="pill secondary">Erlauben</button>
     </div>
-  </div>
+    <div id="invite" class="banner" hidden>
+      <i data-icon="link"></i>
+      <div><strong id="invite-room"></strong><span id="invite-server"></span></div>
+      <button id="invite-clear" class="icon-btn" title="Einladung verwerfen" data-icon="close"></button>
+    </div>
+
+    <!-- what to share (also to change a running share) -->
+    <section id="picker">
+      <div class="panel-head">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-kind="screen"><i data-icon="screen"></i>Bildschirme</button>
+          <button class="tab" data-kind="window"><i data-icon="window"></i>Fenster</button>
+        </div>
+        <button id="refresh" class="icon-btn" title="Aktualisieren" data-icon="refresh"></button>
+      </div>
+      <div id="grid" class="grid"></div>
+      <div class="panel-foot">
+        <select id="room-choice" class="room-choice" title="In welchen Raum geteilt wird – wer den Link kennt, muss trotzdem erst zugelassen werden"></select>
+        <input id="name" maxlength="32" placeholder="Dein Name">
+        <button id="cancel-switch" class="pill secondary" hidden>Abbrechen</button>
+        <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>
+      </div>
+    </section>
+
+    <p id="error" class="error" hidden></p>
+  </main>
+
+  <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
 
   <script type="module" src="app.js"></script>
 </body>

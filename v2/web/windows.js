@@ -237,9 +237,15 @@ export class WindowManager {
 
   // ------------------------------------------------------------ geometry
 
-  /** Size of a window's picture in CSS px at scale 1 (= one video pixel per screen pixel). */
+  /**
+   * Size of a window's picture in CSS px at scale 1 (= one of the presenter's pixels per screen
+   * pixel). From the presenter's full window size, not from the video: the presenter sends fewer
+   * pixels when we show it smaller – sizing by the video would shrink it step by step.
+   */
   native(win) {
     const d = window.devicePixelRatio || 1
+    const { pw, ph } = win.info ?? {}
+    if (pw && ph) return { w: pw / d, h: ph / d }
     return { w: (win.video.videoWidth || 1280) / d, h: (win.video.videoHeight || 800) / d }
   }
 
@@ -302,9 +308,8 @@ export class WindowManager {
     D.h = Math.max(...xs.map((r) => r.y + r.h)) - D.y
     const M = 14
     let k = Math.min((a.w - 2 * M) / D.w, (a.h - 2 * M - BAR) / D.h)
-    // never enlarged beyond one video pixel per screen pixel
-    const d = window.devicePixelRatio || 1
-    for (const win of this.wins.values()) if (win.video.videoWidth && win.info.rect?.w) k = Math.min(k, win.video.videoWidth / win.info.rect.w / d)
+    // never enlarged beyond one of the presenter's pixels per screen pixel
+    for (const win of this.wins.values()) if (win.info.rect?.w) k = Math.min(k, this.native(win).w / win.info.rect.w)
     return { D, k, ox: (a.w - D.w * k) / 2, oy: BAR + M + (a.h - 2 * M - BAR - D.h * k) / 2 }
   }
 

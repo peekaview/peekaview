@@ -536,7 +536,7 @@ impl Hub {
             "rtc" => {
                 let to = v["to"].as_u64().unwrap_or(u64::MAX);
                 if to == 0 {
-                    let _ = self.app.emit_to("main", "rtc", &v);
+                    let _ = self.app.emit_to("toolbar", "rtc", &v);
                 } else {
                     self.send_to(to as u32, &v).await;
                 }
@@ -640,7 +640,7 @@ impl Hub {
         }
     }
 
-    /// Voice chat messages of the presenter's toolbar.
+    /// Voice chat messages of the presenter's PeekaView window.
     pub async fn from_host(&self, mut v: Value) {
         v["from"] = json!(0);
         match v["t"].as_str() {

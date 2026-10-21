@@ -108,7 +108,7 @@ mod imp {
             return;
         }
         // without the accessibility permission: activate the app (allowed while PeekaView is the
-        // active app, i.e. right after the user clicked its toolbar)
+        // active app, i.e. right after the user clicked its window)
         if let Some(app) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid as i32) {
             app.activateWithOptions(NSApplicationActivationOptions(0));
         }

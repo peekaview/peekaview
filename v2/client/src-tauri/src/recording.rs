@@ -5,7 +5,7 @@
 //! * a transcript of the conversation: Apple Speech on-device on macOS when possible, otherwise
 //!   OpenAI (`gpt-4o-transcribe`) with the presenter's API key
 //!
-//! Audio arrives from the toolbar as 16 kHz mono PCM (own microphone + all voice chat partners)
+//! Audio arrives from the PeekaView window as 16 kHz mono PCM (own microphone + all voice chat partners)
 //! and is transcribed in 20 s chunks while the session runs.
 
 use std::{

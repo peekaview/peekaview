@@ -42,7 +42,6 @@ label { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; 
 input, textarea { display: block; width: 100%; margin-top: 6px; padding: 8px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); outline: none; transition: border-color .15s; user-select: text; }
 input:focus, textarea:focus { border-color: var(--accent); }
 textarea { resize: vertical; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
-#settings { max-height: 420px; overflow-y: auto; }
 .hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 h3 { margin: 18px 0 2px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 label.check { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 13px; }
@@ -55,7 +54,7 @@ body.toolbar { background: transparent; overflow: hidden; }
 #shell { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 26px 36px; }
 .bar { display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 7px; border-radius: 14px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); }
 .group { display: flex; align-items: center; gap: 6px; }
-.logo { display: flex; padding: 0 3px; color: var(--fg); }
+.toolbar .logo { padding: 0 3px; }
 .sep { width: 1px; height: 22px; margin: 0 2px; background: var(--line); }
 .grip { display: grid; place-items: center; width: 16px; height: 32px; margin-right: -3px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: grab; }
 .grip:hover { color: var(--fg); }
@@ -71,6 +70,19 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 #code-btn { flex: none; gap: 6px; padding: 0 8px; }
 .chip > svg { color: var(--muted); }
 .chip.copied > svg { color: #86efac; }
+/* ------------------------------------------------ PeekaView window: picker and join requests */
+body.app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.app-head { flex: none; display: flex; align-items: center; gap: 9px; height: 48px; padding: 0 10px 0 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.app-head strong { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+.app-head #settings-btn { margin-left: auto; }
+.logo { display: flex; color: var(--fg); }
+.live-badge { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; padding: 3px 10px 3px 9px; border-radius: 999px; background: rgba(239, 68, 68, .12); color: #fca5a5; font-size: 12px; font-weight: 600; }
+body.app main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; overflow-y: auto; }
+#picker { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#picker .grid { flex: 1; height: auto; min-height: 180px; }
+body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); }
+
+
 .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(239, 68, 68, .25); } 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, .08); } }
 
@@ -98,8 +110,10 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 .toast.info { background: var(--panel); border: 1px solid var(--line); }
 
 /* join requests: nobody watches without the presenter's OK */
-.requests { display: flex; flex-direction: column; gap: 6px; width: 340px; }
+.requests { display: flex; flex-direction: column; gap: 6px; }
+.toolbar .requests { width: 340px; }
 .request { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 10px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); animation: toast-in .25s ease-out; }
+.app .request { border-color: rgba(239, 68, 68, .45); box-shadow: 0 0 0 3px rgba(239, 68, 68, .12); }
 .request .who { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; }
 .request div { flex: 1; min-width: 0; }
 .request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -108,11 +122,9 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 .requests .all { align-self: flex-end; height: 28px; font-size: 12px; }
 .room-choice { flex: none; max-width: 190px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; outline: none; }
 .room-choice:focus { border-color: var(--accent); }
-.rooms-btn { margin-top: 14px; width: 100%; }
 .request .room { color: var(--fg); }
 
-/* ------------------------------------------------ panel (picker / settings) */
-.panel { width: 640px; padding: 14px; border-radius: 16px; box-shadow: 0 10px 24px rgba(0, 0, 0, .48); }
+/* ------------------------------------------------ picker */
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .panel-foot { display: flex; gap: 8px; margin-top: 12px; }
 .panel-foot input { margin: 0; flex: 1; }
@@ -120,7 +132,7 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 .tab { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
 .tab.active { background: var(--raised); color: var(--fg); }
 
-.grid { height: 330px; overflow-x: hidden; overflow-y: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 6px; padding: 2px; }
+.grid { height: 330px; overflow-x: hidden; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-content: start; gap: 6px; padding: 2px; }
 .card { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 7px; border: 0; border-radius: 12px; background: transparent; text-align: left; cursor: pointer; transition: background .15s; }
 .card:hover { background: var(--raised); }
 .thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; background: var(--bg) center / contain no-repeat; outline: 1px solid var(--line); transition: outline-color .15s, box-shadow .15s; }
@@ -213,3 +225,8 @@ body.rooms .toast { position: fixed; left: 50%; bottom: 20px; transform: transla
 .nsite code { color: var(--fg); font: 11.5px ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; }
 .nsite.error span { color: #fca5a5; }
 .nsite .link { padding: 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
+
+/* ------------------------------------------------ settings in the rooms window */
+.page-tabs { display: inline-flex; margin-bottom: 16px; }
+.settings-page { max-width: 560px; }
+.settings-page h3:first-child { margin-top: 0; }

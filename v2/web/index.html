@@ -47,6 +47,8 @@
     .connect:active:not(:disabled) { transform: scale(.98); }
     .connect:disabled { opacity: .35; cursor: default; box-shadow: none; }
     .connect-hint { margin: -10px 0 0; text-align: center; color: #71717a; font-size: 12px; }
+    .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .open-app:hover { color: #fafafa; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -59,6 +61,7 @@
     <ul class="rooms" id="rooms"></ul>
     <button class="connect" id="connect" disabled>Verbinden</button>
     <p class="connect-hint" id="hint"></p>
+    <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
   </form>
   <div id="viewer" hidden></div>
 
@@ -90,6 +93,9 @@
     }
 
     // the room secret travels in the "#…" part of the link – browsers never send it to a server
+    // inside the PeekaView app (a viewer window of its own): the room comes from the app
+    const inApp = typeof window.__PV_JOIN__ === 'string'
+    if (inApp) history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
     let linkRoom = decodeURIComponent(location.hash.slice(1))
     const params = new URLSearchParams(location.search)
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
@@ -171,6 +177,8 @@
       $('connect').disabled = !selected
       $('hint').textContent = !selected
         ? ''
+        : openedInApp && selected === linkRoom
+          ? 'In der PeekaView-App geöffnet – oder hier im Browser verbinden.'
         : gaveUp === selected && !st?.online
           ? 'Keine Verbindung zustande gekommen – ist die Freigabe noch aktiv?'
           : st?.checking
@@ -311,10 +319,47 @@
       connect()
     })
 
+    // ---------------------------------------------------------------- open in the PeekaView app
+    // Installed, it handles "peekaview://join" and shows the share in a window of its own. Whether
+    // it is installed only shows when the page loses the focus to it – remembered from then on.
+    const APP_KEY = 'pv-app'
+    const appKnown = () => { try { return localStorage.getItem(APP_KEY) === '1' } catch { return false } }
+    let openedInApp = false
+    function openInApp(room, gesture) {
+      const st = status.get(room) ?? {}
+      const known = load().find((x) => x.room === room) ?? {}
+      const q = new URLSearchParams({ room })
+      const name = st.room ?? known.name
+      const who = st.who ?? known.who
+      if (name) q.set('name', name)
+      if (who) q.set('who', who)
+      const url = `peekaview://join?${q}`
+      const onBlur = () => {
+        openedInApp = true
+        try { localStorage.setItem(APP_KEY, '1') } catch {}
+        render()
+      }
+      window.addEventListener('blur', onBlur, { once: true })
+      setTimeout(() => window.removeEventListener('blur', onBlur), 3000)
+      if (gesture || appKnown()) {
+        location.href = url
+      } else {
+        // a first try without a click: unknown schemes fail silently in a hidden frame
+        const frame = Object.assign(document.createElement('iframe'), { hidden: true, src: url })
+        document.body.append(frame)
+        setTimeout(() => frame.remove(), 3000)
+      }
+    }
+    $('open-app').hidden = inApp || !linkRoom
+    $('open-app').addEventListener('click', () => openInApp(selected || linkRoom, true))
+
     render()
-    // a link with ?name=… (integrations, tests) joins right away
-    if (linkRoom && params.has('name')) connect()
-    else probeAll()
+    // a link with ?name=… (integrations, tests) – or opened in the app with a known name – joins right away
+    if (linkRoom && (params.has('name') || (inApp && $('name').value.trim()))) connect()
+    else {
+      probeAll()
+      if (linkRoom && !inApp) openInApp(linkRoom, false)
+    }
   </script>
 </body>
 </html>

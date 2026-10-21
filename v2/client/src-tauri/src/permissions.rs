@@ -147,10 +147,12 @@ pub fn request(app: &AppHandle, _kind: &str) {
                 }
                 std::thread::sleep(std::time::Duration::from_millis(350));
             }
-            // all granted: the helper shows its success state, then goes; the toolbar cheers
+            // all granted: the helper shows its success state, then goes; the PeekaView window cheers
             // (and restarts the app, so screen recording takes effect)
             let _ = app.emit_to(HELPER, "perm", serde_json::json!({ "step": "done", "screen": true, "accessibility": true }));
-            let _ = app.emit_to("main", "permission-granted", if step == Some("screen") { "screen" } else { "accessibility" });
+            for window in ["main", "toolbar"] {
+                let _ = app.emit_to(window, "permission-granted", if step == Some("screen") { "screen" } else { "accessibility" });
+            }
             std::thread::sleep(std::time::Duration::from_secs(2));
             let _ = window.destroy();
         });

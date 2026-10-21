@@ -23,6 +23,7 @@ mod settings;
 mod sources;
 mod tray;
 mod video;
+mod viewers;
 
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -80,7 +81,35 @@ async fn start_share(
         admitted: vec![],
         remote: None,
     };
-    session::start(app, opts).await
+    let hosted = session::start(app.clone(), opts).await?;
+    // the link is ready to paste right away (the toolbar says so)
+    if let Some(link) = hosted["link"].as_str() {
+        if clip::os::write(Some(link.to_string()), None, None, &[]).is_ok() {
+            session::link_copied();
+        }
+    }
+    // the share runs: the PeekaView window steps aside for the toolbar
+    hide_main(&app);
+    Ok(hosted)
+}
+
+/// Hides the PeekaView window (it stays in the tray).
+#[tauri::command]
+fn hide_window(app: AppHandle) {
+    hide_main(&app);
+}
+
+/// A short message in the toolbar while sharing, otherwise in the PeekaView window.
+#[tauri::command]
+fn toast(app: AppHandle, text: String) {
+    let to = if app.get_webview_window("toolbar").is_some() { "toolbar" } else { "main" };
+    let _ = app.emit_to(to, "toast", text);
+}
+
+fn hide_main(app: &AppHandle) {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.hide();
+    }
 }
 
 #[tauri::command]
@@ -99,6 +128,15 @@ async fn drag_app(app: AppHandle) -> Result<(), String> {
     permissions::drag_app(&app)
 }
 
+/// Shows the PeekaView window (share picker / running share) in front.
+pub fn show_main(app: &AppHandle) {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
 /// Where the toolbar sits. Until the user drags it, it is centered at the top edge; afterwards the
 /// bar's left edge stays where it was put (physical pixels), also while the panel folds out.
 struct Toolbar {
@@ -113,8 +151,8 @@ struct Toolbar {
 
 static TOOLBAR: std::sync::Mutex<Toolbar> = std::sync::Mutex::new(Toolbar { anchor: None, bar_left: 0.0, dragging: false });
 
-/// The main window is the toolbar; the UI reports the size it needs (bar only, or bar + picker /
-/// settings panel) and where the bar starts inside it.
+/// The toolbar of a running share reports the size it needs (bar only, or bar + join requests)
+/// and where the bar starts inside it.
 #[tauri::command]
 fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>) -> Result<(), String> {
     let mut toolbar = TOOLBAR.lock().unwrap();
@@ -150,6 +188,50 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     window.show().map_err(|e| e.to_string())
 }
 
+/// The toolbar of a running share: a small frameless bar at the top edge of the screen, always on
+/// top. It shows itself once it knows its size (`toolbar_resize`) and goes when the share ends.
+pub fn open_toolbar(app: &AppHandle) {
+    if app.get_webview_window("toolbar").is_some() {
+        return;
+    }
+    match tauri::WebviewWindowBuilder::new(app, "toolbar", tauri::WebviewUrl::App("desktop/toolbar.html".into()))
+        .title("PeekaView")
+        .inner_size(420.0, 64.0)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(false)
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .theme(Some(tauri::Theme::Dark))
+        .build()
+    {
+        // keep it out of screen captures (macOS: the capture filter excludes our windows)
+        #[cfg(not(target_os = "macos"))]
+        Ok(window) => {
+            let _ = window.set_content_protected(true);
+        }
+        #[cfg(target_os = "macos")]
+        Ok(_) => {}
+        Err(e) => log(&format!("toolbar: {e}")),
+    }
+}
+
+/// The running share for the toolbar.
+#[tauri::command]
+fn live_info(app: AppHandle) -> Option<serde_json::Value> {
+    session::live_info(&app)
+}
+
+/// The PeekaView window to pick what to share; `switching`: for the running share.
+#[tauri::command]
+fn show_picker(app: AppHandle, switching: bool) {
+    show_main(&app);
+    let _ = app.emit_to("main", "picker", switching);
+}
+
 /// Grip of a frameless panel (e.g. the clipboard): move its window with the mouse.
 #[tauri::command]
 fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -183,7 +265,7 @@ fn get_settings(app: AppHandle) -> serde_json::Value {
     settings::get(&app)
 }
 
-/// The toolbar keeps the settings the Rust side needs (tray, rooms waiting for remote access).
+/// Settings kept on the Rust side (shares, tray, rooms waiting for remote access).
 #[tauri::command]
 fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
     let own_site_before = settings::text(&app, "site").is_some();
@@ -268,7 +350,7 @@ pub fn open_rooms_window(app: &AppHandle) {
         return;
     }
     let _ = tauri::WebviewWindowBuilder::new(app, "rooms", tauri::WebviewUrl::App("desktop/rooms.html".into()))
-        .title("Raumlinks & Remote-Zugriff")
+        .title("PeekaView – Einstellungen & Räume")
         .inner_size(640.0, 680.0)
         .min_inner_size(520.0, 480.0)
         .theme(Some(tauri::Theme::Dark))
@@ -356,11 +438,6 @@ fn toolbar_moved(window: &tauri::Window, pos: tauri::PhysicalPosition<i32>) {
 
 /// The toolbar goes, PeekaView keeps running in the tray (a click there brings it back).
 #[tauri::command]
-fn toolbar_hide(window: tauri::WebviewWindow) {
-    let _ = window.hide();
-}
-
-#[tauri::command]
 fn quit(app: AppHandle) {
     session::shutdown(&app, true);
     app.exit(0);
@@ -381,7 +458,12 @@ fn restart_app(app: AppHandle) {
 /// Continues a share interrupted by a restart; `null` when there is nothing to continue.
 #[tauri::command]
 async fn resume(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
-    session::continue_after_restart(app).await
+    let hosted = session::continue_after_restart(app.clone()).await?;
+    // the share continues with its toolbar
+    if hosted.is_some() {
+        hide_main(&app);
+    }
+    Ok(hosted)
 }
 
 /// Where an OPENAI_API_KEY was found (the key itself never goes to the UI).
@@ -416,7 +498,7 @@ async fn start_recording(
     session::start_recording(&app, opts).map(str::to_string)
 }
 
-/// Raw 16 kHz mono PCM (i16 LE) from the toolbar's audio mix.
+/// Raw 16 kHz mono PCM (i16 LE) from the PeekaView window's audio mix.
 #[tauri::command]
 fn recording_audio(app: AppHandle, request: tauri::ipc::Request) {
     if let tauri::ipc::InvokeBody::Raw(bytes) = request.body() {
@@ -484,7 +566,10 @@ fn fit_window(app: AppHandle, w: u8) -> Result<(), String> {
 /// Shares other windows / another screen in the running session.
 #[tauri::command]
 async fn switch_source(app: AppHandle, sources: Vec<String>) -> Result<serde_json::Value, String> {
-    tauri::async_runtime::spawn_blocking(move || session::switch_sources(&app, &sources)).await.map_err(|e| e.to_string())?
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || session::switch_sources(&handle, &sources)).await.map_err(|e| e.to_string())??;
+    hide_main(&app);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -495,9 +580,10 @@ fn stop_share(app: AppHandle) {
 fn main() {
     tauri::Builder::default()
         // a second launch (e.g. by a deep link on Windows/Linux) hands its URL to the running app
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(main) = app.get_webview_window("main") {
-                let _ = main.set_focus();
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // a link opens its own window (deep link plugin)
+            if !argv.iter().any(|a| a.starts_with("peekaview://")) {
+                show_main(app);
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
@@ -508,11 +594,16 @@ fn main() {
             if let Err(e) = tray::create(app.handle()) {
                 log(&format!("tray: {e}"));
             }
+            // opened by the user: the PeekaView window comes up (later a click on the tray icon);
+            // opened for a link: only what the link is for
+            if !app.deep_link().get_current().ok().flatten().is_some_and(|urls| !urls.is_empty()) {
+                show_main(app.handle());
+            }
             // permanent rooms with remote access wait for viewers
             p2p::lobby::sync(app.handle(), false);
             // the viewer site, served over Nostr
             nsite::publish_if_needed(app.handle(), false);
-            // keep the toolbar out of screen captures (macOS: the capture filter excludes our windows)
+            // keep the window out of screen captures (macOS: the capture filter excludes our windows)
             #[cfg(not(target_os = "macos"))]
             if let Some(main) = app.get_webview_window("main") {
                 let _ = main.set_content_protected(true);
@@ -522,7 +613,9 @@ fn main() {
             let handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
-                    invite::handle(&handle, &url);
+                    if !viewers::handle(&handle, &url) {
+                        invite::handle(&handle, &url);
+                    }
                 }
             });
             // development only: PEEKAVIEW_DEV_SHARE=screen:<id> [PEEKAVIEW_DEV_ROOM=<secret>] starts a share
@@ -547,6 +640,7 @@ fn main() {
                         remote: None,
                     };
                     let result = session::start(handle.clone(), opts).await;
+                    hide_main(&handle);
                     crate::log(&format!("dev share: {result:?}"));
                     if let Ok(mode) = std::env::var("PEEKAVIEW_DEV_MODE") {
                         if let Some(mode) = session::Mode::parse(&mode) {
@@ -564,13 +658,21 @@ fn main() {
             }
             if let Ok(Some(urls)) = app.deep_link().get_current() {
                 for url in urls {
-                    invite::handle(app.handle(), &url);
+                    if !viewers::handle(app.handle(), &url) {
+                        invite::handle(app.handle(), &url);
+                    }
                 }
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![list_sources,
             highlight,
+            toolbar_resize,
+            toolbar_drag,
+            live_info,
+            show_picker,
+            hide_window,
+            toast,
             start_share,
             take_invite,
             set_mode,
@@ -581,9 +683,6 @@ fn main() {
             request_permission,
             drag_app,
             dismiss_permission,
-            toolbar_resize,
-            toolbar_drag,
-            toolbar_hide,
             fit_window,
             drag_window,
             peers,
@@ -619,13 +718,13 @@ fn main() {
             recording_audio,
             stop_recording])
         .on_window_event(|window, event| {
-            if let (WindowEvent::Moved(pos), "main") = (event, window.label()) {
+            if let (WindowEvent::Moved(pos), "toolbar") = (event, window.label()) {
                 toolbar_moved(window, *pos);
                 return;
             }
             let WindowEvent::CloseRequested { api, .. } = event else { return };
             match window.label() {
-                // closing the toolbar hides it – PeekaView keeps running in the tray (quit from its menu)
+                // closing the window hides it – PeekaView keeps running in the tray (quit from its menu)
                 "main" => {
                     api.prevent_close();
                     let _ = window.hide();

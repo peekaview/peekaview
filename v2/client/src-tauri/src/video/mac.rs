@@ -108,6 +108,9 @@ impl SCStreamOutputTrait for Handler {
     }
 }
 
+/// a static picture is repeated this often
+const HEARTBEAT: Duration = Duration::from_secs(1);
+
 pub struct Video {
     stream: SCStream,
     state: Arc<Mutex<EncState>>,
@@ -283,6 +286,13 @@ impl Video {
         {
             if let Some(buf) = state.last.take() {
                 state.encode(buf.as_ptr(), true);
+                state.last = Some(buf);
+            }
+        } else if state.last_frame.elapsed() >= HEARTBEAT && !crate::guard::OVERVIEW_ACTIVE.load(Ordering::Relaxed) {
+            // nothing changed for a while: the same picture again (a few bytes) – WebKit shows a
+            // video only after more than one frame, and lost packets heal
+            if let Some(buf) = state.last.take() {
+                state.encode(buf.as_ptr(), false);
                 state.last = Some(buf);
             }
         }

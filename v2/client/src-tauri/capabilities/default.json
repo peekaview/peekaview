@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Local UI (main window, overlay, permission helper). Remote viewer windows get no IPC access.",
-  "windows": ["main", "overlay-*", "permission", "clipboard", "rooms"],
+  "description": "Local UI (PeekaView window, toolbar, overlays, helpers). Viewer windows (viewer-*) get no IPC access.",
+  "windows": ["main", "toolbar", "overlay-*", "permission", "clipboard", "rooms"],
   "permissions": ["core:default"]
 }

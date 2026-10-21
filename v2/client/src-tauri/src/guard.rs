@@ -55,7 +55,7 @@ pub static OVERLAY_WINDOWS: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(V
 pub type Target = Option<(u32, i32)>;
 
 /// May viewer input land at screen point (x, y)? Never on one of PeekaView's own windows
-/// (toolbar, helpers); with a shared window (`target`) only if that window – or a dialog / menu
+/// (main window, helpers); with a shared window (`target`) only if that window – or a dialog / menu
 /// of its app – is topmost there.
 pub fn input_allowed(target: Target, x: i32, y: i32) -> bool {
     imp::any_allowed(target, &[(x, y)])
@@ -245,7 +245,7 @@ mod imp {
         let windows = list(false);
         let displays = if target.is_some() { displays() } else { Vec::new() };
         points.iter().any(|&(x, y)| {
-            // never on one of our own windows (toolbar, helpers) – the overlay is click-through
+            // never on one of our own windows (main window, helpers) – the overlay is click-through
             if windows.iter().any(|w| w.pid == me && !is_overlay(w.id) && w.alpha > 0.0 && w.rect.contains(x, y)) {
                 return false;
             }

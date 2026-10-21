@@ -153,8 +153,15 @@ impl Shared {
         let windows: Vec<Value> = streams
             .iter()
             .map(|s| {
+                // the full picture in pixels (viewers size their frames by it, not by the
+                // possibly reduced video)
+                #[cfg(target_os = "macos")]
+                let scale = xcap::Monitor::from_point(s.rect.x + s.rect.w / 2, s.rect.y + s.rect.h / 2).and_then(|m| m.scale_factor()).unwrap_or(2.0) as f64;
+                #[cfg(not(target_os = "macos"))]
+                let scale = 1.0;
                 json!({
                     "w": s.slot, "kind": s.kind, "title": s.title, "app": s.app,
+                    "pw": (s.rect.w as f64 * scale).round(), "ph": (s.rect.h as f64 * scale).round(),
                     "paused": !s.visible(), "reachable": s.reachable, "z": s.z,
                     // where it is on the presenter's screen (viewers mirror the layout when
                     // they may arrange the windows)
@@ -377,8 +384,14 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
     let site = crate::nsite::resolve(&app, &opts.site);
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
+    let link = format!("{site}/#{room}");
     // secret + signing key let the UI keep the same link for the next share
-    Ok(json!({ "room": room, "link": format!("{site}/#{room}"), "ice": ice, "secret": secret, "signingKey": key_hex }))
+    let hosted = json!({ "room": room, "link": link, "ice": ice, "secret": secret, "signingKey": key_hex });
+    *LIVE.lock().unwrap() = Some(hosted.clone());
+    crate::tray::refresh(&app);
+    // the share's toolbar comes up
+    crate::open_toolbar(&app);
+    Ok(hosted)
 }
 
 /// The presenter's own handling of a (routed) message: overlay, remote control, recording, UI.
@@ -424,7 +437,7 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
     }
 }
 
-/// Voice chat messages from the toolbar ({t:"voice"} / {t:"rtc"} / {t:"level"}) to the viewers.
+/// Voice chat messages from the PeekaView window ({t:"voice"} / {t:"rtc"} / {t:"level"}) to the viewers.
 pub fn signal(app: &AppHandle, msg: Value) {
     if !matches!(msg["t"].as_str(), Some("voice" | "rtc" | "level")) {
         return;
@@ -435,7 +448,46 @@ pub fn signal(app: &AppHandle, msg: Value) {
     }
 }
 
+/// The running share as started: link, ICE servers, room (toolbar, tray menu).
+static LIVE: Mutex<Option<Value>> = Mutex::new(None);
+
+/// The running share: its viewer link and what viewers may do.
+pub fn live(app: &AppHandle) -> Option<(String, Mode)> {
+    let mode = app.state::<SessionState>().0.lock().unwrap().as_ref()?.shared.mode();
+    Some((LIVE.lock().unwrap().as_ref()?["link"].as_str()?.to_string(), mode))
+}
+
+static COPIED: AtomicBool = AtomicBool::new(false);
+
+/// The new share's link was put on the clipboard – the toolbar tells once it is up.
+pub fn link_copied() {
+    COPIED.store(true, Ordering::Relaxed);
+}
+
+/// The running share for the toolbar: {link, ice, mode, title, copied, remote?}.
+pub fn live_info(app: &AppHandle) -> Option<Value> {
+    let (title, mode) = {
+        let guard = app.state::<SessionState>();
+        let guard = guard.0.lock().unwrap();
+        let shared = &guard.as_ref()?.shared;
+        (shared.state()["title"].clone(), shared.mode())
+    };
+    let mut info = LIVE.lock().unwrap().clone()?;
+    info["mode"] = json!(mode.as_str());
+    // right after the start: the link was put on the clipboard
+    info["copied"] = json!(COPIED.swap(false, Ordering::Relaxed));
+    info["title"] = title;
+    Some(info)
+}
+
 pub fn set_mode(app: &AppHandle, mode: Mode) {
+    set_mode_quietly(app, mode);
+    // the PeekaView window and the tray menu show it, too
+    let _ = app.emit_to("toolbar", "mode", mode.as_str());
+    crate::tray::refresh(app);
+}
+
+fn set_mode_quietly(app: &AppHandle, mode: Mode) {
     let guard = app.state::<SessionState>();
     let guard = guard.0.lock().unwrap();
     let Some(session) = guard.as_ref() else { return };
@@ -521,7 +573,7 @@ pub fn highlight(app: &AppHandle, ids: &[String]) {
 
 /// Ends the running session (if any). `reason` is shown in the main window. `forget` drops the
 /// saved state; keep it for restarts so the share can continue afterwards. A running recording
-/// is finished and its report announced to the toolbar.
+/// is finished and its report announced to the PeekaView window.
 pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     if forget {
         resume::clear(app);
@@ -531,7 +583,7 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
         let app = app.clone();
         std::thread::spawn(move || {
             if let Ok(path) = rec.finish() {
-                let _ = app.emit_to("main", "report", path.display().to_string());
+                let _ = app.emit_to("toolbar", "report", path.display().to_string());
                 crate::open_path(&path);
             }
         });
@@ -549,6 +601,13 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     hide_overlays(app, &[]);
     to_overlay(app, r#"{"t":"reset"}"#);
     let _ = app.emit_to("main", "ended", reason);
+    *LIVE.lock().unwrap() = None;
+    crate::tray::refresh(app);
+    // the toolbar goes with the share
+    crate::permissions::dismiss(app, "accessibility");
+    if let Some(toolbar) = app.get_webview_window("toolbar") {
+        let _ = toolbar.destroy();
+    }
     announce_requests(app);
     // permanent rooms with remote access wait again
     lobby::sync(app, false);
@@ -843,8 +902,8 @@ pub fn clip_window(app: &AppHandle, open: Option<bool>) -> Result<bool, String> 
                 .skip_taskbar(true)
                 .visible_on_all_workspaces(true);
             // below the toolbar, right-aligned with it
-            if let Some(main) = app.get_webview_window("main") {
-                if let (Ok(pos), Ok(size), Ok(scale)) = (main.outer_position(), main.outer_size(), main.scale_factor()) {
+            if let Some(toolbar) = app.get_webview_window("toolbar") {
+                if let (Ok(pos), Ok(size), Ok(scale)) = (toolbar.outer_position(), toolbar.outer_size(), toolbar.scale_factor()) {
                     let x = (pos.x + size.width as i32) as f64 / scale - w;
                     let y = (pos.y + size.height as i32) as f64 / scale + 6.0;
                     builder = builder.position(x.max(0.0), y);
@@ -858,7 +917,7 @@ pub fn clip_window(app: &AppHandle, open: Option<bool>) -> Result<bool, String> 
         }
         _ => {}
     }
-    let _ = app.emit_to("main", "clip-window", open);
+    let _ = app.emit_to("toolbar", "clip-window", open);
     Ok(open)
 }
 
@@ -923,11 +982,18 @@ pub fn active_secret(app: &AppHandle) -> Option<String> {
 }
 
 /// All open join requests – of the running share and of permanent rooms waiting for remote
-/// access – to the toolbar: [{peer, name, color, room?}].
+/// access – to the PeekaView window: [{peer, name, color, room?}].
 pub fn announce_requests(app: &AppHandle) {
     let mut list = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.requests()).unwrap_or_default();
     list.extend(lobby::requests());
-    let _ = app.emit_to("main", "join-requests", list);
+    // below the toolbar while sharing; otherwise the PeekaView window comes up with them
+    let sharing = app.get_webview_window("toolbar").is_some();
+    if !list.is_empty() && !sharing {
+        crate::show_main(app);
+    }
+    let (to, other) = if sharing { ("toolbar", "main") } else { ("main", "toolbar") };
+    let _ = app.emit_to(other, "join-requests", Vec::<Value>::new());
+    let _ = app.emit_to(to, "join-requests", list);
 }
 
 /// Lets a waiting viewer in or turns them away; `peer: None` = everybody waiting.
@@ -970,7 +1036,10 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
     hosted["mode"] = json!("control");
     hosted["remote"] = json!(room.name);
     hosted["sources"] = json!([]);
-    let _ = app.emit_to("main", "remote-started", hosted);
+    if let Some(live) = LIVE.lock().unwrap().as_mut() {
+        live["remote"] = json!(room.name);
+    }
+    let _ = app.emit_to("toolbar", "live", live_info(app));
     Ok(())
 }
 

@@ -147,7 +147,7 @@ impl Admission {
         self.requests.iter().any(|r| r.peer == peer)
     }
 
-    /// Open requests for the toolbar: [{peer, name, color}].
+    /// Open requests for the PeekaView window: [{peer, name, color}].
     pub fn requests(&self) -> Vec<Value> {
         self.requests
             .iter()

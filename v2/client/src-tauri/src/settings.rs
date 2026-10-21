@@ -1,6 +1,6 @@
-//! Settings the Rust side needs without the toolbar (tray menu, permanent rooms waiting for
+//! Settings the Rust side needs outside the PeekaView window (tray menu, permanent rooms waiting for
 //! remote access): viewer site, name, relays, TURN, keep the link, allow resizing.
-//! The toolbar keeps them in sync; stored in the app data folder (`settings.json`).
+//! The PeekaView window and the settings window keep them in sync; stored in the app data folder (`settings.json`).
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de" style="background: transparent">
+<head>
+  <meta charset="utf-8">
+  <title>PeekaView</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="toolbar sharing">
+  <div id="shell">
+    <div class="bar glass">
+      <button id="grip" class="grip" title="Verschieben" data-icon="grip"></button>
+      <span id="logo" class="logo" title="PeekaView"></span>
+      <i id="live-dot" class="dot" title="Freigabe läuft"></i>
+
+      <div id="bar-live" class="group">
+        <button id="code-btn" class="chip" title="Link zum Zuschauen kopieren">
+          <i class="dot"></i><span id="code">Link kopieren</span><i data-icon="link"></i>
+        </button>
+        <button id="switch-btn" class="icon-btn" title="Andere Fenster oder anderen Bildschirm teilen" data-icon="switch"></button>
+        <span class="sep"></span>
+        <div class="modes" role="radiogroup" aria-label="Zuschauer dürfen">
+          <button data-mode="view" class="active" title="Zuschauer dürfen nur zusehen"><i data-icon="view"></i></button>
+          <button data-mode="draw" title="Zuschauer dürfen zeigen und malen"><i data-icon="draw"></i></button>
+          <button data-mode="control" title="Zuschauer dürfen steuern"><i data-icon="control"></i></button>
+        </div>
+        <span class="sep"></span>
+        <div id="avatars" class="avatars"></div>
+        <span class="sep"></span>
+        <button id="clip-btn" class="icon-btn" title="Gemeinsame Zwischenablage" data-icon="clipboard"></button>
+        <button id="mic-btn" class="icon-btn" title="Sprechen" data-icon="micOff"></button>
+        <button id="rec-btn" class="icon-btn rec" title="Sitzung aufzeichnen"><i data-icon="record"></i><span id="rec-time" hidden></span></button>
+        <button id="stop-btn" class="pill danger" title="Freigabe beenden"><i data-icon="stop"></i>Beenden</button>
+      </div>
+      <button id="fold-btn" class="icon-btn fold" title="Einklappen" data-icon="collapse"></button>
+    </div>
+
+    <div id="requests" class="requests" hidden></div>
+
+    <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
+  </div>
+
+  <script type="module" src="toolbar.js"></script>
+</body>
+</html>
