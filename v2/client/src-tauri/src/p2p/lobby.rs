@@ -157,6 +157,7 @@ impl Lobby {
                     "type": "pong", "from": "host", "to": from, "who": crate::who(),
                     "name": crate::settings::text(app, "name"), "room": self.room.name, "permanent": true, "sharing": false,
                     "busy": session::active_secret(app).is_some(),
+                    "pin": self.room.pin.is_some(), "remote": true,
                 }));
             }
             Some("pin") if msg["to"] == "host" => {

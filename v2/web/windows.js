@@ -391,11 +391,16 @@ export class WindowManager {
 
   clamp(win) {
     const a = this.area()
-    const n = this.native(win)
     win.s = Math.min(win.s, this.fitScale(win, a.w, a.h))
-    const w = n.w * win.s
-    // the title bar always stays reachable
-    win.x = Math.min(Math.max(win.x, 60 - w), a.w - 60)
+    this.clampPos(win)
+  }
+
+  /** Position only (also in the mirror, where the size is the presenter's). */
+  clampPos(win) {
+    const a = this.area()
+    const w = this.native(win).w * win.s
+    // it may hang over the edges, a part of the title bar always stays reachable
+    win.x = Math.min(Math.max(win.x, 48 - w), a.w - 48)
     win.y = Math.min(Math.max(win.y, 0), a.h - BAR)
   }
 
@@ -501,7 +506,8 @@ export class WindowManager {
       win.x = start.wx + ev.clientX - start.x
       win.y = start.wy + ev.clientY - start.y
       win.max = false
-      if (!this.mirror) this.clamp(win)
+      if (this.mirror) this.clampPos(win)
+      else this.clamp(win)
       this.paint(win)
     }
     const up = () => {

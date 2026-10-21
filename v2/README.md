@@ -98,6 +98,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 **Sharing several windows**
 - In the picker, click several windows to share them together, up to six. A screen is always shared on its own.
 - **Separate pictures:** each window is its own video stream with its own red frame. Pointing, drawing and control always refer to one window.
+- **Windows may hang over the edges:** in the viewer and, when the viewer arranges them, on the presenter's screen. A part always stays reachable, and on macOS the title bar stays below the menu bar.
 - **Viewer layout:** viewers get a small window manager, only in their browser. They can move windows, scale them proportionally, minimize, maximize and arrange them side by side. The dock lists all windows for switching between them. The presenter's windows stay as they are.
 - **Covered windows:** a shared window that is completely covered on the presenter's screen is shown greyed out and marked "verdeckt".
 - **Sharp pictures:** pictures are never enlarged beyond one video pixel per screen pixel, so text stays sharp. They only get smaller when the browser window is too small.
@@ -244,6 +245,7 @@ Debug builds are signed ad hoc, so macOS asks for permissions again after each b
 The viewer site opens with a small start page:
 - **Rooms:** the room of the opened link, preselected, plus the last ten **permanent rooms** this browser joined.
 - **Per room:** its name, the presenter as `user@computer`, when it was last used ("Zuletzt: gestern, 14:20") and whether it is **online** right now.
+- **Tags:** whether the link is **permanent** or **temporary** (one share only), whether it has a **PIN**, and whether it offers **remote access**.
 - **Online check:** a "ping" over the room's encrypted signaling. The presenter's signed answer creates no join request.
 - **Connecting:** a big **Verbinden** button joins the selected room; an online room can be joined directly.
 

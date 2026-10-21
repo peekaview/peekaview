@@ -1074,7 +1074,8 @@ pub fn activate_window(app: &AppHandle, slot: u8) -> Result<(), String> {
 
 /// "Resize/Anordnen erlauben": a viewer moved / resized a window in their mirror of the
 /// presenter's screen – the real window follows. Screen coordinates of the presenter (points on
-/// macOS, pixels elsewhere); missing values keep the current ones. It stays on its screen.
+/// macOS, pixels elsewhere); missing values keep the current ones. It may hang over the screen's
+/// edges, as long as a part stays reachable (and its title bar below the menu bar).
 pub fn place_window(app: &AppHandle, slot: u8, x: Option<f64>, y: Option<f64>, w: Option<f64>, h: Option<f64>) -> Result<(), String> {
     if !crate::settings::allow_resize() {
         return Err("Nicht erlaubt".into());
@@ -1092,8 +1093,10 @@ pub fn place_window(app: &AppHandle, slot: u8, x: Option<f64>, y: Option<f64>, w
     let (mw, mh) = (monitor.width().unwrap_or(0) as f64, monitor.height().unwrap_or(0) as f64);
     let w = w.unwrap_or(r.w as f64).clamp(120.0, mw);
     let h = h.unwrap_or(r.h as f64).clamp(80.0, mh - 24.0);
-    let x = x.clamp(mx, (mx + mw - w).max(mx));
-    let y = y.clamp(my + 24.0, (my + mh - h).max(my + 24.0));
+    // partly off screen is fine – enough of it stays visible to grab it again
+    let keep = 80.0;
+    let x = x.clamp(mx - w + keep, mx + mw - keep);
+    let y = y.clamp(my + 24.0, my + mh - 40.0);
     if crate::focus::set_frame(pid as u32, window_id, x.round(), y.round(), w.round(), h.round()) {
         Ok(())
     } else {

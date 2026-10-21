@@ -25,10 +25,17 @@
     .room.online .dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
     .room.checking .dot { background: transparent; border: 2px solid rgba(255,255,255,.25); border-top-color: #fafafa; width: 8px; height: 8px; animation: spin .8s linear infinite; }
     .room div { flex: 1; min-width: 0; }
-    .room strong, .room span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .room strong, .room .sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .room strong { font-weight: 650; }
-    .room span { color: #a1a1aa; font-size: 12px; }
+    .room .sub { color: #a1a1aa; font-size: 12px; }
     .room em { flex: none; font-style: normal; font-size: 12px; color: #71717a; }
+    .room strong { display: flex; align-items: center; gap: 6px; }
+    .room strong b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.07); color: #a1a1aa; font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
+    .tag.permanent { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .tag.pin { background: rgba(234,179,8,.14); color: #fde68a; }
+    .tag.remote { background: rgba(239,68,68,.14); color: #fca5a5; }
+    .tag svg { width: 10px; height: 10px; }
     .room.online em { color: #86efac; }
     .room .forget { position: absolute; top: 6px; right: 6px; display: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #71717a; font-size: 14px; line-height: 1; cursor: pointer; }
     .room:hover .forget { display: block; }
@@ -124,11 +131,22 @@
             const st = status.get(r.room) ?? {}
             const li = document.createElement('li')
             li.className = `room${r.room === selected ? ' selected' : ''}${st.online ? ' online' : ''}${st.checking ? ' checking' : ''}`
-            li.innerHTML = '<i class="dot"></i><div><strong></strong><span></span></div><em></em>'
-            li.querySelector('strong').textContent = st.room ?? r.name ?? (r.link ? 'Dieser Link' : 'Raum')
+            li.innerHTML = '<i class="dot"></i><div><strong></strong><span class="sub"></span></div><em></em>'
+            const strong = li.querySelector('strong')
+            strong.innerHTML = '<b></b>'
+            strong.querySelector('b').textContent = st.room ?? r.name ?? (r.link ? 'Dieser Link' : 'Raum')
+            // what kind of link: permanent or temporary, PIN, remote access (known once answered)
+            const permanent = st.permanent ?? r.permanent ?? (r.link ? undefined : true)
+            const pin = st.pin ?? r.pin
+            const remote = st.remote ?? r.remote
+            const tag = (cls, html, title) => strong.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
+            if (permanent === true) tag('permanent', 'dauerhaft', 'Dauerhafter Raumlink – bleibt immer gleich')
+            else if (permanent === false) tag('', 'temporär', 'Link nur für diese eine Freigabe')
+            if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')
+            if (remote) tag('remote', 'Remote', 'Remote-Zugriff: Anwendungen selbst starten')
             const who = st.who ?? r.who
             const last = r.link ? 'neu' : `Zuletzt: ${ago(r.last)}`
-            li.querySelector('span').textContent = [who, last].filter(Boolean).join(' · ')
+            li.querySelector('.sub').textContent = [who, last].filter(Boolean).join(' · ')
             li.querySelector('em').textContent = st.checking ? '' : st.online ? (st.busy ? 'belegt' : 'online') : 'offline'
             if (!r.link) {
               const forget = Object.assign(document.createElement('button'), { type: 'button', className: 'forget', title: 'Vergessen', textContent: '×' })
@@ -168,16 +186,16 @@
         onMessage: (m) => {
           if (m.type !== 'pong' || m.to !== me || answered) return
           answered = true
-          status.set(room, { online: true, seen: true, who: m.who, room: m.room, busy: m.busy, permanent: m.permanent })
+          status.set(room, { online: true, seen: true, who: m.who, room: m.room, busy: m.busy, permanent: !!m.permanent, pin: !!m.pin, remote: !!m.remote })
           // permanent rooms are remembered with their presenter
           if (m.permanent) {
             const list = load()
             const entry = list.find((x) => x.room === room)
             if (entry) {
-              Object.assign(entry, { who: m.who, name: m.room, seen: Date.now() })
+              Object.assign(entry, { who: m.who, name: m.room, seen: Date.now(), permanent: true, pin: !!m.pin, remote: !!m.remote })
               store(list)
             } else if (room === joined) {
-              store([{ room, name: m.room, who: m.who, last: Date.now(), seen: Date.now() }, ...list])
+              store([{ room, name: m.room, who: m.who, last: Date.now(), seen: Date.now(), permanent: true, pin: !!m.pin, remote: !!m.remote }, ...list])
             }
           }
           render()
@@ -221,7 +239,7 @@
       const list = load()
       const known = list.find((x) => x.room === room)
       if (known || st?.permanent) {
-        const entry = { ...(known ?? {}), room, name: st?.room ?? known?.name, who: st?.who ?? known?.who, last: Date.now() }
+        const entry = { ...(known ?? {}), room, name: st?.room ?? known?.name, who: st?.who ?? known?.who, last: Date.now(), permanent: true, pin: st?.pin ?? known?.pin, remote: st?.remote ?? known?.remote }
         store([entry, ...list.filter((x) => x.room !== room)])
       }
       clearTimeout(probeTimer)

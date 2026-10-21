@@ -267,6 +267,7 @@ impl Hub {
                     self.signaling.send(&json!({
                         "type": "pong", "from": "host", "to": from, "who": crate::who(), "name": name,
                         "room": room.as_ref().map(|r| r.name.clone()), "permanent": room.is_some(), "sharing": true,
+                        "pin": room.as_ref().is_some_and(|r| r.pin.is_some()), "remote": room.as_ref().is_some_and(|r| r.remote),
                     }));
                 }
                 Some("answer") if msg["to"] == "host" => {
