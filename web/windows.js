@@ -274,10 +274,20 @@ export class WindowManager {
     return { w: r.width, h: r.height }
   }
 
-  /** Largest scale (≤ 1) at which a window fits into w × h (title bar included). */
+  /** Largest scale (≤ maxScale) at which a window fits into w × h (title bar included). */
   fitScale(win, w, h, bar = BAR) {
     const n = this.native(win)
-    return Math.max(MIN_SCALE, Math.min(1, (w - 2) / n.w, (h - bar - 2) / n.h))
+    return Math.max(MIN_SCALE, Math.min(this.maxScale(win), (w - 2) / n.w, (h - bar - 2) / n.h))
+  }
+
+  /**
+   * Pixel for pixel on a desktop. A phone's screen is two to three times as dense – pixel for
+   * pixel would show a window a fraction of its size, so there it may grow to the size it has on
+   * the presenter's screen (rect is in the presenter's points).
+   */
+  maxScale(win) {
+    if (!matchMedia('(pointer: coarse)').matches || !win.info?.rect?.w) return 1
+    return Math.max(1, win.info.rect.w / this.native(win).w)
   }
 
   /** Room for one maximized window in device pixels – the presenter can resize to it. */
@@ -638,7 +648,7 @@ export class WindowManager {
         target = { w: Math.max(200 / d, Math.min(a.right - r.left - 2, w)), h: Math.max(150 / d, Math.min(a.bottom - r.top - BAR - 2, h)) }
       } else {
         const s = edge === 'r' ? w / n.w : edge === 'b' ? h / n.h : Math.max(w / n.w, h / n.h)
-        win.s = Math.max(MIN_SCALE, Math.min(1, s))
+        win.s = Math.max(MIN_SCALE, Math.min(this.maxScale(win), s))
         win.max = false
         this.clamp(win)
         this.paint(win)

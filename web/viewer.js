@@ -110,6 +110,12 @@ const CSS = `
 .pv-spinner { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--pv-fg); border-radius: 50%; animation: pv-spin .8s linear infinite; }
 .pv-keys { position: absolute; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
 @keyframes pv-spin { to { transform: rotate(360deg); } }
+/* narrow screens: the chips show their icon only, the title gets the room */
+@media (max-width: 520px) {
+  .pv-top { right: 96px; }
+  .pv-chip { padding: 0 10px; }
+  .pv-mode span, .pv-rec span, .pv-paused span { display: none; }
+}
 @keyframes pv-pulse { 50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, .12); } }
 `
 
@@ -133,8 +139,8 @@ export function mountViewer(el, options) {
     <div class="pv-top">
       <div class="pv-chip pv-glass pv-live"><i class="pv-dot"></i><span class="pv-title"></span></div>
       <div class="pv-chip pv-glass pv-mode"></div>
-      <div class="pv-chip pv-glass pv-rec" hidden><i class="pv-dot"></i><span>Wird aufgezeichnet</span></div>
-      <div class="pv-chip pv-glass pv-paused" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist beim Host verdeckt</span></div>
+      <div class="pv-chip pv-glass pv-rec" title="Wird aufgezeichnet" hidden><i class="pv-dot"></i><span>Wird aufgezeichnet</span></div>
+      <div class="pv-chip pv-glass pv-paused" title="Steuerung pausiert – Fenster ist beim Host verdeckt" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist beim Host verdeckt</span></div>
     </div>
     <div class="pv-stats pv-glass" hidden></div>
     <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
@@ -755,7 +761,7 @@ export function mountViewer(el, options) {
     mode.hidden = !hostPresent
     mode.dataset.mode = state.mode
     mode.innerHTML = `${icon(MODE_ICONS[state.mode] ?? 'view', 15)}<span></span>`
-    mode.querySelector('span').textContent = MODES[state.mode] ?? ''
+    mode.querySelector('span').textContent = mode.title = MODES[state.mode] ?? ''
     const allowed = hostPresent ? TOOLS[state.mode] ?? [] : []
     q('.pv-rec').hidden = !hostPresent || !state.recording
     q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false || !(state.windows ?? []).length
@@ -802,11 +808,20 @@ export function mountViewer(el, options) {
     wm.clearOwn(me.id)
   }
 
+  /** Light enough that white initials would vanish (the presenter is white by default). */
+  function light(color) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(color ?? '')
+    if (!m) return false
+    const n = parseInt(m[1], 16)
+    return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 170
+  }
+
   function renderPeers(list) {
     q('.pv-peers').replaceChildren(
       ...list.map((p) => {
         const li = document.createElement('li')
         li.style.background = p.color
+        if (light(p.color)) li.style.color = '#18181b'
         li.textContent = p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
         li.title = `${p.name}${p.host ? ' – teilt' : ''}${p.id === me?.id ? ' (du)' : ''}`
         li.classList.toggle('me', p.id === me?.id)

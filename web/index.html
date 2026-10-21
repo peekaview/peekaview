@@ -29,8 +29,10 @@
     .room strong { font-weight: 650; }
     .room .sub { color: #a1a1aa; font-size: 12px; }
     .room em { flex: none; font-style: normal; font-size: 12px; color: #71717a; }
-    .room strong { display: flex; align-items: center; gap: 6px; }
-    .room strong b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .room strong { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; }
+    .room strong b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .room .tags { display: flex; gap: 6px; }
+    .room .tags:empty { display: none; }
     .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.07); color: #a1a1aa; font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
     .tag.permanent { background: rgba(59,130,246,.15); color: #93c5fd; }
     .tag.pin { background: rgba(234,179,8,.14); color: #fde68a; }
@@ -153,13 +155,14 @@
             li.className = `room${r.room === selected ? ' selected' : ''}${st.online ? ' online' : ''}${st.checking ? ' checking' : ''}`
             li.innerHTML = '<i class="dot"></i><div><strong></strong><span class="sub"></span></div><em></em>'
             const strong = li.querySelector('strong')
-            strong.innerHTML = '<b></b>'
+            // the tags stay together – on a narrow screen they move below the name as a group
+            strong.innerHTML = '<b></b><span class="tags"></span>'
             strong.querySelector('b').textContent = st.room ?? r.name ?? (r.link ? 'Dieser Link' : 'Raum')
             // what kind of link: permanent or temporary, PIN, remote access (known once answered)
             const permanent = st.permanent ?? r.permanent ?? (r.link ? undefined : true)
             const pin = st.pin ?? r.pin
             const remote = st.remote ?? r.remote
-            const tag = (cls, html, title) => strong.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
+            const tag = (cls, html, title) => strong.lastChild.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
             if (permanent === true) tag('permanent', 'dauerhaft', 'Dauerhafter Raumlink – bleibt immer gleich')
             else if (permanent === false) tag('', 'temporär', 'Link nur für diese eine Freigabe')
             if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')

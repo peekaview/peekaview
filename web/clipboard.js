@@ -34,6 +34,14 @@ const STYLE = `
 .pv-clip-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 8px; padding: 2px 10px 10px; }
 .pv-clip-empty { position: absolute; inset: 48px 16px 16px; display: grid; place-items: center; align-content: center; gap: 10px; border: 1.5px dashed rgba(255, 255, 255, .16); border-radius: 12px; color: var(--c-muted); text-align: center; padding: 16px; pointer-events: none; }
 .pv-clip-empty svg { color: var(--c-raised); }
+.pv-clip-empty.pick { pointer-events: auto; cursor: pointer; transition: border-color .15s, color .15s; }
+.pv-clip-empty.pick:hover { border-color: rgba(255, 255, 255, .3); color: var(--c-fg); }
+.pv-clip input[type="file"] { display: none; }
+/* a phone: a sheet along the bottom edge instead of a panel to move around */
+@media (max-width: 520px) {
+  .pv-clip:not(.fill) { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto; max-width: none; height: min(440px, 62%); }
+  .pv-clip:not(.fill) .pv-clip-grip { visibility: hidden; width: 4px; }
+}
 .pv-clip-drop { position: absolute; inset: 6px; display: grid; place-items: center; align-content: center; gap: 8px; border: 2px dashed var(--c-accent); border-radius: 12px; background: rgba(239, 68, 68, .1); color: #fca5a5; font-weight: 650; pointer-events: none; }
 .pv-tile { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; background: rgba(255, 255, 255, .03); animation: pv-tile-in .22s ease-out; }
 @keyframes pv-tile-in { from { opacity: 0; transform: scale(.94); } }
@@ -314,21 +322,41 @@ export class ClipPanel {
     this.el = document.createElement('div')
     this.el.className = `pv-clip${options.fill ? ' fill' : ''}`
     this.el.tabIndex = 0
+    const paste = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘V' : 'Strg+V'
+    // without a native drop (the viewer) files can also be picked – on a phone the only way
+    const pick = !options.nativeDrop
+    const hint = !pick
+      ? `Dateien hierher ziehen oder mit ${paste} einfügen.`
+      : matchMedia('(pointer: coarse)').matches
+        ? 'Tippen, um Dateien zu teilen.'
+        : `Dateien hierher ziehen, mit ${paste} einfügen oder klicken zum Auswählen.`
     this.el.innerHTML = `
       <div class="pv-clip-head">
         <button class="pv-clip-grip" title="Verschieben">${icon('grip', 16)}</button>
         <strong>Zwischenablage<small></small></strong>
-        <button data-paste title="Aus der eigenen Zwischenablage einfügen (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Strg+'}V)">${icon('paste', 17)}</button>
+        ${pick ? `<button data-pick title="Dateien auswählen">${icon('file', 17)}</button><input type="file" multiple>` : ''}
+        <button data-paste title="Aus der eigenen Zwischenablage einfügen (${paste})">${icon('paste', 17)}</button>
         <button data-close title="Schließen">${icon('close', 16)}</button>
       </div>
       <div class="pv-clip-list"></div>
-      <div class="pv-clip-empty">${icon('clipboard', 34)}<span>Dateien hierher ziehen oder mit ${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘V' : 'Strg+V'} einfügen.<br>Alle in der Sitzung können sie kopieren oder speichern. Bis 100 MB pro Datei.</span></div>
+      <div class="pv-clip-empty${pick ? ' pick' : ''}">${icon('clipboard', 34)}<span>${hint}<br>Alle in der Sitzung können sie kopieren oder speichern. Bis 100 MB pro Datei.</span></div>
       <div class="pv-clip-drop" hidden>${icon('download', 28)}<span>Loslassen zum Teilen</span></div>`
     parent.append(this.el)
     const q = (s) => this.el.querySelector(s)
     this.list = q('.pv-clip-list')
     q('[data-close]').addEventListener('click', () => options.onClose?.())
     q('[data-paste]').addEventListener('click', () => options.actions.paste())
+    if (pick) {
+      const input = q('input[type="file"]')
+      const open = () => input.click()
+      q('[data-pick]').addEventListener('click', open)
+      q('.pv-clip-empty').addEventListener('click', open)
+      input.addEventListener('change', () => {
+        const files = [...input.files]
+        input.value = ''
+        if (files.length) options.actions.add(files)
+      })
+    }
     this.el.addEventListener('paste', (e) => {
       if (!options.actions.addFromPaste) return
       e.preventDefault()
