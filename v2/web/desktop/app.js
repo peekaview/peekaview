@@ -228,7 +228,8 @@ $('share-btn').addEventListener('click', () => {
   loadSources()
 })
 $('settings-btn').addEventListener('click', () => openPanel(currentPanel === 'settings' ? null : 'settings'))
-$('quit-btn').addEventListener('click', () => invoke('quit'))
+// hides the toolbar: PeekaView keeps running in the tray (quit from the tray menu)
+$('quit-btn').addEventListener('click', () => invoke('toolbar_hide'))
 window.addEventListener('keydown', (e) => e.key === 'Escape' && !sharing && openPanel(null))
 
 // ------------------------------------------------------------------ picker
@@ -446,7 +447,8 @@ function renderAvatars(peers) {
 }
 
 $('start').addEventListener('click', start)
-$('stop-btn').addEventListener('click', () => invoke('stop_share'))
+// after sharing the toolbar goes to the tray (a click on the tray icon brings it back)
+$('stop-btn').addEventListener('click', () => invoke('stop_share').then(() => invoke('toolbar_hide')))
 for (const b of document.querySelectorAll('.modes button')) b.addEventListener('click', () => setMode(b.dataset.mode))
 
 $('code-btn').addEventListener('click', async () => {

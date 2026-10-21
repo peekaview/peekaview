@@ -139,7 +139,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 
 ## Permanent room links and remote access
 
-The tray / menu bar icon shows or hides the toolbar with a click. Its menu offers:
+PeekaView keeps running in the tray / menu bar. Ending a share or closing the toolbar (×) only hides it, and a click on the tray icon brings it back. You quit PeekaView from the tray menu. Its menu offers:
 - **Raumlink beibehalten:** every share reuses the last link.
 - **Resize/Anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
   - Resizing a window resizes it here, so it shows 1:1 for them.

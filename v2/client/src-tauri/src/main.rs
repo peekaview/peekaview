@@ -353,6 +353,12 @@ fn toolbar_moved(window: &tauri::Window, pos: tauri::PhysicalPosition<i32>) {
     }
 }
 
+/// The toolbar goes, PeekaView keeps running in the tray (a click there brings it back).
+#[tauri::command]
+fn toolbar_hide(window: tauri::WebviewWindow) {
+    let _ = window.hide();
+}
+
 #[tauri::command]
 fn quit(app: AppHandle) {
     session::shutdown(&app, true);
@@ -574,6 +580,7 @@ fn main() {
             dismiss_permission,
             toolbar_resize,
             toolbar_drag,
+            toolbar_hide,
             fit_window,
             drag_window,
             peers,
@@ -615,9 +622,10 @@ fn main() {
             }
             let WindowEvent::CloseRequested { api, .. } = event else { return };
             match window.label() {
+                // closing the toolbar hides it – PeekaView keeps running in the tray (quit from its menu)
                 "main" => {
-                    session::shutdown(window.app_handle(), true);
-                    window.app_handle().exit(0);
+                    api.prevent_close();
+                    let _ = window.hide();
                 }
                 "permission" if !permissions::may_close() => api.prevent_close(),
                 _ => {}
