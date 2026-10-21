@@ -61,6 +61,18 @@ pub fn input_allowed(target: Target, x: i32, y: i32) -> bool {
     imp::any_allowed(target, &[(x, y)])
 }
 
+/// Is the shared window in front – no other app's window lying over any part of it (PeekaView's
+/// own windows and the window's own dialogs aside)? Always true where the platform does not tell.
+pub fn in_front(target: Target) -> bool {
+    #[cfg(target_os = "macos")]
+    return imp::in_front(target);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = target;
+        true
+    }
+}
+
 /// Can viewers reach the shared window at all, i.e. is some part of it not covered?
 /// Samples a grid over `rect`; always true for a shared screen.
 pub fn reachable(target: Target, rect: Rect) -> bool {
@@ -238,6 +250,20 @@ mod imp {
     }
 
     /// Is input allowed at any of the points? One window list for all of them.
+    pub fn in_front(target: super::Target) -> bool {
+        let Some((id, pid)) = target else { return true };
+        let me = std::process::id() as i32;
+        let windows = list(false);
+        let displays = displays();
+        let Some(own) = windows.iter().find(|w| w.id == id).map(|w| w.rect) else { return true };
+        // front to back, until the window itself: nothing of another app over it
+        !windows
+            .iter()
+            .take_while(|w| w.id != id)
+            .filter(|w| w.alpha > 0.0 && w.pid != me && !is_screen_overlay(w, &displays))
+            .any(|w| overlaps(&w.rect, &own) && !(w.pid == pid && part_of(w, &own)))
+    }
+
     pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
         let me = std::process::id() as i32;
         let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();

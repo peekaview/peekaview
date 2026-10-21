@@ -75,6 +75,8 @@ pub struct Stream {
     pub reachable: bool,
     /// place in the presenter's window stack (0 = frontmost)
     pub z: u32,
+    /// no other app's window over it (the frame is fully red only then)
+    pub front: bool,
 }
 
 impl Stream {
@@ -162,7 +164,7 @@ impl Shared {
                 json!({
                     "w": s.slot, "kind": s.kind, "title": s.title, "app": s.app,
                     "pw": (s.rect.w as f64 * scale).round(), "ph": (s.rect.h as f64 * scale).round(),
-                    "paused": !s.visible(), "reachable": s.reachable, "z": s.z,
+                    "paused": !s.visible(), "reachable": s.reachable, "z": s.z, "front": s.front,
                     // where it is on the presenter's screen (viewers mirror the layout when
                     // they may arrange the windows)
                     "rect": { "x": s.rect.x, "y": s.rect.y, "w": s.rect.w, "h": s.rect.h },
@@ -265,7 +267,7 @@ fn open_stream(id: &str, slot: u8) -> Result<Stream, String> {
         _ => return Err("Ungültige Quelle".into()),
     };
     let (rect, visible) = capture::geometry(&source).ok_or("Quelle nicht mehr vorhanden")?;
-    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true, z: 0 })
+    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true, z: 0, front: true })
 }
 
 /// Picker ids → streams; ids already shared keep their slot (and running pipeline).
@@ -568,6 +570,12 @@ pub fn highlight(app: &AppHandle, ids: &[String]) {
         }
     }
     to_overlay(app, r#"{"t":"frame","live":false}"#);
+    // windows behind others get a half transparent frame
+    let windows: Vec<Value> = streams
+        .iter()
+        .map(|s| json!({ "w": s.slot, "kind": s.kind, "reachable": crate::guard::reachable(s.target(), s.rect), "front": crate::guard::in_front(s.target()) }))
+        .collect();
+    to_overlay(app, &json!({ "t": "state", "windows": windows }).to_string());
     hide_overlays(app, &streams);
 }
 

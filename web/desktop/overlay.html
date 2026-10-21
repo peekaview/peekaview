@@ -56,8 +56,10 @@
         } else if (m.t === 'state') {
           const win = (m.windows ?? []).find((w) => w.w === slot)
           kind = win?.kind ?? kind
-          // covered by another window: the frame lies on top of that one – only a faint hint
+          // covered by another window: the frame lies on top of that one – only a faint hint;
+          // behind another window in parts: half transparent
           document.body.classList.toggle('covered', win?.reachable === false)
+          document.body.classList.toggle('behind', win?.reachable !== false && win?.front === false)
           paint()
         } else if (m.t === 'reset') {
           live = false

@@ -175,10 +175,12 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             }
             for s in streams.iter().filter(|s| s.window_id.is_some()) {
                 let reachable = guard::reachable(s.target(), s.rect);
-                if reachable != s.reachable {
+                let front = guard::in_front(s.target());
+                if reachable != s.reachable || front != s.front {
                     changed = true;
                     if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
                         stream.reachable = reachable;
+                        stream.front = front;
                     }
                 }
             }

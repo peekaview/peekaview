@@ -6,6 +6,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="rooms">
+  <!-- the same head as the PeekaView window -->
+  <header class="app-head">
+    <span id="logo" class="logo"></span>
+    <strong>PeekaView</strong>
+  </header>
   <main>
     <div class="tabs page-tabs" role="tablist">
       <button class="tab active" data-page="rooms-page"><i data-icon="link"></i>Raumlinks &amp; Remote-Zugriff</button>
@@ -15,7 +20,6 @@
     <section id="rooms-page">
     <header class="rooms-head">
       <div>
-        <h1>Raumlinks &amp; Remote-Zugriff</h1>
         <p class="muted">Dauerhafte Links bleiben immer gleich. Wer beitreten will, wird von dir zugelassen – oder kommt mit der PIN des Raums herein. Mit Remote-Zugriff wartet der Raum auch, wenn du gerade nichts teilst, und Zuschauer können die freigegebenen Anwendungen selbst starten.</p>
       </div>
       <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raumlink</button>
@@ -25,6 +29,13 @@
     </section>
 
     <section id="settings-page" class="settings-page" hidden>
+      <h3>Freigabe</h3>
+      <label>Dein Name <span class="muted">so sehen dich die Zuschauer</span>
+        <input id="own-name" maxlength="32" autocomplete="name">
+      </label>
+      <label class="check option"><input type="checkbox" id="keep-link"><span><b>Raumlink beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span></label>
+      <label class="check option"><input type="checkbox" id="allow-resize"><span><b>Resize/Anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span></label>
+
       <h3>Zuschauer-Website</h3>
       <label>Adresse <span class="muted">leer = über Nostr, ganz ohne eigenen Webserver</span>
         <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
@@ -63,7 +74,7 @@
   <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
 
   <script type="module">
-    import { icon } from '../icons.js'
+    import { icon, owl } from '../icons.js'
 
     const { invoke } = window.__TAURI__.core
     const { listen } = window.__TAURI__.event
@@ -72,6 +83,7 @@
       for (const el of root.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 16)
     }
     renderIcons()
+    $('logo').innerHTML = owl(22)
 
     let rooms = []
     let installed = null
@@ -121,8 +133,8 @@
           <button class="icon-btn" data-delete title="Raumlink löschen">${icon('trash', 16)}</button>
         </div>
         <div class="room-link"><code></code>
-          <button class="pill secondary" data-copy>${icon('copy', 15)}Kopieren</button>
-          <button class="pill secondary" data-renew title="Neuer Link – der alte funktioniert dann nicht mehr">${icon('refresh', 15)}Neu</button>
+          <button class="pill secondary" data-copy>${icon('copy', 15)}Link kopieren</button>
+          <button class="pill secondary" data-renew title="Neuer Link – der alte funktioniert dann nicht mehr">${icon('refresh', 15)}Neuer Link</button>
         </div>
         <div class="room-row">
           <span class="room-label">PIN</span>
@@ -131,7 +143,7 @@
           <button class="pill secondary" data-pin>Setzen</button>
           <button class="pill secondary" data-unpin>Entfernen</button>
         </div>
-        <label class="check room-remote"><input type="checkbox" data-remote> Remote-Zugriff – der Raum wartet auch, wenn nichts geteilt wird; Zuschauer können freigegebene Anwendungen starten</label>
+        <label class="check option room-remote"><input type="checkbox" data-remote><span><b>Remote-Zugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span></label>
         <div class="room-apps" hidden>
           <div class="chips"></div>
           <div class="room-row">
@@ -245,6 +257,9 @@
       if (document.activeElement !== $('relays')) $('relays').value = (s.relays ?? []).join('\n')
       if (document.activeElement !== $('turn-urls')) $('turn-urls').value = (s.turn_urls ?? []).join('\n')
       if (document.activeElement !== $('turn-secret')) $('turn-secret').value = s.turn_secret ?? ''
+      if (document.activeElement !== $('own-name')) $('own-name').value = s.name ?? ''
+      $('keep-link').checked = !!s.keep_link
+      $('allow-resize').checked = !!s.allow_resize
     }
     fill(await invoke('get_settings'))
     listen('settings', (e) => fill(e.payload ?? {}))
@@ -253,6 +268,10 @@
         .then(() => toast('Gespeichert'))
         .catch(fail)
     for (const id of ['site', 'relays', 'turn-urls', 'turn-secret']) $(id).addEventListener('change', push)
+    const patch = (p) => invoke('set_settings', { patch: p }).then(() => toast('Gespeichert')).catch(fail)
+    $('own-name').addEventListener('change', () => patch({ name: $('own-name').value.trim() }))
+    $('keep-link').addEventListener('change', () => patch({ keep_link: $('keep-link').checked }))
+    $('allow-resize').addEventListener('change', () => patch({ allow_resize: $('allow-resize').checked }))
 
     // the viewer site on Nostr: address and publishing state
     function renderNsite(st) {

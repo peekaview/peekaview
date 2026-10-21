@@ -136,6 +136,12 @@ async fn drag_app(app: AppHandle) -> Result<(), String> {
 
 /// Shows the PeekaView window (share picker / running share) in front.
 pub fn show_main(app: &AppHandle) {
+    // without the screen recording permission there is nothing to share: the permission helper
+    // instead (it asks for the accessibility permission in the same go)
+    if !permissions::granted("screen") {
+        permissions::request(app, "screen");
+        return;
+    }
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.unminimize();
         let _ = main.show();
@@ -285,6 +291,8 @@ fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
     }
     session::settings_changed(&app);
     tray::refresh(&app);
+    // every window shows the same (PeekaView window, settings window)
+    let _ = app.emit("settings", &settings);
     settings
 }
 
