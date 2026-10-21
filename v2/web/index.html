@@ -47,6 +47,7 @@
     .connect:active:not(:disabled) { transform: scale(.98); }
     .connect:disabled { opacity: .35; cursor: default; box-shadow: none; }
     .connect-hint { margin: -10px 0 0; text-align: center; color: #71717a; font-size: 12px; }
+    .share-phone { align-self: center; height: 40px; padding: 0 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #09090b; color: #fafafa; font: 600 14px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
     .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app:hover { color: #fafafa; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -60,6 +61,7 @@
     <div class="rooms-title"><span>Räume</span><span id="count"></span></div>
     <ul class="rooms" id="rooms"></ul>
     <button class="connect" id="connect" disabled>Verbinden</button>
+    <button class="share-phone" id="share-phone" type="button" hidden>Bildschirm dieses Geräts teilen</button>
     <p class="connect-hint" id="hint"></p>
     <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
   </form>
@@ -93,11 +95,12 @@
     }
 
     // the room secret travels in the "#…" part of the link – browsers never send it to a server
-    // inside the PeekaView app (a viewer window of its own): the room comes from the app
-    const inApp = typeof window.__PV_JOIN__ === 'string'
-    if (inApp) history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
-    let linkRoom = decodeURIComponent(location.hash.slice(1))
+    // inside the PeekaView app – a viewer window of the desktop app (room from the app) or the
+    // Android app (?app=1)
     const params = new URLSearchParams(location.search)
+    const inApp = typeof window.__PV_JOIN__ === 'string' || params.get('app') === '1'
+    if (typeof window.__PV_JOIN__ === 'string') history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
+    let linkRoom = decodeURIComponent(location.hash.slice(1))
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
 
@@ -341,7 +344,11 @@
       }
       window.addEventListener('blur', onBlur, { once: true })
       setTimeout(() => window.removeEventListener('blur', onBlur), 3000)
-      if (gesture || appKnown()) {
+      if (/Android/i.test(navigator.userAgent)) {
+        // Android: an intent – without the app, Chrome stays on this page
+        if (!gesture) return
+        location.href = `intent://join?${q}#Intent;scheme=peekaview;package=de.limtec.peekaview;S.browser_fallback_url=${encodeURIComponent(location.href)};end`
+      } else if (gesture || appKnown()) {
         location.href = url
       } else {
         // a first try without a click: unknown schemes fail silently in a hidden frame
@@ -351,6 +358,9 @@
       }
     }
     $('open-app').hidden = inApp || !linkRoom
+    // the Android app shares the phone's screen
+    $('share-phone').hidden = !window.PeekaViewApp
+    $('share-phone').addEventListener('click', () => window.PeekaViewApp?.share())
     $('open-app').addEventListener('click', () => openInApp(selected || linkRoom, true))
 
     render()
