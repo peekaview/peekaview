@@ -87,6 +87,14 @@ const CSS = `
 .pv-dock button::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 8px; background: #18181b; border: 1px solid var(--pv-line); white-space: nowrap; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .pv-dock button:hover::after { opacity: 1; transform: translate(-50%, 0); }
 .pv-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--pv-line); }
+/* a phone upright: the dock stands beside it */
+.pv-dock.side { bottom: auto; transform: translateY(-50%); flex-direction: column; }
+.pv-dock.side .pv-tasks { flex-direction: column; }
+.pv-dock.side .pv-sep { width: 22px; height: 1px; margin: 3px 0; }
+.pv-dock.side .pv-grip { width: 38px; height: 18px; margin: 0 0 -2px; }
+.pv-dock.side .pv-fold { width: 38px; height: 26px; }
+.pv-dock.side button::after { bottom: auto; top: 50%; left: auto; right: calc(100% + 10px); transform: translate(4px, -50%); }
+.pv-dock.side button:hover::after { transform: translate(0, -50%); }
 .pv-notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: min(420px, 80%); padding: 11px 16px; border-radius: 12px; color: var(--pv-fg); }
 .pv-notice-text { flex: 1; min-width: 0; }
 .pv-pin { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--pv-line); }
@@ -164,16 +172,20 @@ export function mountViewer(el, options) {
     onNav: (slot, a) => send({ t: 'nav', a, w: slot }),
     bottomSpace: () => {
       const d = el.querySelector('.pv-dock')
-      return !d || d.hidden || d.classList.contains('placed') ? 0 : d.offsetHeight + 20
+      return !d || d.hidden || d.classList.contains('placed') || d.classList.contains('side') ? 0 : d.offsetHeight + 20
     },
     onPlace: (slot, f) => send({ t: 'arrange', w: slot, ...f }),
-    onChange: () => renderTasks(),
+    onChange: () => {
+      renderTasks()
+      requestAnimationFrame(sideDock)
+    },
     onFrame: () => {
       if (!hasFrame) {
         hasFrame = true
         update()
       }
       reportViewport()
+      requestAnimationFrame(sideDock)
     },
   })
   q('.pv-top').hidden = !toolbar
@@ -1017,6 +1029,35 @@ export function mountViewer(el, options) {
     if (dock.classList.contains('placed') && saved.x != null) placeDock(saved.x, saved.y)
   })
   dockObserver.observe(el)
+
+  // a shared phone (upright): the dock beside it rather than below – unless moved by hand
+  function sideDock() {
+    if (destroyed) return
+    const dock = q('.pv-dock')
+    const wins = wm.list.filter((w) => !w.min)
+    const win = wins.length === 1 ? wins[0] : null
+    const r = win?.view.getBoundingClientRect()
+    const upright = !!r && r.width > 0 && (win.info.nav || r.height > r.width * 1.3)
+    if (dock.classList.contains('placed') || !upright) {
+      if (dock.classList.contains('side')) {
+        dock.classList.remove('side')
+        dock.style.left = dock.style.top = ''
+        wm.layout()
+      }
+      return
+    }
+    const wasSide = dock.classList.contains('side')
+    dock.classList.add('side')
+    const s = el.getBoundingClientRect()
+    const w = dock.offsetWidth
+    let left = r.right - s.left + 16
+    if (left + w > s.width - 8) left = Math.max(8, r.left - s.left - 16 - w)
+    dock.style.left = `${Math.round(left)}px`
+    dock.style.top = `${Math.round(r.top - s.top + r.height / 2)}px`
+    // the picture may take the room the dock had below it
+    if (!wasSide) wm.layout()
+  }
+  new ResizeObserver(() => requestAnimationFrame(sideDock)).observe(el)
 
   // ------------------------------------------------------------ pointer
 
