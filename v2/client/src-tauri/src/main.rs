@@ -6,6 +6,7 @@ mod control;
 mod guard;
 mod focus;
 mod invite;
+mod lock;
 mod p2p;
 #[cfg(target_os = "macos")]
 mod macos;

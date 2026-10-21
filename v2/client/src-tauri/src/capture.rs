@@ -23,6 +23,9 @@ use crate::{
 const TICK: Duration = Duration::from_millis(33);
 const GEOMETRY_EVERY: Duration = Duration::from_millis(150);
 const REACHABLE_EVERY: Duration = Duration::from_millis(300);
+/// after the window overview closes, its animation still moves the windows
+const OVERVIEW_SETTLE: Duration = Duration::from_millis(700);
+const LOCK_EVERY: Duration = Duration::from_secs(1);
 
 /// Current geometry of the source: `None` once a shared window is gone.
 pub fn geometry(source: &Source) -> Option<(Rect, bool)> {
@@ -67,6 +70,9 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
     let pointer = Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }).ok();
     let mut last_check = Instant::now() - GEOMETRY_EVERY;
     let mut last_reach_check = Instant::now() - REACHABLE_EVERY;
+    let mut overview_until = Instant::now();
+    let mut locked = crate::lock::locked();
+    let mut last_lock_check = Instant::now();
     // presenter's pointer: (slot, x, y)
     let mut last_ptr: Option<(u8, i32, i32)> = None;
     let mut probe = Probe::default();
@@ -86,6 +92,17 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             last_ptr = None;
         }
 
+        // the window overview shows the windows as thumbnails: their frames are not real – keep
+        // the last ones until it is closed (and the windows are back in place)
+        if last_check.elapsed() >= GEOMETRY_EVERY {
+            if guard::overview() {
+                overview_until = Instant::now() + OVERVIEW_SETTLE;
+            }
+            guard::OVERVIEW_ACTIVE.store(Instant::now() < overview_until, Ordering::Relaxed);
+        }
+        if last_check.elapsed() >= GEOMETRY_EVERY && Instant::now() < overview_until {
+            last_check = Instant::now();
+        }
         if last_check.elapsed() >= GEOMETRY_EVERY {
             last_check = Instant::now();
             let streams = shared.streams.lock().unwrap().clone();
@@ -130,8 +147,17 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             }
         }
 
+        // viewers learn when the presenter's screen gets locked or unlocked
+        if last_lock_check.elapsed() >= LOCK_EVERY {
+            last_lock_check = Instant::now();
+            if crate::lock::locked() != locked {
+                locked = !locked;
+                shared.send_state();
+            }
+        }
+
         // viewers are told when remote control of a window is paused because it is covered completely
-        if last_reach_check.elapsed() >= REACHABLE_EVERY {
+        if last_reach_check.elapsed() >= REACHABLE_EVERY && Instant::now() >= overview_until {
             last_reach_check = Instant::now();
             let streams = shared.streams.lock().unwrap().clone();
             let mut changed = false;

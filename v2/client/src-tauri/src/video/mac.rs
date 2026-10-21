@@ -91,7 +91,8 @@ impl SCStreamOutputTrait for Handler {
             return;
         }
         let pb = sample.image_buffer_ptr_borrowed() as *const c_void;
-        if pb.is_null() {
+        // the window overview shows thumbnails in the window's area
+        if pb.is_null() || crate::guard::OVERVIEW_ACTIVE.load(Ordering::Relaxed) {
             return;
         }
         // Capturing a window's area delivers every frame as "complete", also when nothing

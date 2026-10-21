@@ -570,6 +570,16 @@ impl Hub {
                     }
                 });
             }
+            // remote access: the viewer unlocks the presenter's lock screen with the password
+            "unlock" if mode == Mode::Control && self.shared.remote.is_some() => {
+                let (password, shared) = (v["password"].as_str().unwrap_or("").to_string(), self.shared.clone());
+                std::thread::spawn(move || {
+                    let result = crate::lock::unlock(&password);
+                    crate::log(&format!("unlock: {}", if result.is_ok() { "ok" } else { "failed" }));
+                    shared.send(json!({ "t": "unlocked", "to": id, "ok": result.is_ok(), "error": result.err() }));
+                    shared.send_state();
+                });
+            }
             // "Resize/Anordnen erlauben": the viewer activated / moved a window in their window manager
             "activate" | "arrange" if mode == Mode::Control && crate::settings::allow_resize() => {
                 let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());

@@ -190,6 +190,8 @@ impl Shared {
             // viewers may resize, arrange and activate shared windows on this screen
             // (tray menu "Resize/Anordnen erlauben")
             "resize": crate::settings::allow_resize(),
+            // the presenter's screen is locked (in a room with remote access viewers may unlock it)
+            "locked": crate::lock::locked(),
         })
     }
 

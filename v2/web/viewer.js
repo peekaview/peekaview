@@ -118,6 +118,7 @@ export function mountViewer(el, options) {
     <div class="pv-stage">
       <div class="pv-notice pv-glass"><span class="pv-spinner"></span><span class="pv-notice-text"></span>
         <form class="pv-pin" hidden><small>Nicht am Platz? Mit der PIN des Raums geht es auch ohne Bestätigung.</small><input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN"><button>Eintreten</button><small class="pv-pin-error" hidden></small></form>
+        <form class="pv-pin pv-unlock" hidden><input type="password" autocomplete="off" placeholder="Passwort des Benutzers"><button>Entsperren</button><small class="pv-pin-error" hidden></small></form>
       </div>
     </div>
     <div class="pv-top">
@@ -524,6 +525,9 @@ export function mountViewer(el, options) {
       case 'launch-error':
         toast(`Start nicht möglich: ${m.error}`)
         return
+      case 'unlocked':
+        unlockError(m.ok ? '' : m.error || 'Entsperren fehlgeschlagen.')
+        return
       case 'blocked':
         toast(
           m.why === 'permission'
@@ -569,6 +573,26 @@ export function mountViewer(el, options) {
     } catch {
       pinError('Das hat nicht geklappt.')
     }
+  })
+
+  // ------------------------------------------------------------ lock screen (remote access)
+  // the password goes over the encrypted data channel and is typed into the presenter's lock screen
+
+  const unlockForm = q('.pv-unlock')
+  function unlockError(text) {
+    const e = unlockForm.querySelector('.pv-pin-error')
+    e.textContent = text ?? ''
+    e.hidden = !text
+    unlockForm.querySelector('button').disabled = false
+  }
+  unlockForm.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const input = unlockForm.querySelector('input')
+    if (!input.value || !dc || dc.readyState !== 'open') return
+    unlockForm.querySelector('button').disabled = true
+    unlockError()
+    send({ t: 'unlock', password: input.value })
+    input.value = ''
   })
 
   // ------------------------------------------------------------ video
@@ -668,6 +692,8 @@ export function mountViewer(el, options) {
                   : 'waiting'
             : !hostPresent
               ? 'waiting'
+              : state.locked
+                ? 'locked'
               : state.remote && !(state.windows ?? []).length
                 ? 'pick'
                 : state.paused
@@ -686,6 +712,9 @@ export function mountViewer(el, options) {
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
+      locked: state.remote && state.mode === 'control'
+        ? 'Der Bildschirm des Hosts ist gesperrt.'
+        : 'Der Bildschirm des Hosts ist gesperrt – warte, bis die teilende Person ihn entsperrt.',
       live: '',
     }
     const notice = typeof RTCPeerConnection === 'undefined'
@@ -694,6 +723,9 @@ export function mountViewer(el, options) {
     q('.pv-notice-text').textContent = notice
     q('.pv-notice').hidden = !notice
     q('.pv-pin').hidden = status !== 'admission' || !pinChallenge
+    const unlocking = status === 'locked' && state.remote && state.mode === 'control'
+    if (unlockForm.hidden && unlocking) setTimeout(() => unlockForm.querySelector('input').focus({ preventScroll: true }))
+    unlockForm.hidden = !unlocking
     q('.pv-spinner').hidden = !['connecting', 'waiting', 'loading', 'admission'].includes(status)
 
     q('.pv-live').hidden = !hostPresent

@@ -102,6 +102,19 @@ pub fn stack_order() -> Option<Vec<u32>> {
     None
 }
 
+/// Set while the window overview is open (or just closing): the picture shows thumbnails then,
+/// so no frames are sent – viewers keep the last real one.
+pub static OVERVIEW_ACTIVE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Is the presenter's window overview open (macOS Mission Control / App Exposé)? Meanwhile the
+/// window list reports the thumbnails' frames instead of the windows' own.
+pub fn overview() -> bool {
+    #[cfg(target_os = "macos")]
+    return imp::overview();
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
 /// May PeekaView control mouse and keyboard (macOS "Bedienungshilfen")?
 pub fn accessibility() -> bool {
     crate::permissions::granted("accessibility")
@@ -184,6 +197,24 @@ mod imp {
             });
         }
         out
+    }
+
+    /// The Dock shows the overview in windows of their own, on level 18 above everything.
+    pub fn overview() -> bool {
+        let Some(array) = CGWindowListCopyWindowInfo(CGWindowListOption::OptionOnScreenOnly, 0) else {
+            return false;
+        };
+        (0..array.count()).any(|i| {
+            let ptr = unsafe { array.value_at_index(i) } as *const CFDictionary;
+            if ptr.is_null() {
+                return false;
+            }
+            let dict = unsafe { &*ptr };
+            let owner = value(dict, "kCGWindowOwnerName") as *const CFString;
+            number::<i32>(dict, "kCGWindowLayer", CFNumberType::IntType) == Some(18)
+                && !owner.is_null()
+                && unsafe { (*owner).to_string() } == "Dock"
+        })
     }
 
     pub fn window_geometry(win: &xcap::Window) -> Option<(Rect, bool)> {

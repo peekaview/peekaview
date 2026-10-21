@@ -90,7 +90,7 @@
     }
 
     // the room secret travels in the "#…" part of the link – browsers never send it to a server
-    const linkRoom = decodeURIComponent(location.hash.slice(1))
+    let linkRoom = decodeURIComponent(location.hash.slice(1))
     const params = new URLSearchParams(location.search)
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
@@ -169,7 +169,15 @@
       }
       const st = status.get(selected)
       $('connect').disabled = !selected
-      $('hint').textContent = !selected ? '' : st?.checking ? 'Prüfe, ob der Raum online ist …' : st?.online ? '' : 'Gerade offline – du kannst trotzdem verbinden und warten.'
+      $('hint').textContent = !selected
+        ? ''
+        : gaveUp === selected && !st?.online
+          ? 'Keine Verbindung zustande gekommen – ist die Freigabe noch aktiv?'
+          : st?.checking
+            ? 'Prüfe, ob der Raum online ist …'
+            : st?.online
+              ? ''
+              : 'Gerade offline – Verbinden wartet bis zu 30 Sekunden.'
     }
 
     // ---------------------------------------------------------------- online check
@@ -222,6 +230,14 @@
     let probeTimer
     // the room joined from this page (remembered once it turns out to be permanent)
     let joined = null
+    let viewer = null
+    // no connection after this long: back to the start page
+    const GIVE_UP = 30000
+    let giveUpTimer
+    // the room whose connection did not come about (hint on the start page)
+    let gaveUp = null
+    // connected (or waiting for the presenter's approval – a person, not the network)
+    const CONNECTED = ['live', 'loading', 'paused', 'pick', 'locked', 'admission']
     function probeAll() {
       // not while the page is in the background
       if (!document.hidden) for (const r of rooms()) probe(r.room)
@@ -249,8 +265,46 @@
       if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
       $('start').hidden = true
       $('viewer').hidden = false
-      mountViewer($('viewer'), { room, name })
+      gaveUp = null
+      viewer = mountViewer($('viewer'), {
+        room,
+        name,
+        onStatus: (status) => {
+          if (CONNECTED.includes(status)) {
+            clearTimeout(giveUpTimer)
+            giveUpTimer = undefined
+          } else if (!giveUpTimer) {
+            giveUpTimer = setTimeout(() => {
+              leave()
+              gaveUp = room
+              render()
+            }, GIVE_UP)
+          }
+        },
+      })
     }
+
+    /** Back to the start page. */
+    function leave() {
+      clearTimeout(giveUpTimer)
+      giveUpTimer = undefined
+      viewer?.destroy()
+      viewer = null
+      joined = null
+      $('viewer').hidden = true
+      $('start').hidden = false
+      probeAll()
+    }
+
+    // another room link opened in this tab (only the "#…" changed): join that one
+    window.addEventListener('hashchange', () => {
+      const room = decodeURIComponent(location.hash.slice(1))
+      if (!room || room === joined) return
+      linkRoom = selected = room
+      if (viewer) leave()
+      if ($('name').value.trim()) connect()
+      else render()
+    })
 
     $('start').addEventListener('submit', (e) => {
       e.preventDefault()
