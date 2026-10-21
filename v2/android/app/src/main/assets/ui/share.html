@@ -43,6 +43,7 @@
     .hint { padding: 12px 14px; border-radius: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); color: #fde68a; font-size: 14px; }
     .hint button { margin-top: 8px; padding: 8px 12px; border-radius: 9px; border: 0; background: rgba(234,179,8,.2); color: #fde68a; font-weight: 600; }
     .error { color: #fca5a5; }
+    #nsite { word-break: break-all; }
   </style>
 </head>
 <body>
@@ -57,8 +58,8 @@
     <!-- before the share -->
     <section id="setup" class="card">
       <label>Dein Name <input id="name" maxlength="32" autocomplete="name"></label>
-      <label>Zuschauer-Website <input id="site" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://… (aus PeekaView am Computer)"></label>
-      <p class="muted">Leer: der Link öffnet sich nur in der PeekaView-App.</p>
+      <label>Zuschauer-Website <input id="site" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="über Nostr (nsite)"></label>
+      <p id="nsite" class="muted"></p>
       <p class="muted">Android fragt gleich, ob PeekaView den Bildschirm aufnehmen darf. Wer den Link öffnet, muss von dir zugelassen werden.</p>
       <button id="start" class="big">Freigabe starten</button>
       <p id="error" class="error" hidden></p>
@@ -102,6 +103,7 @@
 
     $('name').value = localStorage.getItem('pv-name') ?? ''
     $('site').value = host.site()
+    $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
     $('start').addEventListener('click', () => {
       const name = $('name').value.trim() || 'Android'
       localStorage.setItem('pv-name', $('name').value.trim())
@@ -127,6 +129,11 @@
       $('error').hidden = !st.error
       $('error').textContent = st.error ?? ''
       $('link').textContent = st.link ?? ''
+      // the viewer site this phone publishes over Nostr (unless an own one is set)
+      const ns = st.nsite ?? {}
+      const states = { idle: 'wird gleich veröffentlicht', publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${ns.error ?? ''}` }
+      $('nsite').hidden = !!$('site').value.trim()
+      $('nsite').textContent = `Leer: ${ns.url?.replace('https://', '') ?? ''} · ${states[ns.state] ?? ''}`
       for (const b of document.querySelectorAll('.modes button')) b.classList.toggle('active', b.dataset.mode === st.mode)
       $('control-hint').hidden = !(st.mode === 'control' && !st.controlEnabled)
       const people = st.viewers ?? []

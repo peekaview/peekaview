@@ -62,7 +62,7 @@ fn switch(app: &AppHandle, shared: &Arc<Shared>, videos: &mut Vec<(u8, Video)>, 
         session::hide_overlay(app, slot);
     }
     *shared.streams.lock().unwrap() = next;
-    shared.send_state();
+    session::announce_state(&app, &shared);
     Ok(())
 }
 
@@ -143,7 +143,7 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
                 changed_visibility = true;
             }
             if changed_visibility {
-                shared.send_state();
+                session::announce_state(&app, &shared);
             }
         }
 
@@ -152,7 +152,7 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
             last_lock_check = Instant::now();
             if crate::lock::locked() != locked {
                 locked = !locked;
-                shared.send_state();
+                session::announce_state(&app, &shared);
             }
         }
 
@@ -183,7 +183,7 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
                 }
             }
             if changed {
-                shared.send_state();
+                session::announce_state(&app, &shared);
             }
         }
 

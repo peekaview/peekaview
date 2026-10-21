@@ -156,9 +156,9 @@ function renderGrid(loading = false) {
       const thumb = card.querySelector('.thumb')
       if (s.thumb) thumb.style.backgroundImage = `url("${s.thumb}")`
       else thumb.innerHTML = icon(s.kind, 32)
+      // the app's name, below it the (shortened) window title – no tooltip over the picture
       card.querySelector('strong').textContent = s.kind === 'window' ? s.app : s.title
       card.querySelector('span').textContent = s.kind === 'window' ? s.title : s.app
-      card.title = `${s.app} – ${s.title}`
       card.addEventListener('click', () => select(s.id))
       card.addEventListener('dblclick', () => {
         if (!selected.includes(s.id)) select(s.id)

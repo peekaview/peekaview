@@ -2,7 +2,6 @@ package de.limtec.peekaview
 
 import android.util.Base64
 import fr.acinq.secp256k1.Secp256k1
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -32,11 +31,11 @@ class Signaling(
 ) {
     private val topic = hex(sha256("peekaview/topic/v1:$secret".toByteArray()))
     private val key = SecretKeySpec(sha256("peekaview/key/v1:$secret".toByteArray()), "AES")
-    val publicKey: ByteArray = Secp256k1.pubkeyCreate(signingKey).copyOfRange(1, 33)
+    val publicKey: ByteArray = Nostr.publicKey(signingKey)
     private val publicHex = hex(publicKey)
     private val subscription = "pv-${topic.take(8)}"
 
-    private val http = OkHttpClient.Builder().pingInterval(20, TimeUnit.SECONDS).build()
+    private val http = Nostr.http
     private val sockets = ConcurrentHashMap<String, WebSocket>()
     private val seen = LinkedHashSet<String>()
     // frames of the last seconds, sent again to relays that (re)connect
@@ -123,19 +122,7 @@ class Signaling(
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
         val content = Base64.encodeToString(iv + cipher.doFinal(json.toByteArray()), Base64.NO_WRAP)
-        val createdAt = System.currentTimeMillis() / 1000
-        // NIP-01 id: the serialization of JSON.stringify (hex and base64 need no escaping)
-        val serialized = "[0,\"$publicHex\",$createdAt,$KIND,[[\"t\",\"$topic\"]],\"$content\"]"
-        val id = sha256(serialized.toByteArray())
-        val sig = Secp256k1.signSchnorr(id, signingKey, ByteArray(32).also { random.nextBytes(it) })
-        return JSONObject()
-            .put("id", hex(id))
-            .put("pubkey", publicHex)
-            .put("created_at", createdAt)
-            .put("kind", KIND)
-            .put("tags", JSONArray().put(JSONArray().put("t").put(topic)))
-            .put("content", content)
-            .put("sig", hex(sig))
+        return Nostr.sign(signingKey, KIND, listOf(listOf("t", topic)), content)
     }
 
     companion object {

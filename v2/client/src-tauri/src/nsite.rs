@@ -386,6 +386,13 @@ fn publish(app: &AppHandle, files: &[File], hash: &str) -> Result<Vec<String>, S
     Ok(servers)
 }
 
+/// Are all files still on the servers they went to? Blobs are content-addressed: another
+/// installation with the same files (e.g. the phone app) deleting its copies may take ours, too.
+fn complete(files: &[File], st: &Value) -> bool {
+    let servers: Vec<String> = st["blobs"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
+    !servers.is_empty() && servers.iter().all(|server| files.iter().all(|f| ureq::head(&format!("{server}/{}", f.sha)).call().is_ok()))
+}
+
 /// Publishes the viewer site if it changed (or a week has passed); in the background.
 /// Development builds never publish (and take down what an earlier test published).
 pub fn publish_if_needed(app: &AppHandle, force: bool) {
@@ -403,7 +410,7 @@ pub fn publish_if_needed(app: &AppHandle, force: bool) {
         let hash = aggregate(&files);
         let st = state(&app);
         let fresh = st["hash"] == hash.as_str() && st["published"].as_u64().is_some_and(|t| now().saturating_sub(t) < REPUBLISH.as_secs());
-        if fresh && !force {
+        if fresh && !force && complete(&files, &st) {
             return set_status(&app, json!({ "url": site_url(&app), "state": "ok", "published": st["published"] }));
         }
         set_status(&app, json!({ "url": site_url(&app), "state": "publishing" }));

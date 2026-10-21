@@ -6,10 +6,7 @@ import android.content.Context
 object Prefs {
     private fun prefs(context: Context) = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    /**
-     * The viewer website for links (e.g. the address the desktop app publishes over Nostr).
-     * Empty: links open only in a PeekaView app (peekaview://join).
-     */
+    /** An own viewer website for links; empty: the one this phone publishes over Nostr (nsite). */
     fun site(context: Context): String = prefs(context).getString("site", "")!!.trim().trimEnd('/')
 
     fun setSite(context: Context, site: String) {

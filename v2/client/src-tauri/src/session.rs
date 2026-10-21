@@ -720,6 +720,13 @@ fn hide_overlays(app: &AppHandle, keep: &[Stream]) {
     }
 }
 
+/// A changed state to the viewers and the overlays (frames: covered windows get a faint one).
+pub fn announce_state(app: &AppHandle, shared: &Shared) {
+    let state = shared.state();
+    to_overlay(app, &state.to_string());
+    shared.send(state);
+}
+
 pub fn place_overlay(app: &AppHandle, slot: u8, rect: Rect, visible: bool) {
     if create_overlay(app, slot).is_err() {
         return;

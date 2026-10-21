@@ -54,7 +54,10 @@
           recording = !!m.recording
           paint()
         } else if (m.t === 'state') {
-          kind = (m.windows ?? []).find((w) => w.w === slot)?.kind ?? kind
+          const win = (m.windows ?? []).find((w) => w.w === slot)
+          kind = win?.kind ?? kind
+          // covered by another window: the frame lies on top of that one – only a faint hint
+          document.body.classList.toggle('covered', win?.reachable === false)
           paint()
         } else if (m.t === 'reset') {
           live = false

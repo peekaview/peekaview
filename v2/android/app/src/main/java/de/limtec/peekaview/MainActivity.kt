@@ -107,6 +107,8 @@ class MainActivity : ComponentActivity() {
         })
 
         if (savedInstanceState == null) open(intent) else web.restoreState(savedInstanceState)
+        // the viewer site for this phone's share links, kept up to date over Nostr
+        if (Prefs.site(this).isEmpty()) Nsite.publishIfNeeded(this)
     }
 
     override fun onNewIntent(intent: Intent) {

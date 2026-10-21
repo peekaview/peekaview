@@ -73,8 +73,8 @@ class Host(
     private val denied = HashSet<String>()
     private var nextId = 1
 
-    private val egl = EglBase.create()
-    private val factory: PeerConnectionFactory
+    private val egl = Rtc.egl(context)
+    private val factory = Rtc.factory(context)
     private val capturer: ScreenCapturerAndroid
     private val source: VideoSource
     private val track: VideoTrack
@@ -83,11 +83,6 @@ class Host(
     private val iceJson = JSONArray().put(JSONObject().put("urls", JSONArray().put("stun:stun.l.google.com:19302").put("stun:stun.cloudflare.com:3478")))
 
     init {
-        PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context).createInitializationOptions())
-        factory = PeerConnectionFactory.builder()
-            .setVideoEncoderFactory(DefaultVideoEncoderFactory(egl.eglBaseContext, true, true))
-            .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
-            .createPeerConnectionFactory()
         capturer = ScreenCapturerAndroid(projectionData, object : MediaProjection.Callback() {
             // the user stopped the capture (system UI)
             override fun onStop() {
@@ -105,7 +100,8 @@ class Host(
         capturer.startCapture(w, h, 30)
         signaling = Signaling(secret, signingKey, Prefs.relays(context)) { msg -> exec.execute { signal(msg) } }
         val room = "$secret.${Signaling.b64url(signaling.publicKey)}"
-        link = if (site.isNotEmpty()) "$site/#$room" else "peekaview://join?room=$room"
+        // the configured viewer website, or the one this phone publishes over Nostr
+        link = "${site.ifEmpty { Nsite.url(context) }}/#$room"
         // presence beacon: viewers waiting for this room say hello right away
         exec.scheduleWithFixedDelay({ signaling.send(JSONObject().put("type", "host")) }, 0, 15, TimeUnit.SECONDS)
         exec.scheduleWithFixedDelay(::sweep, 3, 3, TimeUnit.SECONDS)
@@ -126,8 +122,6 @@ class Host(
                 capturer.dispose()
                 source.dispose()
                 textures.dispose()
-                factory.dispose()
-                egl.release()
                 exec.shutdown()
             }, 300, TimeUnit.MILLISECONDS)
         }
@@ -421,6 +415,27 @@ class Host(
         override fun onSetSuccess() = done()
         override fun onCreateFailure(error: String?) {}
         override fun onSetFailure(error: String?) {}
+    }
+
+    /**
+     * WebRTC's factory lives as long as the app: disposing it while its network monitor still
+     * reports changes crashes libwebrtc.
+     */
+    private object Rtc {
+        private var egl: EglBase? = null
+        private var factory: PeerConnectionFactory? = null
+
+        @Synchronized fun egl(context: Context): EglBase = egl ?: EglBase.create().also { egl = it }
+
+        @Synchronized fun factory(context: Context): PeerConnectionFactory = factory ?: run {
+            PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context.applicationContext).createInitializationOptions())
+            val base = egl(context).eglBaseContext
+            PeerConnectionFactory.builder()
+                .setVideoEncoderFactory(DefaultVideoEncoderFactory(base, true, true))
+                .setVideoDecoderFactory(DefaultVideoDecoderFactory(base))
+                .createPeerConnectionFactory()
+                .also { factory = it }
+        }
     }
 
     companion object {

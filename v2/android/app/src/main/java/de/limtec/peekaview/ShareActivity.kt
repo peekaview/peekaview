@@ -75,6 +75,7 @@ class ShareActivity : ComponentActivity() {
         web.addJavascriptInterface(Bridge(), "PeekaViewHost")
         web.loadUrl("${Assets.UI}share.html")
         HostService.listeners += listener
+        Nsite.listeners += listener
     }
 
     override fun onResume() {
@@ -85,6 +86,7 @@ class ShareActivity : ComponentActivity() {
 
     override fun onDestroy() {
         HostService.listeners -= listener
+        Nsite.listeners -= listener
         super.onDestroy()
     }
 
@@ -100,6 +102,7 @@ class ShareActivity : ComponentActivity() {
             .put("starting", starting)
             .put("error", error ?: HostService.lastError)
             .put("controlEnabled", ControlService.enabled(this))
+            .put("nsite", JSONObject().put("url", Nsite.url(this)).put("state", Nsite.state.name.lowercase()).put("error", Nsite.error))
         if (host != null) {
             o.put("link", host.link).put("mode", host.mode)
             o.put("viewers", JSONArray(host.viewers().map { JSONObject().put("name", it.name).put("color", it.color) }))
@@ -129,6 +132,8 @@ class ShareActivity : ComponentActivity() {
                 update()
                 return@runOnUiThread
             }
+            // the phone's own viewer site over Nostr – or, with an own website, not anymore
+            if (site.isBlank()) Nsite.publishIfNeeded(this@ShareActivity) else Nsite.unpublish(this@ShareActivity)
             starting = true
             error = null
             HostService.lastError = null
