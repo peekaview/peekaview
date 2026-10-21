@@ -30,6 +30,11 @@ class HostService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // "Zulassen" / "Ablehnen" in a join request's notification
+        if (intent?.action == ACTION_ADMIT) {
+            intent.getStringExtra(EXTRA_PEER)?.let { host?.admit(it, intent.getBooleanExtra(EXTRA_ALLOW, false)) }
+            return START_NOT_STICKY
+        }
         // first the notification, then the capture (Android's order for media projection)
         val notification = running()
         if (Build.VERSION.SDK_INT >= 29) {
@@ -80,35 +85,49 @@ class HostService : Service() {
     override fun onDestroy() {
         host?.stop()
         host = null
-        getSystemService(NotificationManager::class.java).cancel(ID_REQUEST)
+        val manager = getSystemService(NotificationManager::class.java)
+        for (id in announced.values) manager.cancel(id)
+        announced.clear()
         changed()
         super.onDestroy()
     }
 
-    private var announced = emptySet<String>()
+    // join requests with a notification of their own: peer → notification id
+    private val announced = HashMap<String, Int>()
 
     private fun changed() {
-        // a new join request: a notification that rings
+        // every join request: a notification that rings, to let in or turn away right there
         val requests = host?.requests().orEmpty()
-        val fresh = requests.filter { it.peer !in announced }
-        announced = requests.map { it.peer }.toSet()
         val manager = getSystemService(NotificationManager::class.java)
-        if (fresh.isNotEmpty()) {
+        for (r in requests.filter { it.peer !in announced }) {
+            val id = ID_REQUEST + (r.peer.hashCode() and 0xffff)
+            announced[r.peer] = id
             manager.notify(
-                ID_REQUEST,
+                id,
                 Notification.Builder(this, CHANNEL_REQUESTS)
                     .setSmallIcon(R.drawable.ic_launcher_foreground)
-                    .setContentTitle("${fresh.first().name.ifBlank { "Gast" }} möchte zusehen")
-                    .setContentText("Tippen, um zuzulassen oder abzulehnen")
+                    .setContentTitle("${r.name.ifBlank { "Gast" }} möchte zusehen")
+                    .setContentText("Zulassen oder ablehnen")
                     .setContentIntent(openShare())
-                    .setAutoCancel(true)
+                    .addAction(Notification.Action.Builder(null, "Ablehnen", admit(r.peer, false, id)).build())
+                    .addAction(Notification.Action.Builder(null, "Zulassen", admit(r.peer, true, id + 1)).build())
                     .build(),
             )
-        } else if (requests.isEmpty()) {
-            manager.cancel(ID_REQUEST)
+        }
+        // decided (here, in the app or by timeout): the notification goes
+        for (peer in announced.keys.filter { p -> requests.none { it.peer == p } }) {
+            manager.cancel(announced.remove(peer)!!)
         }
         for (l in listeners) l()
     }
+
+    private fun admit(peer: String, allow: Boolean, code: Int): PendingIntent =
+        PendingIntent.getService(
+            this,
+            code,
+            Intent(this, HostService::class.java).setAction(ACTION_ADMIT).putExtra(EXTRA_PEER, peer).putExtra(EXTRA_ALLOW, allow),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
     private fun openShare(): PendingIntent =
         PendingIntent.getActivity(this, 0, Intent(this, ShareActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -120,11 +139,17 @@ class HostService : Service() {
             .setContentText("Tippen für Link, Zuschauer und Beenden")
             .setContentIntent(openShare())
             .setOngoing(true)
+            // a group of its own: Android would fold the join requests into it, and their
+            // buttons would only show after unfolding
+            .setGroup("share")
             .build()
 
     companion object {
         const val EXTRA_DATA = "data"
         const val EXTRA_NAME = "name"
+        private const val ACTION_ADMIT = "de.limtec.peekaview.ADMIT"
+        private const val EXTRA_PEER = "peer"
+        private const val EXTRA_ALLOW = "allow"
         private const val CHANNEL = "share"
         private const val CHANNEL_REQUESTS = "requests"
         private const val ID = 1

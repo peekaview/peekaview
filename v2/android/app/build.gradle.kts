@@ -48,8 +48,8 @@ dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     // WebRTC (Google's libwebrtc, maintained build) – the host side of a share
     implementation("io.getstream:stream-webrtc-android:1.3.8")
-    // Nostr signaling: websockets to the relays, Schnorr signatures (secp256k1)
+    // Nostr signaling: websockets to the relays (Schnorr signatures: Schnorr.kt)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    testImplementation("junit:junit:4.13.2")
 }

@@ -1,7 +1,6 @@
 package de.limtec.peekaview
 
 import android.util.Base64
-import fr.acinq.secp256k1.Secp256k1
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -141,7 +140,7 @@ class Signaling(
         fun newSigningKey(): ByteArray {
             while (true) {
                 val key = ByteArray(32).also { random.nextBytes(it) }
-                if (Secp256k1.secKeyVerify(key)) return key
+                if (Schnorr.validKey(key)) return key
             }
         }
 

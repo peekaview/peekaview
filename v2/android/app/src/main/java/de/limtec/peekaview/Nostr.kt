@@ -1,6 +1,5 @@
 package de.limtec.peekaview
 
-import fr.acinq.secp256k1.Secp256k1
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -17,14 +16,14 @@ object Nostr {
     private val random = SecureRandom()
     val http: OkHttpClient = OkHttpClient.Builder().pingInterval(20, TimeUnit.SECONDS).build()
 
-    fun publicKey(secret: ByteArray): ByteArray = Secp256k1.pubkeyCreate(secret).copyOfRange(1, 33)
+    fun publicKey(secret: ByteArray): ByteArray = Schnorr.publicKey(secret)
 
     /** A signed event (NIP-01): tags are lists of strings. */
     fun sign(secret: ByteArray, kind: Int, tags: List<List<String>>, content: String, createdAt: Long = System.currentTimeMillis() / 1000): JSONObject {
         val pubkey = Signaling.hex(publicKey(secret))
         val serialized = "[0,${str(pubkey)},$createdAt,$kind,${tags.joinToString(",", "[", "]") { t -> t.joinToString(",", "[", "]") { str(it) } }},${str(content)}]"
         val id = Signaling.sha256(serialized.toByteArray())
-        val sig = Secp256k1.signSchnorr(id, secret, ByteArray(32).also { random.nextBytes(it) })
+        val sig = Schnorr.sign(id, secret, ByteArray(32).also { random.nextBytes(it) })
         return JSONObject()
             .put("id", Signaling.hex(id))
             .put("pubkey", pubkey)
