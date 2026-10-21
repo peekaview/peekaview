@@ -1,12 +1,12 @@
-name: v2 desktop client
+name: desktop client
 
-# manual only (Actions → "v2 desktop client" → Run workflow): every run builds on three
+# manual only (Actions → "desktop client" → Run workflow): every run builds on three
 # platforms, so it does not start on pushes / pull requests
 on:
   workflow_dispatch:
 
 concurrency:
-  group: v2-client-${{ github.ref }}
+  group: client-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,17 +22,12 @@ jobs:
           - os: ubuntu-24.04
             bundles: deb
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: v2
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: v2
 
       - name: Linux system libraries
         if: runner.os == 'Linux'
@@ -48,11 +43,11 @@ jobs:
         run: cargo test -p peekaview --locked
 
       - name: Build app
-        working-directory: v2/client
+        working-directory: client
         run: npx --yes @tauri-apps/cli@2 build --bundles ${{ matrix.bundles }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: peekaview-${{ runner.os }}
-          path: v2/target/release/bundle/
+          path: target/release/bundle/
           if-no-files-found: error
