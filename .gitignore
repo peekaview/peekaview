@@ -30,6 +30,8 @@ tmp/
 *.key
 *.crt
 *.priv
+serviceAccountKey.json
+*serviceAccount*.json
 
 todo.txt
 private
