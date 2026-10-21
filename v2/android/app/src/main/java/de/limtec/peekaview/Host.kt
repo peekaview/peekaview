@@ -2,21 +2,21 @@ package de.limtec.peekaview
 
 import android.content.Context
 import android.content.Intent
-import android.media.projection.MediaProjection
 import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
-import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.H264EncoderFactory
 import org.webrtc.EglBase
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
+import org.webrtc.MediaStreamTrack
+import org.webrtc.RtpParameters
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpReceiver
-import org.webrtc.ScreenCapturerAndroid
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.SurfaceTextureHelper
@@ -75,7 +75,7 @@ class Host(
 
     private val egl = Rtc.egl(context)
     private val factory = Rtc.factory(context)
-    private val capturer: ScreenCapturerAndroid
+    private val capturer: ScreenCapture
     private val source: VideoSource
     private val track: VideoTrack
     private val textures: SurfaceTextureHelper
@@ -83,12 +83,11 @@ class Host(
     private val iceJson = JSONArray().put(JSONObject().put("urls", JSONArray().put("stun:stun.l.google.com:19302").put("stun:stun.cloudflare.com:3478")))
 
     init {
-        capturer = ScreenCapturerAndroid(projectionData, object : MediaProjection.Callback() {
-            // the user stopped the capture (system UI)
-            override fun onStop() {
-                onEnded()
-            }
-        })
+        // the user (or the system) stopped the capture
+        capturer = ScreenCapture(projectionData) {
+            android.util.Log.i("host", "screen capture stopped by the system")
+            onEnded()
+        }
         textures = SurfaceTextureHelper.create("capture", egl.eglBaseContext)
         source = factory.createVideoSource(true)
         capturer.initialize(textures, context, source.capturerObserver)
@@ -98,18 +97,18 @@ class Host(
     fun start() {
         val (w, h) = captureSize()
         capturer.startCapture(w, h, 30)
-        signaling = Signaling(secret, signingKey, Prefs.relays(context)) { msg -> exec.execute { signal(msg) } }
+        signaling = Signaling(secret, signingKey, Prefs.relays(context)) { msg -> post { signal(msg) } }
         val room = "$secret.${Signaling.b64url(signaling.publicKey)}"
         // the configured viewer website, or the one this phone publishes over Nostr
         link = "${site.ifEmpty { Nsite.url(context) }}/#$room"
         // presence beacon: viewers waiting for this room say hello right away
         exec.scheduleWithFixedDelay({ signaling.send(JSONObject().put("type", "host")) }, 0, 15, TimeUnit.SECONDS)
         exec.scheduleWithFixedDelay(::sweep, 3, 3, TimeUnit.SECONDS)
-        exec.execute(::changed)
+        post(::changed)
     }
 
     fun stop() {
-        exec.execute {
+        post {
             for (v in viewers.values) {
                 send(v, JSONObject().put("t", "end"))
                 v.pc.close()
@@ -128,13 +127,28 @@ class Host(
     }
 
     /** The screen turned (or changed size). */
-    fun resize(w: Int, h: Int) = exec.execute {
-        if (w == width && h == height) return@execute
+    fun resize(w: Int, h: Int) = post {
+        if (w == width && h == height) return@post
         width = w
         height = h
         val (cw, ch) = captureSize()
         capturer.changeCaptureFormat(cw, ch, 30)
         broadcast(state())
+    }
+
+    private var refreshed = 0L
+
+    /**
+     * Fresh pictures now (a viewer joined or lost one): Android's screen capture only delivers a
+     * frame when something changes – a resize back and forth makes it deliver two.
+     */
+    private fun refresh() {
+        val now = System.currentTimeMillis()
+        if (now - refreshed < 1000) return
+        refreshed = now
+        val (cw, ch) = captureSize()
+        capturer.changeCaptureFormat(cw, ch - 2, 30)
+        runCatching { exec.schedule({ capturer.changeCaptureFormat(cw, ch, 30) }, 150, TimeUnit.MILLISECONDS) }
     }
 
     // at most 1600 pixels on the long side: sharp enough, light on the network
@@ -153,14 +167,20 @@ class Host(
 
     fun requests(): List<Request> = requestList
 
+    /** Runs on the host's thread – quietly not at all once the share has ended (WebRTC's callbacks
+     *  may still come; an exception there would abort libwebrtc). */
+    private fun post(block: () -> Unit) {
+        runCatching { exec.execute(block) }
+    }
+
     private fun changed() {
         viewerList = viewers.values.filter { it.connected }.map { Viewer(it.name, it.color) }
         requestList = requests.values.map { it.first }
         onChange()
     }
 
-    fun admit(peer: String, allow: Boolean) = exec.execute {
-        val request = requests.remove(peer) ?: return@execute
+    fun admit(peer: String, allow: Boolean) = post {
+        val request = requests.remove(peer) ?: return@post
         if (allow) {
             admitted += peer
             invite(peer, request.first.name, request.first.color)
@@ -171,8 +191,8 @@ class Host(
         changed()
     }
 
-    fun setMode(m: String) = exec.execute {
-        if (m !in listOf("view", "draw", "control") || m == mode) return@execute
+    fun setMode(m: String) = post {
+        if (m !in listOf("view", "draw", "control") || m == mode) return@post
         mode = m
         if (m != "control") for (v in viewers.values) release(v)
         broadcast(state())
@@ -188,7 +208,7 @@ class Host(
             "hello" -> hello(from, msg)
             "answer" -> viewers[from]?.let { v ->
                 val sdp = msg.optJSONObject("sdp") ?: return
-                v.pc.setRemoteDescription(Done { exec.execute { v.answered = true; v.pending.forEach(v.pc::addIceCandidate); v.pending.clear() } }, SessionDescription(SessionDescription.Type.ANSWER, sdp.optString("sdp")))
+                v.pc.setRemoteDescription(Done { post { v.answered = true; v.pending.forEach(v.pc::addIceCandidate); v.pending.clear() } }, SessionDescription(SessionDescription.Type.ANSWER, sdp.optString("sdp")))
             }
             "candidate" -> viewers[from]?.let { v ->
                 val c = msg.optJSONObject("candidate") ?: return
@@ -244,14 +264,14 @@ class Host(
         val config = PeerConnection.RTCConfiguration(ice).apply { sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN }
         lateinit var v: Peer
         val pc = factory.createPeerConnection(config, object : PeerConnection.Observer {
-            override fun onIceCandidate(candidate: IceCandidate) = exec.execute {
+            override fun onIceCandidate(candidate: IceCandidate) = post {
                 signaling.send(
                     JSONObject().put("type", "candidate").put("from", "host").put("to", peer).put("id", id)
                         .put("candidate", JSONObject().put("candidate", candidate.sdp).put("sdpMid", candidate.sdpMid).put("sdpMLineIndex", candidate.sdpMLineIndex)),
                 )
             }
 
-            override fun onConnectionChange(state: PeerConnection.PeerConnectionState) = exec.execute {
+            override fun onConnectionChange(state: PeerConnection.PeerConnectionState) = post {
                 when (state) {
                     PeerConnection.PeerConnectionState.CONNECTED -> {
                         v.connected = true
@@ -277,14 +297,30 @@ class Host(
         v = Peer(id, peer, name, color, pc)
         viewers[peer] = v
         // the screen as slot 0 ("w0": the viewer finds the window by the stream id)
-        pc.addTrack(track, listOf("w0"))
+        val sender = pc.addTrack(track, listOf("w0"))
+        // H.264 – every phone encodes it in hardware (VP8 would be software: slow)
+        pc.transceivers.firstOrNull { it.sender == sender }?.let { t ->
+            val codecs = factory.getRtpSenderCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO).codecs
+            val h264 = codecs.filter { it.name.equals("H264", true) }
+            if (h264.isNotEmpty()) t.setCodecPreferences(h264 + codecs.filter { !it.name.equals("H264", true) && it.name !in listOf("VP8", "VP9", "AV1") })
+        }
+        // enough bits for a sharp screen; under pressure fewer frames *and* fewer pixels, not a
+        // picture that freezes
+        sender.parameters = sender.parameters.apply {
+            degradationPreference = RtpParameters.DegradationPreference.BALANCED
+            for (e in encodings) {
+                e.maxBitrateBps = 6_000_000
+                e.minBitrateBps = 300_000
+                e.maxFramerate = 30
+            }
+        }
         v.dc = pc.createDataChannel("pv", DataChannel.Init().apply { ordered = true }).also { dc ->
             dc.registerObserver(object : DataChannel.Observer {
-                override fun onStateChange() = exec.execute { if (dc.state() == DataChannel.State.OPEN) opened(v) }
+                override fun onStateChange() = post { if (dc.state() == DataChannel.State.OPEN) opened(v) }
                 override fun onMessage(buffer: DataChannel.Buffer) {
                     if (buffer.binary || buffer.data.remaining() > 65_536) return
                     val text = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }.toString(Charsets.UTF_8)
-                    exec.execute { runCatching { message(v, JSONObject(text)) } }
+                    post { runCatching { message(v, JSONObject(text)) } }
                 }
                 override fun onBufferedAmountChange(previous: Long) {}
             })
@@ -292,7 +328,7 @@ class Host(
         // the shared clipboard is not offered by a phone; the channel exists for the viewer
         v.files = pc.createDataChannel("pvfile", DataChannel.Init().apply { ordered = true })
         pc.createOffer(Created { offer ->
-            pc.setLocalDescription(Done { exec.execute {
+            pc.setLocalDescription(Done { post {
                 signaling.send(
                     JSONObject().put("type", "offer").put("from", "host").put("to", peer)
                         .put("sdp", JSONObject().put("type", "offer").put("sdp", offer.description))
@@ -317,6 +353,7 @@ class Host(
         broadcast(peers())
         send(v, JSONObject().put("t", "clip").put("items", JSONArray()))
         changed()
+        refresh()
     }
 
     private fun send(v: Peer, msg: JSONObject) {
@@ -338,7 +375,8 @@ class Host(
             .put(
                 "windows",
                 JSONArray().put(
-                    JSONObject().put("w", 0).put("kind", "screen").put("title", title).put("app", "Android")
+                    // nav: viewers get the phone's back / home / recents buttons
+                    JSONObject().put("w", 0).put("kind", "screen").put("title", title).put("app", "Android").put("nav", true)
                         .put("pw", cw).put("ph", ch).put("paused", false).put("reachable", true).put("z", 0).put("rect", rect),
                 ),
             )
@@ -382,6 +420,8 @@ class Host(
                 it.scroll(x(msg), y(msg), msg.optDouble("dx").toFloat().coerceIn(-20f, 20f) * 60, msg.optDouble("dy").toFloat().coerceIn(-20f, 20f) * 60)
             }
             "key" -> if (mode == "control") control { it.key(msg.optString("key")) }
+            "nav" -> if (mode == "control") control { it.nav(msg.optString("a")) }
+            "keyframe" -> refresh()
         }
     }
 
@@ -431,7 +471,7 @@ class Host(
             PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(context.applicationContext).createInitializationOptions())
             val base = egl(context).eglBaseContext
             PeerConnectionFactory.builder()
-                .setVideoEncoderFactory(DefaultVideoEncoderFactory(base, true, true))
+                .setVideoEncoderFactory(H264EncoderFactory(base))
                 .setVideoDecoderFactory(DefaultVideoDecoderFactory(base))
                 .createPeerConnectionFactory()
                 .also { factory = it }

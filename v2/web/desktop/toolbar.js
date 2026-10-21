@@ -31,6 +31,10 @@ const voice = new Voice({
   },
 })
 
+// errors of this window go to PeekaView's log
+window.addEventListener('error', (e) => invoke('log_js', { message: `toolbar: ${e.message} (${e.filename}:${e.lineno})` }).catch(() => {}))
+window.addEventListener('unhandledrejection', (e) => invoke('log_js', { message: `toolbar: ${e.reason}` }).catch(() => {}))
+
 for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 17)
 $('logo').innerHTML = owl(24)
 

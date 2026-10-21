@@ -81,7 +81,7 @@ async fn start_share(
         admitted: vec![],
         remote: None,
     };
-    let hosted = session::start(app.clone(), opts).await?;
+    let hosted = session::start(app.clone(), opts).await.inspect_err(|e| log(&format!("start_share: {e}")))?;
     // the link is ready to paste right away (the toolbar says so)
     if let Some(link) = hosted["link"].as_str() {
         if clip::os::write(Some(link.to_string()), None, None, &[]).is_ok() {
@@ -91,6 +91,12 @@ async fn start_share(
     // the share runs: the PeekaView window steps aside for the toolbar
     hide_main(&app);
     Ok(hosted)
+}
+
+/// Errors of the app's own pages, into the log.
+#[tauri::command]
+fn log_js(message: String) {
+    log(&format!("js: {}", message.chars().take(500).collect::<String>()));
 }
 
 /// Hides the PeekaView window (it stays in the tray).
@@ -673,6 +679,7 @@ fn main() {
             show_picker,
             hide_window,
             toast,
+            log_js,
             start_share,
             take_invite,
             set_mode,

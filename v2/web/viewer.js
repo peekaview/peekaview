@@ -159,6 +159,12 @@ export function mountViewer(el, options) {
     canResize: () => state.mode === 'control' && state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
     onActivate: (slot) => send({ t: 'activate', w: slot }),
+    // soft buttons of a shared phone – kept above the dock at its usual place
+    onNav: (slot, a) => send({ t: 'nav', a, w: slot }),
+    bottomSpace: () => {
+      const d = el.querySelector('.pv-dock')
+      return !d || d.hidden || d.classList.contains('placed') ? 0 : d.offsetHeight + 20
+    },
     onPlace: (slot, f) => send({ t: 'arrange', w: slot, ...f }),
     onChange: () => renderTasks(),
     onFrame: () => {
@@ -394,6 +400,8 @@ export function mountViewer(el, options) {
           lines.push({
             slot: trackSlots.get(r.trackIdentifier),
             size: `${r.frameWidth ?? '?'}×${r.frameHeight ?? '?'}`,
+            codec: (stats.get(r.codecId)?.mimeType ?? '').replace('video/', ''),
+            decoder: r.decoderImplementation ?? '',
             fps: r.framesPerSecond ?? 0,
             kbps: p.bytes != null ? ((r.bytesReceived - p.bytes) * 8) / 1000 : 0,
             decode: frames > 0 ? ((r.totalDecodeTime - p.decode) / frames) * 1000 : 0,
@@ -419,7 +427,7 @@ export function mountViewer(el, options) {
     for (const l of lines.filter((l) => l.slot != null).sort((a, b) => a.slot - b.slot)) {
       const h = hostStats?.streams?.find((s) => s.w === l.slot)
       out.push(`<b>${name(l.slot).replace(/[<&]/g, '')}</b>`)
-      out.push(`  hier  ${l.size} · ${Math.round(l.fps)} fps · ${Math.round(l.kbps)} kbit/s · Decode ${l.decode.toFixed(1)} ms · Puffer ${Math.round(l.buffer)} ms`)
+      out.push(`  hier  ${l.codec ? `${l.codec} · ` : ''}${l.size} · ${Math.round(l.fps)} fps · ${Math.round(l.kbps)} kbit/s · Decode ${l.decode.toFixed(1)} ms · Puffer ${Math.round(l.buffer)} ms`)
       if (h) out.push(`  Host  ${h.width}×${h.height} · ${h.fps.toFixed(0)} fps · ${h.kbps} kbit/s · Encoder ${h.enc_ms.toFixed(1)} ms · Ziel ${(h.bitrate / 1e6).toFixed(1)} Mbit/s${h.want_w ? ` · auf ${h.want_w} px reduziert` : ''}${h.idle ? ' · pausiert' : ''}`)
     }
     box.innerHTML = out.join('\n')

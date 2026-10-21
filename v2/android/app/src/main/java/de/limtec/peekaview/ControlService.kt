@@ -61,6 +61,15 @@ class ControlService : AccessibilityService() {
         dispatchGesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(stroke, 0, 120)).build(), null, null)
     }
 
+    /** The soft buttons below the phone in the viewer. */
+    fun nav(action: String) {
+        when (action) {
+            "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+            "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
+            "recents" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+        }
+    }
+
     /** Keys with a meaning on a phone: Escape = back, Home = home screen. */
     fun key(name: String) {
         when (name) {

@@ -25,6 +25,10 @@ let invite = null
 // picking new sources for the running share (from its toolbar)
 let switching = false
 
+// errors of this window go to PeekaView's log
+window.addEventListener('error', (e) => invoke('log_js', { message: `main: ${e.message} (${e.filename}:${e.lineno})` }).catch(() => {}))
+window.addEventListener('unhandledrejection', (e) => invoke('log_js', { message: `main: ${e.reason}` }).catch(() => {}))
+
 renderIcons()
 $('logo').innerHTML = owl(22)
 $('name').value = store.get('pv-name') ?? ''
@@ -227,7 +231,10 @@ async function start() {
   if (!selected.length) return
   if (switching) return switchSource()
   const status = await invoke('permission_status')
-  if (!status.screen) return invoke('request_permission', { kind: 'screen' })
+  if (!status.screen) {
+    error('PeekaView darf den Bildschirm noch nicht aufnehmen. Bitte in den Systemeinstellungen erlauben (die Hilfe zeigt wie) – danach startet PeekaView kurz neu.')
+    return invoke('request_permission', { kind: 'screen' })
+  }
 
   const name = $('name').value.trim() || 'Host'
   store.set('pv-name', $('name').value.trim())

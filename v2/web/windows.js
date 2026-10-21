@@ -10,6 +10,7 @@ import { Annotations, injectStyle } from './annotate.js'
 import { icon } from './icons.js'
 
 const BAR = 30 // title bar height (CSS px)
+const NAV = 56 // soft buttons below a shared phone screen (CSS px)
 const GAP = 12
 const MIN_SCALE = 0.12
 
@@ -43,6 +44,11 @@ const STYLE = `
 .pv-win-ghost span { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 7px; background: rgba(9, 9, 11, .85); color: #fafafa; font: 600 12px/1.3 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
 .pv-win-ghost small { display: block; color: #a1a1aa; font-weight: 500; font-size: 11px; }
 .pv-wins.solo .pv-win { border-radius: 0; box-shadow: none; background: transparent; }
+.pv-nav { position: absolute; left: 0; right: 0; top: 100%; height: ${NAV}px; display: flex; align-items: center; justify-content: center; gap: 22px; }
+.pv-nav[hidden] { display: none; }
+.pv-nav button { display: grid; place-items: center; width: 56px; height: 38px; padding: 0; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .08); color: #e4e4e7; cursor: pointer; transition: background .15s; }
+.pv-nav button:hover { background: rgba(255, 255, 255, .16); }
+.pv-nav button:active { background: rgba(255, 255, 255, .26); }
 .pv-wins.solo .pv-win .pv-view { border-radius: 0; }
 .pv-wins.solo .pv-win-bar, .pv-wins.solo .pv-grab { display: none; }
 .pv-wins.moving .pv-view { pointer-events: none; }
@@ -162,6 +168,13 @@ export class WindowManager {
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
       paused.textContent = 'Fenster ist beim Host gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
+      // a phone screen with remote control: soft buttons below it
+      const nav = !!info.nav && control
+      win.el.querySelector('.pv-nav').hidden = !nav
+      if (nav !== !!win.nav) {
+        win.nav = nav
+        changed = true
+      }
     })
     if (mirrored !== this.mirror) changed = true
     this.mirror = mirrored
@@ -187,6 +200,11 @@ export class WindowManager {
       <div class="pv-win-bar"><span class="pv-win-app"></span><span class="pv-win-title"></span><span class="pv-win-flag"></span>
         <button data-min title="Minimieren">${icon('minimize', 15)}</button><button data-max title="Maximieren">${icon('maximize', 13)}</button></div>
       <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
+      <div class="pv-nav" hidden>
+        <button data-nav="back" title="Zurück"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4.5v15L5.5 12z"/></svg></button>
+        <button data-nav="home" title="Startbildschirm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="7.5"/></svg></button>
+        <button data-nav="recents" title="Zuletzt verwendete Apps"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="5" width="14" height="14" rx="2"/></svg></button>
+      </div>
       <div class="pv-grab" data-edge="r"></div><div class="pv-grab" data-edge="b"></div><div class="pv-grab" data-edge="rb" title="Größe ändern"></div>`
     this.root.append(el)
     const video = el.querySelector('video')
@@ -232,6 +250,8 @@ export class WindowManager {
     el.querySelector('.pv-win-bar').addEventListener('dblclick', (e) => !e.target.closest('button') && this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('pointerdown', (e) => !e.target.closest('button') && this.drag(win, e))
     for (const g of el.querySelectorAll('.pv-grab')) g.addEventListener('pointerdown', (e) => this.resize(win, e, g.dataset.edge))
+    // a shared phone: its back / home / recents buttons
+    for (const b of el.querySelectorAll('[data-nav]')) b.addEventListener('click', () => this.options.onNav?.(slot, b.dataset.nav))
     return win
   }
 
@@ -279,9 +299,11 @@ export class WindowManager {
       for (const win of wins) {
         win.min = false
         const n = this.native(win)
-        win.s = this.fitScale(win, a.w, a.h, 0)
+        // room for the soft buttons of a phone below it (above the viewer's dock)
+        const h = a.h - (win.nav ? NAV + (this.options.bottomSpace?.() ?? 0) : 0)
+        win.s = this.fitScale(win, a.w, h, 0)
         win.x = (a.w - n.w * win.s) / 2
-        win.y = (a.h - n.h * win.s) / 2
+        win.y = (h - n.h * win.s) / 2
         this.paint(win, 0)
       }
       return
