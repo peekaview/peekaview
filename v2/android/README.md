@@ -10,9 +10,9 @@ Eine App für zwei Dinge:
   Desktop-App oder in einer anderen Android-App zu. Steuern geht über den Bedienungshilfen-Dienst
   „PeekaView Fernsteuerung“, den man einmalig in den Android-Einstellungen einschaltet.
 
-Für Links, die im Browser funktionieren, trägt man beim Teilen die Zuschauer-Website ein (die
-Adresse, die PeekaView am Computer unter Einstellungen zeigt). Ohne sie öffnet sich der Link nur
-in einer PeekaView-App.
+Die Viewer-Seite für die Links veröffentlicht das Handy selbst über Nostr (nsite), wie die
+Desktop-App: `https://<npub>.nsite.lol/#…`. Wer eine eigene Website einträgt, bekommt Links
+dorthin – die nsite-Seite des Handys wird dann wieder entfernt.
 
 ## Bauen
 
