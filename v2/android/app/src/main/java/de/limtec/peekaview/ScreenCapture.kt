@@ -18,7 +18,7 @@ import org.webrtc.VideoCapturer
  * creating another one – since Android 14 a capture permission allows only one, and Android ends
  * the capture otherwise.
  */
-class ScreenCapture(private val permission: Intent, private val onStop: () -> Unit) : VideoCapturer {
+class ScreenCapture(private val permission: Intent, private val onEnded: () -> Unit) : VideoCapturer {
     private lateinit var context: Context
     private lateinit var textures: SurfaceTextureHelper
     private lateinit var observer: CapturerObserver
@@ -29,7 +29,7 @@ class ScreenCapture(private val permission: Intent, private val onStop: () -> Un
     private val callback = object : MediaProjection.Callback() {
         override fun onStop() {
             textures.handler.post { stopCapture() }
-            onStop()
+            onEnded()
         }
     }
 
@@ -43,7 +43,7 @@ class ScreenCapture(private val permission: Intent, private val onStop: () -> Un
     override fun startCapture(width: Int, height: Int, framerate: Int) {
         textures.handler.post {
             val manager = context.getSystemService(MediaProjectionManager::class.java)
-            val p = manager.getMediaProjection(Activity.RESULT_OK, permission) ?: return@post onStop()
+            val p = manager.getMediaProjection(Activity.RESULT_OK, permission) ?: return@post onEnded()
             projection = p
             p.registerCallback(callback, textures.handler)
             textures.setTextureSize(width, height)

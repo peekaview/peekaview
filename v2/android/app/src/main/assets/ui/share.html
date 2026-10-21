@@ -35,15 +35,24 @@
     .people { display: flex; flex-wrap: wrap; gap: 6px; }
     .person { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--raised); font-size: 14px; }
     .person i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-style: normal; font-size: 11px; font-weight: 700; }
-    .request { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; background: var(--panel); border: 1px solid rgba(239,68,68,.45); box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
-    .request div { flex: 1; min-width: 0; }
-    .request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .request span { color: var(--muted); font-size: 13px; }
-    .request .btn { flex: none; padding: 0 14px; height: 40px; }
+    /* join requests: a modal above everything – nobody watches without the OK */
+    #requests { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; background: rgba(0,0,0,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    #requests:empty { display: none; }
+    .request { width: min(380px, 100%); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 26px 20px 20px; border-radius: 22px; background: var(--panel); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 24px 60px rgba(0,0,0,.6); text-align: center; animation: pop .22s ease-out; }
+    .request .who { font-style: normal; display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 6px; border-radius: 50%; color: #fff; font-size: 22px; font-weight: 700; box-shadow: 0 0 0 6px rgba(239,68,68,.18); animation: ring 1.6s ease-in-out infinite; }
+    .request strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; }
+    .request span { color: var(--muted); font-size: 15px; }
+    .request .row { width: 100%; margin-top: 14px; }
+    .request .btn { height: 50px; font-size: 16px; }
+    @keyframes pop { from { opacity: 0; transform: scale(.94); } }
+    @keyframes ring { 50% { box-shadow: 0 0 0 12px rgba(239,68,68,.06); } }
     .hint { padding: 12px 14px; border-radius: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); color: #fde68a; font-size: 14px; }
     .hint button { margin-top: 8px; padding: 8px 12px; border-radius: 9px; border: 0; background: rgba(234,179,8,.2); color: #fde68a; font-weight: 600; }
     .error { color: #fca5a5; }
     #nsite { word-break: break-all; }
+    label.check { display: flex; align-items: center; gap: 10px; color: var(--fg); font-size: 15px; }
+    label.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+    label.check .muted { font-size: 13px; }
     .watch { align-self: center; margin-top: 4px; padding: 10px 16px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
   </style>
 </head>
@@ -61,6 +70,7 @@
       <label>Dein Name <input id="name" maxlength="32" autocomplete="name"></label>
       <label>Zuschauer-Website <input id="site" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="über Nostr (nsite)"></label>
       <p id="nsite" class="muted"></p>
+      <label class="check"><input type="checkbox" id="keep"> Raumlink beibehalten <span class="muted">– derselbe Link wie beim letzten Mal</span></label>
       <p class="muted">Android fragt gleich, ob PeekaView den Bildschirm aufnehmen darf. Wer den Link öffnet, muss von dir zugelassen werden.</p>
       <button id="start" class="big">Freigabe starten</button>
       <p id="error" class="error" hidden></p>
@@ -113,12 +123,13 @@
     $('name').addEventListener('input', () => localStorage.setItem('pv-name', $('name').value.trim()))
     $('watch').addEventListener('click', () => host.watch())
     $('site').value = host.site()
+    $('keep').checked = host.keepLink()
     $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
     $('start').addEventListener('click', () => {
       const name = $('name').value.trim() || 'Android'
       localStorage.setItem('pv-name', $('name').value.trim())
       $('start').disabled = true
-      host.start(name, $('site').value.trim())
+      host.start(name, $('site').value.trim(), $('keep').checked)
     })
     $('copy').addEventListener('click', () => {
       host.copyLink()
@@ -170,8 +181,10 @@
         ...requests.map((r) => {
           const row = document.createElement('div')
           row.className = 'request'
-          row.innerHTML = '<div><strong></strong><span>möchte zusehen</span></div><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button>'
+          row.innerHTML = '<i class="who"></i><strong></strong><span>möchte deinen Bildschirm sehen</span><div class="row"><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button></div>'
           row.querySelector('strong').textContent = r.name || 'Gast'
+          row.querySelector('.who').textContent = initials(r.name || 'Gast')
+          row.querySelector('.who').style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'
           const [deny, allow] = row.querySelectorAll('button')
           deny.addEventListener('click', () => host.admit(r.peer, false))
           allow.addEventListener('click', () => host.admit(r.peer, true))

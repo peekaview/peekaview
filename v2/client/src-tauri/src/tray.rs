@@ -15,7 +15,17 @@ const ID: &str = "peekaview";
 
 const MODES: [(Mode, &str); 3] = [(Mode::View, "Nur zusehen"), (Mode::Draw, "Zeigen & malen"), (Mode::Control, "Steuern")];
 
-/// The tray icon's click: the running share's toolbar, otherwise the PeekaView window.
+/// The tray icon's click: an open PeekaView window closes; otherwise the running share's
+/// toolbar comes up, or the PeekaView window to pick what to share.
+fn toggle(app: &AppHandle) {
+    if let Some(main) = app.get_webview_window("main").filter(|m| m.is_visible().unwrap_or(false)) {
+        let _ = main.hide();
+        return;
+    }
+    open(app);
+}
+
+/// The running share's toolbar, otherwise the PeekaView window.
 fn open(app: &AppHandle) {
     match app.get_webview_window("toolbar") {
         Some(toolbar) => {
@@ -146,7 +156,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                open(tray.app_handle());
+                toggle(tray.app_handle());
             }
         })
         .build(app)?;

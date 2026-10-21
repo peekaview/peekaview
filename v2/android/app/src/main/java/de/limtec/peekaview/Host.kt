@@ -58,8 +58,10 @@ class Host(
 
     // everything runs on one thread: signaling, WebRTC callbacks, UI calls
     private val exec = Executors.newSingleThreadScheduledExecutor()
-    private val secret = Signaling.newSecret()
-    private val signingKey = Signaling.newSigningKey()
+    // a new room – or the last one again ("Raumlink beibehalten")
+    private val room = Prefs.room(context)
+    private val secret = room.first
+    private val signingKey = room.second
     private lateinit var signaling: Signaling
     private val site = Prefs.site(context)
     var link: String = ""

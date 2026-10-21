@@ -127,7 +127,11 @@ class ShareActivity : ComponentActivity() {
         fun site(): String = Prefs.site(this@ShareActivity)
 
         @JavascriptInterface
-        fun start(name: String, site: String) = runOnUiThread {
+        fun keepLink(): Boolean = Prefs.keepLink(this@ShareActivity)
+
+        @JavascriptInterface
+        fun start(name: String, site: String, keep: Boolean) = runOnUiThread {
+            Prefs.setKeepLink(this@ShareActivity, keep)
             pendingName = name.take(32).ifBlank { "Android" }
             try {
                 Prefs.setSite(this@ShareActivity, site)
