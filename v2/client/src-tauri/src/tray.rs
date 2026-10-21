@@ -13,7 +13,7 @@ use crate::session::Mode;
 
 const ID: &str = "peekaview";
 
-const MODES: [(Mode, &str); 3] = [(Mode::View, "Nur zusehen"), (Mode::Draw, "Zeigen & malen"), (Mode::Control, "Steuern")];
+const MODES: [(Mode, &str); 3] = [(Mode::View, "Zusehen"), (Mode::Draw, "Zeigen & Malen"), (Mode::Control, "Steuern")];
 
 /// The tray icon's click: an open PeekaView window closes; otherwise the running share's
 /// toolbar comes up, or the PeekaView window to pick what to share.

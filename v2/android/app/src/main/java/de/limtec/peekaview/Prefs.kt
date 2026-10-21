@@ -31,6 +31,31 @@ object Prefs {
         return room
     }
 
+    const val PIN_ROUNDS = 120_000
+
+    /** The PIN of this phone's shares as (salt, PBKDF2 key) – the PIN itself is not kept. */
+    fun pin(context: Context): Pair<ByteArray, ByteArray>? {
+        val p = prefs(context)
+        val salt = p.getString("pin_salt", null) ?: return null
+        val key = p.getString("pin_key", null) ?: return null
+        return android.util.Base64.decode(salt, android.util.Base64.NO_WRAP) to android.util.Base64.decode(key, android.util.Base64.NO_WRAP)
+    }
+
+    /** Sets a new PIN (at least 4 characters) or, with null, none. */
+    fun setPin(context: Context, pin: String?) {
+        val p = prefs(context).edit()
+        if (pin == null) {
+            p.remove("pin_salt").remove("pin_key").apply()
+            return
+        }
+        require(pin.trim().length >= 4) { "Die PIN braucht mindestens 4 Zeichen." }
+        val salt = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val spec = javax.crypto.spec.PBEKeySpec(pin.trim().toCharArray(), salt, PIN_ROUNDS, 256)
+        val key = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        p.putString("pin_salt", android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP))
+            .putString("pin_key", android.util.Base64.encodeToString(key, android.util.Base64.NO_WRAP)).apply()
+    }
+
     fun relays(context: Context): List<String> =
         prefs(context).getString("relays", null)?.split(Regex("\\s+"))?.filter { it.startsWith("wss://") }?.takeIf { it.isNotEmpty() }
             ?: Signaling.DEFAULT_RELAYS

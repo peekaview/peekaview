@@ -11,7 +11,10 @@
     [hidden] { display: none !important; }
     main { display: flex; flex-direction: column; gap: 14px; max-width: 560px; margin: 0 auto; padding: 18px 16px 32px; }
     header { display: flex; align-items: center; gap: 10px; }
-    header strong { font-size: 18px; }
+    header strong { font-size: 17px; font-weight: 650; }
+    .logo { display: flex; color: var(--fg); }
+    .title { margin: 4px 0 -2px; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+    #stop { flex: none; }
     .badge { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 4px 11px; border-radius: 999px; background: rgba(239,68,68,.14); color: #fca5a5; font-size: 13px; font-weight: 600; }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(239,68,68,.25); } 50% { box-shadow: 0 0 0 6px rgba(239,68,68,.08); } }
@@ -59,7 +62,7 @@
     .clip-list:empty::after { content: 'Noch leer – Text einfügen, eine Datei wählen oder Zuschauer legen etwas ab.'; color: var(--muted); font-size: 13px; }
     .clip-item { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
     .clip-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .clip-thumb { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--raised) center / cover no-repeat; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .clip-thumb { font-style: normal; flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--raised) center / cover no-repeat; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .clip-info { flex: 1; min-width: 0; }
     .clip-info strong, .clip-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .clip-info span { color: var(--muted); font-size: 12.5px; }
@@ -73,9 +76,11 @@
 <body>
   <main>
     <header>
-      <strong>Bildschirm teilen</strong>
+      <i id="logo" class="logo"></i>
+      <strong>PeekaView</strong>
       <span id="live" class="badge" hidden><i class="dot"></i>Freigabe läuft</span>
     </header>
+    <h1 class="title">Bildschirm teilen</h1>
 
     <div id="requests"></div>
 
@@ -85,6 +90,8 @@
       <label>Zuschauer-Website <input id="site" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="über Nostr (nsite)"></label>
       <p id="nsite" class="muted"></p>
       <label class="check"><input type="checkbox" id="keep"> Raumlink beibehalten <span class="muted">– derselbe Link wie beim letzten Mal</span></label>
+      <label class="check"><input type="checkbox" id="use-pin"> Mit PIN <span class="muted">– wer sie kennt, kommt ohne Zulassen herein</span></label>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="PIN (mindestens 4 Zeichen)" hidden>
       <p class="muted">Android fragt gleich, ob PeekaView den Bildschirm aufnehmen darf. Wer den Link öffnet, muss von dir zugelassen werden.</p>
       <button id="start" class="big">Freigabe starten</button>
       <p id="error" class="error" hidden></p>
@@ -99,14 +106,14 @@
         <code id="link"></code>
       </div>
       <div class="row">
-        <button id="copy" class="btn">Kopieren</button>
-        <button id="send" class="btn primary">Senden …</button>
+        <button id="copy" class="btn">Link kopieren</button>
+        <button id="send" class="btn primary">Link teilen …</button>
       </div>
       <div>
         <div class="muted" style="margin-bottom: 6px">Zuschauer dürfen</div>
         <div class="modes">
           <button data-mode="view" class="active">Zusehen</button>
-          <button data-mode="draw">Zeigen</button>
+          <button data-mode="draw">Zeigen &amp; Malen</button>
           <button data-mode="control">Steuern</button>
         </div>
       </div>
@@ -139,7 +146,9 @@
     </section>
   </main>
 
-  <script>
+  <script type="module">
+    import { owl } from '../web/icons.js'
+    document.getElementById('logo').innerHTML = owl(26)
     const host = window.PeekaViewHost
     const $ = (id) => document.getElementById(id)
     const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
@@ -151,7 +160,8 @@
     $('watch').addEventListener('click', () => host.watch())
     $('clip-paste').addEventListener('click', () => host.clipPaste())
     $('clip-file').addEventListener('click', () => host.clipFile())
-    const size = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`)
+    // sizes as in the viewer's clipboard ("1,0 MB")
+    const size = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`)
     function renderClip(items) {
       $('clip-list').replaceChildren(
         ...items.map((it) => {
@@ -162,7 +172,7 @@
           if (it.preview) thumb.style.backgroundImage = `url("${it.preview}")`
           else thumb.textContent = (it.name.split('.').pop() || '').slice(0, 4) || (it.mime.split('/')[0] ?? '')
           li.querySelector('strong').textContent = it.name
-          li.querySelector('.clip-info span').textContent = `${size(it.size)} · von ${it.by}`
+          li.querySelector('.clip-info span').textContent = `${size(it.size)} · ${it.by}`
           if (it.text) li.querySelector('.clip-top').insertAdjacentElement('afterend', Object.assign(document.createElement('p'), { className: 'clip-text', textContent: it.text }))
           for (const b of li.querySelectorAll('[data-a]')) {
             b.addEventListener('click', () => ({ copy: host.clipCopy, save: host.clipSave, share: host.clipShare, del: host.clipRemove })[b.dataset.a].call(host, it.id))
@@ -173,17 +183,25 @@
     }
     $('site').value = host.site()
     $('keep').checked = host.keepLink()
+    // the PIN: set once, kept (only its key is stored) – a new one replaces it
+    const hasPin = host.hasPin()
+    $('use-pin').checked = hasPin
+    $('pin').placeholder = hasPin ? 'PIN ist gesetzt – leer lassen zum Behalten' : 'PIN (mindestens 4 Zeichen)'
+    const showPin = () => ($('pin').hidden = !$('use-pin').checked)
+    $('use-pin').addEventListener('change', showPin)
+    showPin()
     $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
     $('start').addEventListener('click', () => {
       const name = $('name').value.trim() || 'Android'
       localStorage.setItem('pv-name', $('name').value.trim())
       $('start').disabled = true
-      host.start(name, $('site').value.trim(), $('keep').checked)
+      host.start(name, $('site').value.trim(), $('keep').checked, $('use-pin').checked, $('pin').value)
+      $('pin').value = ''
     })
     $('copy').addEventListener('click', () => {
       host.copyLink()
       $('copy').textContent = 'Kopiert ✓'
-      setTimeout(() => ($('copy').textContent = 'Kopieren'), 1500)
+      setTimeout(() => ($('copy').textContent = 'Link kopieren'), 1500)
     })
     $('send').addEventListener('click', () => host.sendLink())
     $('stop').addEventListener('click', () => host.stop())
@@ -232,7 +250,7 @@
         ...requests.map((r) => {
           const row = document.createElement('div')
           row.className = 'request'
-          row.innerHTML = '<i class="who"></i><strong></strong><span>möchte deinen Bildschirm sehen</span><div class="row"><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button></div>'
+          row.innerHTML = '<i class="who"></i><strong></strong><span>möchte zusehen</span><div class="row"><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button></div>'
           row.querySelector('strong').textContent = r.name || 'Gast'
           row.querySelector('.who').textContent = initials(r.name || 'Gast')
           row.querySelector('.who').style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'

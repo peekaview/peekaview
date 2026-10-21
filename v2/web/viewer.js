@@ -17,7 +17,8 @@ import { ClipPanel, FileChannel, MAX_SIZE, browserCopyable, filesFromClipboard, 
 
 export { peerColor } from './icons.js'
 
-const MODES = { view: 'Nur ansehen', draw: 'Zeigen & Malen', control: 'Fernsteuerung' }
+// the same names in every PeekaView (viewer, desktop toolbar, tray, Android)
+const MODES = { view: 'Zusehen', draw: 'Zeigen & Malen', control: 'Steuern' }
 const MODE_ICONS = { view: 'view', draw: 'draw', control: 'control' }
 const TOOLS = { view: [], draw: ['point', 'draw'], control: ['point', 'draw', 'control'] }
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'Fn', 'OS']

@@ -232,8 +232,10 @@ class Host(
             "ping" -> signaling.send(
                 JSONObject().put("type", "pong").put("from", "host").put("to", from)
                     .put("who", "$name@${Build.MODEL}").put("name", name).put("room", JSONObject.NULL)
-                    .put("permanent", false).put("sharing", true).put("pin", false).put("remote", false),
+                    .put("permanent", false).put("sharing", true).put("pin", pin != null).put("remote", false),
             )
+            // the room's PIN instead of waiting for the presenter's OK
+            "pin" -> if (msg.optString("to") == "host") pinAnswer(from, msg.optString("response"))
         }
     }
 
@@ -255,9 +257,48 @@ class Host(
                 // nobody watches without the presenter's OK
                 val isNew = peer !in requests
                 requests[peer] = Request(peer, name, color) to System.currentTimeMillis()
-                signaling.send(JSONObject().put("type", "waiting").put("from", "host").put("to", peer))
+                val waiting = JSONObject().put("type", "waiting").put("from", "host").put("to", peer)
+                // with a PIN: a challenge (PBKDF2 key, HMAC of a one-time nonce – the PIN never travels)
+                pin?.let { (salt, _) ->
+                    val nonce = nonces.getOrPut(peer) { Signaling.randomId() }
+                    waiting.put("pin", JSONObject().put("salt", android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)).put("rounds", Prefs.PIN_ROUNDS).put("nonce", nonce))
+                }
+                signaling.send(waiting)
                 if (isNew) changed()
             }
+        }
+    }
+
+    // the room's PIN (salt, PBKDF2 key) – set in the share screen
+    private val pin = Prefs.pin(context)
+    private val nonces = HashMap<String, String>()
+    private val tries = HashMap<String, Int>()
+
+    /** A viewer answered the PIN challenge: let in, or try again (5 tries, then turned away). */
+    private fun pinAnswer(peer: String, response: String) {
+        val (_, key) = pin ?: return signaling.send(JSONObject().put("type", "pin-wrong").put("from", "host").put("to", peer).put("locked", true))
+        val request = requests[peer]?.first
+        val nonce = nonces[peer]
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256").apply { init(javax.crypto.spec.SecretKeySpec(key, "HmacSHA256")) }
+        val expected = nonce?.let { mac.doFinal(it.toByteArray()) }
+        val given = runCatching { ByteArray(response.length / 2) { response.substring(it * 2, it * 2 + 2).toInt(16).toByte() } }.getOrNull()
+        if (request != null && expected != null && given != null && java.security.MessageDigest.isEqual(expected, given)) {
+            requests.remove(peer)
+            nonces.remove(peer)
+            admitted += peer
+            invite(peer, request.name, request.color)
+            changed()
+            return
+        }
+        val left = (5 - (tries[peer] ?: 0) - 1).coerceAtLeast(0)
+        tries[peer] = 5 - left
+        // a new challenge for the next try (the viewer says hello again to get it)
+        nonces.remove(peer)
+        signaling.send(JSONObject().put("type", "pin-wrong").put("from", "host").put("to", peer).put("left", left))
+        if (left == 0) {
+            requests.remove(peer)
+            denied += peer
+            changed()
         }
     }
 

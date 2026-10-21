@@ -177,16 +177,42 @@ class ShareActivity : ComponentActivity() {
         fun keepLink(): Boolean = Prefs.keepLink(this@ShareActivity)
 
         @JavascriptInterface
-        fun start(name: String, site: String, keep: Boolean) = runOnUiThread {
+        fun hasPin(): Boolean = Prefs.pin(this@ShareActivity) != null
+
+        /** `usePin`: with the PIN (`pin` new, or empty = keep the one set). */
+        @JavascriptInterface
+        fun start(name: String, site: String, keep: Boolean, usePin: Boolean, pin: String) {
+            runOnUiThread {
+                starting = true
+                error = null
+                update()
+            }
+            // the PIN's key takes a moment (PBKDF2) – not on the UI thread
+            Thread {
+                val problem = try {
+                    Prefs.setSite(this@ShareActivity, site)
+                    when {
+                        !usePin -> Prefs.setPin(this@ShareActivity, null)
+                        pin.isNotBlank() -> Prefs.setPin(this@ShareActivity, pin)
+                        Prefs.pin(this@ShareActivity) == null -> throw IllegalArgumentException("Bitte eine PIN eingeben.")
+                    }
+                    null
+                } catch (e: IllegalArgumentException) {
+                    e.message
+                }
+                runOnUiThread { begin(name, site, keep, problem) }
+            }.start()
+        }
+
+        private fun begin(name: String, site: String, keep: Boolean, problem: String?) {
+            if (problem != null) {
+                starting = false
+                error = problem
+                update()
+                return
+            }
             Prefs.setKeepLink(this@ShareActivity, keep)
             pendingName = name.take(32).ifBlank { "Android" }
-            try {
-                Prefs.setSite(this@ShareActivity, site)
-            } catch (e: IllegalArgumentException) {
-                error = e.message
-                update()
-                return@runOnUiThread
-            }
             // the phone's own viewer site over Nostr – or, with an own website, not anymore
             if (site.isBlank()) Nsite.publishIfNeeded(this@ShareActivity) else Nsite.unpublish(this@ShareActivity)
             starting = true
