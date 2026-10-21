@@ -9,7 +9,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.hardware.display.DisplayManager
 import android.util.DisplayMetrics
+import android.view.Display
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
@@ -41,14 +43,14 @@ class HostService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        val metrics: DisplayMetrics = resources.displayMetrics
+        val (width, height) = screenSize()
         try {
             host = Host(
                 context = applicationContext,
                 name = intent.getStringExtra(EXTRA_NAME) ?: "Android",
                 projectionData = data,
-                width = metrics.widthPixels,
-                height = metrics.heightPixels,
+                width = width,
+                height = height,
                 onChange = ::changed,
                 onEnded = { stopSelf() },
             ).also { it.start() }
@@ -63,8 +65,16 @@ class HostService : Service() {
     // turned: the capture follows
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
-        val metrics = resources.displayMetrics
-        host?.resize(metrics.widthPixels, metrics.heightPixels)
+        val (width, height) = screenSize()
+        host?.resize(width, height)
+    }
+
+    /** The whole screen in pixels, with status and navigation bar. */
+    private fun screenSize(): Pair<Int, Int> {
+        val display = getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION") display.getRealMetrics(metrics)
+        return metrics.widthPixels to metrics.heightPixels
     }
 
     override fun onDestroy() {
