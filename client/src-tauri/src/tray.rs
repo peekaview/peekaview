@@ -46,7 +46,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             MenuItem::with_id(app, format!("copy:{}", r.id), label, true, None::<&str>)
         })
         .collect::<tauri::Result<_>>()?;
-    let none = MenuItem::with_id(app, "rooms-none", "Noch keine dauerhaften Raumlinks", false, None::<&str>)?;
+    let none = MenuItem::with_id(app, "rooms-none", "Noch keine festen Räume", false, None::<&str>)?;
     let mut link_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = links.iter().map(|l| l as &dyn tauri::menu::IsMenuItem<Wry>).collect();
     if link_refs.is_empty() {
         link_refs.push(&none);

@@ -60,7 +60,7 @@ function renderRoomChoice() {
   add('new', 'Neuer Link')
   add('keep', 'Letzten Link beibehalten')
   for (const r of rooms) add(`room:${r.id}`, `Raum: ${r.name}${r.pin ? ' (PIN)' : ''}`)
-  add('manage', 'Raumlinks verwalten …')
+  add('manage', 'Feste Räume verwalten …')
   select.value = [...select.options].some((o) => o.value === value) ? value : 'new'
 }
 $('room-choice').addEventListener('change', () => {

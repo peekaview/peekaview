@@ -13,53 +13,77 @@
   </header>
   <main>
     <div class="tabs page-tabs" role="tablist">
-      <button class="tab active" data-page="rooms-page"><i data-icon="link"></i>Raumlinks &amp; Remote-Zugriff</button>
+      <button class="tab active" data-page="rooms-page"><i data-icon="link"></i>Feste Räume</button>
       <button class="tab" data-page="settings-page"><i data-icon="settings"></i>Einstellungen</button>
     </div>
 
     <section id="rooms-page">
-    <header class="rooms-head">
-      <div>
-        <p class="muted">Dauerhafte Links bleiben immer gleich. Wer beitreten will, wird von dir zugelassen – oder kommt mit der PIN des Raums herein. Mit Remote-Zugriff wartet der Raum auch, wenn du gerade nichts teilst, und Zuschauer können die freigegebenen Anwendungen selbst starten.</p>
-      </div>
-      <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raumlink</button>
-    </header>
-    <div id="list" class="room-list"></div>
-    <p id="empty" class="empty" hidden>Noch keine dauerhaften Raumlinks.</p>
+      <header class="page-head">
+        <p class="muted">Ein fester Raum hat einen Link, der immer gleich bleibt – z. B. für Kunden oder den eigenen Rechner. Wer beitreten will, wird von dir zugelassen.</p>
+        <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raum</button>
+      </header>
+      <div id="list" class="room-list"></div>
+      <p id="empty" class="empty" hidden>Noch keine festen Räume.</p>
     </section>
 
-    <section id="settings-page" class="settings-page" hidden>
+    <section id="settings-page" hidden>
       <h3>Freigabe</h3>
-      <label>Dein Name <span class="muted">so sehen dich die Zuschauer</span>
-        <input id="own-name" maxlength="32" autocomplete="name">
-      </label>
-      <label class="check option"><input type="checkbox" id="keep-link"><span><b>Raumlink beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span></label>
-      <label class="check option"><input type="checkbox" id="allow-resize"><span><b>Resize/Anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span></label>
+      <div class="set-group">
+        <label class="set-row">
+          <span class="text"><b>Dein Name</b><small>So sehen dich die Zuschauer.</small></span>
+          <input id="own-name" maxlength="32" autocomplete="name">
+        </label>
+        <label class="set-row">
+          <span class="text"><b>Raumlink beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span>
+          <input type="checkbox" class="switch" id="keep-link">
+        </label>
+        <label class="set-row">
+          <span class="text"><b>Resize/Anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span>
+          <input type="checkbox" class="switch" id="allow-resize">
+        </label>
+      </div>
 
       <h3>Zuschauer-Website</h3>
-      <label>Adresse <span class="muted">leer = über Nostr, ganz ohne eigenen Webserver</span>
-        <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
-      </label>
-      <p id="nsite" class="hint nsite"></p>
+      <div class="set-group">
+        <label class="set-row stack">
+          <span class="text"><b>Adresse</b><small>Leer lassen: die Seite liegt auf Nostr, ganz ohne eigenen Webserver.</small></span>
+          <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
+          <span id="nsite" class="nsite"></span>
+        </label>
+      </div>
 
       <h3>Verbindung</h3>
-      <p class="hint">Bild, Ton und Steuerung laufen direkt zwischen den Rechnern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
-      <label>Nostr-Relays <span class="muted">eine Adresse pro Zeile, leer = Standard</span>
-        <textarea id="relays" rows="3" spellcheck="false"></textarea>
-      </label>
-      <label>TURN-Server <span class="muted">Fallback für strenge Firewalls, eine Adresse pro Zeile</span>
-        <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
-      </label>
-      <label>TURN-Secret <span class="muted">coturn static-auth-secret – bleibt auf diesem Rechner</span>
-        <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
-      </label>
+      <div class="set-group">
+        <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Rechnern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
+        <label class="set-row stack">
+          <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
+          <textarea id="relays" rows="3" spellcheck="false"></textarea>
+        </label>
+        <label class="set-row stack">
+          <span class="text"><b>TURN-Server</b><small>Fallback für strenge Firewalls, eine Adresse pro Zeile.</small></span>
+          <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
+        </label>
+        <label class="set-row">
+          <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Rechner.</small></span>
+          <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
+        </label>
+      </div>
 
       <h3>Aufzeichnung &amp; Transkript</h3>
-      <label class="check" id="local-stt-row"><input type="checkbox" id="local-stt" checked> Lokale Spracherkennung von macOS verwenden (empfohlen)</label>
-      <label>OpenAI-API-Key <span class="muted">für das Transkript, falls lokal nicht möglich</span>
-        <input id="openai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…">
-      </label>
-      <label class="check"><input type="checkbox" id="use-env"> Key aus .env verwenden (OPENAI_API_KEY) <span id="env-status" class="muted"></span></label>
+      <div class="set-group">
+        <label class="set-row" id="local-stt-row">
+          <span class="text"><b>Lokale Spracherkennung</b><small>Die Spracherkennung von macOS – nichts verlässt den Rechner (empfohlen).</small></span>
+          <input type="checkbox" class="switch" id="local-stt" checked>
+        </label>
+        <label class="set-row">
+          <span class="text"><b>OpenAI-API-Key</b><small>Für das Transkript, falls lokal nicht möglich.</small></span>
+          <input id="openai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…">
+        </label>
+        <label class="set-row">
+          <span class="text"><b>Key aus .env verwenden</b><small>OPENAI_API_KEY <span id="env-status"></span></small></span>
+          <input type="checkbox" class="switch" id="use-env">
+        </label>
+      </div>
     </section>
   </main>
 
@@ -124,44 +148,59 @@
       $('list').replaceChildren(...rooms.map(card))
     }
 
+    // the same tags as on the viewer's start page
+    const tag = (cls, html, title) => `<small class="tag ${cls}" title="${title}">${html}</small>`
+
     function card(room) {
       const el = document.createElement('section')
-      el.className = 'room-card glass'
+      el.className = 'set-group room-card'
       el.innerHTML = `
-        <div class="room-top">
-          <input class="room-name" maxlength="60">
-          <button class="icon-btn" data-delete title="Raumlink löschen">${icon('trash', 16)}</button>
+        <div class="room-head">
+          <input class="room-name" maxlength="60" placeholder="Raumname" title="Umbenennen">
+          <span class="tags"></span>
+          <button class="icon-btn" data-delete title="Raum löschen">${icon('trash', 16)}</button>
         </div>
         <div class="room-link"><code></code>
-          <button class="pill secondary" data-copy>${icon('copy', 15)}Link kopieren</button>
-          <button class="pill secondary" data-renew title="Neuer Link – der alte funktioniert dann nicht mehr">${icon('refresh', 15)}Neuer Link</button>
+          <button class="pill secondary" data-copy>${icon('copy', 15)}Kopieren</button>
+          <button class="icon-btn" data-renew title="Neuer Link – der bisherige funktioniert dann nicht mehr">${icon('refresh', 16)}</button>
         </div>
-        <div class="room-row">
-          <span class="room-label">PIN</span>
-          <span class="room-pin-state"></span>
-          <input class="room-pin" type="password" inputmode="numeric" placeholder="neue PIN" autocomplete="new-password">
-          <button class="pill secondary" data-pin>Setzen</button>
-          <button class="pill secondary" data-unpin>Entfernen</button>
+        <div class="set-row">
+          <span class="text"><b>PIN</b><small>Mit der PIN kommen Zuschauer ohne deine Bestätigung herein.</small></span>
+          <span class="pin-set"><span class="pin-state">${icon('lock', 13)}gesetzt</span><button class="pill secondary" data-pin-change>Ändern</button><button class="pill secondary" data-unpin>Entfernen</button></span>
+          <span class="pin-edit"><input class="room-pin" type="password" inputmode="numeric" placeholder="mind. 4 Zeichen" autocomplete="new-password"><button class="pill secondary" data-pin>Setzen</button></span>
         </div>
-        <label class="check option room-remote"><input type="checkbox" data-remote><span><b>Remote-Zugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span></label>
-        <div class="room-apps" hidden>
-          <div class="chips"></div>
-          <div class="room-row">
-            <button class="pill secondary" data-add-app>${icon('window', 15)}Anwendung hinzufügen</button>
-            <label class="check"><input type="checkbox" data-desktop> Gesamter Desktop</label>
+        <label class="set-row">
+          <span class="text"><b>Remote-Zugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span>
+          <input type="checkbox" class="switch" data-remote>
+        </label>
+        <div class="room-apps">
+          <div class="set-row stack">
+            <span class="text"><b>Freigegebene Anwendungen</b></span>
+            <div class="chips"></div>
           </div>
+          <label class="set-row">
+            <span class="text"><b>Gesamter Desktop</b><small>Zuschauer können auch den ganzen Bildschirm teilen lassen.</small></span>
+            <input type="checkbox" class="switch" data-desktop>
+          </label>
         </div>`
       const q = (s) => el.querySelector(s)
       q('.room-name').value = room.name
       q('.room-name').addEventListener('change', () => save(room, { name: q('.room-name').value }))
+      q('.room-name').addEventListener('keydown', (e) => e.key === 'Enter' && e.target.blur())
+      q('.tags').innerHTML = (room.pin ? tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN') : '') + (room.remote ? tag('remote', 'Remote', 'Remote-Zugriff') : '')
       q('code').textContent = room.link
       q('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(room.link).then(() => toast('Link kopiert')).catch(fail))
       twice(q('[data-renew]'), 'Der bisherige Link funktioniert dann nicht mehr.', () => invoke('room_renew', { id: room.id }).catch(fail))
-      twice(q('[data-delete]'), `Raumlink „${room.name}“ löschen`, () => invoke('room_delete', { id: room.id }).catch(fail))
-      q('.room-pin-state').textContent = room.pin ? 'gesetzt' : 'keine'
-      q('.room-pin-state').classList.toggle('on', room.pin)
-      q('[data-unpin]').hidden = !room.pin
-      q('[data-pin]').addEventListener('click', () => {
+      twice(q('[data-delete]'), `Raum „${room.name}“ löschen`, () => invoke('room_delete', { id: room.id }).catch(fail))
+      // PIN: set → state with "Ändern"/"Entfernen", otherwise (or while changing) the field
+      const editPin = (on) => {
+        q('.pin-set').hidden = on
+        q('.pin-edit').hidden = !on
+        if (on && room.pin) q('.room-pin').focus()
+      }
+      editPin(!room.pin)
+      q('[data-pin-change]').addEventListener('click', () => editPin(true))
+      const setPin = () => {
         const pin = q('.room-pin').value.trim()
         if (pin.length < 4) return fail('Die PIN braucht mindestens 4 Zeichen.')
         q('[data-pin]').disabled = true
@@ -169,6 +208,11 @@
           .then(() => toast('PIN gesetzt'))
           .catch(fail)
           .finally(() => (q('[data-pin]').disabled = false))
+      }
+      q('[data-pin]').addEventListener('click', setPin)
+      q('.room-pin').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') setPin()
+        if (e.key === 'Escape' && room.pin) editPin(false)
       })
       q('[data-unpin]').addEventListener('click', () => invoke('room_pin', { id: room.id, pin: null }).then(() => toast('PIN entfernt')).catch(fail))
       const remote = q('[data-remote]')
@@ -177,6 +221,10 @@
       remote.addEventListener('change', () => save(room, { remote: remote.checked }))
       q('[data-desktop]').checked = room.desktop
       q('[data-desktop]').addEventListener('change', (e) => save(room, { desktop: e.target.checked }))
+      const add = document.createElement('button')
+      add.className = 'app-chip add'
+      add.innerHTML = `${icon('window', 13)}Anwendung hinzufügen`
+      add.addEventListener('click', () => openPicker(room))
       q('.chips').replaceChildren(
         ...room.apps.map((app) => {
           const chip = document.createElement('span')
@@ -187,8 +235,8 @@
           chip.querySelector('button').addEventListener('click', () => save(room, { apps: room.apps.filter((a) => a.id !== app.id) }))
           return chip
         }),
+        add,
       )
-      q('[data-add-app]').addEventListener('click', () => openPicker(room))
       return el
     }
 
