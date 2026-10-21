@@ -156,10 +156,9 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 /* ------------------------------------------------ overlay: red frame around the shared area */
 body.overlay { background: transparent; overflow: hidden; }
 .overlay #root { position: fixed; inset: 0; border: 3px solid var(--accent); border-radius: 4px; transition: border-color .3s, border-width .3s; }
-.overlay.covered #root { border-width: 1px; border-color: rgba(239, 68, 68, .28); }
-.overlay.covered .badge { opacity: .35; }
-.overlay.behind #root { border-color: rgba(239, 68, 68, .5); }
-.overlay.behind .badge { opacity: .6; }
+/* not in front (partly or fully behind other windows): half transparent, still easy to see */
+.overlay.covered #root, .overlay.behind #root { border-color: rgba(239, 68, 68, .55); }
+.overlay.covered .badge, .overlay.behind .badge { opacity: .65; }
 .overlay .badge { position: fixed; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; max-width: 300px; height: 24px; padding: 0 4px 0 10px; border-radius: 0 0 8px 8px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 650; white-space: nowrap; }
 .overlay .badge > span { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-right: 6px; }
 .overlay .fit { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px; background: rgba(255, 255, 255, .18); color: #fff; cursor: pointer; }

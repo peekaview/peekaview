@@ -275,6 +275,8 @@ async function start() {
   }
 }
 
+$('start').addEventListener('click', start)
+
 const sourceTitle = (s) => (s.kind === 'window' ? `${s.app} – ${s.title}` : s.title)
 const sharedTitle = () => {
   const list = selected.map((id) => sources.find((s) => s.id === id)).filter(Boolean)
