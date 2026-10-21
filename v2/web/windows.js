@@ -88,10 +88,18 @@ export class WindowManager {
     this.arranged = false // the viewer moved / scaled windows themselves
     this.observer = new ResizeObserver(() => this.layout())
     this.observer.observe(this.root)
+    // this page lost the focus right after a window was activated: the presenter's screen is
+    // this computer's (testing), and every activation takes the focus from the browser
+    this.local = false
+    this.onBlur = () => {
+      if (Date.now() - (this.activatedAt ?? 0) < 1000) this.local = true
+    }
+    window.addEventListener('blur', this.onBlur)
   }
 
   destroy() {
     this.observer.disconnect()
+    window.removeEventListener('blur', this.onBlur)
     for (const win of this.wins.values()) win.ann.destroy()
     this.root.remove()
   }
@@ -204,7 +212,21 @@ export class WindowManager {
     }
     video.addEventListener('loadeddata', onFrame)
     video.addEventListener('resize', onFrame)
-    el.addEventListener('pointerdown', () => this.focus(slot, true), true)
+    // a click (not a drag) brings the window to the front – also at the presenter's, which is
+    // done on release: activating it there may take the focus away from this page mid-drag
+    el.addEventListener(
+      'pointerdown',
+      (e) => {
+        this.focus(slot)
+        const start = { x: e.clientX, y: e.clientY }
+        const up = (ev) => {
+          window.removeEventListener('pointerup', up, true)
+          if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) this.activate(win)
+        }
+        window.addEventListener('pointerup', up, true)
+      },
+      true,
+    )
     el.querySelector('[data-min]').addEventListener('click', () => this.minimize(slot))
     el.querySelector('[data-max]').addEventListener('click', () => this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('dblclick', (e) => !e.target.closest('button') && this.toggleMax(slot))
@@ -432,13 +454,15 @@ export class WindowManager {
 
   // ------------------------------------------------------------ window actions
 
-  /** `byUser`: the viewer picked it – with "Resize/Anordnen erlauben" it comes to the front there, too. */
-  focus(slot, byUser = false) {
+  /** With "Resize/Anordnen erlauben" the window the viewer picked comes to the front at the presenter's, too. */
+  activate(win) {
+    if (!win || !this.options.canResize?.() || Date.now() - (win.activated ?? 0) < 800) return
+    win.activated = this.activatedAt = Date.now()
+    this.options.onActivate?.(win.slot)
+  }
+
+  focus(slot) {
     const win = this.wins.get(slot)
-    if (byUser && win && this.options.canResize?.() && Date.now() - (win.activated ?? 0) > 800) {
-      win.activated = Date.now()
-      this.options.onActivate?.(slot)
-    }
     this.active = win ? slot : null
     for (const w of this.wins.values()) w.el.classList.toggle('active', w === win)
     // in the mirror the presenter's stacking order rules
@@ -463,11 +487,13 @@ export class WindowManager {
       win.min = false
       this.clamp(win)
       this.paint(win)
-      this.focus(slot, true)
+      this.focus(slot)
+      this.activate(win)
     } else if (this.active === slot) {
       this.minimize(slot)
     } else {
-      this.focus(slot, true)
+      this.focus(slot)
+      this.activate(win)
     }
   }
 
@@ -531,6 +557,8 @@ export class WindowManager {
       if (win.x === start.wx && win.y === start.wy) return
       if (this.mirror) this.options.onPlace?.(win.slot, this.toHost(win))
       else this.arrangeThere(win)
+      // moved windows come to the front there – unless that takes the focus from this page
+      if (!this.local) this.activate(win)
     }
     bar.addEventListener('pointermove', move)
     bar.addEventListener('pointerup', up)

@@ -1,6 +1,6 @@
 // Presenter toolbar of the desktop client: a small bar at the top edge of the screen; the source
 // picker and the settings fold out below it.
-import { icon } from '../icons.js'
+import { icon, owl } from '../icons.js'
 import { Voice } from '../voice.js'
 
 const { invoke } = window.__TAURI__.core
@@ -12,7 +12,7 @@ const store = {
   set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
 }
 const renderIcons = (root = document) => {
-  for (const el of root.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, el.closest('.logo') ? 16 : 17)
+  for (const el of root.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 17)
 }
 const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const site = () => $('site').value.trim().replace(/\/+$/, '')
@@ -44,6 +44,7 @@ const voice = new Voice({
 })
 
 renderIcons()
+$('logo').innerHTML = owl(24)
 $('site').value = (store.get('pv-site') ?? DEFAULT_SITE).replace(/^http:\/\/localhost:8090\/?$/, '')
 $('relays').value = store.get('pv-relays') ?? ''
 $('turn-urls').value = store.get('pv-turn-urls') ?? ''

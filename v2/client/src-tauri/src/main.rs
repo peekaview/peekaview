@@ -527,6 +527,8 @@ fn main() {
             // development only: PEEKAVIEW_DEV_SHARE=screen:<id> [PEEKAVIEW_DEV_ROOM=<secret>] starts a share
             #[cfg(debug_assertions)]
             if let Ok(source) = std::env::var("PEEKAVIEW_DEV_SHARE") {
+                // never pick up an interrupted share of the presenter instead
+                resume::clear(app.handle());
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     let opts = session::StartOptions {

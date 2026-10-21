@@ -55,7 +55,7 @@ body.toolbar { background: transparent; overflow: hidden; }
 #shell { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 26px 36px; }
 .bar { display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 7px; border-radius: 14px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); }
 .group { display: flex; align-items: center; gap: 6px; }
-.logo svg { box-sizing: content-box; padding: 5px; border-radius: 8px; background: var(--accent); color: #fff; }
+.logo { display: flex; padding: 0 3px; color: var(--fg); }
 .sep { width: 1px; height: 22px; margin: 0 2px; background: var(--line); }
 .grip { display: grid; place-items: center; width: 16px; height: 32px; margin-right: -3px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: grab; }
 .grip:hover { color: var(--fg); }
@@ -67,7 +67,8 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 
 .chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; transition: background .15s; }
 .chip:hover { background: var(--raised); }
-.chip > span { font-weight: 650; }
+.chip > span { font-size: 11.5px; font-weight: 650; white-space: nowrap; }
+#code-btn { flex: none; gap: 6px; padding: 0 8px; }
 .chip > svg { color: var(--muted); }
 .chip.copied > svg { color: #86efac; }
 .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
@@ -79,10 +80,10 @@ body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.
 .modes button.active { background: var(--fg); color: var(--bg); }
 .modes button[data-mode="control"].active { background: var(--accent); color: #fff; }
 
-.avatars { display: flex; padding-left: 6px; }
+.avatars { display: flex; flex: none; padding-left: 6px; }
 .avatars span { display: grid; place-items: center; width: 26px; height: 26px; margin-left: -6px; border-radius: 50%; border: 2px solid var(--panel); color: #fff; font-size: 10px; font-weight: 650; }
 .avatars .more { background: var(--raised); color: var(--muted); }
-.avatars .none { width: auto; margin: 0 4px 0 -2px; border: 0; color: var(--muted); font-size: 12px; font-weight: 500; }
+.avatars .none { width: auto; margin: 0 4px 0 -2px; border: 0; color: var(--muted); font-size: 11px; font-weight: 500; white-space: nowrap; }
 
 .toast { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 12px; background: #16a34a; color: #fff; font-weight: 600; box-shadow: 0 6px 18px rgba(0, 0, 0, .35); animation: toast-in .25s ease-out; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
