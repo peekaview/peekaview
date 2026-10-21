@@ -36,6 +36,7 @@ pub fn handle(app: &AppHandle, url: &tauri::Url) {
     *app.state::<PendingInvite>().0.lock().unwrap() = Some(invite.clone());
     let _ = app.emit_to("main", "invite", invite);
     if let Some(main) = app.get_webview_window("main") {
+        crate::set_dock(app, true);
         let _ = main.unminimize();
         let _ = main.show();
         let _ = main.set_focus();

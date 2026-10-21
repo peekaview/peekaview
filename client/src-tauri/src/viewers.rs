@@ -96,6 +96,7 @@ pub fn open(app: &AppHandle, room: &str, name: Option<String>, who: Option<Strin
     // one window per room
     let hash = room.bytes().fold(0xcbf29ce484222325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3));
     let label = format!("viewer-{hash:016x}");
+    crate::set_dock(app, true);
     if let Some(window) = app.get_webview_window(&label) {
         let _ = window.unminimize();
         let _ = window.show();

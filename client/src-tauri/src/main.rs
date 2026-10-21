@@ -116,6 +116,7 @@ fn hide_main(app: &AppHandle) {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.hide();
     }
+    sync_dock(app);
 }
 
 #[tauri::command]
@@ -143,9 +144,44 @@ pub fn show_main(app: &AppHandle) {
         return;
     }
     if let Some(main) = app.get_webview_window("main") {
+        set_dock(app, true);
         let _ = main.unminimize();
         let _ = main.show();
         let _ = main.set_focus();
+    }
+}
+
+/// Windows that bring the Dock icon along (macOS). The toolbar and the frames do not: a running
+/// share without any of these lives in the tray only.
+fn in_dock(label: &str) -> bool {
+    matches!(label, "main" | "rooms" | "permission" | "clipboard") || label.starts_with("viewer-")
+}
+
+/// Dock icon (and ⌘-Tab) only while one of PeekaView's windows is open – once they are closed or
+/// hidden, PeekaView sits in the tray alone.
+pub fn sync_dock(app: &AppHandle) {
+    let app = app.clone();
+    // after the window event: a window being hidden still counts as visible while it is reported
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        let open = app.webview_windows().iter().any(|(label, w)| in_dock(label) && w.is_visible().unwrap_or(false));
+        set_dock(&app, open);
+    });
+}
+
+#[allow(unused_variables)]
+pub fn set_dock(app: &AppHandle, visible: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        use std::sync::atomic::{AtomicU8, Ordering};
+        // 0 = not set yet, 1 = in the Dock, 2 = tray only
+        static STATE: AtomicU8 = AtomicU8::new(0);
+        let want = if visible { 1 } else { 2 };
+        if STATE.swap(want, Ordering::SeqCst) == want {
+            return;
+        }
+        let policy = if visible { tauri::ActivationPolicy::Regular } else { tauri::ActivationPolicy::Accessory };
+        let _ = app.set_activation_policy(policy);
     }
 }
 
@@ -358,6 +394,7 @@ fn rooms_window(app: AppHandle) {
 
 /// The window to manage permanent room links, PINs and remote access.
 pub fn open_rooms_window(app: &AppHandle) {
+    set_dock(app, true);
     if let Some(w) = app.get_webview_window("rooms") {
         let _ = w.show();
         let _ = w.set_focus();
@@ -677,6 +714,8 @@ fn main() {
                     }
                 }
             }
+            // started into the tray (resumed share, login item): no Dock icon
+            sync_dock(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![list_sources,
@@ -733,6 +772,9 @@ fn main() {
             recording_audio,
             stop_recording])
         .on_window_event(|window, event| {
+            if in_dock(window.label()) && matches!(event, WindowEvent::Focused(_) | WindowEvent::Destroyed | WindowEvent::CloseRequested { .. }) {
+                sync_dock(window.app_handle());
+            }
             if let (WindowEvent::Moved(pos), "toolbar") = (event, window.label()) {
                 toolbar_moved(window, *pos);
                 return;

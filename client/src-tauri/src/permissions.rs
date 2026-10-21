@@ -90,6 +90,7 @@ pub fn request(app: &AppHandle, _kind: &str) {
         if missing().is_empty() {
             return;
         }
+        crate::set_dock(app, true);
         if let Some(existing) = app.get_webview_window(HELPER) {
             let _ = existing.show();
             return;
