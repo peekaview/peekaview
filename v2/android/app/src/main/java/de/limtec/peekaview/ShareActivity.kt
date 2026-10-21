@@ -76,6 +76,8 @@ class ShareActivity : ComponentActivity() {
         web.loadUrl("${Assets.UI}share.html")
         HostService.listeners += listener
         Nsite.listeners += listener
+        // the viewer site for this phone's share links, kept up to date over Nostr
+        if (Prefs.site(this).isEmpty()) Nsite.publishIfNeeded(this)
     }
 
     override fun onResume() {
@@ -169,6 +171,10 @@ class ShareActivity : ComponentActivity() {
             val link = HostService.host?.link ?: return@runOnUiThread
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link), "Link senden"))
         }
+
+        /** Watching a share instead: the viewer's start page with the rooms joined before. */
+        @JavascriptInterface
+        fun watch() = runOnUiThread { startActivity(Intent(this@ShareActivity, MainActivity::class.java)) }
 
         @JavascriptInterface
         fun controlSettings() = runOnUiThread {

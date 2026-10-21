@@ -24,10 +24,6 @@
             android:exported="true"
             android:launchMode="singleTask">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -35,12 +31,17 @@
             </intent-filter>
         </activity>
 
-        <!-- sharing this phone's screen: link, viewers, join requests -->
+        <!-- the app's start: sharing this phone's screen (link, viewers, join requests) -->
         <activity
             android:name=".ShareActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
-            android:exported="false"
-            android:launchMode="singleTask" />
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <!-- the running share: screen capture and connections, also with the app in the background -->
         <service

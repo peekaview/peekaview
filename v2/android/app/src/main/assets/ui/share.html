@@ -44,6 +44,7 @@
     .hint button { margin-top: 8px; padding: 8px 12px; border-radius: 9px; border: 0; background: rgba(234,179,8,.2); color: #fde68a; font-weight: 600; }
     .error { color: #fca5a5; }
     #nsite { word-break: break-all; }
+    .watch { align-self: center; margin-top: 4px; padding: 10px 16px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
   </style>
 </head>
 <body>
@@ -64,6 +65,8 @@
       <button id="start" class="big">Freigabe starten</button>
       <p id="error" class="error" hidden></p>
     </section>
+
+    <button id="watch" class="watch">Einer Freigabe zusehen …</button>
 
     <!-- the running share -->
     <section id="running" class="card" hidden>
@@ -101,7 +104,10 @@
     const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     let known = new Set()
 
+    // the own name, remembered as typed (the viewer's start page uses the same)
     $('name').value = localStorage.getItem('pv-name') ?? ''
+    $('name').addEventListener('input', () => localStorage.setItem('pv-name', $('name').value.trim()))
+    $('watch').addEventListener('click', () => host.watch())
     $('site').value = host.site()
     $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
     $('start').addEventListener('click', () => {
@@ -124,6 +130,7 @@
     window.pvHostUpdate = (st) => {
       $('live').hidden = !st.sharing
       $('setup').hidden = st.sharing
+      $('watch').hidden = st.sharing
       $('running').hidden = !st.sharing
       $('start').disabled = !!st.starting
       $('error').hidden = !st.error

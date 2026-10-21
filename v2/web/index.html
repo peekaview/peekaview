@@ -112,6 +112,8 @@
     let linkRoom = decodeURIComponent(location.hash.slice(1))
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
+    // remembered as typed
+    $('name').addEventListener('input', () => { try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {} })
 
     // rooms on the page: the link's room first, then the remembered ones
     const status = new Map() // room -> {online, checking, who, room, permanent, name}

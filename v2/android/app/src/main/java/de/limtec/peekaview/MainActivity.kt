@@ -133,10 +133,13 @@ class MainActivity : ComponentActivity() {
 
     /** For the bundled pages only (no other page is ever loaded). */
     inner class Bridge {
-        /** Shares this phone's screen. */
+        /** Shares this phone's screen: back to the app's start. */
         @JavascriptInterface
         fun share() {
-            runOnUiThread { startActivity(Intent(this@MainActivity, ShareActivity::class.java)) }
+            runOnUiThread {
+                startActivity(Intent(this@MainActivity, ShareActivity::class.java))
+                finish()
+            }
         }
     }
 }
