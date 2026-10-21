@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de" style="background: transparent">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    #root { position: fixed; inset: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+    // Viewers' pointers and drawings on top of the shared phone screen – the same rendering as
+    // the desktop app's overlay. The app hands over the messages (window.pv).
+    import { Annotations } from '../web/annotate.js'
+
+    const ann = new Annotations(document.getElementById('root'))
+    window.pv = (m) => ann.handle(m)
+  </script>
+</body>
+</html>

@@ -86,6 +86,10 @@
           <button data-mode="control">Steuern</button>
         </div>
       </div>
+      <div id="overlay-hint" class="hint" hidden>
+        Damit du Zeiger und Zeichnungen der Zuschauer auf dem Handy siehst, muss PeekaView einmalig „Über anderen Apps einblenden“ dürfen.
+        <br><button id="overlay-settings">Erlauben</button>
+      </div>
       <div id="control-hint" class="hint" hidden>
         Zum Steuern muss „PeekaView Fernsteuerung“ einmalig in den Bedienungshilfen eingeschaltet werden.
         <br><button id="control-settings">Einstellungen öffnen</button>
@@ -124,6 +128,7 @@
     $('send').addEventListener('click', () => host.sendLink())
     $('stop').addEventListener('click', () => host.stop())
     $('control-settings').addEventListener('click', () => host.controlSettings())
+    $('overlay-settings').addEventListener('click', () => host.overlaySettings())
     for (const b of document.querySelectorAll('.modes button')) b.addEventListener('click', () => host.setMode(b.dataset.mode))
 
     // called by the app with the current state
@@ -143,6 +148,7 @@
       $('nsite').textContent = `Leer: ${ns.url?.replace('https://', '') ?? ''} · ${states[ns.state] ?? ''}`
       for (const b of document.querySelectorAll('.modes button')) b.classList.toggle('active', b.dataset.mode === st.mode)
       $('control-hint').hidden = !(st.mode === 'control' && !st.controlEnabled)
+      $('overlay-hint').hidden = !(st.sharing && st.mode !== 'view' && !st.overlayAllowed)
       const people = st.viewers ?? []
       $('people').replaceChildren(
         ...(people.length

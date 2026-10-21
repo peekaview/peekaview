@@ -68,6 +68,9 @@ class Host(
         private set
 
     private val viewers = LinkedHashMap<String, Peer>()
+    // viewers' pointers and drawings on the phone itself
+    private val overlay = Overlay(context)
+    private val annotations = setOf("peers", "left", "state", "ptr", "ping", "draw", "clear", "hide", "level")
     private val requests = LinkedHashMap<String, Pair<Request, Long>>()
     private val admitted = HashSet<String>()
     private val denied = HashSet<String>()
@@ -104,6 +107,7 @@ class Host(
         // presence beacon: viewers waiting for this room say hello right away
         exec.scheduleWithFixedDelay({ signaling.send(JSONObject().put("type", "host")) }, 0, 15, TimeUnit.SECONDS)
         exec.scheduleWithFixedDelay(::sweep, 3, 3, TimeUnit.SECONDS)
+        overlay.show()
         post(::changed)
     }
 
@@ -115,6 +119,7 @@ class Host(
             }
             viewers.clear()
             runCatching { signaling.send(JSONObject().put("type", "bye").put("from", "host")) }
+            overlay.hide()
             exec.schedule({
                 runCatching { signaling.close() }
                 runCatching { capturer.stopCapture() }
@@ -364,6 +369,13 @@ class Host(
 
     private fun broadcast(msg: JSONObject, except: Peer? = null) {
         for (v in viewers.values) if (v !== except) send(v, msg)
+        if (msg.optString("t") in annotations) overlay.handle(msg)
+    }
+
+    /** "Über anderen Apps einblenden" was allowed meanwhile: the layer comes up. */
+    fun showOverlay() {
+        overlay.show()
+        post { overlay.handle(peers()) }
     }
 
     private fun state(): JSONObject {

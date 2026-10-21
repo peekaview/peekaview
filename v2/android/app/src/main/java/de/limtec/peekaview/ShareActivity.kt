@@ -82,7 +82,8 @@ class ShareActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // e.g. back from the accessibility settings
+        // e.g. back from the accessibility or overlay settings
+        HostService.host?.showOverlay()
         update()
     }
 
@@ -104,6 +105,7 @@ class ShareActivity : ComponentActivity() {
             .put("starting", starting)
             .put("error", error ?: HostService.lastError)
             .put("controlEnabled", ControlService.enabled(this))
+            .put("overlayAllowed", Overlay.allowed(this))
             .put("nsite", JSONObject().put("url", Nsite.url(this)).put("state", Nsite.state.name.lowercase()).put("error", Nsite.error))
         if (host != null) {
             o.put("link", host.link).put("mode", host.mode)
@@ -175,6 +177,12 @@ class ShareActivity : ComponentActivity() {
         /** Watching a share instead: the viewer's start page with the rooms joined before. */
         @JavascriptInterface
         fun watch() = runOnUiThread { startActivity(Intent(this@ShareActivity, MainActivity::class.java)) }
+
+        /** "Über anderen Apps einblenden" for viewers' pointers and drawings on the phone. */
+        @JavascriptInterface
+        fun overlaySettings() = runOnUiThread {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName")))
+        }
 
         @JavascriptInterface
         fun controlSettings() = runOnUiThread {
