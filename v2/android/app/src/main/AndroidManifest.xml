@@ -45,6 +45,17 @@
             </intent-filter>
         </activity>
 
+        <!-- shared clipboard items for other apps (copy, share) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="de.limtec.peekaview.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/files" />
+        </provider>
+
         <!-- the running share: screen capture and connections, also with the app in the background -->
         <service
             android:name=".HostService"

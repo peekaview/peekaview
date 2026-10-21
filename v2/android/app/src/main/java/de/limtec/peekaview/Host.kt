@@ -54,6 +54,10 @@ class Host(
         var voice = false
         // remote control: the button being held
         var holding = false
+        // shared clipboard: the upload in progress, downloads one after the other, previews sent
+        var upload: ClipStore.Item? = null
+        val downloads = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val previews = HashSet<String>()
     }
 
     // everything runs on one thread: signaling, WebRTC callbacks, UI calls
@@ -122,6 +126,7 @@ class Host(
             viewers.clear()
             runCatching { signaling.send(JSONObject().put("type", "bye").put("from", "host")) }
             overlay.hide()
+            clip.clear()
             exec.schedule({
                 runCatching { signaling.close() }
                 runCatching { capturer.stopCapture() }
@@ -332,8 +337,17 @@ class Host(
                 override fun onBufferedAmountChange(previous: Long) {}
             })
         }
-        // the shared clipboard is not offered by a phone; the channel exists for the viewer
-        v.files = pc.createDataChannel("pvfile", DataChannel.Init().apply { ordered = true })
+        // the shared clipboard's files
+        v.files = pc.createDataChannel("pvfile", DataChannel.Init().apply { ordered = true }).also { dc ->
+            dc.registerObserver(object : DataChannel.Observer {
+                override fun onStateChange() {}
+                override fun onBufferedAmountChange(previous: Long) {}
+                override fun onMessage(buffer: DataChannel.Buffer) {
+                    val bytes = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }
+                    if (buffer.binary) post { fileChunk(v, bytes) } else post { runCatching { fileMessage(v, JSONObject(String(bytes))) } }
+                }
+            })
+        }
         pc.createOffer(Created { offer ->
             pc.setLocalDescription(Done { post {
                 signaling.send(
@@ -345,8 +359,134 @@ class Host(
         }, MediaConstraints())
     }
 
+    // ------------------------------------------------------------ shared clipboard
+
+    private val clip = ClipStore(context)
+    private var progressAt = 0L
+
+    private fun clipList() = JSONObject().put("t", "clip").put("items", JSONArray(clip.all().filter { it.complete }.map { it.meta() }))
+
+    private fun sendPreviews(v: Peer) {
+        for (item in clip.all()) {
+            val preview = item.preview ?: continue
+            if (item.complete && v.previews.add(item.id)) send(v, JSONObject().put("t", "clip-preview").put("id", item.id).put("preview", preview))
+        }
+    }
+
+    /** The clipboard changed: everybody gets the list (and new previews), the phone's screen too. */
+    private fun announceClip() {
+        broadcast(clipList())
+        for (v in viewers.values) sendPreviews(v)
+        changed()
+    }
+
+    private fun sendFile(v: Peer, msg: JSONObject) {
+        val dc = v.files ?: return
+        if (dc.state() == DataChannel.State.OPEN) dc.send(DataChannel.Buffer(ByteBuffer.wrap(msg.toString().toByteArray()), false))
+    }
+
+    private fun fileMessage(v: Peer, msg: JSONObject) {
+        when (msg.optString("t")) {
+            // an upload: the item, then its bytes
+            "put" -> {
+                val id = msg.optString("id")
+                try {
+                    val item = clip.add(
+                        id, msg.optString("name"), msg.optString("mime"), msg.optLong("size"), v.id,
+                        msg.optString("text").ifEmpty { null }, msg.optBoolean("hidden"), msg.optString("preview").ifEmpty { null },
+                    )
+                    v.upload = item
+                    if (item.complete) uploaded(v, item)
+                } catch (e: Exception) {
+                    sendFile(v, JSONObject().put("t", "error").put("id", id).put("error", e.message ?: "Fehler"))
+                }
+            }
+            // a download, one after the other, without flooding the connection
+            "get" -> {
+                val id = msg.optString("id")
+                val req = msg.optInt("req")
+                v.downloads.execute { serve(v, id, req) }
+            }
+        }
+    }
+
+    private fun fileChunk(v: Peer, bytes: ByteArray) {
+        val item = v.upload ?: return
+        try {
+            clip.write(item, bytes)
+        } catch (e: Exception) {
+            v.upload = null
+            clip.remove(item.id, 0)
+            sendFile(v, JSONObject().put("t", "error").put("id", item.id).put("error", e.message ?: "Fehler"))
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (now - progressAt > 250) {
+            progressAt = now
+            broadcast(JSONObject().put("t", "clip-progress").put("id", item.id).put("received", item.received))
+        }
+        if (item.complete) uploaded(v, item)
+    }
+
+    private fun uploaded(v: Peer, item: ClipStore.Item) {
+        v.upload = null
+        sendFile(v, JSONObject().put("t", "stored").put("id", item.id))
+        if (!item.hidden) announceClip()
+    }
+
+    private fun serve(v: Peer, id: String, req: Int) {
+        val dc = v.files ?: return
+        val item = clip.get(id)?.takeIf { it.complete }
+        if (item == null) return sendFile(v, JSONObject().put("t", "error").put("id", id).put("req", req).put("error", "nicht mehr vorhanden"))
+        sendFile(v, JSONObject().put("t", "data").put("id", id).put("req", req).put("size", item.size))
+        item.file.inputStream().use { input ->
+            val buffer = ByteArray(ClipStore.CHUNK)
+            while (true) {
+                val n = input.read(buffer)
+                if (n <= 0) break
+                while (dc.state() == DataChannel.State.OPEN && dc.bufferedAmount() > 4L * 1024 * 1024) Thread.sleep(10)
+                if (dc.state() != DataChannel.State.OPEN) return
+                dc.send(DataChannel.Buffer(ByteBuffer.wrap(buffer.copyOf(n)), true))
+            }
+        }
+        sendFile(v, JSONObject().put("t", "end").put("id", id).put("req", req))
+    }
+
+    // ------------------------------------------------------------ the phone's own clipboard actions
+
+    /** Items for the share screen. */
+    fun clipItems(): List<ClipStore.Item> = clip.all().filter { it.complete }
+
+    /** The phone puts something in (text from its clipboard, a file). */
+    fun clipAdd(name: String, mime: String, text: String?, preview: String?, read: (java.io.OutputStream) -> Unit) = post {
+        val tmp = java.io.File.createTempFile("clip", null, context.cacheDir)
+        try {
+            tmp.outputStream().use(read)
+            val item = clip.add(Signaling.randomId(), name, mime, tmp.length(), 0, text, false, preview)
+            tmp.inputStream().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n <= 0) break
+                    clip.write(item, buffer.copyOf(n))
+                }
+            }
+            announceClip()
+        } catch (e: Exception) {
+            android.util.Log.w("clip", "add failed", e)
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    fun clipRemove(id: String) = post { if (clip.remove(id, 0)) announceClip() }
+
+    /** A participant's name (for "von …" in the list). */
+    fun nameOf(id: Int): String = if (id == 0) name else viewers.values.firstOrNull { it.id == id }?.name ?: "Gast"
+
     private fun remove(v: Peer) {
         viewers.remove(v.peer)
+        v.downloads.shutdownNow()
         release(v)
         runCatching { v.pc.close() }
         broadcast(JSONObject().put("t", "left").put("id", v.id))
@@ -358,7 +498,8 @@ class Host(
         send(v, JSONObject().put("t", "welcome").put("id", v.id).put("name", v.name).put("color", v.color).put("ice", iceJson))
         send(v, state())
         broadcast(peers())
-        send(v, JSONObject().put("t", "clip").put("items", JSONArray()))
+        send(v, clipList())
+        sendPreviews(v)
         changed()
         refresh()
     }
@@ -436,6 +577,7 @@ class Host(
             "key" -> if (mode == "control") control { it.key(msg.optString("key")) }
             "nav" -> if (mode == "control") control { it.nav(msg.optString("a")) }
             "keyframe" -> refresh()
+            "clip-del" -> if (clip.remove(msg.optString("id"), v.id)) announceClip()
         }
     }
 

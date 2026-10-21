@@ -53,6 +53,20 @@
     label.check { display: flex; align-items: center; gap: 10px; color: var(--fg); font-size: 15px; }
     label.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
     label.check .muted { font-size: 13px; }
+    .clip-head { display: flex; align-items: baseline; gap: 8px; }
+    .clip-head strong { font-size: 16px; }
+    .clip-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .clip-list:empty::after { content: 'Noch leer – Text einfügen, eine Datei wählen oder Zuschauer legen etwas ab.'; color: var(--muted); font-size: 13px; }
+    .clip-item { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+    .clip-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .clip-thumb { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: var(--raised) center / cover no-repeat; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .clip-info { flex: 1; min-width: 0; }
+    .clip-info strong, .clip-info span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .clip-info span { color: var(--muted); font-size: 12.5px; }
+    .clip-text { margin: 0; color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+    .clip-actions { display: flex; gap: 6px; }
+    .clip-actions button { flex: 1; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 13px; font-weight: 600; }
+    .clip-actions .del { flex: none; width: 40px; color: var(--muted); }
     .watch { align-self: center; margin-top: 4px; padding: 10px 16px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
   </style>
 </head>
@@ -110,6 +124,19 @@
       </div>
       <button id="stop" class="btn danger">Freigabe beenden</button>
     </section>
+
+    <!-- shared clipboard (while sharing) -->
+    <section id="clip" class="card" hidden>
+      <div class="clip-head">
+        <strong>Zwischenablage</strong>
+        <span class="muted">für alle in der Freigabe</span>
+      </div>
+      <div class="row">
+        <button id="clip-paste" class="btn">Einfügen</button>
+        <button id="clip-file" class="btn">Datei …</button>
+      </div>
+      <ul id="clip-list" class="clip-list"></ul>
+    </section>
   </main>
 
   <script>
@@ -122,6 +149,28 @@
     $('name').value = localStorage.getItem('pv-name') ?? ''
     $('name').addEventListener('input', () => localStorage.setItem('pv-name', $('name').value.trim()))
     $('watch').addEventListener('click', () => host.watch())
+    $('clip-paste').addEventListener('click', () => host.clipPaste())
+    $('clip-file').addEventListener('click', () => host.clipFile())
+    const size = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`)
+    function renderClip(items) {
+      $('clip-list').replaceChildren(
+        ...items.map((it) => {
+          const li = document.createElement('li')
+          li.className = 'clip-item'
+          li.innerHTML = '<div class="clip-top"><i class="clip-thumb"></i><div class="clip-info"><strong></strong><span></span></div></div><div class="clip-actions"><button data-a="copy">Kopieren</button><button data-a="save">Speichern</button><button data-a="share">Teilen …</button><button data-a="del" class="del" title="Entfernen">✕</button></div>'
+          const thumb = li.querySelector('.clip-thumb')
+          if (it.preview) thumb.style.backgroundImage = `url("${it.preview}")`
+          else thumb.textContent = (it.name.split('.').pop() || '').slice(0, 4) || (it.mime.split('/')[0] ?? '')
+          li.querySelector('strong').textContent = it.name
+          li.querySelector('.clip-info span').textContent = `${size(it.size)} · von ${it.by}`
+          if (it.text) li.querySelector('.clip-top').insertAdjacentElement('afterend', Object.assign(document.createElement('p'), { className: 'clip-text', textContent: it.text }))
+          for (const b of li.querySelectorAll('[data-a]')) {
+            b.addEventListener('click', () => ({ copy: host.clipCopy, save: host.clipSave, share: host.clipShare, del: host.clipRemove })[b.dataset.a].call(host, it.id))
+          }
+          return li
+        }),
+      )
+    }
     $('site').value = host.site()
     $('keep').checked = host.keepLink()
     $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
@@ -147,6 +196,8 @@
       $('live').hidden = !st.sharing
       $('setup').hidden = st.sharing
       $('watch').hidden = st.sharing
+      $('clip').hidden = !st.sharing
+      renderClip(st.clip ?? [])
       $('running').hidden = !st.sharing
       $('start').disabled = !!st.starting
       $('error').hidden = !st.error
