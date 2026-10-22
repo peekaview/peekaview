@@ -28,7 +28,7 @@ const CSS = `
 .pv-viewer {
   --pv-accent: #ef4444; --pv-bg: #09090b; --pv-fg: #fafafa; --pv-muted: #a1a1aa;
   --pv-glass: rgba(24, 24, 27, .78); --pv-line: rgba(255, 255, 255, .09);
-  position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden;
+  position: relative; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden;
   background: var(--pv-bg); color: var(--pv-fg);
   font: 500 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased; user-select: none;
@@ -38,63 +38,56 @@ const CSS = `
 .pv-viewer button { margin: 0; box-sizing: border-box; font: inherit; line-height: 1; }
 .pv-viewer svg { flex: none; }
 .pv-glass { background: var(--pv-glass); border: 1px solid var(--pv-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); }
-.pv-stage { position: absolute; inset: 0; display: grid; place-items: center; }
+.pv-stage { position: absolute; inset: 0; overflow: hidden; display: grid; place-items: center; isolation: isolate; }
 .pv-view { position: relative; touch-action: none; }
 .pv-viewer[data-tool="draw"] .pv-view { cursor: crosshair; }
 .pv-screen, .pv-ann { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pv-screen { object-fit: fill; background: #000; pointer-events: none; }
-.pv-top { position: absolute; top: 12px; left: 12px; right: 140px; display: flex; gap: 8px; pointer-events: none; }
+.pv-status { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.pv-live { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.pv-title { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.pv-dock:has(.pv-task) .pv-title { display: none; }
+.pv-mode, .pv-rec, .pv-paused { display: inline-flex; align-items: center; flex: none; }
 .pv-chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; min-width: 0; }
 .pv-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--pv-accent); box-shadow: 0 0 0 3px rgba(239, 68, 68, .25); animation: pv-pulse 2s ease-in-out infinite; }
 .pv-mode { color: var(--pv-muted); }
 .pv-mode[data-mode="draw"] { color: #fde68a; }
 .pv-mode[data-mode="control"] { color: #fca5a5; }
-.pv-peers { position: absolute; top: 12px; right: 12px; display: flex; margin: 0; padding: 0 0 0 6px; list-style: none; }
+.pv-peers { position: absolute; top: calc(var(--pv-toolbar-bottom, 0px) + 12px); right: 12px; z-index: 0; display: flex; margin: 0; padding: 0 0 0 6px; list-style: none; }
 .pv-peers li { width: 30px; height: 30px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--pv-bg); color: #fff; font-size: 11px; font-weight: 650; letter-spacing: .02em; text-shadow: 0 1px 1px rgba(0,0,0,.3); }
 .pv-peers li.me { border-color: var(--pv-fg); }
 .pv-peers li.voice { box-shadow: 0 0 0 2px #22c55e; }
 .pv-rec { color: #fca5a5; }
 .pv-paused { color: #fde68a; }
 .pv-dock button.live { background: #16a34a; color: #fff; }
-.pv-dock { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; border-radius: 14px; }
-.pv-dock.placed { transform: none; bottom: auto; }
-/* controls always above the shared windows (they climb up when focused) */
-.pv-top, .pv-peers, .pv-dock, .pv-toast, .pv-notice, .pv-stats { z-index: 100000; }
-.pv-stats { position: absolute; left: 12px; top: 52px; max-width: calc(100% - 24px); padding: 8px 11px; border-radius: 10px; color: #d4d4d8; font: 11.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre; overflow: hidden; pointer-events: none; }
+.pv-dock { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); box-sizing: border-box; width: max-content; max-width: calc(100% - 24px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; padding: 5px; border-radius: 14px; }
+/* Shared windows stay in the stage stacking context, below these controls. */
+.pv-dock, .pv-toast, .pv-notice, .pv-stats { z-index: 100000; }
+.pv-stats { position: absolute; left: 12px; top: calc(var(--pv-toolbar-bottom, 0px) + 12px); max-width: calc(100% - 24px); padding: 8px 11px; border-radius: 10px; color: #d4d4d8; font: 11.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre; overflow: hidden; pointer-events: none; }
 .pv-stats b { color: #fafafa; font-weight: 650; }
-.pv-dock.collapsed > :not(.pv-grip):not(.pv-fold) { display: none !important; }
-.pv-dock .pv-grip { width: 18px; margin-right: -2px; color: var(--pv-muted); cursor: grab; touch-action: none; }
-.pv-dock .pv-grip:active { cursor: grabbing; }
-.pv-dock .pv-grip:hover:not(:disabled) { background: transparent; color: var(--pv-fg); }
+.pv-dock.collapsed > :not(.pv-fold):not(.pv-status):not([data-voice]) { display: none !important; }
+.pv-dock.collapsed .pv-live, .pv-dock.collapsed .pv-mode { display: none; }
+.pv-dock.collapsed .pv-status:has(.pv-rec[hidden]):has(.pv-paused[hidden]) { display: none; }
 .pv-dock .pv-fold { width: 26px; color: var(--pv-muted); }
 .pv-dock .pv-fold:hover:not(:disabled) { color: var(--pv-fg); }
-.pv-dock.dragging button::after { display: none; }
 .pv-dock button[data-count]::before { content: attr(data-count); position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--pv-accent); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; }
 .pv-dock button.open { background: rgba(255, 255, 255, .14); }
-.pv-tasks { display: flex; align-items: center; gap: 3px; }
+.pv-tasks { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; min-width: 0; max-width: 100%; }
 .pv-dock .pv-task { width: auto; max-width: 150px; gap: 7px; padding: 0 10px 0 7px; grid-auto-flow: column; color: var(--pv-muted); }
 .pv-dock .pv-task span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .pv-dock .pv-task i { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; color: #fff; font: 700 9px/1 system-ui, sans-serif; font-style: normal; }
 .pv-dock .pv-task.active { color: var(--pv-fg); background: rgba(255, 255, 255, .1); }
 .pv-dock .pv-task.min { opacity: .5; }
-.pv-toast { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); color: #fde68a; pointer-events: none; animation: pv-in .2s ease-out; }
+.pv-toast { position: absolute; top: calc(var(--pv-toolbar-bottom, 0px) + 12px); left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); color: #fde68a; pointer-events: none; animation: pv-in .2s ease-out; }
 @keyframes pv-in { from { opacity: 0; transform: translate(-50%, -4px); } }
 .pv-dock button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--pv-fg); cursor: pointer; transition: background .15s, color .15s, opacity .15s; }
 .pv-dock button:hover:not(:disabled) { background: rgba(255, 255, 255, .09); }
 .pv-dock button.active { background: var(--pv-fg); color: var(--pv-bg); }
 .pv-dock button:disabled { opacity: .28; cursor: default; }
-.pv-dock button::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 8px; background: #18181b; border: 1px solid var(--pv-line); white-space: nowrap; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
+.pv-dock button::after { content: attr(data-tip); position: absolute; top: calc(100% + 10px); left: 50%; transform: translate(-50%, -4px); padding: 5px 9px; border-radius: 8px; background: #18181b; border: 1px solid var(--pv-line); white-space: nowrap; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .pv-dock button:hover::after { opacity: 1; transform: translate(-50%, 0); }
 .pv-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--pv-line); }
-/* a phone upright: the dock stands beside it */
-.pv-dock.side { bottom: auto; transform: translateY(-50%); flex-direction: column; }
-.pv-dock.side .pv-tasks { flex-direction: column; }
-.pv-dock.side .pv-sep { width: 22px; height: 1px; margin: 3px 0; }
-.pv-dock.side .pv-grip { width: 38px; height: 18px; margin: 0 0 -2px; }
-.pv-dock.side .pv-fold { width: 38px; height: 26px; }
-.pv-dock.side button::after { bottom: auto; top: 50%; left: auto; right: calc(100% + 10px); transform: translate(4px, -50%); }
-.pv-dock.side button:hover::after { transform: translate(0, -50%); }
 .pv-notice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: min(420px, 80%); padding: 11px 16px; border-radius: 12px; color: var(--pv-fg); }
 .pv-notice-text { flex: 1; min-width: 0; }
 .pv-pin { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--pv-line); }
@@ -110,12 +103,6 @@ const CSS = `
 .pv-spinner { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--pv-fg); border-radius: 50%; animation: pv-spin .8s linear infinite; }
 .pv-keys { position: absolute; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
 @keyframes pv-spin { to { transform: rotate(360deg); } }
-/* narrow screens: the chips show their icon only, the title gets the room */
-@media (max-width: 520px) {
-  .pv-top { right: 96px; }
-  .pv-chip { padding: 0 10px; }
-  .pv-mode span, .pv-rec span, .pv-paused span { display: none; }
-}
 @keyframes pv-pulse { 50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, .12); } }
 `
 
@@ -131,22 +118,21 @@ export function mountViewer(el, options) {
   el.classList.add('pv-viewer')
   el.innerHTML = `
     <div class="pv-stage">
+      <ul class="pv-peers"></ul>
       <div class="pv-notice pv-glass"><span class="pv-spinner"></span><span class="pv-notice-text"></span>
         <form class="pv-pin" hidden><small>Nicht am Platz? Mit der PIN des Raums geht es auch ohne Bestätigung.</small><input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN"><button>Eintreten</button><small class="pv-pin-error" hidden></small></form>
         <form class="pv-pin pv-unlock" hidden><input type="password" autocomplete="off" placeholder="Passwort des Benutzers"><button>Entsperren</button><small class="pv-pin-error" hidden></small></form>
       </div>
     </div>
-    <div class="pv-top">
-      <div class="pv-chip pv-glass pv-live"><i class="pv-dot"></i><span class="pv-title"></span></div>
-      <div class="pv-chip pv-glass pv-mode"></div>
-      <div class="pv-chip pv-glass pv-rec" title="Wird aufgezeichnet" hidden><i class="pv-dot"></i><span>Wird aufgezeichnet</span></div>
-      <div class="pv-chip pv-glass pv-paused" title="Steuerung pausiert – Fenster ist beim Host verdeckt" hidden>${icon('control', 15)}<span>Steuerung pausiert – Fenster ist beim Host verdeckt</span></div>
-    </div>
     <div class="pv-stats pv-glass" hidden></div>
     <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
-    <ul class="pv-peers"></ul>
     <div class="pv-dock pv-glass">
-      <button class="pv-grip" data-tip="Verschieben">${icon('grip', 16)}</button>
+      <div class="pv-status">
+        <span class="pv-live"><i class="pv-dot"></i><span class="pv-title"></span></span>
+        <span class="pv-mode" role="img"></span>
+        <span class="pv-rec" role="img" aria-label="Wird aufgezeichnet" title="Wird aufgezeichnet" hidden><i class="pv-dot"></i></span>
+        <span class="pv-paused" role="img" aria-label="Steuerung pausiert" title="Steuerung pausiert – Fenster ist beim Host verdeckt" hidden>${icon('control', 15)}</span>
+      </div>
       <span class="pv-tasks"></span>
       <button data-tile data-tip="Fenster nebeneinander">${icon('tile')}</button>
       <span class="pv-sep pv-tasks-sep"></span>
@@ -156,7 +142,7 @@ export function mountViewer(el, options) {
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
-      <button data-voice data-tip="Sprechen">${icon('micOff')}</button>
+      <button data-voice data-tip="Mikrofon stumm – einschalten" aria-label="Mikrofon stumm – einschalten" aria-pressed="false">${icon('micOff')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
     <textarea class="pv-keys" aria-hidden="true" tabindex="-1" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>`
@@ -165,6 +151,11 @@ export function mountViewer(el, options) {
 
   const keys = q('.pv-keys')
   // every shared window in a frame of its own (or alone, as large as possible)
+  let toolbarSpace = 0
+  let dockFrame = 0
+  const scheduleDock = () => {
+    if (!dockFrame) dockFrame = requestAnimationFrame(() => { dockFrame = 0; positionDock() })
+  }
   const wm = new WindowManager(stage, {
     voice: voiceEnabled,
     // how large each window is shown here – the presenter encodes no more pixels than that
@@ -174,16 +165,12 @@ export function mountViewer(el, options) {
     canResize: () => state.mode === 'control' && state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
     onActivate: (slot) => send({ t: 'activate', w: slot }),
-    // soft buttons of a shared phone – kept above the dock at its usual place
     onNav: (slot, a) => send({ t: 'nav', a, w: slot }),
-    bottomSpace: () => {
-      const d = el.querySelector('.pv-dock')
-      return !d || d.hidden || d.classList.contains('placed') || d.classList.contains('side') ? 0 : d.offsetHeight + 20
-    },
+    topSpace: () => toolbarSpace,
     onPlace: (slot, f) => send({ t: 'arrange', w: slot, ...f }),
     onChange: () => {
       renderTasks()
-      requestAnimationFrame(sideDock)
+      scheduleDock()
     },
     onFrame: () => {
       if (!hasFrame) {
@@ -191,10 +178,10 @@ export function mountViewer(el, options) {
         update()
       }
       reportViewport()
-      requestAnimationFrame(sideDock)
+      scheduleDock()
     },
   })
-  q('.pv-top').hidden = !toolbar
+  q('.pv-status').hidden = !toolbar
   q('.pv-dock').hidden = !toolbar
   q('.pv-peers').hidden = !peers
 
@@ -204,7 +191,11 @@ export function mountViewer(el, options) {
     onChange: () => {
       const b = q('[data-voice]')
       b.classList.toggle('live', voice.on)
-      b.dataset.tip = voice.on ? 'Mikrofon aus' : 'Sprechen'
+      b.disabled = voice.starting
+      b.setAttribute('aria-busy', String(voice.starting))
+      b.setAttribute('aria-pressed', String(voice.on))
+      b.dataset.tip = voice.starting ? 'Mikrofon wird freigegeben …' : voice.on ? 'Mikrofon an – stummschalten' : 'Mikrofon stumm – einschalten'
+      b.setAttribute('aria-label', b.dataset.tip)
       b.innerHTML = icon(voice.on ? 'mic' : 'micOff')
     },
   })
@@ -552,6 +543,9 @@ export function mountViewer(el, options) {
       case 'launch-error':
         toast(`Start nicht möglich: ${m.error}`)
         return
+      case 'control-error':
+        toast(m.error || 'Die Eingabe ist fehlgeschlagen.')
+        return
       case 'unlocked':
         unlockError(m.ok ? '' : m.error || 'Entsperren fehlgeschlagen.')
         return
@@ -735,7 +729,7 @@ export function mountViewer(el, options) {
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
       busy: 'Gerade nicht verfügbar – auf diesem Rechner läuft schon eine andere Freigabe.',
-      pick: 'Remote-Zugriff: Starte unten im Dock eine Anwendung oder den Desktop.',
+      pick: 'Remote-Zugriff: Starte oben in der Toolbar eine Anwendung oder den Desktop.',
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
@@ -756,12 +750,14 @@ export function mountViewer(el, options) {
     q('.pv-spinner').hidden = !['connecting', 'waiting', 'loading', 'admission'].includes(status)
 
     q('.pv-live').hidden = !hostPresent
-    q('.pv-title').textContent = state.title || 'Bildschirmfreigabe'
+    q('.pv-status').hidden = !toolbar || !hostPresent
+    q('.pv-title').textContent = q('.pv-live').title = state.title || 'Bildschirmfreigabe'
     const mode = q('.pv-mode')
     mode.hidden = !hostPresent
     mode.dataset.mode = state.mode
-    mode.innerHTML = `${icon(MODE_ICONS[state.mode] ?? 'view', 15)}<span></span>`
-    mode.querySelector('span').textContent = mode.title = MODES[state.mode] ?? ''
+    mode.innerHTML = icon(MODE_ICONS[state.mode] ?? 'view', 15)
+    mode.title = MODES[state.mode] ?? ''
+    mode.setAttribute('aria-label', mode.title)
     const allowed = hostPresent ? TOOLS[state.mode] ?? [] : []
     q('.pv-rec').hidden = !hostPresent || !state.recording
     q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false || !(state.windows ?? []).length
@@ -835,7 +831,7 @@ export function mountViewer(el, options) {
   q('[data-clear]').addEventListener('click', clear)
   q('[data-voice]').addEventListener('click', () => {
     if (voice.on) voice.stop()
-    else voice.start().catch(() => (q('[data-voice]').dataset.tip = 'Kein Zugriff auf das Mikrofon'))
+    else voice.start().catch(() => toast('Kein Zugriff auf das Mikrofon. Bitte im Browser erlauben.'))
   })
 
   // ------------------------------------------------------------ shared clipboard
@@ -975,104 +971,38 @@ export function mountViewer(el, options) {
     }
   }
 
-  // ------------------------------------------------------------ dock: drag & collapse
-  // Position (as a fraction of the viewer) and collapsed state are remembered per browser.
+  // ------------------------------------------------------------ toolbar: fixed at the viewer's top edge
 
   const dock = q('.pv-dock')
   const DOCK_KEY = 'pv-dock'
-  const loadDock = () => {
-    try {
-      return JSON.parse(localStorage.getItem(DOCK_KEY)) ?? {}
-    } catch {
-      return {}
-    }
-  }
-  const saveDock = (patch) => {
-    try {
-      localStorage.setItem(DOCK_KEY, JSON.stringify({ ...loadDock(), ...patch }))
-    } catch {}
-  }
-  function placeDock(fx, fy) {
-    if (!Number.isFinite(fx) || !Number.isFinite(fy)) return
-    const r = el.getBoundingClientRect()
-    const d = dock.getBoundingClientRect()
-    dock.classList.add('placed')
-    dock.style.left = `${Math.round(Math.min(Math.max(0, r.width - d.width), Math.max(0, fx * r.width)))}px`
-    dock.style.top = `${Math.round(Math.min(Math.max(0, r.height - d.height), Math.max(0, fy * r.height)))}px`
-  }
   function foldDock(collapsed) {
     dock.classList.toggle('collapsed', collapsed)
     const b = q('.pv-fold')
     b.innerHTML = icon(collapsed ? 'expand' : 'collapse', 16)
     b.dataset.tip = collapsed ? 'Ausklappen' : 'Einklappen'
   }
-  {
-    const saved = loadDock()
-    foldDock(!!saved.collapsed)
-    if (saved.x != null) requestAnimationFrame(() => placeDock(saved.x, saved.y))
-  }
+  try { foldDock(!!JSON.parse(localStorage.getItem(DOCK_KEY))?.collapsed) } catch {}
   q('.pv-fold').addEventListener('click', () => {
     const collapsed = !dock.classList.contains('collapsed')
     foldDock(collapsed)
-    saveDock({ collapsed })
+    try { localStorage.setItem(DOCK_KEY, JSON.stringify({ collapsed })) } catch {}
   })
-  q('.pv-grip').addEventListener('pointerdown', (e) => {
-    e.preventDefault()
-    const grip = e.currentTarget
-    grip.setPointerCapture(e.pointerId)
-    const r = el.getBoundingClientRect()
-    const d = dock.getBoundingClientRect()
-    const dx = e.clientX - d.left
-    const dy = e.clientY - d.top
-    dock.classList.add('dragging')
-    const move = (ev) => placeDock((ev.clientX - dx - r.left) / r.width, (ev.clientY - dy - r.top) / r.height)
-    const up = () => {
-      grip.removeEventListener('pointermove', move)
-      grip.removeEventListener('pointerup', up)
-      grip.removeEventListener('pointercancel', up)
-      dock.classList.remove('dragging')
-      const now = el.getBoundingClientRect()
-      saveDock({ x: parseFloat(dock.style.left) / now.width, y: parseFloat(dock.style.top) / now.height })
-    }
-    grip.addEventListener('pointermove', move)
-    grip.addEventListener('pointerup', up)
-    grip.addEventListener('pointercancel', up)
-  })
-  // keep a placed dock inside the viewer when it gets smaller
-  const dockObserver = new ResizeObserver(() => {
-    const saved = loadDock()
-    if (dock.classList.contains('placed') && saved.x != null) placeDock(saved.x, saved.y)
-  })
+  const dockObserver = new ResizeObserver(scheduleDock)
   dockObserver.observe(el)
+  dockObserver.observe(dock)
 
-  // a shared phone (upright): the dock beside it rather than below – unless moved by hand
-  function sideDock() {
+  function positionDock() {
     if (destroyed) return
-    const dock = q('.pv-dock')
-    const wins = wm.list.filter((w) => !w.min)
-    const win = wins.length === 1 ? wins[0] : null
-    const r = win?.view.getBoundingClientRect()
-    const upright = !!r && r.width > 0 && (win.info.nav || r.height > r.width * 1.3)
-    if (dock.classList.contains('placed') || !upright) {
-      if (dock.classList.contains('side')) {
-        dock.classList.remove('side')
-        dock.style.left = dock.style.top = ''
-        wm.layout()
-      }
-      return
+    const viewer = el.getBoundingClientRect()
+    const bottom = dock.hidden ? 0 : dock.getBoundingClientRect().bottom - viewer.top
+    el.style.setProperty('--pv-toolbar-bottom', `${bottom}px`)
+    const space = bottom ? Math.ceil(bottom + 12) : 0
+    if (space !== toolbarSpace) {
+      toolbarSpace = space
+      wm.layout()
+      reportViewport()
     }
-    const wasSide = dock.classList.contains('side')
-    dock.classList.add('side')
-    const s = el.getBoundingClientRect()
-    const w = dock.offsetWidth
-    let left = r.right - s.left + 16
-    if (left + w > s.width - 8) left = Math.max(8, r.left - s.left - 16 - w)
-    dock.style.left = `${Math.round(left)}px`
-    dock.style.top = `${Math.round(r.top - s.top + r.height / 2)}px`
-    // the picture may take the room the dock had below it
-    if (!wasSide) wm.layout()
   }
-  new ResizeObserver(() => requestAnimationFrame(sideDock)).observe(el)
 
   // ------------------------------------------------------------ pointer
 
@@ -1211,11 +1141,13 @@ export function mountViewer(el, options) {
       document.removeEventListener('visibilitychange', onVisibility)
       clearTimeout(viewportTimer)
       dockObserver.disconnect()
+      cancelAnimationFrame(dockFrame)
       clipPanel?.destroy()
       clearTimeout(toastTimer)
       wm.destroy()
       el.replaceChildren()
       el.classList.remove('pv-viewer')
+      el.style.removeProperty('--pv-toolbar-bottom')
     },
   }
 }

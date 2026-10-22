@@ -16,6 +16,8 @@ export class Voice {
     this.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }]
     this.myId = null
     this.on = false
+    this.starting = false
+    this.request = 0
     this.local = null
     this.peers = []
     this.pcs = new Map()
@@ -29,27 +31,51 @@ export class Voice {
   }
 
   async start() {
-    if (this.on) return
-    this.local = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    })
-    this.on = true
-    this.send({ t: 'voice', on: true })
-    this.meter()
-    this.sync()
+    if (this.on || this.starting) return
+    const request = ++this.request
+    this.starting = true
     this.onChange?.()
+    try {
+      // Native audio processing; these preferences let the browser choose what it supports.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      })
+      // A closed room must not turn its microphone on after a delayed permission response.
+      if (request !== this.request) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
+      this.local = stream
+      this.on = true
+      for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => {
+        if (this.local === stream) this.stop()
+      }, { once: true })
+      this.send({ t: 'voice', on: true })
+      this.meter()
+      this.sync()
+    } catch (err) {
+      if (request === this.request) throw err
+    } finally {
+      if (request === this.request) {
+        this.starting = false
+        this.onChange?.()
+      }
+    }
   }
 
   stop() {
-    if (!this.on) return
+    ++this.request
+    this.starting = false
+    const wasOn = this.on
     this.on = false
-    this.send({ t: 'voice', on: false })
+    if (wasOn) this.send({ t: 'voice', on: false })
     clearInterval(this.meterTimer)
     this.meterCtx?.close().catch(() => {})
     this.meterCtx = null
     for (const id of [...this.pcs.keys()]) this.close(id)
     this.local?.getTracks().forEach((t) => t.stop())
     this.local = null
+    this.level = 0
     this.onChange?.()
   }
 

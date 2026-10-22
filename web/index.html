@@ -8,7 +8,7 @@
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     [hidden] { display: none !important; }
     body { font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
-    #viewer { height: 100%; }
+    #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
     #start { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 40px; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     .brand i { display: flex; color: #fafafa; }

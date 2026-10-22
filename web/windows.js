@@ -71,7 +71,7 @@ const appColor = (name) => {
 export class WindowManager {
   /**
    * @param {HTMLElement} stage
-   * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void,
+   * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void, topSpace?: () => number,
    *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void,
    *          onActivate?: (slot: number) => void, onArrange?: (slot: number, x: number, y: number) => void,
    *          onPlace?: (slot: number, frame: {x?: number, y?: number, hw?: number, hh?: number}) => void}} options
@@ -269,15 +269,17 @@ export class WindowManager {
     return { w: (win.video.videoWidth || 1280) / d, h: (win.video.videoHeight || 800) / d }
   }
 
-  area() {
+  area(fitting = false) {
     const r = this.root.getBoundingClientRect()
-    return { w: r.width, h: r.height }
+    // Reserve toolbar space for automatic fitting; manual moves use the full viewer.
+    const top = fitting ? Math.min(r.height, this.options.topSpace?.() ?? 0) : 0
+    return { w: r.width, h: r.height - top, top }
   }
 
   /** Largest scale (≤ maxScale) at which a window fits into w × h (title bar included). */
   fitScale(win, w, h, bar = BAR) {
     const n = this.native(win)
-    return Math.max(MIN_SCALE, Math.min(this.maxScale(win), (w - 2) / n.w, (h - bar - 2) / n.h))
+    return Math.max(0, Math.min(this.maxScale(win), (w - 2) / n.w, (h - bar - 2) / n.h))
   }
 
   /**
@@ -292,14 +294,14 @@ export class WindowManager {
 
   /** Room for one maximized window in device pixels – the presenter can resize to it. */
   viewport() {
-    const a = this.area()
+    const a = this.area(true)
     const d = window.devicePixelRatio || 1
     const bar = this.wins.size > 1 ? BAR : 0
     return { w: Math.floor(a.w * d), h: Math.floor((a.h - bar) * d) }
   }
 
   layout(only) {
-    const a = this.area()
+    const a = this.area(true)
     if (!a.w || !a.h) return
     if (this.mirror) return this.layoutMirror()
     this.desks.replaceChildren()
@@ -309,11 +311,11 @@ export class WindowManager {
       for (const win of wins) {
         win.min = false
         const n = this.native(win)
-        // room for the soft buttons of a phone below it (above the viewer's dock)
-        const h = a.h - (win.nav ? NAV + (this.options.bottomSpace?.() ?? 0) : 0)
+        // room for the soft buttons below a shared phone screen
+        const h = a.h - (win.nav ? NAV : 0)
         win.s = this.fitScale(win, a.w, h, 0)
         win.x = (a.w - n.w * win.s) / 2
-        win.y = (h - n.h * win.s) / 2
+        win.y = a.top + (h - n.h * win.s) / 2
         this.paint(win, 0)
       }
       return
@@ -333,7 +335,7 @@ export class WindowManager {
 
   /** Scale and offset that map the presenter's screen coordinates onto this view. */
   mirrorMap() {
-    const a = this.area()
+    const a = this.area(true)
     const xs = this.screens
     const D = { x: Math.min(...xs.map((r) => r.x)), y: Math.min(...xs.map((r) => r.y)) }
     D.w = Math.max(...xs.map((r) => r.x + r.w)) - D.x
@@ -342,7 +344,7 @@ export class WindowManager {
     let k = Math.min((a.w - 2 * M) / D.w, (a.h - 2 * M - BAR) / D.h)
     // never enlarged beyond one of the presenter's pixels per screen pixel
     for (const win of this.wins.values()) if (win.info.rect?.w) k = Math.min(k, this.native(win).w / win.info.rect.w)
-    return { D, k, ox: (a.w - D.w * k) / 2, oy: BAR + M + (a.h - 2 * M - BAR - D.h * k) / 2 }
+    return { D, k, ox: (a.w - D.w * k) / 2, oy: a.top + BAR + M + (a.h - 2 * M - BAR - D.h * k) / 2 }
   }
 
   layoutMirror() {
@@ -410,7 +412,7 @@ export class WindowManager {
   /** Side by side in a grid, each as large as it may be in its cell. */
   tile() {
     if (this.mirror) return this.tileHost()
-    const a = this.area()
+    const a = this.area(true)
     const wins = this.list.filter((w) => !w.min)
     if (!wins.length) return
     const cols = Math.ceil(Math.sqrt(wins.length * (a.w / a.h) / 1.6)) || 1
@@ -424,7 +426,7 @@ export class WindowManager {
       const col = i % cols
       const row = Math.floor(i / cols)
       win.x = GAP + col * (cw + GAP) + (cw - n.w * win.s) / 2
-      win.y = GAP + row * (ch + GAP) + (ch - n.h * win.s - BAR) / 2
+      win.y = a.top + GAP + row * (ch + GAP) + (ch - n.h * win.s - BAR) / 2
       this.paint(win)
     })
     this.arranged = false
@@ -550,7 +552,7 @@ export class WindowManager {
       return
     }
     if (!win || this.wins.size <= 1) return
-    const a = this.area()
+    const a = this.area(true)
     if (win.max && win.prev) {
       Object.assign(win, win.prev, { max: false, prev: null })
     } else {
@@ -558,7 +560,7 @@ export class WindowManager {
       const n = this.native(win)
       win.s = this.fitScale(win, a.w, a.h)
       win.x = (a.w - n.w * win.s) / 2
-      win.y = (a.h - n.h * win.s - BAR) / 2
+      win.y = a.top + (a.h - n.h * win.s - BAR) / 2
       win.max = true
     }
     this.arranged = true

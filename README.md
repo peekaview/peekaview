@@ -224,6 +224,10 @@ Each viewer gets its own upstream from the presenter. That suits support and tea
 
 Serve the viewer site with any static server. In production, use HTTPS and `Cache-Control: no-cache` for `.js`.
 
+The public viewer at [peekaview.de](https://peekaview.de) is deployed by the
+[`viewer` GitHub workflow](.github/workflows/viewer.yml) to Cloudflare Pages.
+See [deployment setup and local checks](deploy/README.md).
+
 ```bash
 python3 -m http.server -d web 8090
 ```
