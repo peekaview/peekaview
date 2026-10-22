@@ -1,4 +1,4 @@
-// Voice chat: a WebRTC audio mesh between everybody in the room who switched their microphone on.
+// Voice chat: a WebRTC audio mesh. Participants may listen while their microphone is muted.
 // Signaling runs over the PeekaView relay ({t:'rtc', to, sdp|candidate}); for every pair the
 // participant with the lower id sends the offer (the presenter has id 0).
 // While the microphone is on, its level goes to everybody ({t:'level', v: 0..1}) for the speaking
@@ -16,6 +16,7 @@ export class Voice {
     this.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }]
     this.myId = null
     this.on = false
+    this.enabled = false
     this.starting = false
     this.request = 0
     this.local = null
@@ -28,10 +29,18 @@ export class Voice {
   setSelf(id, iceServers) {
     this.myId = id
     if (Array.isArray(iceServers) && iceServers.length) this.iceServers = iceServers
+    this.sync()
+  }
+
+  setEnabled(enabled) {
+    if (this.enabled === enabled) return
+    this.enabled = enabled
+    if (enabled) this.sync()
+    else this.stop()
   }
 
   async start() {
-    if (this.on || this.starting) return
+    if (!this.enabled || this.on || this.starting) return
     const request = ++this.request
     this.starting = true
     this.onChange?.()
@@ -47,14 +56,17 @@ export class Voice {
       }
       this.local = stream
       this.on = true
+      await Promise.all([...this.pcs.values()].flatMap(pc => pc.getSenders().map(sender => sender.replaceTrack(stream.getAudioTracks()[0]))))
+      if (request !== this.request) return
       for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => {
         if (this.local === stream) this.stop()
       }, { once: true })
       this.send({ t: 'voice', on: true })
+      for (const player of this.players.values()) player.play().catch(console.warn)
       this.meter()
       this.sync()
     } catch (err) {
-      if (request === this.request) throw err
+      if (request === this.request) { this.stop(); throw err }
     } finally {
       if (request === this.request) {
         this.starting = false
@@ -72,10 +84,11 @@ export class Voice {
     clearInterval(this.meterTimer)
     this.meterCtx?.close().catch(() => {})
     this.meterCtx = null
-    for (const id of [...this.pcs.keys()]) this.close(id)
+    for (const pc of this.pcs.values()) for (const sender of pc.getSenders()) sender.replaceTrack(null).catch(console.error)
     this.local?.getTracks().forEach((t) => t.stop())
     this.local = null
     this.level = 0
+    this.sync()
     this.onChange?.()
   }
 
@@ -118,7 +131,7 @@ export class Voice {
   }
 
   sync() {
-    const wanted = new Set(this.on ? this.peers.filter((p) => p.voice && p.id !== this.myId).map((p) => p.id) : [])
+    const wanted = new Set(this.enabled && this.myId !== null ? this.peers.filter((p) => (p.voice || this.on) && p.id !== this.myId).map((p) => p.id) : [])
     for (const id of [...this.pcs.keys()]) if (!wanted.has(id)) this.close(id)
     for (const id of wanted) if (!this.pcs.has(id) && this.myId < id) this.connect(id, true)
   }
@@ -126,16 +139,18 @@ export class Voice {
   connect(id, offer) {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers })
     this.pcs.set(id, pc)
-    for (const track of this.local.getTracks()) pc.addTrack(track, this.local)
+    // Negotiate both directions once; replaceTrack switches the microphone without reconnecting.
+    if (offer) pc.addTransceiver(this.on ? this.local.getAudioTracks()[0] : 'audio', { direction: 'sendrecv' })
     pc.onicecandidate = (e) => e.candidate && this.send({ t: 'rtc', to: id, candidate: e.candidate.toJSON() })
     pc.ontrack = (e) => {
+      if (!this.enabled || this.pcs.get(id) !== pc) return
       let player = this.players.get(id)
       if (!player) {
         player = new Audio()
         player.autoplay = true
         this.players.set(id, player)
       }
-      player.srcObject = e.streams[0]
+      player.srcObject = new MediaStream([e.track])
       player.play().catch(() => {})
       this.onChange?.()
     }
@@ -156,12 +171,16 @@ export class Voice {
 
   /** Incoming signaling message ({t:'rtc', from, sdp|candidate}). */
   async handle(m) {
-    if (!this.on || typeof m.from !== 'number') return
+    if (!this.enabled || typeof m.from !== 'number') return
     let pc = this.pcs.get(m.from)
     try {
       if (m.sdp?.type === 'offer') {
         pc ??= this.connect(m.from, false)
         await pc.setRemoteDescription(m.sdp)
+        // Reuse the offer's transceiver; addTransceiver on the answerer would leave an extra, unassociated one.
+        const transceiver = pc.getTransceivers()[0]
+        transceiver.direction = 'sendrecv'
+        await transceiver.sender.replaceTrack(this.on ? this.local.getAudioTracks()[0] : null)
         await pc.setLocalDescription(await pc.createAnswer())
         this.send({ t: 'rtc', to: m.from, sdp: pc.localDescription.toJSON() })
         await this.flush(m.from)

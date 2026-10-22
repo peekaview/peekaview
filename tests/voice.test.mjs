@@ -6,6 +6,7 @@ function setup(capture) {
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: capture } })
   const sent = []
   const voice = new Voice({ send: msg => sent.push(msg) })
+  voice.setEnabled(true)
   voice.meter = () => {}
   return { voice, sent }
 }
@@ -67,4 +68,36 @@ test('denied permission stays muted and can be retried; a revoked microphone upd
   assert.equal(voice.on, false)
   assert.equal(track.stopped, true)
   assert.deepEqual(sent, [{ t: 'voice', on: true }, { t: 'voice', on: false }])
+})
+
+test('muting keeps incoming voices for listening and transcription; disabling speech closes them', async () => {
+  const { track, stream } = microphone()
+  const { voice } = setup(async () => stream)
+  voice.setSelf(2)
+  voice.setPeers([{ id: 1, voice: true }])
+  const replaced = []
+  let closed = false
+  const pc = { getSenders: () => [{ replaceTrack: async track => { replaced.push(track) } }], close: () => { closed = true } }
+  voice.pcs.set(1, pc)
+  const incoming = microphone().stream
+  voice.players.set(1, { srcObject: incoming, play: async () => {} })
+  await voice.start()
+  voice.stop()
+  assert.equal(track.stopped, true)
+  assert.equal(closed, false)
+  assert.deepEqual(replaced, [track, null])
+  assert.deepEqual(voice.remoteStreams(), [incoming])
+  voice.setEnabled(false)
+  assert.equal(closed, true)
+  assert.equal(voice.pcs.size, 0)
+  assert.deepEqual(voice.remoteStreams(), [])
+})
+
+test('disabled speech never requests microphone access', async () => {
+  let captures = 0
+  const { voice } = setup(async () => { ++captures })
+  voice.setEnabled(false)
+  await voice.start()
+  assert.equal(captures, 0)
+  assert.equal(voice.on, false)
 })

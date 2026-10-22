@@ -482,7 +482,7 @@ export function mountViewer(el, options) {
     hostPresent = false
     offered = false
     state = { mode: 'view' }
-    voice.stop()
+    voice.setEnabled(false)
     resetVideo()
     wm.setWindows([])
     clipItems = []
@@ -504,6 +504,7 @@ export function mountViewer(el, options) {
         // when remote control is granted, switch straight to the control tool
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
+        voice.setEnabled(voiceEnabled && state.voice_enabled === true)
         // "Resize/Anordnen erlauben": the windows where they are on the presenter's screen
         wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode === 'control' && m.resize === true, screens: m.screens ?? [] })
         renderTasks()
@@ -765,7 +766,7 @@ export function mountViewer(el, options) {
     for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.hidden = !allowed.includes(b.dataset.tool)
     q('[data-clear]').hidden = !allowed.length
     q('.pv-tools-sep').hidden = !allowed.length || !me
-    q('[data-voice]').hidden = !voiceEnabled || !me
+    q('[data-voice]').hidden = !voiceEnabled || state.voice_enabled !== true || !me
     const clipButton = q('[data-clip]')
     clipButton.hidden = !me || !hostPresent
     if (clipItems.length) clipButton.dataset.count = String(clipItems.length)
@@ -830,6 +831,7 @@ export function mountViewer(el, options) {
   for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool))
   q('[data-clear]').addEventListener('click', clear)
   q('[data-voice]').addEventListener('click', () => {
+    if (!voiceEnabled || state.voice_enabled !== true || !me) return
     if (voice.on) voice.stop()
     else voice.start().catch(() => toast('Kein Zugriff auf das Mikrofon. Bitte im Browser erlauben.'))
   })
@@ -1129,7 +1131,7 @@ export function mountViewer(el, options) {
     clear,
     destroy() {
       destroyed = true
-      voice.stop()
+      voice.setEnabled(false)
       clearTimeout(helloTimer)
       clearTimeout(blockTimer)
       if (pc) signaling?.send({ type: 'bye', from: peerId })
