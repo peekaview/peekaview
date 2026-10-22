@@ -5,10 +5,11 @@
 #   ./build.sh --debug    debug build (viewer site http://localhost:8090 for local tests)
 #   ./build.sh --no-open  install without starting it
 #
-# macOS ties granted permissions (screen recording, accessibility) to the app's signature.
-# Set PEEKAVIEW_SIGN_IDENTITY to a signing identity from your keychain (see
-# `security find-identity -v -p codesigning`) so they survive rebuilds; without it the app is
-# signed ad hoc and macOS may ask again after each build.
+# macOS ties granted permissions (screen recording, accessibility) to the app's signature. An ad
+# hoc signed build counts as a new app every time – the permissions are asked for again. So the
+# app is signed with the certificate "PeekaView Local" from the keychain when there is one (a
+# self-signed one is enough: Keychain Access → Certificate Assistant → Create a Certificate,
+# name "PeekaView Local", type "Code Signing"); PEEKAVIEW_SIGN_IDENTITY picks another one.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -19,7 +20,7 @@ for arg in "$@"; do
   case "$arg" in
     --debug) profile=debug ;;
     --no-open) open_app=0 ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "Unbekannte Option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -36,9 +37,18 @@ args=(build --bundles app)
 app="target/$profile/bundle/macos/PeekaView.app"
 [[ -d "$app" ]] || { echo "Build fehlgeschlagen: $app fehlt" >&2; exit 1; }
 
-if [[ -n "${PEEKAVIEW_SIGN_IDENTITY:-}" ]]; then
-  echo "▸ Signiere mit: $PEEKAVIEW_SIGN_IDENTITY"
-  codesign --force --deep --sign "$PEEKAVIEW_SIGN_IDENTITY" "$app"
+identity="${PEEKAVIEW_SIGN_IDENTITY:-}"
+# self-signed certificates are not "valid" for find-identity -v, but codesign takes them
+if [[ -z "$identity" ]] && security find-identity -p codesigning | grep -q '"PeekaView Local"'; then
+  identity="PeekaView Local"
+fi
+if [[ -n "$identity" ]]; then
+  echo "▸ Signiere mit: $identity"
+  codesign --force --deep --sign "$identity" "$app"
+else
+  echo "ℹ︎ Ohne Zertifikat „PeekaView Local“ fragt macOS nach jedem Build die Berechtigungen neu ab."
+  echo "  Einmalig anlegen: Schlüsselbundverwaltung → Zertifikatsassistent → Zertifikat erstellen …"
+  echo "  Name „PeekaView Local“, Identitätstyp „Selbst signierter Stamm“, Zertifikattyp „Codesignatur“."
 fi
 
 echo "▸ Installiere nach /Applications …"

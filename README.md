@@ -235,6 +235,10 @@ cd client && npx @tauri-apps/cli@2 build --debug --bundles app
 ```
 
 On a Mac, `./build.sh` builds the release app and installs it to `/Applications` (`--debug` for a test build).
+It signs the app with the keychain certificate "PeekaView Local" when there is one – a self-signed
+code signing certificate is enough (Keychain Access → Certificate Assistant → Create a Certificate).
+Without it the app is signed ad hoc, and macOS asks for screen recording and accessibility again
+after every build.
 
 CI (`.github/workflows/client.yml`) runs the unit tests and builds Windows, macOS and Linux bundles. It runs **only on demand** (Actions → "desktop client" → Run workflow), because every run builds on three platforms.
 
