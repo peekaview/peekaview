@@ -10,10 +10,22 @@
     [hidden] { display: none !important; }
     body { font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
     #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
-    #start { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 40px; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 40px; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     .brand i { display: flex; color: #fafafa; }
     .lead { margin: -8px 0 0; color: #a1a1aa; }
+    #start { display:flex;flex-direction:column;gap:18px;margin:0; }
+    .home-nav { display:flex;gap:6px;padding:4px;border-radius:12px;background:#09090b; }
+    .home-nav button { flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 8px;border:0;border-radius:9px;background:transparent;color:#a1a1aa;font:600 13px system-ui;cursor:pointer; }
+    .home-nav button[aria-pressed="true"] { background:#3f3f46;color:#fafafa; }
+    .home-nav button:focus-visible, #paste-open:focus-visible { outline:2px solid #fafafa;outline-offset:3px; }
+    #paste-link summary { color:#a1a1aa;font-size:12px;cursor:pointer; }
+    #paste-link[open] summary { margin-bottom:12px; }
+    .paste-row { display:flex;align-items:center;gap:8px;margin-top:7px; }
+    #start .paste-row input { flex:1;min-width:0;margin:0; }
+    #paste-open { padding:11px 14px;border:0;border-radius:9px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
+    #link-error { margin:8px 0 0;color:#fca5a5;font-size:12px; }
+    #recent-links { display:flex;flex-direction:column;gap:10px; }
     #start label { display: block; color: #a1a1aa; font-size: 12px; }
     #start input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
     #start input:focus { border-color: #ef4444; }
@@ -61,18 +73,32 @@
   </style>
 </head>
 <body>
-  <form id="start">
+  <main id="home">
     <div class="brand"><i id="logo"></i>PeekaView</div>
-    <p class="lead" id="lead">Bildschirmfreigabe ansehen – direkt, ohne Installation.</p>
-    <label>Dein Name <input id="name" maxlength="32" required autocomplete="name"></label>
-    <div class="rooms-title"><span>Räume</span><span id="count"></span></div>
-    <ul class="rooms" id="rooms"></ul>
-    <button class="connect" id="connect" disabled>Verbinden</button>
+    <nav class="home-nav" aria-label="Was möchtest du tun?">
+      <button type="button" data-home="link" aria-pressed="true">Link öffnen</button>
+      <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
+    </nav>
+  <form id="start">
+    <p class="lead" id="lead" hidden></p>
+    <details id="paste-link" open>
+      <summary>Freigabelink öffnen</summary>
+      <label>Freigabelink
+        <span class="paste-row"><input id="share-url" type="text" inputmode="url" autocomplete="off" placeholder="https://peekaview.de/#…"><button id="paste-open" type="button">Öffnen</button></span>
+      </label>
+      <p id="link-error" role="alert" hidden></p>
+    </details>
+    <label id="name-label" hidden>Dein Name <input id="name" maxlength="32" autocomplete="name"></label>
+    <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span><span id="count"></span></div>
+    <ul class="rooms" id="rooms"></ul></div>
+    <button class="connect" id="connect" hidden disabled>Freigabe ansehen</button>
     <button class="share-phone" id="share-phone" type="button" hidden>Bildschirm dieses Geräts teilen</button>
     <p class="connect-hint" id="hint"></p>
     <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
   </form>
-  <details id="fixed-room-entry" style="box-sizing:border-box;width:min(460px,calc(100% - 32px));margin:20px auto;padding:18px 26px;background:#18181b;border-radius:16px"><summary>Kontakte</summary><div id="fixed-rooms" style="margin-top:14px"></div></details>
+  <section id="fixed-room-entry" hidden><div id="fixed-rooms"></div></section>
+    <p id="host-note" class="lead">Zum Bildschirmteilen PeekaView Desktop oder die Android-App öffnen.</p>
+  </main>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
@@ -123,6 +149,42 @@
     const inApp = typeof window.__PV_JOIN__ === 'string' || params.get('app') === '1'
     if (typeof window.__PV_JOIN__ === 'string') history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
     let linkRoom = decodeURIComponent(location.hash.slice(1))
+    let homeView=linkRoom ? 'link' : (()=>{try{return localStorage.getItem('pv-start-view')==='contacts'?'contacts':'link'}catch{return 'link'}})()
+    let renderedSelection
+    function showHome(){
+      $('home').hidden=!!viewer || !$('opened').hidden
+      $('start').hidden=homeView!=='link'
+      $('fixed-room-entry').hidden=homeView!=='contacts'
+      $('host-note').hidden=inApp || homeView==='contacts'
+      for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
+    }
+    for(const button of document.querySelectorAll('[data-home]')){
+      button.innerHTML=icon(button.dataset.home==='link'?'link':'users',16)+button.textContent
+      button.addEventListener('click',()=>{
+        homeView=button.dataset.home
+        try{localStorage.setItem('pv-start-view',homeView)}catch{}
+        showHome()
+      })
+    }
+    function openPastedLink(){
+      const field=$('share-url'),error=$('link-error')
+      try{
+        const url=new URL(field.value.trim())
+        if(url.origin!=='https://peekaview.de' || url.username || url.password)throw new Error()
+        if(['/fixed-rooms','/fixed-rooms.html'].includes(url.pathname) && new URLSearchParams(url.hash.slice(1)).has('invite')){
+          location.href=new URL('fixed-rooms.html'+url.hash,location.href).href;return
+        }
+        const room=decodeURIComponent(url.hash.slice(1))
+        if(!['/','/index.html'].includes(url.pathname) || !/^[A-Za-z0-9_-]{22}(\.[A-Za-z0-9_-]{43})?$/.test(room))throw new Error()
+        error.hidden=true;field.value=''
+        if(url.searchParams.has('name'))$('name').value=url.searchParams.get('name').slice(0,32)
+        location.hash=room
+      }catch{
+        error.textContent='Das ist kein PeekaView-Link. Bitte den vollständigen Link einfügen.';error.hidden=false;field.focus()
+      }
+    }
+    $('paste-open').addEventListener('click',openPastedLink)
+    $('share-url').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();openPastedLink()}})
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
     // remembered as typed
@@ -154,7 +216,15 @@
     }
 
     function render() {
+      showHome()
       const list = rooms()
+      $('name-label').hidden=!selected
+      $('name').required=!!selected
+      $('connect').hidden=!selected
+      $('lead').hidden=!selected
+      $('paste-link').querySelector('summary').hidden=!selected
+      $('recent-links').hidden=!list.length || (list.length===1 && !!linkRoom)
+      if(renderedSelection!==selected){$('paste-link').open=!selected;renderedSelection=selected}
       $('count').textContent = load().length ? `${load().length} gemerkt` : ''
       if (!list.length) {
         $('rooms').innerHTML = '<li class="empty">Öffne den Link, den du von der teilenden Person bekommen hast.</li>'
@@ -202,6 +272,7 @@
         )
       }
       const st = status.get(selected)
+      $('lead').textContent=st?.who?`Freigabe von ${st.who}. Keine Anmeldung nötig.`:'Als Gast teilnehmen. Keine Anmeldung nötig.'
       $('connect').disabled = !selected
       $('hint').textContent = !selected
         ? ''
@@ -299,8 +370,7 @@
       joined = room
       if (!st) probe(room)
       if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
-      $('start').hidden = true
-      $('fixed-room-entry').hidden = true
+      $('home').hidden = true
       $('viewer').hidden = false
       gaveUp = null
       viewer = mountViewer($('viewer'), {
@@ -330,15 +400,20 @@
       viewer = null
       joined = null
       $('viewer').hidden = true
-      $('start').hidden = false
-      $('fixed-room-entry').hidden = false
+      showHome()
       probeAll()
     }
 
     // another room link opened in this tab (only the "#…" changed): join that one
     window.addEventListener('hashchange', () => {
       const room = decodeURIComponent(location.hash.slice(1))
-      if (!room || room === joined) return
+      if (!room) {
+        linkRoom='';selected=load()[0]?.room || ''
+        if(viewer)leave()
+        render();return
+      }
+      if (room === joined) return
+      homeView='link'
       linkRoom = selected = room
       if (viewer) leave()
       if ($('name').value.trim()) connect()
@@ -347,7 +422,7 @@
 
     $('start').addEventListener('submit', (e) => {
       e.preventDefault()
-      connect()
+      if(!selected)openPastedLink();else connect()
     })
 
     // ---------------------------------------------------------------- open in the PeekaView app
@@ -370,8 +445,7 @@
         openedInApp = true
         try { localStorage.setItem(APP_KEY, '1') } catch {}
         clearTimeout(probeTimer)
-        $('start').hidden = true
-        $('fixed-room-entry').hidden = true
+        $('home').hidden = true
         $('opened-text').textContent = /Android/i.test(navigator.userAgent)
           ? 'In der PeekaView-App geöffnet. Sie können dieses Fenster schließen.'
           : 'Mit PeekaView Desktop geöffnet. Sie können dieses Fenster schließen.'
@@ -395,8 +469,6 @@
     $('opened-logo').innerHTML = owl(40)
     $('open-web').addEventListener('click', () => {
       $('opened').hidden = true
-      $('fixed-room-entry').hidden = false
-      $('start').hidden = false
       render()
       probeAll()
     })

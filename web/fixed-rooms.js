@@ -84,7 +84,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   let rendered = '', seen = new Set(), polling = false, stoppingAudio = false
   let allContacts = false, allGroups = false
   const openGroups = new Set(), openContacts = new Set()
-  let emailSent=''
+  let emailSent=client.session.pendingEmail || ''
   let pcmContext, pcmNode, pcmPending=false
   const pcmSources=new Map()
   const fail = e => { error.textContent = e.message || String(e) }
@@ -101,7 +101,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   function form(fields, submit, run) {
     const f = document.createElement('form'); const inputs = fields.map(([name,type,value]) => input(name,type,value))
-    f.append(...inputs.map(i=>i.box)); const b = element('button', submit); f.append(b)
+    f.append(...inputs.map(i=>i.box)); const b = element('button', submit,'fr-primary'); f.append(b)
     f.addEventListener('submit', e => { e.preventDefault(); action(async()=>{ b.disabled=true; try { await run(...inputs.map(i=>i.field.value.trim()));for(const i of inputs)i.field.defaultValue=i.field.value } finally { b.disabled=false } }) })
     return f
   }
@@ -329,15 +329,16 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if (invitation) {
       if (!preview) { content.append(button('Einladung prüfen', loadInvitation)); return }
       const kind=preview.kind
-      const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'E-Mail-Adresse bestätigen'
-      content.append(element('h3',title),element('p',kind==='device'?'Danach können dich deine Kontakte direkt anrufen.':`${preview.sender_email} lädt dich ein.`,'fr-muted'),element('p',`Du nimmst als ${preview.email} teil.`))
-      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':'E-Mail bestätigen',async name=>{
+      const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Deine E-Mail bestätigen'
+      const next=preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach erstellst du deine Gruppe.':'Danach sind deine Kontakte und Gruppen hier verfügbar.'
+      content.append(element('h3',title),element('p',kind==='device'?next:`${preview.sender_email} lädt dich ein.`,'fr-muted'),element('p',kind==='device'?preview.email:`Du nimmst als ${preview.email} teil.`))
+      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':'Bestätigen und weiter',async name=>{
         const result = await client.request('invitation/accept',{invitation,name,platform})
         if (result.token) client.session.token=result.token
         client.session.device=result.device
         if(result.next_action && result.next_action!=='login')client.session.nextAction=result.next_action
         else delete client.session.nextAction
-        client.save();invitation='';preview=null;emailSent=''
+        delete client.session.pendingEmail;client.save();invitation='';preview=null;emailSent=''
         history.replaceState(null,'',location.pathname+location.search)
         await configureNative(client)
         notice.textContent=kind==='group'?'Einladung angenommen.':kind==='contact'?'Kontakt hinzugefügt. Ihr könnt euch jetzt anrufen.':'E-Mail-Adresse bestätigt.'
@@ -360,17 +361,21 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     }
     if (!client.session.token) {
       if(!client.session.nextAction){
-        content.append(element('p','Speichere Personen, die du direkt anrufen möchtest.','fr-muted'),button('Person einladen',()=>beginConnection('contact'),'fr-primary'),button('Neue Gruppe',()=>beginConnection('group')),button('Schon dabei? Anmelden',()=>beginConnection('login')))
+        content.append(element('p','Speichere Personen, die du direkt anrufen möchtest.','fr-muted'),button('Person einladen',()=>beginConnection('contact'),'fr-primary'),button('Neue Gruppe',()=>beginConnection('group')),button('Schon dabei? Anmelden',()=>beginConnection('login'),'fr-text-button'))
       }else if(emailSent){
-        content.append(element('h3','Prüfe deine E-Mails'),element('p',`Bestätigungslink an ${emailSent} gesendet.`),element('p','Öffne den Link hier im Browser oder in PeekaView. Danach geht es weiter.','fr-muted'),button('Andere E-Mail-Adresse',()=>{emailSent='';rendered='';render()}))
+        const next=client.session.nextAction==='contact'?'Danach gibst du die E-Mail-Adresse der Person ein, die du einladen möchtest.':client.session.nextAction==='group'?'Danach erstellst du deine Gruppe.':'Danach öffnen sich deine Kontakte.'
+        content.append(element('h3','Prüfe deine E-Mails'),element('p',`Bestätigungslink an ${emailSent} gesendet.`),element('p',`Öffne den Link in deiner E-Mail. ${next}`,'fr-muted'),button('Andere E-Mail-Adresse',()=>{emailSent='';delete client.session.pendingEmail;client.save();rendered='';render()},'fr-text-button'))
       }else{
-        content.append(element('h3',client.session.nextAction==='group'?'Gruppe erstellen':client.session.nextAction==='login'?'Kontakte öffnen':'Person einladen'),element('p',client.session.nextAction==='login'?'Bestätige deine E-Mail-Adresse, um deine Kontakte und Gruppen hier zu öffnen.':'Bestätige einmal deine E-Mail-Adresse, damit ihr euch gegenseitig anrufen könnt.','fr-muted'))
-        content.append(form([['Deine E-Mail-Adresse','email','']],'E-Mail bestätigen',async email=>{
-          await client.request('device/request',{email,next_action:client.session.nextAction},false);emailSent=email
+        if(client.session.nextAction!=='login')content.append(element('small',`${client.session.nextAction==='group'?'Gruppe erstellen':'Person einladen'} · Schritt 1 von 2`,'fr-muted'))
+        const explanation=client.session.nextAction==='login'?'Bestätige deine E-Mail-Adresse, um deine Kontakte und Gruppen hier zu öffnen.':client.session.nextAction==='contact'?'Bestätige zuerst deine eigene E-Mail-Adresse. Danach lädst du die andere Person ein.':'Bestätige zuerst deine eigene E-Mail-Adresse. Danach erstellst du deine Gruppe.'
+        content.append(element('h3',client.session.nextAction==='login'?'Kontakte öffnen':'Deine E-Mail bestätigen'),element('p',explanation,'fr-muted'))
+        content.append(form([['Deine E-Mail-Adresse','email','']],'Bestätigungslink senden',async email=>{
+          await client.request('device/request',{email,next_action:client.session.nextAction},false);emailSent=email;client.session.pendingEmail=email;client.save()
         }))
       }
-      if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;client.save();emailSent='';rendered='';render()}))
-      const connection=element('details');connection.append(element('summary','Erweitert'),button('Eigenen Server verwenden',()=>{client.session={};emailSent='';client.save()}));content.append(connection);return
+      if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;delete client.session.pendingEmail;client.save();emailSent='';rendered='';render()}))
+      if(platform==='browser' && !client.session.nextAction)content.append(element('p','Zum Bildschirmteilen PeekaView Desktop oder die Android-App öffnen.','fr-muted'))
+      const connection=element('details',undefined,'fr-advanced');connection.append(element('summary','Erweitert'),button('Eigenen Server verwenden',()=>{client.session={};emailSent='';client.save()}));content.append(connection);return
     }
     const pending=client.state.calls.find(c=>c.id===callId && ['requested','rejected'].includes(c.status))
     if(pending){
@@ -378,7 +383,8 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     }
     const heading=element('div',undefined,'fr-heading')
     const identity=element('details');identity.append(element('summary',client.session.device.email),personDetails({name:'Dieses Gerät',email:client.session.device.email,devices:[client.session.device]}),element('p','Weiteres Gerät verbinden: Dort „Anmelden“ wählen und dieselbe E-Mail-Adresse bestätigen.','fr-muted'))
-    heading.append(identity,button('Aktualisieren',()=>refresh()))
+    const reload=button('',()=>refresh(),'fr-icon-button');reload.innerHTML=icon('refresh',16);reload.title='Neu laden';reload.setAttribute('aria-label','Neu laden')
+    heading.append(identity,reload)
     content.append(heading)
     for(const call of client.state.calls.filter(c=>c.status==='joined')){
       content.append(button(`${call.name} · Gespräch öffnen`,()=>onOpen(call.id),'fr-resume'))
@@ -392,7 +398,9 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       content.append(element('p',call.status==='requested'?`„${call.name}“: Zulassung ausstehend.`:`„${call.name}“: Für dieses Gespräch nicht zugelassen.`,'fr-muted'))
     }
     const inviteContact=element('details',undefined,'fr-invite-contact');inviteContact.open=client.session.nextAction==='contact'
-    inviteContact.append(element('summary','Person einladen'),form([['E-Mail-Adresse der Person','email','']],'Einladung senden',async email=>{
+    inviteContact.append(element('summary','Person einladen'))
+    if(client.session.nextAction==='contact')inviteContact.append(element('small','Schritt 2 von 2 · Wen möchtest du einladen?','fr-muted'))
+    inviteContact.append(form([['E-Mail-Adresse der Person','email','']],'Einladung senden',async email=>{
       await client.request('contacts/invite',{email});delete client.session.nextAction;client.save();notice.textContent=`Einladung an ${email} gesendet.`
     }))
     content.append(inviteContact)
@@ -400,6 +408,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     for(const pending of client.state.invitations || [])content.append(element('p',`${pending.email} · Einladung offen`,'fr-muted'))
     if(client.state.rooms.length)content.append(collection('Gruppen',client.state.rooms,allGroups,()=>{allGroups=!allGroups},groupCard,''))
     const add=element('details',undefined,'fr-new-group');add.open=client.session.nextAction==='group';add.append(element('summary','Neue Gruppe'))
+    if(client.session.nextAction==='group')add.append(element('small','Schritt 2 von 2 · Wie soll die Gruppe heißen?','fr-muted'))
     const createGroup=form([['Gruppenname','text','']],'Gruppe erstellen',async name=>{
       const people=[...createGroup.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value)
       const group=await client.request('rooms/create',{name,people});createGroup.reset();delete client.session.nextAction;client.save();openGroups.add(group.id);if(client.state.rooms.length>=5)allGroups=true;notice.textContent=`„${name}“ erstellt.`
