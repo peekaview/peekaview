@@ -74,7 +74,7 @@
 </head>
 <body>
   <main id="home">
-    <div class="brand"><i id="logo"></i>PeekaView</div>
+    <div class="brand"><i id="logo"></i>PeekaView<div id="profile" hidden></div></div>
     <nav class="home-nav" aria-label="Was möchtest du tun?">
       <button type="button" data-home="link" aria-pressed="true">Link öffnen</button>
       <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
@@ -117,7 +117,7 @@
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
-    mountRooms($('fixed-rooms'), {onIncoming: call => {
+    mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
       const notice = document.createElement('button')
       notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`
       notice.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;padding:14px;border:1px solid #ef4444;border-radius:12px;background:#18181b;color:white;cursor:pointer'

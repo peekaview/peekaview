@@ -73,13 +73,17 @@ const element = (tag, text, className) => {
   if (className) el.className = className
   return el
 }
-export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', onIncoming, onOpen = openRoom } = {}) {
+export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', profileRoot = null, onIncoming, onOpen = openRoom } = {}) {
   const client = new RoomClient()
   root.classList.add('fixed-rooms')
   const content = element('div', undefined, 'fr-content')
   const error = element('p', '', 'fr-error'); error.setAttribute('role', 'alert')
   const notice=element('p','','fr-notice');notice.setAttribute('role','status')
   root.append(content, notice, error)
+  const profileHost=profileRoot || element('div',undefined,'fr-profile-bar')
+  profileHost.classList.add('fixed-rooms','fr-profile-slot');profileHost.hidden=true
+  if(!profileRoot)root.prepend(profileHost)
+  let profileRendered='',profileOpen=false
   let disposed = false, timer, preview = null, active = null, previews = new Map(), voice, signaling, voiceSecret
   let rendered = '', seen = new Set(), polling = false, stoppingAudio = false
   let allContacts = false, allGroups = false
@@ -178,6 +182,36 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     return el
   }
   function badge(text, kind = '') { return element('span',text,`fr-badge ${kind}`) }
+  function sizeProfile(){
+    const profile=profileHost.querySelector('.fr-profile')
+    if(profile?.open && profile.offsetParent!==null)profile.style.setProperty('--fr-profile-width',`${Math.min(320,innerWidth-32,profile.getBoundingClientRect().right-16)}px`)
+  }
+  function renderProfile(){
+    const key=JSON.stringify([client.session.token,client.session.device,client.state.person])
+    if(profileRendered===key)return
+    profileRendered=key;profileHost.replaceChildren();profileHost.hidden=!client.session.token
+    if(!client.session.token)return
+    const device=client.session.device
+    const profile=element('details',undefined,'fr-profile');profile.open=profileOpen
+    profile.addEventListener('toggle',()=>{profileOpen=profile.open;sizeProfile()})
+    const summary=element('summary');summary.setAttribute('aria-label','Profil');summary.title='Profil'
+    summary.append(avatar(device),document.createTextNode('Profil'));profile.append(summary)
+    const panel=element('section',undefined,'fr-profile-panel');panel.setAttribute('aria-label','Dein Profil')
+    const heading=element('div',undefined,'fr-profile-head')
+    const reload=button('',()=>refresh(),'fr-icon-button');reload.innerHTML=icon('refresh',16);reload.title='Neu laden';reload.setAttribute('aria-label','Neu laden')
+    heading.append(element('h3','Dein Profil'),reload)
+    panel.append(heading,element('p',device.email,'fr-profile-email'),element('strong','Deine Geräte'))
+    const devices=element('div',undefined,'fr-profile-devices')
+    if(!client.state.person)devices.append(element('p','Geräte werden geladen …','fr-muted'))
+    else for(const own of client.state.person.devices){
+      const row=element('div',undefined,'fr-profile-device')
+      row.append(element('span',own.name),badge({desktop:'Computer',android:'Android',browser:'Browser'}[own.platform]))
+      if(own.id===device.id)row.append(badge('Dieses Gerät','fr-badge-live'))
+      devices.append(row)
+    }
+    const help=element('details',undefined,'fr-advanced');help.append(element('summary','Weiteres Gerät verbinden'),element('p','Auf dem anderen Gerät „Anmelden“ wählen und dieselbe E-Mail-Adresse bestätigen.','fr-muted'))
+    panel.append(devices,help);profile.append(panel);profileHost.append(profile)
+  }
   function groupCard(room) {
     const card=element('section',undefined,'fr-room')
     const row=element('div',undefined,'fr-room-row')
@@ -323,6 +357,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     return box
   }
   function render() {
+    renderProfile()
     if (active) return renderCall()
     if (rendered && (content.querySelector('.fr-access-selection > *') || content.querySelector('.fr-new-group input[type=checkbox]:checked') || [...content.querySelectorAll('input:not([type="checkbox"])')].some(input=>input.value!==input.defaultValue))) return
     const key = JSON.stringify([client.session, client.state, preview, invitation, emailSent, callId])
@@ -388,11 +423,6 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if(pending){
       content.append(element('h3',pending.name),element('p',pending.status==='requested'?'Warte auf Zulassung …':'Du wurdest für dieses Gespräch nicht zugelassen.'),element('p',pending.status==='requested'?'Sobald du zugelassen wirst, öffnet sich das Gespräch. Dein Mikrofon bleibt zunächst aus.':'Du bleibst Mitglied der Gruppe.','fr-muted'),button('Zu den Kontakten',()=>{callId='';history.replaceState(null,'',location.pathname+location.search);render()}));return
     }
-    const heading=element('div',undefined,'fr-heading')
-    const identity=element('details');identity.append(element('summary',client.session.device.email),personDetails({name:'Dieses Gerät',email:client.session.device.email,devices:[client.session.device]}),element('p','Weiteres Gerät verbinden: Dort „Anmelden“ wählen und dieselbe E-Mail-Adresse bestätigen.','fr-muted'))
-    const reload=button('',()=>refresh(),'fr-icon-button');reload.innerHTML=icon('refresh',16);reload.title='Neu laden';reload.setAttribute('aria-label','Neu laden')
-    heading.append(identity,reload)
-    content.append(heading)
     for(const call of client.state.calls.filter(c=>c.status==='joined')){
       content.append(button(`${call.name} · Gespräch öffnen`,()=>onOpen(call.id),'fr-resume'))
     }
@@ -594,6 +624,16 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   const focus=()=>refresh().catch(fail)
   const changed=()=>{ client.session=JSON.parse(client.storage.getItem(KEY)||'{}');if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
+  const dismissProfile=e=>{
+    const profile=profileHost.querySelector('.fr-profile')
+    if(!profile?.open)return
+    if(e.type==='keydown' ? e.key!=='Escape' : profileHost.contains(e.target))return
+    profileOpen=false;profile.open=false
+    if(e.type==='keydown'){e.preventDefault();profile.querySelector('summary').focus()}
+  }
+  window.addEventListener('pointerdown',dismissProfile)
+  window.addEventListener('keydown',dismissProfile)
+  window.addEventListener('resize',sizeProfile)
   window.addEventListener('storage',changed)
   window.addEventListener('focus',focus)
   const unload=()=>{
@@ -608,5 +648,5 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   if(invitation) loadInvitation().catch(fail)
   refresh().catch(fail)
   timer=setInterval(focus,4000)
-  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);recordingListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
+  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);window.removeEventListener('pointerdown',dismissProfile);window.removeEventListener('keydown',dismissProfile);window.removeEventListener('resize',sizeProfile);profileHost.replaceChildren();profileHost.hidden=true;recordingListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
 }

@@ -10,11 +10,12 @@ import test from 'node:test'
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '../web')
 const device = { id: '0000000000000000', email: 'me@example.test', name: 'Mein Computer' }
+const person={id:'9999999999999999',email:device.email,name:'Ich',devices:[{...device,platform:'desktop'},{id:'8888888888888888',name:'Mein Handy',platform:'android'}]}
 const contacts = Array.from({length:8}, (_,i) => ({id:String(i+1).padStart(16,'0'),email:`kontakt${i+1}@example.test`,name:`Kontakt ${i+1}`,devices:[{id:String(i+101).padStart(16,'0'),name:`Gerät ${i+1}`,platform:['desktop','android','browser'][i%3]},{id:String(i+201).padStart(16,'0'),name:`Handy ${i+1}`,platform:'android'}],last_used:100-i}))
 const rooms = Array.from({length:7}, (_,i) => ({id:String(i+11).padStart(16,'0'),name:`Gruppe ${i+1}`,owner:device.id,can_manage:true,participants:[device,{...contacts[i].devices[0],email:contacts[i].email}],people:[{id:device.id,name:'Ich',email:device.email,devices:[device]},contacts[i]],last_used:100-i}))
-const fixture = `<!doctype html><html lang="de"><meta charset="utf-8"><link rel="stylesheet" href="/fixed-rooms.css"><style>body{background:#09090b;padding:20px;max-width:660px}</style><main></main>
+const fixture = `<!doctype html><html lang="de"><meta charset="utf-8"><link rel="stylesheet" href="/fixed-rooms.css"><style>body{background:#09090b;color:#fafafa;font-family:system-ui;padding:20px;max-width:660px}h1{font-size:20px}</style><header class="fr-page-head"><h1>Kontakte</h1><div id="profile" hidden></div></header><main></main>
 <script>
-window.qa={requests:[],opened:[],native:[],state:${JSON.stringify({device,contacts,rooms,calls:[]})}};
+window.qa={requests:[],opened:[],native:[],state:${JSON.stringify({device,person,contacts,rooms,calls:[]})}};
 if(new URLSearchParams(location.search).has('call') || new URLSearchParams(location.search).has('joined'))qa.state.calls=[{id:'1234567890abcdef',room:qa.state.rooms[0].id,name:'Gruppe 1',kind:'group',status:'joined',secret:'isolated-test-secret',voice_id:1,participants:[{...qa.state.device,voice_id:1,voice:0}],requests:[{...qa.state.contacts[7].devices[0],email:qa.state.contacts[7].email,person_name:qa.state.contacts[7].name}]}];
 localStorage.setItem('pv-fixed-rooms-v1',JSON.stringify({api:'https://rooms.example.test/api.php',token:'test-token',device:qa.state.device}));
 window.__TAURI__={core:{invoke:async(cmd,args)=>{
@@ -39,7 +40,7 @@ window.fetch=async(url,options)=>{
 };
 if(new URLSearchParams(location.search).has('signup'))localStorage.setItem('pv-fixed-rooms-v1',JSON.stringify({api:'https://rooms.example.test/api.php'}));
 if(new URLSearchParams(location.search).has('browser'))delete window.__TAURI__;
-</script><script type="module">import {Signaling} from '/signal.js';Signaling.open=async()=>({send(){},close(){}});import {mountRooms} from '/fixed-rooms.js';const ui=mountRooms(document.querySelector('main'),{callId:new URLSearchParams(location.search).get('call')||'',invitation:new URLSearchParams(location.search).get('invite')||'',onOpen:async id=>qa.opened.push(id)});qa.refresh=ui.refresh;</script></html>`
+</script><script type="module">import {Signaling} from '/signal.js';Signaling.open=async()=>({send(){},close(){}});import {mountRooms} from '/fixed-rooms.js';const ui=mountRooms(document.querySelector('main'),{profileRoot:document.getElementById('profile'),callId:new URLSearchParams(location.search).get('call')||'',invitation:new URLSearchParams(location.search).get('invite')||'',onOpen:async id=>qa.opened.push(id)});qa.refresh=ui.refresh;</script></html>`
 
 test('contacts and groups show five each, expand independently and call the chosen destination', {timeout:90000}, async () => {
   const server=createServer(async(request,response)=>{
@@ -67,6 +68,19 @@ test('contacts and groups show five each, expand independently and call the chos
     assert.equal(await evaluate("document.querySelector('.fr-contact .fr-badge')===null"),true)
     assert.equal(await evaluate("document.querySelector('.fr-person .fr-person-details').hidden"),true)
     await browser('set','viewport','393','852')
+    await browser('click','.fr-profile > summary')
+    assert.equal(await evaluate("document.querySelectorAll('.fr-profile-device').length"),2)
+    assert.equal(await evaluate("document.querySelector('.fr-profile-panel').textContent.includes('Mein Handy') && document.querySelector('.fr-profile-panel').textContent.includes('Dieses Gerät')"),true)
+    assert.equal(await evaluate("(()=>{const r=document.querySelector('.fr-profile-panel').getBoundingClientRect();return r.left>=0 && r.right<=innerWidth})()"),true)
+    await browser('screenshot','/tmp/peekaview-profil-geraete.png')
+    await evaluate('qa.refresh().then(()=>true)')
+    assert.equal(await evaluate("document.querySelector('.fr-profile').open"),true)
+    await browser('press','Escape')
+    assert.equal(await evaluate("!document.querySelector('.fr-profile').open && document.activeElement===document.querySelector('.fr-profile > summary')"),true)
+    await browser('click','.fr-profile > summary')
+    await browser('click','.fr-page-head h1')
+    assert.equal(await evaluate("document.querySelector('.fr-profile').open"),false)
+    assert.equal(await evaluate("qa.requests.some(r=>r.action==='calls/direct' || r.action==='calls/start')"),false)
     await browser('screenshot','/tmp/peekaview-kontakte-anrufen.png')
     await browser('click','.fr-invite-contact summary')
     await browser('wait','.fr-invite-contact[open] input[type=email]')

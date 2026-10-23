@@ -10,7 +10,9 @@ import test from 'node:test'
 
 const web=resolve(dirname(fileURLToPath(import.meta.url)),'../web')
 const room='a'.repeat(22)+'.'+'b'.repeat(43)
-const shim=`<script>window.qa={requests:[]};window.fetch=async(url,options)=>{qa.requests.push({action:new URL(url).searchParams.get('action'),body:JSON.parse(options.body)});return Response.json({sent:true})};</script>`
+const own={id:'0000000000000000',email:'own@example.test',name:'Mein Browser',platform:'browser'}
+const state={device:own,person:{id:'1111111111111111',email:own.email,name:'Ich',devices:[own]},contacts:[],rooms:[],calls:[],invitations:[]}
+const shim=`<script>window.qa={requests:[]};window.fetch=async(url,options)=>{const action=new URL(url).searchParams.get('action');qa.requests.push({action,body:options.body?JSON.parse(options.body):null});return Response.json(action==='state'?${JSON.stringify(state)}:{sent:true})};</script>`
 
 test('home gives usable entry points, remembers the choice and requests identity only for the chosen action',{timeout:90000},async()=>{
   const server=createServer(async(request,response)=>{
@@ -89,5 +91,15 @@ test('home gives usable entry points, remembers the choice and requests identity
     assert.equal(await evaluate("document.querySelector('[data-home=link]').getAttribute('aria-pressed')"),'true')
     assert.equal(await evaluate("document.querySelector('#fixed-room-entry').hidden"),true)
     assert.equal(await evaluate("document.querySelector('input[type=email]')===null"),true)
+    await evaluate(`localStorage.setItem('pv-fixed-rooms-v1',JSON.stringify({api:'https://rooms.example.test/api.php',token:'test-token',device:${JSON.stringify(own)}}));window.dispatchEvent(new StorageEvent('storage',{key:'pv-fixed-rooms-v1'}));true`)
+    await browser('wait','#profile:not([hidden]) summary')
+    assert.equal(await evaluate("!!document.querySelector('.brand #profile .fr-profile')"),true)
+    await browser('click','[data-home="contacts"]')
+    await browser('click','[data-home="link"]')
+    assert.equal(await evaluate("document.querySelector('#profile').hidden"),false)
+    await browser('set','viewport','320','700')
+    await browser('click','#profile summary')
+    assert.equal(await evaluate("(()=>{const r=document.querySelector('.fr-profile-panel').getBoundingClientRect();return r.left>=0 && r.right<=innerWidth})()"),true)
+    await browser('screenshot','/tmp/peekaview-home-profil.png')
   }finally{try{await browser('close')}finally{await new Promise(resolve=>server.close(resolve))}}
 })

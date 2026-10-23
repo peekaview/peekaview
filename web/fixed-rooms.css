@@ -13,8 +13,25 @@
 .fixed-rooms form { gap: 10px; }
 .fixed-rooms input { width: 100%; min-width: 0; background: #09090b; }
 .fixed-rooms details > :not(summary) { margin-top: 10px; }
-.fr-heading, .fr-call-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.fr-heading > :first-child, .fr-call-bar > strong { flex: 1; }
+.fr-call-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fr-call-bar > strong { flex: 1; }
+.fr-profile-slot { display:flex;align-items:center;justify-content:flex-end;margin-left:auto; }
+.fr-profile-slot[hidden] { display:none; }
+.fr-profile-bar { margin-bottom:14px; }
+.fr-profile { position:relative; }
+.fr-profile > summary { display:flex;align-items:center;gap:7px;list-style:none;padding:3px 7px 3px 3px;border:1px solid #3f3f46;border-radius:999px;background:#27272a;font-size:12px;font-weight:600; }
+.fr-profile > summary::-webkit-details-marker { display:none; }
+.fr-profile > summary .fr-avatar { width:26px;height:26px; }
+.fr-profile > .fr-profile-panel { position:absolute;z-index:1000;top:100%;right:0;display:flex;flex-direction:column;gap:12px;width:var(--fr-profile-width,min(320px,calc(100vw - 32px)));max-height:65vh;overflow-y:auto;margin-top:8px;padding:16px;border:1px solid #3f3f46;border-radius:14px;background:#18181b;box-shadow:0 12px 36px #0008;font-size:13px;font-weight:500;letter-spacing:normal; }
+.fr-profile-head { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.fr-profile-head h3 { font-size:14px;text-transform:none;letter-spacing:normal; }
+.fr-profile-panel > strong { font-size:12px; }
+.fr-profile-email { color:#a1a1aa;overflow-wrap:anywhere; }
+.fr-profile-devices { display:flex;flex-direction:column;gap:7px; }
+.fr-profile-device { display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:9px;border-radius:8px;background:#27272a; }
+.fr-profile-device > span:first-child { flex:1;min-width:0;overflow-wrap:anywhere; }
+.fr-page-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px; }
+.fr-page-head h1 { margin:0; }
 .fr-room, .fr-person, .fr-ring { background: #18181b; border: 1px solid #27272a; border-radius: 10px; }
 .fr-room-row { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
 .fixed-rooms .fr-room-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; background: transparent; text-align: left; }
@@ -47,7 +64,6 @@
 .fr-person > .fr-person-details { padding: 10px; border-top: 1px solid #27272a; }
 .fr-person-details summary { color: #a1a1aa; font-size: 12px; }
 .fr-person-details .fr-member { margin-top: 6px; }
-.fr-heading > details { min-width: 0; overflow-wrap: anywhere; }
 .fixed-rooms .fr-person .fr-contact { flex: 1; min-width: 0; border: 0; }
 .fr-members { display: flex; flex-direction: column; gap: 5px; }
 .fr-member { display: flex; align-items: center; gap: 7px; min-width: 0; color: #a1a1aa; font-size: 11px; }
