@@ -9,6 +9,9 @@ const dist = resolve(here, 'dist')
 const files = [
   'index.html', 'viewer.js', 'windows.js', 'signal.js', 'annotate.js',
   'icons.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
+  'fixed-rooms.html', 'fixed-rooms.js', 'fixed-rooms.css', 'room-sw.js',
+  'room-pcm-worklet.js',
+  'rooms.webmanifest', 'room-icon.png',
   'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'vendor/pdfjs/LICENSE',
 ]
 await rm(dist, { recursive: true, force: true })

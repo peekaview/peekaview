@@ -109,7 +109,7 @@ const CSS = `
 /**
  * @param {HTMLElement} el
  * @param {{room: string, name: string, color?: string, relays?: string[], toolbar?: boolean, voice?: boolean,
- *          peers?: boolean, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
+ *          peers?: boolean, peerId?: string, onRooms?: () => void, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
  */
 export function mountViewer(el, options) {
   const { room, name, color, relays, toolbar = true, peers = true, voice: voiceEnabled = true, onStatus, onPeers } = options
@@ -142,6 +142,7 @@ export function mountViewer(el, options) {
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
+      <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" ${options.onRooms ? '' : 'hidden'}>${icon('window')}</button>
       <button data-voice data-tip="Mikrofon stumm – einschalten" aria-label="Mikrofon stumm – einschalten" aria-pressed="false">${icon('micOff')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
@@ -234,6 +235,7 @@ export function mountViewer(el, options) {
   // kept for this tab and room, so a reload does not have to be let in again
   const peerKey = `pv-peer-${String(room ?? '').slice(0, 12)}`
   const peerId = (() => {
+    if (options.peerId && /^[0-9a-f]{16}$/.test(options.peerId)) return options.peerId
     try {
       const saved = sessionStorage.getItem(peerKey)
       if (saved && /^[0-9a-f]{16}$/.test(saved)) return saved
@@ -645,7 +647,7 @@ export function mountViewer(el, options) {
     const many = wins.length > 1
     // remote access: applications the viewer may start (not running in the share yet)
     const shared = new Set(wins.map((w) => (w.info.kind === 'window' ? w.info.app : '')))
-    const launchers = state.mode === 'control' ? (state.apps ?? []).filter((a) => a.kind === 'desktop' ? !wins.some((w) => w.info.kind === 'screen') : !shared.has(a.name)) : []
+    const launchers = state.mode === 'control' ? (state.apps ?? []).filter((a) => a.kind === 'desktop' ? a.id.startsWith('screen:') || !wins.some((w) => w.info.kind === 'screen') : !shared.has(a.name)) : []
     q('.pv-tasks').hidden = !many && !launchers.length
     q('[data-tile]').hidden = !many
     q('.pv-tasks-sep').hidden = !many && !launchers.length
@@ -830,6 +832,7 @@ export function mountViewer(el, options) {
 
   for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool))
   q('[data-clear]').addEventListener('click', clear)
+  q('[data-fixed-rooms]').addEventListener('click', () => options.onRooms?.())
   q('[data-voice]').addEventListener('click', () => {
     if (!voiceEnabled || state.voice_enabled !== true || !me) return
     if (voice.on) voice.stop()

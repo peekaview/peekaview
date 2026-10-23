@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PeekaView</title>
+  <link rel="stylesheet" href="fixed-rooms.css">
   <style>
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     [hidden] { display: none !important; }
@@ -71,6 +72,7 @@
     <p class="connect-hint" id="hint"></p>
     <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
   </form>
+  <details id="fixed-room-entry" style="box-sizing:border-box;width:min(460px,calc(100% - 32px));margin:20px auto;padding:18px 26px;background:#18181b;border-radius:16px"><summary>Kontakte</summary><div id="fixed-rooms" style="margin-top:14px"></div></details>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
@@ -84,10 +86,19 @@
     // it is online right now – asked over the room's encrypted signaling ("ping"), which creates
     // no join request.
     import { mountViewer } from './viewer.js'
+    import { mountRooms, openRoom } from './fixed-rooms.js'
     import { icon, owl } from './icons.js'
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
+    mountRooms($('fixed-rooms'), {onIncoming: call => {
+      const notice = document.createElement('button')
+      notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`
+      notice.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;padding:14px;border:1px solid #ef4444;border-radius:12px;background:#18181b;color:white;cursor:pointer'
+      notice.onclick = () => openRoom(call.id)
+      document.body.append(notice)
+      setTimeout(()=>notice.remove(),45000)
+    }})
     const KEY = 'pv-rooms'
     const MAX = 10
     $('logo').innerHTML = owl(32)
@@ -289,9 +300,11 @@
       if (!st) probe(room)
       if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
       $('start').hidden = true
+      $('fixed-room-entry').hidden = true
       $('viewer').hidden = false
       gaveUp = null
       viewer = mountViewer($('viewer'), {
+        onRooms: () => openRoom(),
         room,
         name,
         onStatus: (status) => {
@@ -318,6 +331,7 @@
       joined = null
       $('viewer').hidden = true
       $('start').hidden = false
+      $('fixed-room-entry').hidden = false
       probeAll()
     }
 
@@ -357,6 +371,7 @@
         try { localStorage.setItem(APP_KEY, '1') } catch {}
         clearTimeout(probeTimer)
         $('start').hidden = true
+        $('fixed-room-entry').hidden = true
         $('opened-text').textContent = /Android/i.test(navigator.userAgent)
           ? 'In der PeekaView-App geöffnet. Sie können dieses Fenster schließen.'
           : 'Mit PeekaView Desktop geöffnet. Sie können dieses Fenster schließen.'
@@ -380,6 +395,7 @@
     $('opened-logo').innerHTML = owl(40)
     $('open-web').addEventListener('click', () => {
       $('opened').hidden = true
+      $('fixed-room-entry').hidden = false
       $('start').hidden = false
       render()
       probeAll()

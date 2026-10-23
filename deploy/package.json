@@ -5,7 +5,7 @@
   "packageManager": "pnpm@12.15.0",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test build.test.mjs ../tests/voice.test.mjs",
+    "test": "node --test build.test.mjs ../tests/voice.test.mjs ../tests/room-push.test.mjs",
     "deploy": "pnpm build && wrangler pages deploy dist --project-name peekaview --branch master"
   },
   "devDependencies": {
