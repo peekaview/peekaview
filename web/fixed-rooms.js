@@ -137,7 +137,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   function collection(title, items, expanded, toggle, renderItem, empty) {
     const section=element('section',undefined,'fr-collection')
-    section.append(element('h3',title))
+    const heading=element('h3',title);heading.append(element('span',String(items.length),'fr-count'));section.append(heading)
     if (!items.length) section.append(element('p',empty,'fr-muted'))
     for (const item of expanded ? items : items.slice(0,5)) section.append(renderItem(item))
     if (items.length>5) section.append(button(expanded?'Weniger anzeigen':`Alle ${items.length} anzeigen`,()=>{toggle();rendered='';render()},'fr-expand'))
@@ -160,7 +160,8 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const call=button('',()=>callContact(contact.id),'fr-contact')
     const text=element('span',undefined,'fr-person-text');text.append(element('strong',contact.name),element('small',contact.email))
     const joined=client.state.calls.some(c=>c.kind==='contact' && c.status==='joined' && c.contact_id===contact.id)
-    call.append(avatar(contact),text,element('span',joined?'Öffnen':'Anrufen','fr-call-action'))
+    const action=element('span',undefined,'fr-call-action');action.innerHTML=icon(joined?'expand':'phone',14);action.append(document.createTextNode(joined?'Öffnen':'Anrufen'))
+    call.append(avatar(contact),text,action)
     call.setAttribute('aria-label',`${contact.name}: ${joined?'Gespräch öffnen':'Anrufen'}`)
     const details=personDetails(contact);details.open=true;details.hidden=!openContacts.has(contact.id)
     const toggle=button('',()=>{details.hidden=!details.hidden;if(details.hidden)openContacts.delete(contact.id);else openContacts.add(contact.id);toggle.setAttribute('aria-expanded',String(!details.hidden))},'fr-group-toggle')
@@ -193,7 +194,8 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const joined=client.state.calls.some(c=>c.room===room.id && c.status==='joined')
     const pending=client.state.calls.find(c=>c.room===room.id && ['requested','rejected'].includes(c.status))
     const label=pending?(pending.status==='requested'?'Wartet':'Nicht zugelassen'):joined?'Öffnen':room.active_call?'Beitreten':'Anrufen'
-    call.append(element('span',label,'fr-call-action'));call.disabled=!!pending
+    const action=element('span',undefined,'fr-call-action');action.innerHTML=icon(joined || room.active_call?'expand':'phone',14);action.append(document.createTextNode(label))
+    call.append(action);call.disabled=!!pending
     call.setAttribute('aria-label',`${room.name}: ${label}`)
     const details=element('div',undefined,'fr-group-details')
     details.hidden=!openGroups.has(room.id)
@@ -402,17 +404,15 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     for (const call of client.state.calls.filter(c=>['requested','rejected'].includes(c.status))) {
       content.append(element('p',call.status==='requested'?`„${call.name}“: Zulassung ausstehend.`:`„${call.name}“: Für dieses Gespräch nicht zugelassen.`,'fr-muted'))
     }
-    const inviteContact=element('details',undefined,'fr-invite-contact');inviteContact.open=client.session.nextAction==='contact'
-    inviteContact.append(element('summary','Person einladen'))
+    const actions=element('div',undefined,'fr-create-actions')
+    const inviteContact=element('details',undefined,'fr-invite-contact fr-create');inviteContact.open=client.session.nextAction==='contact'
+    const inviteLabel=element('summary');inviteLabel.innerHTML=icon('plus',15);inviteLabel.append(document.createTextNode('Person einladen'));inviteContact.append(inviteLabel)
     if(client.session.nextAction==='contact')inviteContact.append(element('small','Schritt 2 von 2 · Wen möchtest du einladen?','fr-muted'))
     inviteContact.append(form([['E-Mail-Adresse der Person','email','']],'Einladung senden',async email=>{
       await client.request('contacts/invite',{email});delete client.session.nextAction;client.save();notice.textContent=`Einladung an ${email} gesendet.`
     }))
-    content.append(inviteContact)
-    content.append(collection('Kontakte',client.state.contacts || [],allContacts,()=>{allContacts=!allContacts},contactCard,'Noch keine Kontakte. Lade eine Person ein, um sie direkt anzurufen.'))
-    for(const pending of client.state.invitations || [])content.append(element('p',`${pending.email} · Einladung offen`,'fr-muted'))
-    if(client.state.rooms.length)content.append(collection('Gruppen',client.state.rooms,allGroups,()=>{allGroups=!allGroups},groupCard,''))
-    const add=element('details',undefined,'fr-new-group');add.open=client.session.nextAction==='group';add.append(element('summary','Neue Gruppe'))
+    const add=element('details',undefined,'fr-new-group fr-create');add.open=client.session.nextAction==='group'
+    const groupLabel=element('summary');groupLabel.innerHTML=icon('plus',15);groupLabel.append(document.createTextNode('Neue Gruppe'));add.append(groupLabel)
     if(client.session.nextAction==='group')add.append(element('small','Schritt 2 von 2 · Wie soll die Gruppe heißen?','fr-muted'))
     const createGroup=form([['Gruppenname','text','']],'Gruppe erstellen',async name=>{
       const people=[...createGroup.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value)
@@ -423,7 +423,13 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       for(const person of client.state.contacts){const label=element('label',undefined,'fr-check');const check=document.createElement('input');check.type='checkbox';check.value=person.id;label.append(check,document.createTextNode(person.name));choices.append(label)}
       createGroup.insertBefore(choices,createGroup.lastElementChild)
     }
-    add.append(createGroup);content.append(add)
+    add.append(createGroup);actions.append(inviteContact,add);content.append(actions)
+    const contacts=collection('Kontakte',client.state.contacts || [],allContacts,()=>{allContacts=!allContacts},contactCard,'Lade eine Person ein. Nach ihrer Bestätigung kannst du sie hier anrufen.')
+    if(client.state.contacts.length)contacts.insertBefore(element('p','Anrufen und gemeinsam auf den Bildschirm schauen.','fr-muted'),contacts.children[1])
+    else contacts.classList.add('fr-empty-contacts')
+    for(const pending of client.state.invitations || [])contacts.append(element('p',`${pending.email} · Einladung offen`,'fr-muted'))
+    content.append(contacts)
+    if(client.state.rooms.length)content.append(collection('Gruppen',client.state.rooms,allGroups,()=>{allGroups=!allGroups},groupCard,''))
     if(!client.state.contacts.length && !client.state.rooms.length)return
     if (platform==='browser') {
       content.append(element('p','Zum Bildschirmteilen benötigst du PeekaView Desktop oder die Android-App (kostenlos).','fr-muted'))

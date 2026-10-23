@@ -19,7 +19,17 @@
 .fr-room-row { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
 .fixed-rooms .fr-room-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; background: transparent; text-align: left; }
 .fr-collection { display: flex; flex-direction: column; gap: 5px; }
-.fixed-rooms .fr-collection > h3 { margin: 0 0 2px; font-size: 13px; font-weight: 650; text-transform: none; letter-spacing: normal; color: #fafafa; }
+.fixed-rooms .fr-collection > h3 { display:flex;align-items:center;gap:8px;margin:0 0 3px;font-size:15px;font-weight:700;text-transform:none;letter-spacing:normal;color:#fafafa; }
+.fr-count { border-radius:6px;padding:1px 6px;background:#27272a;color:#a1a1aa;font-size:11px;font-weight:600; }
+.fr-collection > .fr-muted { margin-bottom:7px; }
+.fr-empty-contacts { padding:16px;border:1px dashed #3f3f46;border-radius:10px; }
+.fr-create-actions { display:flex;flex-wrap:wrap;gap:8px;padding-bottom:14px;border-bottom:1px solid #27272a; }
+.fr-create > summary { display:flex;align-items:center;gap:6px;list-style:none;padding:8px 11px;border:1px solid #3f3f46;border-radius:9px;background:#27272a;font-size:12px;font-weight:600; }
+.fr-create > summary::-webkit-details-marker { display:none; }
+.fr-create > summary:hover { background:#3f3f46; }
+.fr-create[open] { flex-basis:100%;padding:12px;border:1px solid #3f3f46;border-radius:12px; }
+.fr-create[open] > summary { width:fit-content; }
+.fr-create[open] > summary .pv-icon { transform:rotate(45deg); }
 .fixed-rooms .fr-contact { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-color: #27272a; background: #18181b; text-align: left; }
 .fixed-rooms .fr-contact:hover, .fixed-rooms .fr-room-name:hover { background: #27272a; }
 .fr-avatar { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 11px; font-weight: 750; }
@@ -27,7 +37,7 @@
 .fr-person-text strong, .fr-person-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fr-person-text strong { font-size: 12px; font-weight: 650; }
 .fr-person-text small { color: #a1a1aa; font-size: 11px; }
-.fr-call-action { flex: none; font-size: 11px; color: #d4d4d8; }
+.fr-call-action { flex:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:6px 9px;border:1px solid #166534;border-radius:8px;background:#052e16;color:#bbf7d0;font-size:11px;font-weight:650; }
 .fr-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 42%; }
 .fr-badge { flex: none; padding: 2px 6px; border-radius: 5px; background: #27272a; color: #a1a1aa; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .fr-badge-live { background: #14532d; color: #bbf7d0; }

@@ -15,6 +15,8 @@ const paths = {
   check: '<path d="m4.5 12.5 4.8 4.8L19.5 7"/>',
   link: '<path d="M10 13.5a4.5 4.5 0 0 0 6.4.4l2.7-2.7a4.5 4.5 0 0 0-6.4-6.4l-1.5 1.5"/><path d="M14 10.5a4.5 4.5 0 0 0-6.4-.4l-2.7 2.7a4.5 4.5 0 0 0 6.4 6.4l1.5-1.5"/>',
   users: '<circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 19.5a6.5 6.5 0 0 1 13 0"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 6.6"/><path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  phone: '<path d="m8 3 3 5-2.5 2a14 14 0 0 0 5.5 5.5l2-2.5 5 3-.6 3.5a2 2 0 0 1-2.2 1.5A19 19 0 0 1 3 5.3a2 2 0 0 1 1.5-2.2L8 3Z"/>',
   settings: '<path d="M4 7h9"/><path d="M17 7h3"/><circle cx="15" cy="7" r="2"/><path d="M4 17h3"/><path d="M11 17h9"/><circle cx="9" cy="17" r="2"/>',
   pause: '<rect x="6.5" y="5" width="3.5" height="14" rx="1.2"/><rect x="14" y="5" width="3.5" height="14" rx="1.2"/>',
   mic: '<rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/>',
