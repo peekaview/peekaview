@@ -330,18 +330,18 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       if (!preview) { content.append(button('Einladung prüfen', loadInvitation)); return }
       const kind=preview.kind
       const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Deine E-Mail bestätigen'
-      const next=preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach erstellst du deine Gruppe.':'Danach sind deine Kontakte und Gruppen hier verfügbar.'
+      const next=preview.contact_email?`Die Einladung an ${preview.contact_email} wird danach automatisch versendet.`:preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach erstellst du deine Gruppe.':'Danach sind deine Kontakte und Gruppen hier verfügbar.'
       content.append(element('h3',title),element('p',kind==='device'?next:`${preview.sender_email} lädt dich ein.`,'fr-muted'),element('p',kind==='device'?preview.email:`Du nimmst als ${preview.email} teil.`))
-      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':'Bestätigen und weiter',async name=>{
+      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':preview.contact_email?'Bestätigen und Einladung senden':'Bestätigen und weiter',async name=>{
         const result = await client.request('invitation/accept',{invitation,name,platform})
         if (result.token) client.session.token=result.token
         client.session.device=result.device
         if(result.next_action && result.next_action!=='login')client.session.nextAction=result.next_action
         else delete client.session.nextAction
-        delete client.session.pendingEmail;client.save();invitation='';preview=null;emailSent=''
+        delete client.session.pendingEmail;delete client.session.pendingContactEmail;client.save();invitation='';preview=null;emailSent=''
         history.replaceState(null,'',location.pathname+location.search)
         await configureNative(client)
-        notice.textContent=kind==='group'?'Einladung angenommen.':kind==='contact'?'Kontakt hinzugefügt. Ihr könnt euch jetzt anrufen.':'E-Mail-Adresse bestätigt.'
+        notice.textContent=result.invited_email?`E-Mail bestätigt. Einladung an ${result.invited_email} gesendet.`:kind==='group'?'Einladung angenommen.':kind==='contact'?'Kontakt hinzugefügt. Ihr könnt euch jetzt anrufen.':'E-Mail-Adresse bestätigt.'
         if(result.request_call){
           if(platform==='browser'){callId=result.request_call;history.replaceState(null,'',`${location.pathname}${location.search}#call=${callId}`)}
           else await onOpen(result.request_call)
@@ -363,17 +363,22 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       if(!client.session.nextAction){
         content.append(element('p','Speichere Personen, die du direkt anrufen möchtest.','fr-muted'),button('Person einladen',()=>beginConnection('contact'),'fr-primary'),button('Neue Gruppe',()=>beginConnection('group')),button('Schon dabei? Anmelden',()=>beginConnection('login'),'fr-text-button'))
       }else if(emailSent){
-        const next=client.session.nextAction==='contact'?'Danach gibst du die E-Mail-Adresse der Person ein, die du einladen möchtest.':client.session.nextAction==='group'?'Danach erstellst du deine Gruppe.':'Danach öffnen sich deine Kontakte.'
+        const next=client.session.pendingContactEmail?`Die Einladung an ${client.session.pendingContactEmail} geht danach automatisch raus.`:client.session.nextAction==='contact'?'Danach lädst du die andere Person ein.':client.session.nextAction==='group'?'Danach erstellst du deine Gruppe.':'Danach öffnen sich deine Kontakte.'
         content.append(element('h3','Prüfe deine E-Mails'),element('p',`Bestätigungslink an ${emailSent} gesendet.`),element('p',`Öffne den Link in deiner E-Mail. ${next}`,'fr-muted'),button('Andere E-Mail-Adresse',()=>{emailSent='';delete client.session.pendingEmail;client.save();rendered='';render()},'fr-text-button'))
+      }else if(client.session.nextAction==='contact' && !client.session.pendingContactEmail){
+        content.append(element('h3','Wen möchtest du einladen?'),form([['E-Mail-Adresse der Person','email','']],'Weiter',async email=>{
+          client.session.pendingContactEmail=email.toLowerCase();client.save()
+        }))
       }else{
-        if(client.session.nextAction!=='login')content.append(element('small',`${client.session.nextAction==='group'?'Gruppe erstellen':'Person einladen'} · Schritt 1 von 2`,'fr-muted'))
-        const explanation=client.session.nextAction==='login'?'Bestätige deine E-Mail-Adresse, um deine Kontakte und Gruppen hier zu öffnen.':client.session.nextAction==='contact'?'Bestätige zuerst deine eigene E-Mail-Adresse. Danach lädst du die andere Person ein.':'Bestätige zuerst deine eigene E-Mail-Adresse. Danach erstellst du deine Gruppe.'
+        if(client.session.nextAction==='group')content.append(element('small','Gruppe erstellen · Schritt 1 von 2','fr-muted'))
+        const explanation=client.session.nextAction==='login'?'Bestätige deine E-Mail-Adresse, um deine Kontakte und Gruppen hier zu öffnen.':client.session.pendingContactEmail?`Einladung an ${client.session.pendingContactEmail}. Bestätige einmal deine eigene Adresse, dann senden wir die Einladung automatisch.`:'Bestätige zuerst deine eigene E-Mail-Adresse. Danach erstellst du deine Gruppe.'
         content.append(element('h3',client.session.nextAction==='login'?'Kontakte öffnen':'Deine E-Mail bestätigen'),element('p',explanation,'fr-muted'))
         content.append(form([['Deine E-Mail-Adresse','email','']],'Bestätigungslink senden',async email=>{
-          await client.request('device/request',{email,next_action:client.session.nextAction},false);emailSent=email;client.session.pendingEmail=email;client.save()
+          await client.request('device/request',{email,next_action:client.session.nextAction,...(client.session.pendingContactEmail?{contact_email:client.session.pendingContactEmail}:{})},false);emailSent=email;client.session.pendingEmail=email;client.save()
         }))
+        if(client.session.pendingContactEmail)content.append(button('Person ändern',()=>{delete client.session.pendingContactEmail;client.save();rendered='';render()},'fr-text-button'))
       }
-      if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;delete client.session.pendingEmail;client.save();emailSent='';rendered='';render()}))
+      if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;delete client.session.pendingEmail;delete client.session.pendingContactEmail;client.save();emailSent='';rendered='';render()}))
       if(platform==='browser' && !client.session.nextAction)content.append(element('p','Zum Bildschirmteilen PeekaView Desktop oder die Android-App öffnen.','fr-muted'))
       const connection=element('details',undefined,'fr-advanced');connection.append(element('summary','Erweitert'),button('Eigenen Server verwenden',()=>{client.session={};emailSent='';client.save()}));content.append(connection);return
     }
