@@ -14,7 +14,7 @@
 <script type="module">
   import { mountRooms } from './fixed-rooms.js'
   const p = new URLSearchParams(location.hash.slice(1))
-  mountRooms(document.getElementById('fixed-rooms'),{profileRoot:document.getElementById('profile'),callId:p.get('call')||'',invitation:p.get('invite')||'',invitationApi:p.get('api')||''})
+  mountRooms(document.getElementById('fixed-rooms'),{profileRoot:document.getElementById('profile'),callId:p.get('call')||'',invitation:p.get('invite')||'',invitationApi:p.get('api')||'',handoff:p.get('handoff')||''})
   // Opening another email link in this tab changes only the fragment.
   window.addEventListener('hashchange',()=>location.reload())
 </script>

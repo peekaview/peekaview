@@ -30,6 +30,7 @@ window.fetch=async(url,options)=>{
  if(action==='rooms/add-contact'){const body=JSON.parse(options.body);qa.state.rooms.find(r=>r.id===body.room).people.push(qa.state.contacts.find(c=>c.id===body.person));}
  if(action==='calls/admit'){const body=JSON.parse(options.body);qa.state.calls[0].requests=qa.state.calls[0].requests.filter(p=>p.id!==body.device);}
  if(action==='invitation/preview' && new URLSearchParams(location.search).get('invite')==='verify')return new Response(JSON.stringify({kind:'device',email:qa.state.device.email,next_action:'contact'}),{headers:{'Content-Type':'application/json'}});
+ if(action==='invitation/open-status')return new Response(JSON.stringify({opened:!!qa.desktopOpened}),{headers:{'Content-Type':'application/json'}});
  if(action==='invitation/accept' && new URLSearchParams(location.search).get('invite')==='verify')return new Response(JSON.stringify({token:'test-token',device:qa.state.device,next_action:'contact'}),{headers:{'Content-Type':'application/json'}});
  if(action==='invitation/preview')return new Response(JSON.stringify({kind:'group',sender_name:'Anna',sender_email:'anna@example.test',name:'Gruppe 1',email:'me@example.test',room:qa.state.rooms[0].id}),{headers:{'Content-Type':'application/json'}});
  if(action==='invitation/accept'){
@@ -189,7 +190,9 @@ test('contacts and groups show five each, expand independently and call the chos
     await browser('open',`http://127.0.0.1:${server.address().port}/contacts.html?signup=1&browser=1&invite=verify`)
     await browser('wait','form button')
     assert.equal(await evaluate("document.body.innerText.includes('Danach lädst du die andere Person ein.')"),true)
-    assert.equal(await evaluate("document.querySelector('form button').textContent"),'Bestätigen und weiter')
+    assert.equal(await evaluate("document.querySelector('form button').textContent"),'Nur diesen Browser hinzufügen')
+    assert.equal(await evaluate("document.body.innerText.includes('Dieses Gerät hinzufügen') && document.querySelector('.fr-device-choice button').textContent==='PeekaView Desktop öffnen'"),true)
+    assert.equal(await evaluate("document.querySelector('.fr-device-choice a')===null"),true)
     await browser('click','form button')
     await browser('wait','.fr-invite-contact[open] input[type=email]')
     assert.equal(await evaluate("document.querySelector('.fr-invite-contact').innerText.includes('Schritt 2 von 2')"),true)
@@ -212,5 +215,19 @@ test('contacts and groups show five each, expand independently and call the chos
     await browser('wait','.fr-call')
     assert.equal(await evaluate("qa.requests.some(r=>r.action==='calls/join')"),false)
     assert.equal(await evaluate("document.querySelector('.fr-mic').textContent"),'Mikrofon aus')
+    // Exercise external app launch last; native protocol prompts are outside this DOM test.
+    await browser('open',`http://127.0.0.1:${server.address().port}/contacts.html?signup=1&browser=1&invite=verify`)
+    await browser('wait','form button')
+    await evaluate("document.querySelector('.fr-device-choice button').click();true")
+    await browser('wait','--fn',"qa.requests.some(r=>r.action==='invitation/open-status')")
+    const opening=await evaluate("qa.requests.find(r=>r.action==='invitation/open-status').body")
+    assert.match(opening.handoff,/^[a-f0-9]{32}$/)
+    assert.equal(opening.invitation,'verify')
+    assert.equal(await evaluate("qa.requests.some(r=>r.action==='invitation/accept')"),false)
+    await evaluate('qa.desktopOpened=true')
+    await browser('wait','--text','PeekaView Desktop ist geöffnet. Bestätige das Gerät dort.')
+    assert.equal(await evaluate("document.querySelector('form').hidden"),true)
+    await evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Stattdessen diesen Browser hinzufügen').click();true")
+    assert.equal(await evaluate("document.querySelector('form').hidden"),false)
   } finally {try {await browser('close')} finally {await new Promise(resolve=>server.close(resolve))}}
 })

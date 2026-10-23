@@ -73,7 +73,7 @@ const element = (tag, text, className) => {
   if (className) el.className = className
   return el
 }
-export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', profileRoot = null, onIncoming, onOpen = openRoom } = {}) {
+export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', handoff = '', profileRoot = null, onIncoming, onOpen = openRoom } = {}) {
   const client = new RoomClient()
   root.classList.add('fixed-rooms')
   const content = element('div', undefined, 'fr-content')
@@ -89,6 +89,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   let allContacts = false, allGroups = false
   const openGroups = new Set(), openContacts = new Set()
   let emailSent=client.session.pendingEmail || ''
+  let desktopState='ready', desktopProbe='', desktopTimer
   let pcmContext, pcmNode, pcmPending=false
   const pcmSources=new Map()
   const fail = e => { error.textContent = e.message || String(e) }
@@ -108,6 +109,27 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     f.append(...inputs.map(i=>i.box)); const b = element('button', submit,'fr-primary'); f.append(b)
     f.addEventListener('submit', e => { e.preventDefault(); action(async()=>{ b.disabled=true; try { await run(...inputs.map(i=>i.field.value.trim()));for(const i of inputs)i.field.defaultValue=i.field.value } finally { b.disabled=false } }) })
     return f
+  }
+  function openDesktop() {
+    clearTimeout(desktopTimer)
+    const probe=crypto.randomUUID().replaceAll('-',''), token=invitation
+    desktopProbe=probe;desktopState='waiting';rendered='';render()
+    location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:token,handoff:probe})}`
+    const deadline=Date.now()+15000
+    const check=async()=>{
+      try {
+        const result=await client.request('invitation/open-status',{invitation:token,handoff:probe},false)
+        if(disposed || desktopProbe!==probe || invitation!==token)return
+        if(result.opened)desktopState='opened'
+        else if(Date.now()>=deadline)desktopState='unconfirmed'
+        else {desktopTimer=setTimeout(check,1000);return}
+      }catch(e){
+        if(disposed || desktopProbe!==probe || invitation!==token)return
+        desktopState='error';fail(e)
+      }
+      rendered='';render()
+    }
+    desktopTimer=setTimeout(check,500)
   }
   async function callContact(person) {
     const existing=client.state.calls.find(c=>c.kind==='contact' && c.status==='joined' && c.contact_id===person)
@@ -360,17 +382,19 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     renderProfile()
     if (active) return renderCall()
     if (rendered && (content.querySelector('.fr-access-selection > *') || content.querySelector('.fr-new-group input[type=checkbox]:checked') || [...content.querySelectorAll('input:not([type="checkbox"])')].some(input=>input.value!==input.defaultValue))) return
-    const key = JSON.stringify([client.session, client.state, preview, invitation, emailSent, callId])
+    const key = JSON.stringify([client.session, client.state, preview, invitation, emailSent, callId, desktopState])
     if (key === rendered) return
     rendered = key; content.replaceChildren()
     if (invitation) {
       if (!preview) { content.append(button('Einladung prüfen', loadInvitation)); return }
       const kind=preview.kind
-      const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Deine E-Mail bestätigen'
+      const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Dieses Gerät hinzufügen'
       const next=preview.contact_email?`Die Einladung an ${preview.contact_email} wird danach automatisch versendet.`:preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach erstellst du deine Gruppe.':'Danach sind deine Kontakte und Gruppen hier verfügbar.'
       content.append(element('h3',title),element('p',kind==='device'?next:`${preview.sender_email} lädt dich ein.`,'fr-muted'),element('p',kind==='device'?preview.email:`Du nimmst als ${preview.email} teil.`))
-      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':preview.contact_email?'Bestätigen und Einladung senden':'Bestätigen und weiter',async name=>{
+      if(kind==='device')content.append(element('p','Öffne diesen Link auf dem Gerät, das du hinzufügen möchtest.','fr-muted'))
+      const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':platform==='browser'?'Nur diesen Browser hinzufügen':'Dieses Gerät hinzufügen',async name=>{
         const result = await client.request('invitation/accept',{invitation,name,platform})
+        clearTimeout(desktopTimer);desktopProbe=''
         if (result.token) client.session.token=result.token
         client.session.device=result.device
         if(result.next_action && result.next_action!=='login')client.session.nextAction=result.next_action
@@ -385,7 +409,23 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         }
       })
       const deviceDetails=element('details');deviceDetails.append(element('summary','Gerätedetails'),acceptance.firstElementChild);acceptance.prepend(deviceDetails)
-      if (platform==='browser') content.append(button('In PeekaView öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` }))
+      if(kind==='device' && platform==='browser')acceptance.lastElementChild.classList.remove('fr-primary')
+      if (platform==='browser') {
+        const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent)
+        if(kind==='device' && !mobile){
+          const choice=element('section',undefined,'fr-device-choice')
+          const download=element('a','Noch nicht? PeekaView Desktop herunterladen');download.href=new URL('download.html',import.meta.url).href;download.target='_blank';download.rel='noopener'
+          if(desktopState==='waiting' || desktopState==='opened'){
+            const status=element('p',desktopState==='opened'?'PeekaView Desktop ist geöffnet. Bestätige das Gerät dort.':'PeekaView Desktop wird geöffnet …','fr-muted');status.setAttribute('role','status');choice.append(status)
+          }
+          if(desktopState==='unconfirmed')choice.append(element('p','Keine Rückmeldung von PeekaView Desktop. Falls ein Öffnen-Dialog erscheint, bestätige ihn.','fr-muted'))
+          choice.append(button(desktopState==='ready'?'PeekaView Desktop öffnen':'Erneut öffnen',openDesktop,'fr-primary'))
+          if(desktopState==='unconfirmed' || desktopState==='error')choice.append(download,element('small','Nach der Installation hier „Erneut öffnen“ wählen.','fr-muted'))
+          content.append(choice)
+          acceptance.hidden=desktopState==='waiting' || desktopState==='opened'
+          if(acceptance.hidden)content.append(button('Stattdessen diesen Browser hinzufügen',()=>{clearTimeout(desktopTimer);desktopProbe='';desktopState='ready';rendered='';render()}))
+        }else content.append(button(mobile?'In der PeekaView-App öffnen':'In PeekaView öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` },kind==='device'?'fr-primary':''))
+      }
       content.append(acceptance)
       return
     }
@@ -470,7 +510,9 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const api=apiURL(invitationApi || client.session.api)
     if (client.session.api && api!==client.session.api) throw new Error('Diese Einladung gehört zu einem anderen PeekaView-Server. Öffne sie in einem eigenen Browserprofil.')
     client.session.api=api
-    preview=await client.request('invitation/preview',{invitation},false); client.save(); render()
+    preview=await client.request('invitation/preview',{invitation},false)
+    if(platform==='desktop' && handoff && preview.kind==='device')await client.request('invitation/opened',{invitation,handoff},false)
+    client.save(); render()
   }
   async function join(id) {
     const call=client.state.calls.find(c=>c.id===id)
@@ -648,5 +690,5 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   if(invitation) loadInvitation().catch(fail)
   refresh().catch(fail)
   timer=setInterval(focus,4000)
-  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);window.removeEventListener('pointerdown',dismissProfile);window.removeEventListener('keydown',dismissProfile);window.removeEventListener('resize',sizeProfile);profileHost.replaceChildren();profileHost.hidden=true;recordingListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
+  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);clearTimeout(desktopTimer);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);window.removeEventListener('pointerdown',dismissProfile);window.removeEventListener('keydown',dismissProfile);window.removeEventListener('resize',sizeProfile);profileHost.replaceChildren();profileHost.hidden=true;recordingListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
 }
