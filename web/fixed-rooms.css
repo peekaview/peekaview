@@ -15,7 +15,7 @@
 .fixed-rooms details > :not(summary) { margin-top: 10px; }
 .fr-heading, .fr-call-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .fr-heading > :first-child, .fr-call-bar > strong { flex: 1; }
-.fr-room, .fr-ring { background: #18181b; border: 1px solid #27272a; border-radius: 10px; }
+.fr-room, .fr-person, .fr-ring { background: #18181b; border: 1px solid #27272a; border-radius: 10px; }
 .fr-room-row { display: flex; align-items: center; gap: 6px; padding-right: 6px; }
 .fixed-rooms .fr-room-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; background: transparent; text-align: left; }
 .fr-collection { display: flex; flex-direction: column; gap: 5px; }
@@ -34,6 +34,11 @@
 .fixed-rooms .fr-group-toggle { flex: none; display: grid; place-items: center; padding: 6px; border: 0; background: transparent; color: #a1a1aa; }
 .fr-group-details { padding: 10px; border-top: 1px solid #27272a; }
 .fr-group-details > :not(:first-child) { margin-top: 12px; }
+.fr-person > .fr-person-details { padding: 10px; border-top: 1px solid #27272a; }
+.fr-person-details summary { color: #a1a1aa; font-size: 12px; }
+.fr-person-details .fr-member { margin-top: 6px; }
+.fr-heading > details { min-width: 0; overflow-wrap: anywhere; }
+.fixed-rooms .fr-person .fr-contact { flex: 1; min-width: 0; border: 0; }
 .fr-members { display: flex; flex-direction: column; gap: 5px; }
 .fr-member { display: flex; align-items: center; gap: 7px; min-width: 0; color: #a1a1aa; font-size: 11px; }
 .fr-member .fr-avatar { width: 22px; height: 22px; font-size: 9px; }

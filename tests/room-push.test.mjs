@@ -15,8 +15,8 @@ test('room transcript mixes stereo into one second of silent-output mono PCM',as
 })
 
 test('service worker rejects expired/invalid calls and opens only its own room page without credentials',async()=>{
-  const handlers={}, shown=[], opened=[]
-  const self={addEventListener:(t,h)=>handlers[t]=h,registration:{scope:'https://peekaview.de/',showNotification:async(...args)=>shown.push(args)}}
+  const handlers={}, shown=[], opened=[], closed=[]
+  const self={addEventListener:(t,h)=>handlers[t]=h,registration:{scope:'https://peekaview.de/',showNotification:async(...args)=>shown.push(args),getNotifications:async options=>[{close:()=>closed.push(options.tag)}]}}
   vm.runInNewContext(await readFile(new URL('../web/room-sw.js',import.meta.url),'utf8'),{self,URL,URLSearchParams,Date,clients:{openWindow:async url=>opened.push(url)}})
   async function push(data){let work;handlers.push({data:{json:()=>data},waitUntil:p=>work=p});await work}
   await push({call:'bad',api:'https://api.example.test/api.php',expires:Date.now()/1000+45});assert.equal(shown.length,0)
@@ -29,4 +29,7 @@ test('service worker rejects expired/invalid calls and opens only its own room p
   await push({call:'0123456789abcdef',api:'https://api.example.test/api.php',caller:'Anna',admitted:true,expires:Date.now()/1000+45})
   assert.equal(shown[1][0],'PeekaView: Du kannst teilnehmen')
   assert.equal(shown[1][1].body,'Du wurdest zum Gespräch zugelassen.')
+  await push({answered_call:'0123456789abcdef',api:'https://api.example.test/api.php',expires:Date.now()/1000+45})
+  assert.deepEqual(closed,['peekaview-0123456789abcdef'])
+  assert.equal(shown.length,2)
 })
