@@ -804,6 +804,7 @@ export function mountViewer(el, options) {
     if (!me) return
     send({ t: 'clear' })
     wm.clearOwn(me.id)
+    toast('Deine Zeichnungen sind gelöscht.')
   }
 
   /** Light enough that white initials would vanish (the presenter is white by default). */

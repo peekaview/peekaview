@@ -287,7 +287,18 @@ for (const tab of document.querySelectorAll('.tab')) {
     updateStart()
   })
 }
-$('refresh').addEventListener('click', loadSources)
+$('refresh').addEventListener('click', async () => {
+  const b = $('refresh')
+  b.classList.add('busy')
+  b.disabled = true
+  try {
+    await loadSources()
+    toast('Liste aktualisiert', 'ok', 1500)
+  } finally {
+    b.classList.remove('busy')
+    b.disabled = false
+  }
+})
 
 // ------------------------------------------------------------------ sharing
 
@@ -304,6 +315,8 @@ async function start() {
   const name = $('name').value.trim() || 'Host'
   store.set('pv-name', $('name').value.trim())
   $('start').disabled = true
+  // starting takes a moment (capture, connection data): say so
+  $('start-label').textContent = 'Wird gestartet …'
   try {
     // "Letzten Link beibehalten": the same room secret and presenter key as last time;
     // a permanent room: its secret and key

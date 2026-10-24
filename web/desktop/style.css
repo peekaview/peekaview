@@ -38,6 +38,9 @@ i[data-icon] { display: contents; }
 /* ------------------------------------------------ buttons */
 .icon-btn { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
 .icon-btn:hover { background: var(--raised); color: var(--fg); }
+/* something runs after a click (reloading a list): the icon turns */
+.icon-btn.busy svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .pill { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; padding: 0 13px; border-radius: 9px; font-weight: 650; white-space: nowrap; cursor: pointer; transition: background .15s, opacity .15s; }
 .primary { border: 0; background: var(--accent); color: #fff; }
 .primary:hover:not(:disabled) { background: var(--accent-hover); }

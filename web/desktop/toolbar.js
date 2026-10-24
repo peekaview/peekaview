@@ -112,9 +112,17 @@ invoke('live_info').then((live) => {
 })
 listen('live', (e) => e.payload && show(e.payload))
 
+// what a click on a mode changed, in words
+const MODE_TEXT = {
+  view: 'Zuschauer sehen jetzt nur zu.',
+  draw: 'Zuschauer dürfen jetzt zeigen und malen.',
+  control: 'Zuschauer dürfen jetzt Maus und Tastatur benutzen.',
+}
+
 async function setMode(mode, send = true) {
   for (const b of document.querySelectorAll('.modes button')) b.classList.toggle('active', b.dataset.mode === mode)
   if (!send) return
+  toast(MODE_TEXT[mode] ?? '', mode === 'control' ? 'info' : 'ok', 2500)
   invoke('set_mode', { mode })
   if (mode !== 'control') invoke('dismiss_permission', { kind: 'accessibility' })
   else if (!(await invoke('permission_status')).accessibility) invoke('request_permission', { kind: 'accessibility' })
@@ -126,6 +134,7 @@ listen('mode', (e) => setMode(String(e.payload), false))
 $('code-btn').addEventListener('click', async () => {
   await invoke('copy_text', { text: link }).catch(() => navigator.clipboard.writeText(link))
   markCopied()
+  toast('Link kopiert – jetzt in E-Mail oder Chat einfügen.')
 })
 function markCopied() {
   const chip = $('code-btn')
@@ -136,11 +145,24 @@ function markCopied() {
     chip.lastElementChild.outerHTML = icon('link', 17)
   }, 1500)
 }
-listen('copied', markCopied)
+// copied from the tray menu: the same feedback
+listen('copied', () => {
+  markCopied()
+  toast('Link kopiert – jetzt in E-Mail oder Chat einfügen.')
+})
 
 // other windows / another screen: picked in the PeekaView window
 $('switch-btn').addEventListener('click', () => invoke('show_picker', { switching: true }))
-$('stop-btn').addEventListener('click', () => invoke('stop_share'))
+$('stop-btn').addEventListener('click', () => {
+  const b = $('stop-btn')
+  b.disabled = true
+  b.innerHTML = `${icon('stop', 17)}Wird beendet …`
+  invoke('stop_share').catch((e) => {
+    b.disabled = false
+    b.innerHTML = `${icon('stop', 17)}Beenden`
+    toast(String(e), 'info', 5000)
+  })
+})
 
 function renderAvatars(peers) {
   const viewers = peers.filter((p) => !p.host)
