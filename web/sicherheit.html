@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sicherheit – PeekaView</title>
+  <link rel="stylesheet" href="fixed-rooms.css">
+  <link rel="stylesheet" href="legal.css">
+</head>
+<body class="legal-page">
+<main class="pv-legal">
+  <a class="back" href="./">← Zurück zu PeekaView</a>
+  <h1>Sicherheit</h1>
+  <p class="lead">Wie PeekaView deinen Bildschirm schützt – und worauf du selbst achten kannst.</p>
+
+  <section class="card">
+    <h2>Du entscheidest, wer zusieht</h2>
+    <p>Niemand sieht deinen Bildschirm, bevor du ihn hereinlässt. Wer deinen Link öffnet, klopft nur an: Du siehst den Namen und klickst auf „Zulassen“ oder „Ablehnen“. Ausnahme: Hast du für einen festen Raum oder eine Gruppe eine PIN festgelegt, kommt man mit der richtigen PIN auch ohne deine Bestätigung herein.</p>
+  </section>
+
+  <section class="card">
+    <h2>Du entscheidest, was die anderen dürfen</h2>
+    <ul>
+      <li><strong>Ansehen:</strong> Die anderen sehen nur zu.</li>
+      <li><strong>Zeigen:</strong> Sie können zusätzlich mit ihrem Mauszeiger zeigen und malen.</li>
+      <li><strong>Steuern:</strong> Sie können Maus und Tastatur benutzen. Teilst du ein einzelnes Fenster, kommen ihre Eingaben nur in diesem Fenster an – und nur dort, wo es nicht von einem anderen Fenster verdeckt ist.</li>
+    </ul>
+    <p>Ein roter Rahmen zeigt dir immer, was gerade geteilt wird. Mit „Beenden“ ist die Freigabe sofort vorbei.</p>
+  </section>
+
+  <section class="card">
+    <h2>Verschlüsselt und direkt</h2>
+    <ul>
+      <li>Bild, Ton und Steuerung laufen <strong>direkt</strong> zwischen den Geräten (WebRTC) und sind <strong>Ende-zu-Ende verschlüsselt</strong>. Es gibt keinen PeekaView-Server, der deinen Bildschirm sieht.</li>
+      <li>Die Geräte finden sich über öffentliche Nostr-Relays. Diese Nachrichten sind mit AES-256 verschlüsselt. Die Relays sehen nur, <em>dass</em> verbunden wird – keine Namen, keine Inhalte.</li>
+      <li>Der Schlüssel des Raums steht im Link hinter dem „#“. Diesen Teil schickt der Browser nie an einen Server.</li>
+      <li>Nachrichten der teilenden Person sind digital signiert. Wer nur den Link kennt, kann sich nicht als teilende Person ausgeben.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Offen und überprüfbar</h2>
+    <p>PeekaView ist freie Software. Jeder kann den <a href="https://github.com/peekaview/peekaview">Quellcode auf GitHub</a> lesen und prüfen.</p>
+  </section>
+
+  <h2>So bleibst du sicher</h2>
+  <ul>
+    <li>Schick den Link nur an Personen, die zusehen sollen.</li>
+    <li>Lass nur Leute herein, deren Namen du kennst. Im Zweifel: „Ablehnen“.</li>
+    <li>Teile lieber einzelne Fenster als den ganzen Bildschirm – dann sieht niemand versehentlich andere Programme oder Nachrichten.</li>
+    <li>Erlaube „Steuern“ nur, wenn du der Person vertraust, und schalte danach wieder auf „Ansehen“.</li>
+    <li>Vorsicht bei Fremden, die dich anrufen, Hilfe anbieten und dich bitten, deinen Bildschirm zu teilen. Seriöse Firmen tun das nicht unaufgefordert. Im Zweifel: auflegen.</li>
+  </ul>
+
+  <h2>Sicherheitslücke gefunden?</h2>
+  <p>Bitte schreib uns an <a href="mailto:info@limtec.de">info@limtec.de</a>. Wir kümmern uns schnell darum.</p>
+</main>
+<footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html" aria-current="page">Sicherheit</a></footer>
+</body>
+</html>

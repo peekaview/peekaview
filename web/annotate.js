@@ -189,7 +189,7 @@ export class Annotations {
     if (audio.dataset.kind !== kind) {
       audio.dataset.kind = kind
       audio.innerHTML = kind === 'on' ? '<i class="pv-bars"><b></b><b></b><b></b></i>' : kind === 'off' ? icon('micOff', 12) : ''
-      audio.title = kind === 'off' ? 'Mikrofon aus' : ''
+      audio.title = kind === 'off' ? 'Mikrofon ist aus' : ''
     }
     this.paintLevel(id)
   }

@@ -5,6 +5,12 @@ import { Signaling } from './signal.js'
 import { icon, peerColor } from './icons.js'
 
 const KEY = 'pv-fixed-rooms-v1'
+const API = 'https://peekaview.devxpert.de/api.php'
+// sessions without a server (e.g. from the former "own server" option) use PeekaView's
+function readSession(storage) {
+  const session = JSON.parse(storage.getItem(KEY) || '{}')
+  return { ...session, api: session.api || API }
+}
 export const platform = window.__TAURI__ ? 'desktop' : window.PeekaViewApp || window.PeekaViewHost ? 'android' : 'browser'
 export function apiURL(value) {
   const url = new URL(value)
@@ -16,7 +22,7 @@ export class RoomClient extends EventTarget {
   constructor(storage = localStorage) {
     super()
     this.storage = storage
-    this.session = JSON.parse(storage.getItem(KEY) || '{"api":"https://peekaview.devxpert.de/api.php"}')
+    this.session = readSession(storage)
     this.state = { contacts: this.session.contactsVersion===2 ? this.session.contacts : [], rooms: this.session.contactsVersion===2 ? this.session.rooms : [], calls: [], invitations: [] }
   }
   save() {
@@ -72,6 +78,18 @@ const element = (tag, text, className) => {
   if (text !== undefined) el.textContent = text
   if (className) el.className = className
   return el
+}
+/** The way to sharing one's own screen: PeekaView Desktop (start page and contacts). */
+export function downloadCard() {
+  const card=element('a',undefined,'pv-download')
+  // a tab of its own: a running call or a half-done sign-up stays open
+  card.href=new URL('download.html',import.meta.url).href;card.target='_blank';card.rel='noopener'
+  const art=element('span',undefined,'pv-download-icon');art.innerHTML=icon('screen',22)
+  const text=element('span',undefined,'pv-download-text')
+  text.append(element('strong','Selbst den Bildschirm zeigen?'),element('small','Dafür brauchst du PeekaView Desktop – kostenlos.'))
+  const action=element('span',undefined,'pv-download-action');action.innerHTML=icon('download',16);action.append('PeekaView Desktop herunterladen')
+  card.append(art,text,action)
+  return card
 }
 export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', handoff = '', profileRoot = null, onIncoming, onOpen = openRoom } = {}) {
   const client = new RoomClient()
@@ -169,6 +187,18 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if (items.length>5) section.append(button(expanded?'Weniger anzeigen':`Alle ${items.length} anzeigen`,()=>{toggle();rendered='';render()},'fr-expand'))
     return section
   }
+  // where someone is in a sign-up flow: "1 Person · 2 Deine E-Mail · 3 Bestätigen"
+  function steps(labels, current) {
+    const list=element('ol',undefined,'fr-steps');list.setAttribute('aria-label',`Schritt ${current} von ${labels.length}`)
+    labels.forEach((label,i)=>{
+      const item=element('li',undefined,i+1<current?'done':i+1===current?'now':'')
+      item.append(element('b',i+1<current?'✓':String(i+1)),document.createTextNode(label))
+      if(i+1===current)item.setAttribute('aria-current','step')
+      list.append(item)
+    })
+    return list
+  }
+  const FLOW={contact:['Person','Deine E-Mail','Bestätigen'],group:['Deine E-Mail','Bestätigen','Gruppe'],login:['Deine E-Mail','Bestätigen']}
   function beginConnection(nextAction){client.session.nextAction=nextAction;client.save();rendered='';render()}
   function personDetails(person){
     const details=element('details',undefined,'fr-person-details')
@@ -189,11 +219,17 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const action=element('span',undefined,'fr-call-action');action.innerHTML=icon(joined?'expand':'phone',14);action.append(document.createTextNode(joined?'Öffnen':'Anrufen'))
     call.append(avatar(contact),text,action)
     call.setAttribute('aria-label',`${contact.name}: ${joined?'Gespräch öffnen':'Anrufen'}`)
-    const details=personDetails(contact);details.open=true;details.hidden=!openContacts.has(contact.id)
-    const toggle=button('',()=>{details.hidden=!details.hidden;if(details.hidden)openContacts.delete(contact.id);else openContacts.add(contact.id);toggle.setAttribute('aria-expanded',String(!details.hidden))},'fr-group-toggle')
-    toggle.innerHTML=icon('settings',17);toggle.setAttribute('aria-label',`${contact.name}: Details`);toggle.setAttribute('aria-expanded',String(!details.hidden))
+    const details=element('div',undefined,'fr-person-details');details.hidden=!openContacts.has(contact.id)
+    details.append(element('h4',`Geräte von ${contact.name}`))
+    for(const device of contact.devices || []){
+      const line=element('div',undefined,'fr-member')
+      line.append(element('span',device.name),badge({desktop:'Computer',android:'Android',browser:'Browser'}[device.platform] || 'Gerät'));details.append(line)
+    }
+    const toggle=button('',()=>{details.hidden=!details.hidden;if(details.hidden)openContacts.delete(contact.id);else openContacts.add(contact.id);toggleLabel(toggle,!details.hidden)},'fr-group-toggle')
+    toggle.setAttribute('aria-label',`${contact.name}: Details`);toggleLabel(toggle,!details.hidden)
     row.append(call,toggle);card.append(row,details);return card
   }
+  function toggleLabel(toggle, open){toggle.textContent=open?'Weniger':'Mehr';toggle.setAttribute('aria-expanded',String(open))}
   function avatar(person, group = false) {
     const el=element('span',undefined,'fr-avatar')
     const color=peerColor(person.id)
@@ -246,7 +282,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const badges=element('span',undefined,'fr-badges')
     if (room.active_call) badges.append(badge('Gespräch läuft','fr-badge-live'))
     if (room.pin) badges.append(badge('PIN'))
-    if (room.unattended) badges.append(badge('Zugriff bereit'))
+    if (room.unattended) badges.append(badge('Fernzugriff an'))
     const joined=client.state.calls.some(c=>c.room===room.id && c.status==='joined')
     const pending=client.state.calls.find(c=>c.room===room.id && ['requested','rejected'].includes(c.status))
     const label=pending?(pending.status==='requested'?'Wartet':'Nicht zugelassen'):joined?'Öffnen':room.active_call?'Beitreten':'Anrufen'
@@ -257,16 +293,16 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     details.hidden=!openGroups.has(room.id)
     const toggle=button('',()=>{
       if (openGroups.has(room.id)) openGroups.delete(room.id); else openGroups.add(room.id)
-      details.hidden=!openGroups.has(room.id);toggle.setAttribute('aria-expanded',String(!details.hidden))
+      details.hidden=!openGroups.has(room.id);toggleLabel(toggle,!details.hidden)
     },'fr-group-toggle')
-    toggle.innerHTML=icon('settings',17)
     toggle.title=`${room.name}: Mitglieder und Einstellungen`
     toggle.setAttribute('aria-label',toggle.title)
-    toggle.setAttribute('aria-expanded',String(!details.hidden))
+    toggleLabel(toggle,!details.hidden)
     row.append(call,badges,toggle);card.append(row,details)
     const members=element('div',undefined,'fr-members')
+    members.append(element('h4','Mitglieder'))
     for (const person of room.people || []) members.append(personDetails(person))
-    for (const invitation of room.invitations || []) members.append(element('div',`${invitation.email} · Einladung offen`,'fr-muted'))
+    for (const invitation of room.invitations || []) members.append(element('div',`${invitation.email} · eingeladen, wartet auf Bestätigung`,'fr-muted'))
     details.append(members)
     if (room.can_manage) details.append(memberEditor(room))
     details.append(accessSettings(room))
@@ -274,6 +310,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   function memberEditor(room) {
       const editor=element('div',undefined,'fr-member-editor')
+      editor.append(element('h4','Jemanden hinzufügen'))
       const others=(client.state.contacts || []).filter(d=>!(room.people || []).some(p=>p.id===d.id))
       if (others.length) {
         const add=element('div',undefined,'fr-add-contact')
@@ -285,7 +322,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         add.append(select,submit)
         editor.append(add)
       }
-      const invite=element('details');invite.append(element('summary','Per E-Mail einladen'))
+      const invite=element('details');invite.append(element('summary',others.length?'Jemand, der noch nicht in deinen Kontakten ist? Per E-Mail einladen':'Per E-Mail einladen'))
       invite.append(form([['E-Mail-Adresse','email','']],'Einladung senden',async email=>{
         await client.request('rooms/invite',{room:room.id,email});notice.textContent=`Einladung an ${email} gesendet.`
       }))
@@ -295,34 +332,36 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   function accessSettings(room) {
     const box=element('div',undefined,'fr-access-settings')
     let pinEnabled, pinField, pendingAccess=false
+    box.append(element('h4','Sicherheit'))
     if (room.can_manage) {
       const f=document.createElement('form')
       const label=element('label',undefined,'fr-check')
       pinEnabled=document.createElement('input');pinEnabled.type='checkbox';pinEnabled.checked=!!room.pin;pinEnabled.disabled=!!room.pin_required
-      label.append(pinEnabled,document.createTextNode('Gruppen-PIN'))
+      label.append(pinEnabled,document.createTextNode('PIN verlangen – wer die Gruppe anruft, muss sie eingeben'))
       pinField=document.createElement('input');pinField.type='password';pinField.minLength=6;pinField.maxLength=128;pinField.autocomplete='new-password'
       pinField.setAttribute('aria-label','Gruppen-PIN');pinField.placeholder=room.pin?'Neue PIN (leer lassen zum Beibehalten)':'PIN · mindestens 6 Zeichen'
-      const sync=()=>{pinField.hidden=!pinEnabled.checked;pinField.required=pinEnabled.checked && !room.pin}
-      pinEnabled.addEventListener('change',sync);sync()
-      const save=element('button','PIN speichern')
+      const save=element('button','PIN speichern','fr-primary')
+      // the button only shows when there is something to save
+      const sync=()=>{pinField.hidden=!pinEnabled.checked;pinField.required=pinEnabled.checked && !room.pin;save.hidden=pinEnabled.checked===!!room.pin && !pinField.value}
+      pinEnabled.addEventListener('change',sync);pinField.addEventListener('input',sync);sync()
       f.append(label,pinField,save)
-      if (room.pin_required) f.append(element('small','Für unbeaufsichtigten Zugriff erforderlich.','fr-muted'))
+      if (room.pin_required) f.append(element('small','Für den Fernzugriff nötig.','fr-muted'))
       if (room.active_call) f.append(element('small','Eine PIN-Änderung beendet den Gruppenanruf.','fr-muted'))
       f.addEventListener('submit',e=>{e.preventDefault();action(async()=>{
         save.disabled=true
         try {
           await client.request('rooms/settings',{room:room.id,pin_enabled:pinEnabled.checked,pin:pinEnabled.checked?pinField.value:''});pinField.value='';room.pin=pinEnabled.checked
           if(pendingAccess && room.pin){pendingAccess=false;await choose()}
-          else notice.textContent='Gruppen-PIN gespeichert.'
+          else notice.textContent='PIN gespeichert.'
         }
         finally {save.disabled=false}
       })})
       box.append(f)
     }
-    if (platform==='browser') return box
+    if (platform==='browser') { if(!room.can_manage)box.replaceChildren(); return box }
     const label=element('label',undefined,'fr-check')
     const unattended=document.createElement('input');unattended.type='checkbox';unattended.checked=!!room.unattended
-    label.append(unattended,document.createTextNode('Unbeaufsichtigter Zugriff auf diesem Gerät'))
+    label.append(unattended,document.createTextNode('Fernzugriff auf dieses Gerät erlauben – auch wenn niemand davor sitzt'))
     const selection=element('div',undefined,'fr-access-selection')
     const native=window.PeekaViewHost || window.PeekaViewApp
     const configure=async value=>{
@@ -334,9 +373,9 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         unattended.checked=false
         if (pinEnabled) {
           pendingAccess=true;pinEnabled.checked=true;pinEnabled.dispatchEvent(new Event('change'));pinField.focus()
-          notice.textContent='Lege zuerst eine Gruppen-PIN mit mindestens 6 Zeichen fest. Danach wählst du aus, was freigegeben werden darf.';return
+          notice.textContent='Lege zuerst eine PIN mit mindestens 6 Zeichen fest. Danach wählst du aus, was freigegeben werden darf.';return
         }
-        throw new Error('Bitte den Gruppenersteller, zuerst eine Gruppen-PIN festzulegen.')
+        throw new Error('Bitte die Person, die die Gruppe erstellt hat, zuerst eine PIN festzulegen.')
       }
       const options=platform==='desktop' ? await window.__TAURI__.core.invoke('fixed_access_options',{room:room.id}) : JSON.parse(native.roomAccessOptions(room.id))
       if (options.error) throw new Error(options.error)
@@ -361,7 +400,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         const value={enabled:true,screens:[],apps:[]}
         for (const {check,kind} of choices) if (check.checked) value[kind].push(check.value)
         if (!value.screens.length && !value.apps.length) throw new Error('Wähle mindestens einen Bildschirm oder eine Anwendung.')
-        await configure(value);selection.replaceChildren();notice.textContent='Unbeaufsichtigter Zugriff ist für die ausgewählten Inhalte bereit.'
+        await configure(value);selection.replaceChildren();notice.textContent='Fernzugriff ist für die ausgewählten Inhalte an.'
       },'fr-primary')
       const sync=()=>{activate.disabled=!choices.some(c=>c.check.checked)}
       for(const choice of choices)choice.check.addEventListener('change',sync)
@@ -369,11 +408,11 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     }
     unattended.addEventListener('change',()=>action(async()=>{
       unattended.disabled=true
-      try {if(unattended.checked) await choose();else {pendingAccess=false;await configure({enabled:false,screens:[],apps:[]});selection.replaceChildren();notice.textContent='Unbeaufsichtigter Zugriff ist aus.'}}
+      try {if(unattended.checked) await choose();else {pendingAccess=false;await configure({enabled:false,screens:[],apps:[]});selection.replaceChildren();notice.textContent='Fernzugriff ist aus.'}}
       catch(e){unattended.checked=!!room.unattended;throw e}
       finally{unattended.disabled=false}
     }))
-    box.append(label)
+    box.append(label,element('small','Gruppenmitglieder können dann die ausgewählten Programme sehen und bedienen. Dafür ist eine PIN nötig.','fr-muted'))
     if (room.unattended) box.append(button('Auswahl ändern',choose))
     box.append(selection)
     return box
@@ -386,12 +425,14 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if (key === rendered) return
     rendered = key; content.replaceChildren()
     if (invitation) {
-      if (!preview) { content.append(button('Einladung prüfen', loadInvitation)); return }
+      if (!preview) { content.append(element('p','Einladung wird geladen …','fr-muted'),button('Erneut versuchen', loadInvitation)); return }
       const kind=preview.kind
-      const title=kind==='group' ? `Einladung zu „${preview.name}“` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Dieses Gerät hinzufügen'
-      const next=preview.contact_email?`Die Einladung an ${preview.contact_email} wird danach automatisch versendet.`:preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach erstellst du deine Gruppe.':'Danach sind deine Kontakte und Gruppen hier verfügbar.'
-      content.append(element('h3',title),element('p',kind==='device'?next:`${preview.sender_email} lädt dich ein.`,'fr-muted'),element('p',kind==='device'?preview.email:`Du nimmst als ${preview.email} teil.`))
-      if(kind==='device')content.append(element('p','Öffne diesen Link auf dem Gerät, das du hinzufügen möchtest.','fr-muted'))
+      const title=kind==='group' ? `${preview.sender_name || preview.sender_email} lädt dich in die Gruppe „${preview.name}“ ein` : kind==='contact' ? `${preview.sender_name} möchte dich als Kontakt hinzufügen` : 'Wo möchtest du PeekaView benutzen?'
+      const next=preview.contact_email?`Danach geht die Einladung an ${preview.contact_email} automatisch raus.`:preview.next_action==='contact'?'Danach lädst du die andere Person ein.':preview.next_action==='group'?'Danach gibst du deiner Gruppe einen Namen.':'Danach siehst du hier deine Kontakte und Gruppen.'
+      const flow=FLOW[preview.next_action]
+      if(kind==='device' && flow)content.append(steps(flow,flow.indexOf('Bestätigen')+1))
+      const who=element('p',kind==='device'?'Fast geschafft für ':'Du machst mit als ');who.append(element('strong',preview.email),'.')
+      content.append(element('h3',title),who,element('p',kind==='device'?next:kind==='group'?'Klicke auf „Gruppe beitreten“. Danach könnt ihr euch gegenseitig anrufen.':'Klicke auf „Kontakt hinzufügen“. Danach könnt ihr euch gegenseitig anrufen.','fr-muted'))
       const acceptance=form([['Name dieses Geräts','text',client.session.device?.name || (platform==='android'?'Mein Handy':platform==='desktop'?'Mein Computer':'Mein Browser')]],kind==='group'?'Gruppe beitreten':kind==='contact'?'Kontakt hinzufügen':platform==='browser'?'Nur diesen Browser hinzufügen':'Dieses Gerät hinzufügen',async name=>{
         const result = await client.request('invitation/accept',{invitation,name,platform})
         clearTimeout(desktopTimer);desktopProbe=''
@@ -408,63 +449,71 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
           else await onOpen(result.request_call)
         }
       })
-      const deviceDetails=element('details');deviceDetails.append(element('summary','Gerätedetails'),acceptance.firstElementChild);acceptance.prepend(deviceDetails)
+      const deviceDetails=element('details',undefined,'fr-device-name');deviceDetails.append(element('summary','Gerätename ändern (optional)'),acceptance.firstElementChild);acceptance.append(deviceDetails)
+      acceptance.lastElementChild.classList.add('fr-big')
       if(kind==='device' && platform==='browser')acceptance.lastElementChild.classList.remove('fr-primary')
       if (platform==='browser') {
         const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent)
         if(kind==='device' && !mobile){
           const choice=element('section',undefined,'fr-device-choice')
-          const download=element('a','Noch nicht? PeekaView Desktop herunterladen');download.href=new URL('download.html',import.meta.url).href;download.target='_blank';download.rel='noopener'
+          choice.append(element('strong','Auf diesem Computer mit PeekaView Desktop'),element('small','Damit kannst du auch deinen eigenen Bildschirm zeigen.','fr-muted'))
+          const download=element('a','Noch nicht installiert? PeekaView Desktop herunterladen');download.href=new URL('download.html',import.meta.url).href;download.target='_blank';download.rel='noopener'
           if(desktopState==='waiting' || desktopState==='opened'){
             const status=element('p',desktopState==='opened'?'PeekaView Desktop ist geöffnet. Bestätige das Gerät dort.':'PeekaView Desktop wird geöffnet …','fr-muted');status.setAttribute('role','status');choice.append(status)
           }
           if(desktopState==='unconfirmed')choice.append(element('p','Keine Rückmeldung von PeekaView Desktop. Falls ein Öffnen-Dialog erscheint, bestätige ihn.','fr-muted'))
-          choice.append(button(desktopState==='ready'?'PeekaView Desktop öffnen':'Erneut öffnen',openDesktop,'fr-primary'))
+          choice.append(button(desktopState==='ready'?'PeekaView Desktop öffnen':'Erneut öffnen',openDesktop,'fr-primary fr-big'))
           if(desktopState==='unconfirmed' || desktopState==='error')choice.append(download,element('small','Nach der Installation hier „Erneut öffnen“ wählen.','fr-muted'))
           content.append(choice)
           acceptance.hidden=desktopState==='waiting' || desktopState==='opened'
           if(acceptance.hidden)content.append(button('Stattdessen diesen Browser hinzufügen',()=>{clearTimeout(desktopTimer);desktopProbe='';desktopState='ready';rendered='';render()}))
-        }else content.append(button(mobile?'In der PeekaView-App öffnen':'In PeekaView öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` },kind==='device'?'fr-primary':''))
+          else content.append(element('p','oder nur im Browser – zum Zuschauen und Anrufen:','fr-muted fr-or'))
+          content.append(acceptance)
+        }else{
+          // the main action first; the installed app is the alternative
+          const app=button(mobile?'In der PeekaView-App öffnen':'In PeekaView Desktop öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` },kind==='device'?'fr-primary fr-big':'fr-text-button')
+          if(kind==='device')content.append(app,acceptance)
+          else content.append(acceptance,element('p','PeekaView schon installiert? Dann kannst du die Einladung auch dort annehmen:','fr-muted'),app)
+        }
+        if(kind==='device')content.append(element('p','Tipp: Für ein anderes Gerät öffne den Link aus der E-Mail einfach dort.','fr-muted'))
+        return
       }
       content.append(acceptance)
       return
     }
-    if (!client.session.api) {
-      content.append(element('h3','Eigener Server'))
-      content.append(form([['Server-Adresse','url','']],'Verbinden',async api=>{
-        client.session.api=apiURL(api); await client.request('config',undefined,false); client.save()
-      }))
-      return
-    }
     if (!client.session.token) {
+      const flow=FLOW[client.session.nextAction]
       if(!client.session.nextAction){
-        content.append(element('p','Speichere Personen, die du direkt anrufen möchtest.','fr-muted'),button('Person einladen',()=>beginConnection('contact'),'fr-primary'),button('Neue Gruppe',()=>beginConnection('group')),button('Schon dabei? Anmelden',()=>beginConnection('login'),'fr-text-button'))
+        const intro=element('section',undefined,'fr-intro')
+        intro.append(element('h2','Direkt anrufen – ohne Link'),element('p','Speichere Familie, Freunde oder Kollegen als Kontakt. Dann rufst du sie mit einem Klick an und ihr schaut gemeinsam auf einen Bildschirm.','fr-muted'))
+        content.append(intro,button('Person einladen',()=>beginConnection('contact'),'fr-primary fr-big'),button('Gruppe erstellen',()=>beginConnection('group'),'fr-big'),button('Ich habe schon Kontakte – anmelden',()=>beginConnection('login'),'fr-text-button'))
       }else if(emailSent){
-        const next=client.session.pendingContactEmail?`Die Einladung an ${client.session.pendingContactEmail} geht danach automatisch raus.`:client.session.nextAction==='contact'?'Danach lädst du die andere Person ein.':client.session.nextAction==='group'?'Danach erstellst du deine Gruppe.':'Danach öffnen sich deine Kontakte.'
-        content.append(element('h3','Prüfe deine E-Mails'),element('p',`Bestätigungslink an ${emailSent} gesendet.`),element('p',`Öffne den Link in deiner E-Mail. ${next}`,'fr-muted'),button('Andere E-Mail-Adresse',()=>{emailSent='';delete client.session.pendingEmail;client.save();rendered='';render()},'fr-text-button'))
+        const step=client.session.nextAction==='contact'?3:2
+        const next=client.session.pendingContactEmail?`Danach geht die Einladung an ${client.session.pendingContactEmail} automatisch raus.`:client.session.nextAction==='contact'?'Danach lädst du die andere Person ein.':client.session.nextAction==='group'?'Danach gibst du deiner Gruppe einen Namen.':'Danach siehst du hier deine Kontakte.'
+        const mail=element('p','Wir haben dir eine E-Mail an ');mail.append(element('strong',emailSent),' geschickt.')
+        content.append(steps(flow,step),element('h3','Prüfe jetzt deine E-Mails'),mail,element('p',`Öffne die E-Mail von PeekaView und klicke auf den Link darin. ${next}`),element('p','Keine E-Mail da? Schau auch im Spam-Ordner nach.','fr-muted'),button('Andere E-Mail-Adresse eingeben',()=>{emailSent='';delete client.session.pendingEmail;client.save();rendered='';render()},'fr-text-button'))
       }else if(client.session.nextAction==='contact' && !client.session.pendingContactEmail){
-        content.append(element('h3','Wen möchtest du einladen?'),form([['E-Mail-Adresse der Person','email','']],'Weiter',async email=>{
+        content.append(steps(flow,1),element('h3','Wen möchtest du einladen?'),element('p','Die Person bekommt eine E-Mail mit einem Link. Sobald sie ihn öffnet, seid ihr verbunden.','fr-muted'),form([['E-Mail-Adresse der Person','email','']],'Weiter',async email=>{
           client.session.pendingContactEmail=email.toLowerCase();client.save()
         }))
       }else{
-        if(client.session.nextAction==='group')content.append(element('small','Gruppe erstellen · Schritt 1 von 2','fr-muted'))
-        const explanation=client.session.nextAction==='login'?'Bestätige deine E-Mail-Adresse, um deine Kontakte und Gruppen hier zu öffnen.':client.session.pendingContactEmail?`Einladung an ${client.session.pendingContactEmail}. Bestätige einmal deine eigene Adresse, dann senden wir die Einladung automatisch.`:'Bestätige zuerst deine eigene E-Mail-Adresse. Danach erstellst du deine Gruppe.'
-        content.append(element('h3',client.session.nextAction==='login'?'Kontakte öffnen':'Deine E-Mail bestätigen'),element('p',explanation,'fr-muted'))
+        const explanation=client.session.nextAction==='login'?'Wir schicken dir einen Link per E-Mail. Damit öffnest du deine Kontakte und Gruppen – ganz ohne Passwort.':client.session.pendingContactEmail?`Damit ${client.session.pendingContactEmail} weiß, dass die Einladung von dir kommt, bestätigst du einmal deine eigene Adresse. Ein Passwort brauchst du nicht.`:'Bestätige einmal deine eigene Adresse. Ein Passwort brauchst du nicht.'
+        content.append(steps(flow,client.session.nextAction==='contact'?2:1),element('h3',client.session.nextAction==='login'?'Wie lautet deine E-Mail-Adresse?':'Und wie lautet deine E-Mail-Adresse?'),element('p',explanation,'fr-muted'))
         content.append(form([['Deine E-Mail-Adresse','email','']],'Bestätigungslink senden',async email=>{
           await client.request('device/request',{email,next_action:client.session.nextAction,...(client.session.pendingContactEmail?{contact_email:client.session.pendingContactEmail}:{})},false);emailSent=email;client.session.pendingEmail=email;client.save()
         }))
-        if(client.session.pendingContactEmail)content.append(button('Person ändern',()=>{delete client.session.pendingContactEmail;client.save();rendered='';render()},'fr-text-button'))
+        if(client.session.pendingContactEmail)content.append(button(`Andere Person statt ${client.session.pendingContactEmail}`,()=>{delete client.session.pendingContactEmail;client.save();rendered='';render()},'fr-text-button'))
       }
       if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;delete client.session.pendingEmail;delete client.session.pendingContactEmail;client.save();emailSent='';rendered='';render()}))
-      if(platform==='browser' && !client.session.nextAction)content.append(element('p','Zum Bildschirmteilen PeekaView Desktop oder die Android-App öffnen.','fr-muted'))
-      const connection=element('details',undefined,'fr-advanced');connection.append(element('summary','Erweitert'),button('Eigenen Server verwenden',()=>{client.session={};emailSent='';client.save()}));content.append(connection);return
+      if(platform==='browser' && !client.session.nextAction)content.append(downloadCard())
+      return
     }
     const pending=client.state.calls.find(c=>c.id===callId && ['requested','rejected'].includes(c.status))
     if(pending){
       content.append(element('h3',pending.name),element('p',pending.status==='requested'?'Warte auf Zulassung …':'Du wurdest für dieses Gespräch nicht zugelassen.'),element('p',pending.status==='requested'?'Sobald du zugelassen wirst, öffnet sich das Gespräch. Dein Mikrofon bleibt zunächst aus.':'Du bleibst Mitglied der Gruppe.','fr-muted'),button('Zu den Kontakten',()=>{callId='';history.replaceState(null,'',location.pathname+location.search);render()}));return
     }
     for(const call of client.state.calls.filter(c=>c.status==='joined')){
-      content.append(button(`${call.name} · Gespräch öffnen`,()=>onOpen(call.id),'fr-resume'))
+      content.append(button(`Laufendes Gespräch „${call.name}“ – zurück zum Gespräch`,()=>onOpen(call.id),'fr-resume'))
     }
     for (const call of client.state.calls.filter(c=>c.status==='ringing')) {
       const ring=element('section',undefined,'fr-ring')
@@ -477,13 +526,13 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const actions=element('div',undefined,'fr-create-actions')
     const inviteContact=element('details',undefined,'fr-invite-contact fr-create');inviteContact.open=client.session.nextAction==='contact'
     const inviteLabel=element('summary');inviteLabel.innerHTML=icon('plus',15);inviteLabel.append(document.createTextNode('Person einladen'));inviteContact.append(inviteLabel)
-    if(client.session.nextAction==='contact')inviteContact.append(element('small','Schritt 2 von 2 · Wen möchtest du einladen?','fr-muted'))
+    if(client.session.nextAction==='contact')inviteContact.append(element('strong','Fast geschafft: Wen möchtest du einladen?'))
     inviteContact.append(form([['E-Mail-Adresse der Person','email','']],'Einladung senden',async email=>{
       await client.request('contacts/invite',{email});delete client.session.nextAction;client.save();notice.textContent=`Einladung an ${email} gesendet.`
     }))
     const add=element('details',undefined,'fr-new-group fr-create');add.open=client.session.nextAction==='group'
-    const groupLabel=element('summary');groupLabel.innerHTML=icon('plus',15);groupLabel.append(document.createTextNode('Neue Gruppe'));add.append(groupLabel)
-    if(client.session.nextAction==='group')add.append(element('small','Schritt 2 von 2 · Wie soll die Gruppe heißen?','fr-muted'))
+    const groupLabel=element('summary');groupLabel.innerHTML=icon('plus',15);groupLabel.append(document.createTextNode('Gruppe erstellen'));add.append(groupLabel)
+    if(client.session.nextAction==='group')add.append(steps(FLOW.group,3),element('strong','Fast geschafft: Wie soll die Gruppe heißen?'))
     const createGroup=form([['Gruppenname','text','']],'Gruppe erstellen',async name=>{
       const people=[...createGroup.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value)
       const group=await client.request('rooms/create',{name,people});createGroup.reset();delete client.session.nextAction;client.save();openGroups.add(group.id);if(client.state.rooms.length>=5)allGroups=true;notice.textContent=`„${name}“ erstellt.`
@@ -497,14 +546,14 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const contacts=collection('Kontakte',client.state.contacts || [],allContacts,()=>{allContacts=!allContacts},contactCard,'Lade eine Person ein. Nach ihrer Bestätigung kannst du sie hier anrufen.')
     if(client.state.contacts.length)contacts.insertBefore(element('p','Anrufen und gemeinsam auf den Bildschirm schauen.','fr-muted'),contacts.children[1])
     else contacts.classList.add('fr-empty-contacts')
-    for(const pending of client.state.invitations || [])contacts.append(element('p',`${pending.email} · Einladung offen`,'fr-muted'))
+    for(const pending of client.state.invitations || [])contacts.append(element('p',`${pending.email} · eingeladen, wartet auf Bestätigung`,'fr-muted'))
     content.append(contacts)
     if(client.state.rooms.length)content.append(collection('Gruppen',client.state.rooms,allGroups,()=>{allGroups=!allGroups},groupCard,''))
     if(!client.state.contacts.length && !client.state.rooms.length)return
     if (platform==='browser') {
-      content.append(element('p','Zum Bildschirmteilen benötigst du PeekaView Desktop oder die Android-App (kostenlos).','fr-muted'))
-      if ('serviceWorker' in navigator && 'PushManager' in window && (!client.session.pushEnabled || Notification.permission!=='granted')) content.append(button('Auch bei geschlossener Seite erreichbar sein',enablePush))
-    } else if (platform==='android') content.append(button('Anrufe im Hintergrund empfangen',()=> (window.PeekaViewHost||window.PeekaViewApp).enableRoomCalls()))
+      if ('serviceWorker' in navigator && 'PushManager' in window && (!client.session.pushEnabled || Notification.permission!=='granted')) content.append(button('Anrufe auch bei geschlossener Seite erhalten',enablePush,'fr-push'))
+      content.append(downloadCard())
+    } else if (platform==='android') content.append(button('Anrufe auch bei geschlossener App erhalten',()=> (window.PeekaViewHost||window.PeekaViewApp).enableRoomCalls()))
   }
   async function loadInvitation() {
     const api=apiURL(invitationApi || client.session.api)
@@ -536,13 +585,13 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       content.replaceChildren()
       const call=element('section',undefined,'fr-call')
       const bar=element('header',undefined,'fr-call-bar')
-      bar.append(element('strong',active.name),button('Mikrofon aus',async()=>{
+      bar.append(element('strong',active.name),button('Mikrofon einschalten',async()=>{
         if (voice.on) voice.stop(); else await voice.start()
       },'fr-mic'),button('Auflegen',leave,'fr-leave'))
       if (platform!=='browser') bar.append(button('Bildschirm teilen',()=>shareCall(active.id)))
       call.append(bar,element('div',undefined,'fr-admissions'),element('div',undefined,'fr-call-invite'),element('p','','fr-call-people'),element('div',undefined,'fr-streams'))
       content.append(call)
-      if (platform==='browser') content.append(element('p','Zum Bildschirmteilen benötigst du PeekaView Desktop oder die Android-App (kostenlos).','fr-muted'))
+      if (platform==='browser') content.append(downloadCard())
     }
     const admissions=content.querySelector('.fr-admissions')
     const requests=active.requests || []
@@ -551,7 +600,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       admissions.dataset.requests=requestsKey;admissions.replaceChildren()
       for(const person of requests){
         const row=element('section',undefined,'fr-ring')
-        row.append(element('strong',person.person_name),element('span','Zu diesem Gespräch zulassen?'),
+        row.append(element('strong',`${person.person_name} möchte zum Gespräch dazukommen`),
           button('Ablehnen',()=>client.request('calls/admit',{call:active.id,device:person.id,allow:false})),
           button('Zulassen',()=>client.request('calls/admit',{call:active.id,device:person.id,allow:true}),'fr-primary'))
         const device=element('details');device.append(element('summary',person.email),element('small',person.name));row.append(device)
@@ -578,7 +627,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     }
     if (!wanted.size) {
       let wait=streams.querySelector('.fr-wait');if(!wait){wait=element('p','','fr-wait');streams.append(wait)}
-      wait.textContent=active.participants.length<2?'Warte auf weitere Teilnehmende …':'Verbunden. Noch keine Bildschirmfreigabe.'
+      wait.textContent=active.participants.length<2?'Warte, bis die anderen dazukommen …':platform==='browser'?'Ihr seid verbunden. Noch zeigt niemand seinen Bildschirm.':'Ihr seid verbunden. Zum Zeigen oben auf „Bildschirm teilen“ klicken.'
     } else streams.querySelector('.fr-wait')?.remove()
     renderMicrophone()
     if (voice) {
@@ -588,7 +637,8 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   function renderMicrophone(){
     const b=content.querySelector('.fr-mic');if(!b)return
-    b.innerHTML=icon(voice?.on?'mic':'micOff',16)+(voice?.on?'Mikrofon an':'Mikrofon aus')
+    b.innerHTML=icon(voice?.on?'mic':'micOff',16)+(voice?.on?'Mikrofon ausschalten':'Mikrofon einschalten')
+    b.classList.toggle('fr-live',!!voice?.on)
     b.disabled=!voice || voice.starting
     b.setAttribute('aria-label',voice?.on?'Mikrofon ausschalten':'Mikrofon einschalten')
     b.setAttribute('aria-pressed',String(!!voice?.on))
@@ -665,7 +715,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     } finally { polling=false }
   }
   const focus=()=>refresh().catch(fail)
-  const changed=()=>{ client.session=JSON.parse(client.storage.getItem(KEY)||'{}');if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
+  const changed=()=>{ client.session=readSession(client.storage);if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
   const dismissProfile=e=>{
     const profile=profileHost.querySelector('.fr-profile')
     if(!profile?.open)return

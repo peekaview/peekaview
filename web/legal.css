@@ -1,0 +1,35 @@
+/* Impressum, Datenschutz, Sicherheit: as pages of their own (body.legal-page) and inside the
+   footer's dialog on the other pages (legal.js) – the text itself is styled by .pv-legal. */
+body.legal-page { margin: 0; background: #09090b; color: #fafafa; -webkit-font-smoothing: antialiased; }
+body.legal-page main { box-sizing: border-box; width: min(720px, calc(100% - 32px)); margin: 6vh auto 0; }
+.pv-legal { color: #fafafa; font: 500 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.pv-legal .back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 26px; color: #fafafa; font-size: 15px; font-weight: 650; text-decoration: none; }
+.pv-legal .back:hover { color: #fca5a5; }
+.pv-legal h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; letter-spacing: -.02em; }
+.pv-legal .lead { margin: 0 0 28px; color: #a1a1aa; font-size: 16px; }
+.pv-legal h2 { margin: 34px 0 10px; font-size: 19px; letter-spacing: -.01em; }
+.pv-legal h3 { margin: 22px 0 6px; font-size: 15px; }
+.pv-legal p, .pv-legal li { color: #d4d4d8; }
+.pv-legal p { margin: 0 0 12px; }
+.pv-legal ul { margin: 0 0 12px; padding-left: 20px; }
+.pv-legal li { margin: 6px 0; }
+.pv-legal a { color: #fafafa; text-underline-offset: 3px; }
+.pv-legal address { font-style: normal; color: #d4d4d8; }
+.pv-legal strong { color: #fafafa; }
+.pv-legal .card { margin: 0 0 14px; padding: 16px 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: #18181b; }
+.pv-legal .card h2, .pv-legal .card h3 { margin-top: 0; }
+.pv-legal .card p:last-child, .pv-legal .card ul:last-child { margin-bottom: 0; }
+.pv-legal .updated { margin-top: 30px; color: #71717a; font-size: 13px; }
+
+/* the dialog */
+.pv-legal-dialog { box-sizing: border-box; width: min(760px, calc(100% - 24px)); max-height: min(88vh, 100%); padding: 0; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: #09090b; color: #fafafa; box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.pv-legal-dialog::backdrop { background: rgba(0,0,0,.65); backdrop-filter: blur(3px); }
+.pv-legal-dialog[open] { display: flex; flex-direction: column; animation: pv-legal-in .18s ease-out; }
+@keyframes pv-legal-in { from { opacity: 0; transform: translateY(8px); } }
+.pv-legal-bar { flex: none; display: flex; justify-content: flex-end; padding: 10px 10px 0; }
+.pv-legal-close { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 1px solid #3f3f46; border-radius: 50%; background: #27272a; color: #fafafa; cursor: pointer; }
+.pv-legal-close:hover { background: #3f3f46; }
+.pv-legal-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
+.pv-legal-dialog .pv-legal { overflow-y: auto; padding: 4px 26px 26px; }
+.pv-legal-dialog .pv-legal h1 { font-size: 26px; }
+@media (max-width: 520px) { .pv-legal-dialog .pv-legal { padding: 0 16px 20px; } }

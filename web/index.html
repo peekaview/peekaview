@@ -5,25 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PeekaView</title>
   <link rel="stylesheet" href="fixed-rooms.css">
+  <link rel="stylesheet" href="legal.css">
   <style>
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     [hidden] { display: none !important; }
     body { font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
     #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
-    #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 40px; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     .brand i { display: flex; color: #fafafa; }
     .lead { margin: -8px 0 0; color: #a1a1aa; }
+    .title { margin: 4px 0 0; font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -.015em; }
+    #start .title + .lead { margin-top: -10px; font-size: 15px; }
+    #name-note { margin: 6px 0 0; color: #71717a; font-size: 12px; }
+    #name-error { margin: 6px 0 0; color: #fca5a5; font-size: 13px; font-weight: 600; }
+    #start input.invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.2); }
+    #start #name-label { color: #fafafa; font-size: 14px; font-weight: 600; }
+    #start #name { padding: 13px 14px; font-size: 16px; }
+    #start #paste-link > label { color: #fafafa; font-size: 14px; font-weight: 600; }
+    #share-url { padding: 13px 14px !important; font-size: 15px !important; }
+    #paste-open.quiet { background:#3f3f46; }
+    .other-link { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .other-link:hover { color: #fafafa; }
     #start { display:flex;flex-direction:column;gap:18px;margin:0; }
     .home-nav { display:flex;gap:6px;padding:4px;border-radius:12px;background:#09090b; }
     .home-nav button { flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 8px;border:0;border-radius:9px;background:transparent;color:#a1a1aa;font:600 13px system-ui;cursor:pointer; }
     .home-nav button[aria-pressed="true"] { background:#3f3f46;color:#fafafa; }
     .home-nav button:focus-visible, #paste-open:focus-visible { outline:2px solid #fafafa;outline-offset:3px; }
-    #paste-link summary { color:#a1a1aa;font-size:12px;cursor:pointer; }
-    #paste-link[open] summary { margin-bottom:12px; }
     .paste-row { display:flex;align-items:center;gap:8px;margin-top:7px; }
     #start .paste-row input { flex:1;min-width:0;margin:0; }
-    #paste-open { padding:11px 14px;border:0;border-radius:9px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
+    #paste-open { padding:14px 18px;border:0;border-radius:10px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
     #link-error { margin:8px 0 0;color:#fca5a5;font-size:12px; }
     #recent-links { display:flex;flex-direction:column;gap:10px; }
     #start label { display: block; color: #a1a1aa; font-size: 12px; }
@@ -57,17 +68,18 @@
     .room:hover em { visibility: hidden; }
     .room .forget:hover { background: rgba(255,255,255,.1); color: #fafafa; }
     .empty { margin: 0; padding: 14px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.12); color: #71717a; text-align: center; font-size: 13px; }
-    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: center; width: min(320px, 100%); height: 54px; margin-top: 4px; border: 0; border-radius: 16px; background: #ef4444; color: #fff; font: 700 17px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); transition: background .15s, transform .1s, opacity .15s; }
+    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: stretch; height: 52px; margin-top: 4px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); transition: background .15s, transform .1s, opacity .15s; }
     .connect:hover:not(:disabled) { background: #dc2626; }
     .connect:active:not(:disabled) { transform: scale(.98); }
     .connect:disabled { opacity: .35; cursor: default; box-shadow: none; }
-    .connect-hint { margin: -10px 0 0; text-align: center; color: #71717a; font-size: 12px; }
+    .connect-hint { margin: -10px 0 0; text-align: center; color: #a1a1aa; font-size: 13px; }
+    .connect-hint:empty { display: none; }
     .share-phone { align-self: center; height: 40px; padding: 0 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: #09090b; color: #fafafa; font: 600 14px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
     .opened { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 28vh auto 0; padding: 0 24px; text-align: center; color: #fafafa; }
     .opened i { display: flex; color: #71717a; }
     .opened p { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.5; }
-    .opened button { padding: 2px 6px; border: 0; background: none; color: #71717a; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-    .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .opened button { padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app:hover { color: #fafafa; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -80,30 +92,37 @@
       <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
     </nav>
   <form id="start">
-    <p class="lead" id="lead" hidden></p>
-    <details id="paste-link" open>
-      <summary>Freigabelink öffnen</summary>
-      <label>Freigabelink
+    <h1 class="title" id="title">Bildschirm ansehen</h1>
+    <p class="lead" id="lead">Du hast einen Link bekommen? Füge ihn hier ein.</p>
+    <div id="paste-link">
+      <label>Link einfügen
         <span class="paste-row"><input id="share-url" type="text" inputmode="url" autocomplete="off" placeholder="https://peekaview.de/#…"><button id="paste-open" type="button">Öffnen</button></span>
       </label>
       <p id="link-error" role="alert" hidden></p>
-    </details>
-    <label id="name-label" hidden>Dein Name <input id="name" maxlength="32" autocomplete="name"></label>
+    </div>
+    <div id="name-box" hidden>
+      <label id="name-label" for="name">Wie heißt du?</label>
+      <input id="name" maxlength="32" autocomplete="name" placeholder="z. B. Anna" aria-describedby="name-note name-error">
+      <p id="name-error" role="alert" hidden>Bitte gib zuerst deinen Namen ein.</p>
+      <p id="name-note">Diesen Namen sieht die teilende Person.</p>
+    </div>
     <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span><span id="count"></span></div>
     <ul class="rooms" id="rooms"></ul></div>
     <button class="connect" id="connect" hidden disabled>Freigabe ansehen</button>
     <button class="share-phone" id="share-phone" type="button" hidden>Bildschirm dieses Geräts teilen</button>
     <p class="connect-hint" id="hint"></p>
     <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
+    <button class="other-link" id="other-link" type="button" hidden>Einen anderen Link öffnen</button>
   </form>
   <section id="fixed-room-entry" hidden><div id="fixed-rooms"></div></section>
-    <p id="host-note" class="lead">Zum Bildschirmteilen PeekaView Desktop oder die Android-App öffnen.</p>
+    <div id="host-note"></div>
   </main>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
     <button id="open-web" type="button">Doch hier im Browser ansehen</button>
   </div>
+  <footer class="pv-footer" id="footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
   <div id="viewer" hidden></div>
 
   <script type="module">
@@ -112,11 +131,13 @@
     // it is online right now – asked over the room's encrypted signaling ("ping"), which creates
     // no join request.
     import { mountViewer } from './viewer.js'
-    import { mountRooms, openRoom } from './fixed-rooms.js'
+    import { downloadCard, mountRooms, openRoom } from './fixed-rooms.js'
     import { icon, owl } from './icons.js'
+    import './legal.js'
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
+    $('host-note').append(downloadCard())
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
       const notice = document.createElement('button')
       notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`
@@ -150,12 +171,15 @@
     if (typeof window.__PV_JOIN__ === 'string') history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
     let linkRoom = decodeURIComponent(location.hash.slice(1))
     let homeView=linkRoom ? 'link' : (()=>{try{return localStorage.getItem('pv-start-view')==='contacts'?'contacts':'link'}catch{return 'link'}})()
-    let renderedSelection
     function showHome(){
       $('home').hidden=!!viewer || !$('opened').hidden
+      // not inside the apps, not over a running share
+      $('footer').hidden=inApp || !!viewer
+      // someone who came with a link has exactly one thing to do: enter a name and join
+      document.querySelector('.home-nav').hidden=!!linkRoom
       $('start').hidden=homeView!=='link'
       $('fixed-room-entry').hidden=homeView!=='contacts'
-      $('host-note').hidden=inApp || homeView==='contacts'
+      $('host-note').hidden=inApp || homeView==='contacts' || !!linkRoom
       for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
     }
     for(const button of document.querySelectorAll('[data-home]')){
@@ -184,11 +208,21 @@
       }
     }
     $('paste-open').addEventListener('click',openPastedLink)
+    // a pasted link opens right away – no need to find the button
+    $('share-url').addEventListener('paste',()=>setTimeout(()=>{if(/^\s*https?:/i.test($('share-url').value))openPastedLink()}))
+    $('other-link').addEventListener('click',()=>{location.hash=''})
     $('share-url').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();openPastedLink()}})
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
     // remembered as typed
-    $('name').addEventListener('input', () => { try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {} })
+    $('name').addEventListener('input', () => {
+      try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
+      showNameError(false)
+    })
+    function showNameError(show) {
+      $('name-error').hidden = !show
+      $('name').classList.toggle('invalid', show)
+    }
 
     // rooms on the page: the link's room first, then the remembered ones
     const status = new Map() // room -> {online, checking, who, room, permanent, name}
@@ -218,13 +252,12 @@
     function render() {
       showHome()
       const list = rooms()
-      $('name-label').hidden=!selected
-      $('name').required=!!selected
+      $('name-box').hidden=!selected
       $('connect').hidden=!selected
-      $('lead').hidden=!selected
-      $('paste-link').querySelector('summary').hidden=!selected
-      $('recent-links').hidden=!list.length || (list.length===1 && !!linkRoom)
-      if(renderedSelection!==selected){$('paste-link').open=!selected;renderedSelection=selected}
+      $('paste-link').hidden=!!linkRoom
+      $('paste-open').classList.toggle('quiet',!!selected)
+      $('other-link').hidden=!linkRoom
+      $('recent-links').hidden=!list.length || !!linkRoom
       $('count').textContent = load().length ? `${load().length} gemerkt` : ''
       if (!list.length) {
         $('rooms').innerHTML = '<li class="empty">Öffne den Link, den du von der teilenden Person bekommen hast.</li>'
@@ -244,10 +277,10 @@
             const pin = st.pin ?? r.pin
             const remote = st.remote ?? r.remote
             const tag = (cls, html, title) => strong.lastChild.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
-            if (permanent === true) tag('permanent', 'dauerhaft', 'Dauerhafter Raumlink – bleibt immer gleich')
-            else if (permanent === false) tag('', 'temporär', 'Link nur für diese eine Freigabe')
+            if (permanent === true) tag('permanent', 'fester Raum', 'Fester Raum – der Link bleibt immer gleich')
+            else if (permanent === false) tag('', 'einmalig', 'Link nur für diese eine Freigabe')
             if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')
-            if (remote) tag('remote', 'Remote', 'Remote-Zugriff: Anwendungen selbst starten')
+            if (remote) tag('remote', 'Fernzugriff', 'Fernzugriff: Programme selbst starten')
             const who = st.who ?? r.who
             const last = r.link ? 'neu' : `Zuletzt: ${ago(r.last)}`
             li.querySelector('.sub').textContent = [who, last].filter(Boolean).join(' · ')
@@ -272,19 +305,24 @@
         )
       }
       const st = status.get(selected)
-      $('lead').textContent=st?.who?`Freigabe von ${st.who}. Keine Anmeldung nötig.`:'Als Gast teilnehmen. Keine Anmeldung nötig.'
+      $('title').textContent = linkRoom ? (st?.who ? `${st.who} möchte dir den Bildschirm zeigen` : 'Du bist zu einer Bildschirmfreigabe eingeladen') : 'Bildschirm ansehen'
+      $('lead').textContent = linkRoom
+        ? 'Gib deinen Namen ein und klicke auf „Freigabe ansehen“. Keine Anmeldung, nichts zu installieren.'
+        : selected
+          ? 'Wähle unten einen Raum – oder füge einen neuen Link ein.'
+          : 'Du hast einen Link bekommen? Füge ihn hier ein.'
       $('connect').disabled = !selected
       $('hint').textContent = !selected
         ? ''
         : openedInApp && selected === linkRoom
           ? 'In der PeekaView-App geöffnet – oder hier im Browser verbinden.'
         : gaveUp === selected && !st?.online
-          ? 'Keine Verbindung zustande gekommen – ist die Freigabe noch aktiv?'
+          ? 'Es kam keine Verbindung zustande. Bitte die teilende Person, die Freigabe zu starten, und versuche es dann noch einmal.'
           : st?.checking
             ? 'Prüfe, ob der Raum online ist …'
             : st?.online
               ? ''
-              : 'Gerade offline – Verbinden wartet bis zu 30 Sekunden.'
+              : 'Die teilende Person ist gerade nicht online. Nach dem Klick wartet PeekaView bis zu 30 Sekunden.'
     }
 
     // ---------------------------------------------------------------- online check
@@ -356,7 +394,10 @@
       const room = selected
       if (!room) return
       const name = $('name').value.trim()
-      if (!name) return $('name').focus()
+      if (!name) {
+        showNameError(true)
+        return $('name').focus()
+      }
       try { localStorage.setItem('pv-name', name) } catch {}
       // remember permanent rooms (the newest first)
       const st = status.get(room)
@@ -371,6 +412,7 @@
       if (!st) probe(room)
       if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
       $('home').hidden = true
+      $('footer').hidden = true
       $('viewer').hidden = false
       gaveUp = null
       viewer = mountViewer($('viewer'), {
@@ -417,7 +459,10 @@
       linkRoom = selected = room
       if (viewer) leave()
       if ($('name').value.trim()) connect()
-      else render()
+      else {
+        render()
+        $('name').focus()
+      }
     })
 
     $('start').addEventListener('submit', (e) => {
@@ -447,8 +492,8 @@
         clearTimeout(probeTimer)
         $('home').hidden = true
         $('opened-text').textContent = /Android/i.test(navigator.userAgent)
-          ? 'In der PeekaView-App geöffnet. Sie können dieses Fenster schließen.'
-          : 'Mit PeekaView Desktop geöffnet. Sie können dieses Fenster schließen.'
+          ? 'In der PeekaView-App geöffnet. Du kannst dieses Fenster schließen.'
+          : 'In PeekaView Desktop geöffnet. Du kannst dieses Fenster schließen.'
         $('opened').hidden = false
       }
       window.addEventListener('blur', onBlur, { once: true })
@@ -473,6 +518,7 @@
       probeAll()
     })
     $('open-app').hidden = inApp || !linkRoom
+    $('open-app').textContent = /Android/i.test(navigator.userAgent) ? 'In der PeekaView-App öffnen' : 'In PeekaView Desktop öffnen'
     // the Android app shares the phone's screen
     $('share-phone').hidden = !window.PeekaViewApp
     $('share-phone').addEventListener('click', () => window.PeekaViewApp?.share())
@@ -483,6 +529,7 @@
     if (linkRoom && (params.has('name') || (inApp && $('name').value.trim()))) connect()
     else {
       probeAll()
+      if (linkRoom && !$('name').value) $('name').focus()
       if (linkRoom && !inApp) openInApp(linkRoom, false)
     }
   </script>

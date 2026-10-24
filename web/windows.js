@@ -74,7 +74,7 @@ export class WindowManager {
   /**
    * @param {HTMLElement} stage
    * @param {{voice?: boolean, onChange?: () => void, onFrame?: () => void, topSpace?: () => number,
-   *          canResize?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void,
+   *          canResize?: () => boolean, canActivate?: () => boolean, onResize?: (slot: number, pw: number, ph: number) => void,
    *          onActivate?: (slot: number) => void, onArrange?: (slot: number, x: number, y: number) => void,
    *          onPlace?: (slot: number, frame: {x?: number, y?: number, hw?: number, hh?: number}) => void}} options
    *   onPlace: mirror mode – the presenter's window gets this frame (their screen coordinates)
@@ -166,11 +166,12 @@ export class WindowManager {
       // Annotation coordinates only make sense while the host's whole window is in front.
       const covered = !info.paused && (info.front === false || info.reachable === false)
       win.el.classList.toggle('covered', covered)
-      win.el.querySelector('.pv-win-flag').textContent = covered ? 'Beim Host im Hintergrund' : ''
+      win.el.querySelector('.pv-win-flag').textContent = covered ? 'Im Hintergrund' : ''
+      win.el.querySelector('.pv-win-bar').title = covered && this.options.canActivate?.() ? 'Bei der teilenden Person in den Vordergrund holen' : ''
       if (!this.canAnnotate(win)) win.ann.reset()
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
-      paused.textContent = 'Fenster ist beim Host gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
+      paused.textContent = 'Das Fenster ist bei der teilenden Person gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
       // a phone screen with remote control: soft buttons below it
       const nav = !!info.nav && control
       win.el.querySelector('.pv-nav').hidden = !nav
@@ -240,11 +241,18 @@ export class WindowManager {
       (e) => {
         this.focus(slot)
         const start = { x: e.clientX, y: e.clientY }
+        const titleBar = !!e.target.closest('.pv-win-bar')
+        const activate = e.button === 0 && !e.target.closest('button, .pv-grab')
         const up = (ev) => {
+          if (ev.pointerId !== e.pointerId) return
           window.removeEventListener('pointerup', up, true)
-          if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) this.activate(win)
+          window.removeEventListener('pointercancel', up, true)
+          if (ev.type === 'pointerup' && activate && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) {
+            this.activate(win, titleBar ? !!this.options.canActivate?.() : !!this.options.canResize?.())
+          }
         }
         window.addEventListener('pointerup', up, true)
+        window.addEventListener('pointercancel', up, true)
       },
       true,
     )
@@ -360,7 +368,7 @@ export class WindowManager {
         el.style.top = `${oy + (r.y - D.y) * k}px`
         el.style.width = `${r.w * k}px`
         el.style.height = `${r.h * k}px`
-        el.innerHTML = `<span>${this.screens.length > 1 ? `Bildschirm ${i + 1} des Hosts` : 'Bildschirm des Hosts'}</span>`
+        el.innerHTML = `<span>${this.screens.length > 1 ? `Bildschirm ${i + 1} der teilenden Person` : 'Bildschirm der teilenden Person'}</span>`
         return el
       }),
     )
@@ -497,8 +505,8 @@ export class WindowManager {
   // ------------------------------------------------------------ window actions
 
   /** With "Resize/Anordnen erlauben" the window the viewer picked comes to the front at the presenter's, too. */
-  activate(win) {
-    if (!win || !this.options.canResize?.() || Date.now() - (win.activated ?? 0) < 800) return
+  activate(win, allowed = this.options.canResize?.()) {
+    if (!win || !allowed || Date.now() - (win.activated ?? 0) < 800) return
     win.activated = this.activatedAt = Date.now()
     this.options.onActivate?.(win.slot)
   }
@@ -638,7 +646,7 @@ export class WindowManager {
       ghost.style.height = `${Math.round(remote ? target.h + BAR : win.el.offsetHeight)}px`
       const label = ghost.querySelector('span')
       if (remote) {
-        label.innerHTML = '<b></b><small>neue Fenstergröße beim Host</small>'
+        label.innerHTML = '<b></b><small>neue Fenstergröße bei der teilenden Person</small>'
         const k = this.mirror ? (this.map ?? this.mirrorMap()).k : 1 / d
         label.querySelector('b').textContent = `${Math.round(target.w / k)} × ${Math.round(target.h / k)}`
       } else {

@@ -6,13 +6,16 @@
   <meta name="referrer" content="no-referrer">
   <title>Kontakte – PeekaView</title>
   <link rel="stylesheet" href="fixed-rooms.css">
+  <link rel="stylesheet" href="legal.css">
   <link rel="manifest" href="rooms.webmanifest">
   <link rel="apple-touch-icon" href="room-icon.png">
-  <style>body{margin:0;padding:22px;background:#09090b;color:#fafafa;font-family:system-ui}main{max-width:1500px;margin:auto}h1{font-size:20px;margin:0 0 20px}</style>
+  <style>body{margin:0;padding:22px;background:#09090b;color:#fafafa;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1500px;margin:auto}h1{font-size:22px;margin:0 0 20px;letter-spacing:-.015em}</style>
 </head>
 <body><main><header class="fr-page-head"><h1>Kontakte</h1><div id="profile" hidden></div></header><div id="fixed-rooms"></div></main>
+<footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
 <script type="module">
   import { mountRooms } from './fixed-rooms.js'
+  import './legal.js'
   const p = new URLSearchParams(location.hash.slice(1))
   mountRooms(document.getElementById('fixed-rooms'),{profileRoot:document.getElementById('profile'),callId:p.get('call')||'',invitation:p.get('invite')||'',invitationApi:p.get('api')||'',handoff:p.get('handoff')||''})
   // Opening another email link in this tab changes only the fragment.

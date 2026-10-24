@@ -1,20 +1,23 @@
-.fixed-rooms { font: 500 13px/1.45 system-ui, sans-serif; color: #fafafa; min-width: 0; }
+.fixed-rooms { font: 500 13px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #fafafa; min-width: 0; -webkit-font-smoothing: antialiased; }
 .fixed-rooms * { box-sizing: border-box; }
 .fixed-rooms [hidden] { display: none !important; }
 .fr-content { display: flex; flex-direction: column; gap: 14px; }
 .fixed-rooms p, .fixed-rooms h3 { margin: 0; }
-.fixed-rooms button, .fixed-rooms input, .fixed-rooms select { font: inherit; color: inherit; border: 1px solid #3f3f46; border-radius: 9px; padding: 9px 12px; background: #27272a; }
+.fixed-rooms button, .fixed-rooms input, .fixed-rooms select { font: inherit; color: inherit; border: 1px solid #3f3f46; border-radius: 10px; padding: 9px 12px; background: #27272a; }
 .fixed-rooms button, .fixed-rooms summary { cursor: pointer; }
 .fixed-rooms button:hover { background: #3f3f46; }
 .fixed-rooms button:disabled { opacity: .5; cursor: default; }
-.fixed-rooms button:focus-visible, .fixed-rooms input:focus-visible, .fixed-rooms summary:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
+.fixed-rooms button:focus-visible, .fixed-rooms summary:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
 .fixed-rooms label, .fixed-rooms form { display: flex; flex-direction: column; gap: 7px; }
 .fixed-rooms label { font-size: 12px; color: #a1a1aa; }
 .fixed-rooms form { gap: 10px; }
-.fixed-rooms input { width: 100%; min-width: 0; background: #09090b; }
+.fixed-rooms input { width: 100%; min-width: 0; background: #09090b; border-color: rgba(255,255,255,.1); transition: border-color .15s; }
+.fixed-rooms input:focus { border-color: #ef4444; outline: none; }
 .fixed-rooms details > :not(summary) { margin-top: 10px; }
 .fr-call-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.fr-call-bar > strong { flex: 1; }
+.fr-call-bar > strong { flex: 1; font-size: 16px; }
+.fixed-rooms .fr-leave { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.14); color: #fca5a5; font-weight: 650; }
+.fixed-rooms .fr-leave:hover { background: rgba(239,68,68,.25); }
 .fr-profile-slot { display:flex;align-items:center;justify-content:flex-end;margin-left:auto; }
 .fr-profile-slot[hidden] { display:none; }
 .fr-profile-bar { margin-bottom:14px; }
@@ -52,13 +55,48 @@
 .fr-avatar { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 11px; font-weight: 750; }
 .fr-person-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .fr-person-text strong, .fr-person-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fr-person-text strong { font-size: 12px; font-weight: 650; }
-.fr-person-text small { color: #a1a1aa; font-size: 11px; }
+.fr-person-text strong { font-size: 14px; font-weight: 650; }
+.fr-person-text small { color: #a1a1aa; font-size: 12px; }
 .fr-call-action { flex:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:6px 9px;border:1px solid #166534;border-radius:8px;background:#052e16;color:#bbf7d0;font-size:11px;font-weight:650; }
 .fr-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 42%; }
 .fr-badge { flex: none; padding: 2px 6px; border-radius: 5px; background: #27272a; color: #a1a1aa; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .fr-badge-live { background: #14532d; color: #bbf7d0; }
-.fixed-rooms .fr-group-toggle { flex: none; display: grid; place-items: center; padding: 6px; border: 0; background: transparent; color: #a1a1aa; }
+.fixed-rooms .fr-group-toggle { flex: none; display: grid; place-items: center; min-width: 58px; padding: 6px 8px; border: 1px solid #3f3f46; background: transparent; color: #d4d4d8; font-size: 12px; font-weight: 600; }
+.fixed-rooms .fr-group-toggle[aria-expanded="true"] { background: #27272a; }
+.fixed-rooms h4 { margin: 0 0 4px; color: #fafafa; font-size: 12px; font-weight: 700; }
+.fixed-rooms h2, .fixed-rooms .fr-content > h3 { margin: 0; font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -.015em; text-transform: none; }
+.fr-intro { display: flex; flex-direction: column; gap: 6px; }
+.fr-intro .fr-muted { font-size: 15px; line-height: 1.45; }
+/* the big action buttons look like "Freigabe ansehen" on the start page */
+.fixed-rooms .fr-big, .fixed-rooms .fr-content > form > .fr-primary { min-height: 52px; padding: 0 18px; border-radius: 14px; font-size: 16px; font-weight: 700; }
+.fixed-rooms .fr-primary.fr-big, .fixed-rooms .fr-content > form > .fr-primary { box-shadow: 0 10px 30px rgba(239,68,68,.35); }
+.fixed-rooms .fr-content > form label, .fixed-rooms .fr-create form > label { color: #fafafa; font-size: 13px; font-weight: 600; }
+.fixed-rooms .fr-content > form input { padding: 12px 13px; font-size: 15px; }
+.fr-steps { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; color: #71717a; font-size: 12px; font-weight: 600; }
+.fr-steps li { display: flex; align-items: center; gap: 6px; }
+.fr-steps b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid #3f3f46; font-size: 11px; }
+.fr-steps li.now { color: #fafafa; }
+.fr-steps li.now b { border-color: #ef4444; background: #ef4444; color: #fff; }
+.fr-steps li.done { color: #86efac; }
+.fr-steps li.done b { border-color: #166534; background: #052e16; }
+/* PeekaView Desktop download: a card of its own, not a footnote */
+.pv-download { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: #09090b; color: #fafafa; text-decoration: none; font: 500 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; transition: border-color .15s, background .15s; }
+.pv-download:hover { border-color: rgba(255,255,255,.25); background: #18181b; }
+.pv-download:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
+.pv-download-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(239,68,68,.14); color: #fca5a5; }
+.pv-download-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pv-download-text strong { font-size: 15px; font-weight: 650; }
+.pv-download-text small { color: #a1a1aa; font-size: 13px; }
+.pv-download-action { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border-radius: 12px; background: #3f3f46; font-size: 14px; font-weight: 650; }
+.pv-download:hover .pv-download-action { background: #52525b; }
+/* footer of the public pages: Impressum, Datenschutz, Sicherheit */
+.pv-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin: 36px auto 0; padding: 0 16px 32px; font: 500 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.pv-footer a { padding: 6px 2px; color: #a1a1aa; text-decoration: none; }
+.pv-footer a:hover, .pv-footer a[aria-current="page"] { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+.fr-device-choice a { color: #fafafa; font-weight: 600; text-underline-offset: 3px; }
+.fr-or { text-align: center; }
+.fixed-rooms .fr-push { align-self: flex-start; }
+.fixed-rooms .fr-mic.fr-live { border-color: #166534; background: #052e16; color: #bbf7d0; }
 .fr-group-details { padding: 10px; border-top: 1px solid #27272a; }
 .fr-group-details > :not(:first-child) { margin-top: 12px; }
 .fr-person > .fr-person-details { padding: 10px; border-top: 1px solid #27272a; }
@@ -81,11 +119,11 @@
 .fr-access-group { display: flex; flex-direction: column; gap: 7px; }
 .fr-access-group > strong { color: #a1a1aa; font-size: 11px; }
 .fr-dialog-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-.fr-pin-dialog { width: min(360px,calc(100% - 32px)); padding: 20px; border: 1px solid #3f3f46; border-radius: 14px; background: #18181b; color: #fafafa; font: 13px system-ui; }
+.fr-pin-dialog { width: min(360px,calc(100% - 32px)); padding: 20px; border: 1px solid #3f3f46; border-radius: 14px; background: #18181b; color: #fafafa; font: 500 13px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .fr-pin-dialog::backdrop { background: #0009; }
 .fr-pin-dialog form, .fr-pin-dialog label { display: flex; flex-direction: column; gap: 10px; }
 .fr-pin-dialog input, .fr-pin-dialog button { font: inherit; color: inherit; padding: 9px 12px; border: 1px solid #3f3f46; border-radius: 8px; background: #27272a; }
-.fr-pin-dialog .fr-primary { background: #b91c1c; border-color: #b91c1c; }
+.fr-pin-dialog .fr-primary { background: #ef4444; border-color: #ef4444; color: #fff; font-weight: 650; }
 .fixed-rooms .fr-expand { align-self: flex-start; padding: 5px 0; border: 0; background: transparent; color: #a1a1aa; }
 .fr-ring { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border-color: #ef4444; }
 .fr-ring strong { flex-basis: 100%; }
@@ -93,7 +131,8 @@
 .fr-ring strong { overflow-wrap: anywhere; }
 .fr-admissions, .fr-member-editor { display: flex; flex-direction: column; gap: 10px; }
 .fr-admissions:empty, .fr-call-invite:empty { display: none; }
-.fixed-rooms .fr-primary { background: #b91c1c; }
+.fixed-rooms .fr-primary { border-color: #ef4444; background: #ef4444; color: #fff; font-weight: 650; }
+.fixed-rooms .fr-primary:hover:not(:disabled) { border-color: #dc2626; background: #dc2626; }
 .fr-muted, .fr-call-people, .fr-wait { color: #a1a1aa; font-size: 12px; }
 .fr-error { color: #fca5a5; margin-top: 10px !important; white-space: pre-wrap; }
 .fr-error:empty { display: none; }
@@ -107,8 +146,8 @@
 .fr-stream h3 { margin: 0 0 6px; font-size: 13px; }
 .fr-viewer { position: relative; height: min(65vh,700px); min-height: 300px; overflow: hidden; border: 1px solid #3f3f46; border-radius: 10px; }
 
-.fixed-rooms .fr-text-button { align-self:flex-start;padding:5px 0;border:0;background:none;color:#a1a1aa; }
+.fixed-rooms .fr-text-button { align-self:flex-start;padding:5px 0;border:0;background:none;color:#a1a1aa;font-size:13px;text-decoration:underline;text-underline-offset:3px; }
+.fixed-rooms .fr-text-button:hover { background:none;color:#fafafa; }
 .fixed-rooms .fr-icon-button { display:grid;place-items:center;padding:8px;border:0;background:none;color:#a1a1aa; }
 .fr-advanced { color:#a1a1aa;font-size:11px; }
 .fr-device-choice { display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #3f3f46;border-radius:12px;background:#18181b; }
-.fr-device-choice a { color:#d4d4d8;text-underline-offset:3px; }
