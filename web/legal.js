@@ -37,7 +37,7 @@ function dialog() {
 }
 
 export function mountLegalLinks(root = document) {
-  for (const link of root.querySelectorAll('.pv-footer a')) {
+  for (const link of root.querySelectorAll('.pv-footer a, a[data-legal]')) {
     link.addEventListener('click', async (e) => {
       if (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
       e.preventDefault()

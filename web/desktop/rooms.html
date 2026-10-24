@@ -19,7 +19,7 @@
 
     <section id="rooms-page">
       <header class="page-head">
-        <p class="muted">Ein fester Raum hat einen Link, der immer gleich bleibt – z. B. für Kunden oder den eigenen Rechner. Wer beitreten will, wird von dir zugelassen.</p>
+        <p class="muted">Ein fester Raum hat einen Link, der immer gleich bleibt – z. B. für Kunden oder den eigenen Computer. Wer beitreten will, wird von dir zugelassen.</p>
         <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raum</button>
       </header>
       <div id="list" class="room-list"></div>
@@ -34,11 +34,11 @@
           <input id="own-name" maxlength="32" autocomplete="name">
         </label>
         <label class="set-row">
-          <span class="text"><b>Raumlink beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span>
+          <span class="text"><b>Letzten Link beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span>
           <input type="checkbox" class="switch" id="keep-link">
         </label>
         <label class="set-row">
-          <span class="text"><b>Resize/Anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span>
+          <span class="text"><b>Fenster anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span>
           <input type="checkbox" class="switch" id="allow-resize">
         </label>
       </div>
@@ -54,7 +54,7 @@
 
       <h3>Verbindung</h3>
       <div class="set-group">
-        <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Rechnern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
+        <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Computern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
         <label class="set-row stack">
           <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
           <textarea id="relays" rows="3" spellcheck="false"></textarea>
@@ -64,7 +64,7 @@
           <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
         </label>
         <label class="set-row">
-          <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Rechner.</small></span>
+          <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Computer.</small></span>
           <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
         </label>
       </div>
@@ -72,7 +72,7 @@
       <h3>Aufzeichnung &amp; Transkript</h3>
       <div class="set-group">
         <label class="set-row" id="local-stt-row">
-          <span class="text"><b>Lokale Spracherkennung</b><small>Die Spracherkennung von macOS – nichts verlässt den Rechner (empfohlen).</small></span>
+          <span class="text"><b>Lokale Spracherkennung</b><small>Die Spracherkennung von macOS – nichts verlässt den Computer (empfohlen).</small></span>
           <input type="checkbox" class="switch" id="local-stt" checked>
         </label>
         <label class="set-row">
@@ -170,7 +170,7 @@
           <span class="pin-edit"><input class="room-pin" type="password" inputmode="numeric" placeholder="mind. 4 Zeichen" autocomplete="new-password"><button class="pill secondary" data-pin>Setzen</button></span>
         </div>
         <label class="set-row">
-          <span class="text"><b>Remote-Zugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span>
+          <span class="text"><b>Fernzugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span>
           <input type="checkbox" class="switch" data-remote>
         </label>
         <div class="room-apps">
@@ -187,7 +187,7 @@
       q('.room-name').value = room.name
       q('.room-name').addEventListener('change', () => save(room, { name: q('.room-name').value }))
       q('.room-name').addEventListener('keydown', (e) => e.key === 'Enter' && e.target.blur())
-      q('.tags').innerHTML = (room.pin ? tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN') : '') + (room.remote ? tag('remote', 'Remote', 'Remote-Zugriff') : '')
+      q('.tags').innerHTML = (room.pin ? tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN') : '') + (room.remote ? tag('remote', 'Fernzugriff', 'Fernzugriff') : '')
       q('code').textContent = room.link
       q('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(room.link).then(() => toast('Link kopiert')).catch(fail))
       twice(q('[data-renew]'), 'Der bisherige Link funktioniert dann nicht mehr.', () => invoke('room_renew', { id: room.id }).catch(fail))

@@ -23,7 +23,7 @@ export function renderRequests(box, list) {
       if (r.room) {
         const label = row.querySelector('div span')
         label.textContent = 'möchte in „'
-        label.append(Object.assign(document.createElement('b'), { className: 'room', textContent: r.room }), '“ – Remote-Zugriff')
+        label.append(Object.assign(document.createElement('b'), { className: 'room', textContent: r.room }), '“ – Fernzugriff')
       }
       const who = row.querySelector('.who')
       who.textContent = initials(r.name || 'Gast')

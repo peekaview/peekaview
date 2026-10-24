@@ -29,12 +29,26 @@
   </section>
 
   <section class="card">
-    <h2>Verschlüsselt und direkt</h2>
+    <h2>Freigabe per Link: direkt und Ende-zu-Ende verschlüsselt</h2>
     <ul>
-      <li>Bild, Ton und Steuerung laufen <strong>direkt</strong> zwischen den Geräten (WebRTC) und sind <strong>Ende-zu-Ende verschlüsselt</strong>. Es gibt keinen PeekaView-Server, der deinen Bildschirm sieht.</li>
-      <li>Die Geräte finden sich über öffentliche Nostr-Relays. Diese Nachrichten sind mit AES-256 verschlüsselt. Die Relays sehen nur, <em>dass</em> verbunden wird – keine Namen, keine Inhalte.</li>
-      <li>Der Schlüssel des Raums steht im Link hinter dem „#“. Diesen Teil schickt der Browser nie an einen Server.</li>
-      <li>Nachrichten der teilenden Person sind digital signiert. Wer nur den Link kennt, kann sich nicht als teilende Person ausgeben.</li>
+      <li>Bild, Ton, Steuerung und die gemeinsame Zwischenablage laufen <strong>direkt</strong> zwischen den Geräten (WebRTC) und sind <strong>Ende-zu-Ende verschlüsselt</strong>. Auch wenn ein Relay-Server (TURN) aushelfen muss, reicht er nur verschlüsselte Daten weiter.</li>
+      <li>Der Schlüssel des Raums steht nur im Link, hinter dem „#“. Diesen Teil schickt der Browser nie an einen Server – kein Server kennt den Schlüssel.</li>
+      <li>Die Geräte finden sich über öffentliche Nostr-Relays. Diese Nachrichten sind mit AES-256 verschlüsselt. Die Relays sehen nur IP-Adressen und Zeitpunkte – keine Namen, keine Inhalte.</li>
+      <li>Jede Nachricht ist digital signiert. Wer nur den Link kennt, kann sich weder als teilende Person ausgeben noch als jemand, den du schon hereingelassen hast.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Anrufe über Kontakte</h2>
+    <p>Bild und Ton laufen auch hier direkt zwischen den Geräten und sind verschlüsselt. Die Schlüssel für den Verbindungsaufbau verteilt aber der Kontakte-Server. Wer ihn betreibt oder übernimmt, könnte sich deshalb theoretisch unbemerkt in ein Gespräch einklinken. Für sehr vertrauliche Inhalte nutze lieber eine Freigabe per Link.</p>
+  </section>
+
+  <section class="card">
+    <h2>Was du trotzdem wissen solltest</h2>
+    <ul>
+      <li><strong>Die Webseite:</strong> Wie bei jedem Dienst im Browser musst du der Seite vertrauen, die du öffnest. Prüfe, dass in der Adresszeile peekaview.de steht.</li>
+      <li><strong>Aufzeichnung:</strong> Die teilende Person kann eine Sitzung aufzeichnen – mit Bildschirmfotos und Mitschrift des Gesprächs. Ist dafür OpenAI eingerichtet, geht der Ton zur Spracherkennung dorthin.</li>
+      <li><strong>Wer hereinkommt, sieht alles:</strong> Die Verschlüsselung schützt vor Fremden unterwegs – nicht vor Personen, die du selbst hereinlässt.</li>
     </ul>
   </section>
 

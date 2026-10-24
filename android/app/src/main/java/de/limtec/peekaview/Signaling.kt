@@ -113,7 +113,11 @@ class Signaling(
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, raw, 0, 12))
             cipher.doFinal(raw, 12, raw.size - 12)
         }.getOrNull() ?: return
-        onMessage(JSONObject(String(plain)))
+        val msg = JSONObject(String(plain))
+        // a viewer is its key: only from whom it says it is from (knowing the link is not enough
+        // to speak for a viewer who was let in)
+        if (Nostr.verifiedSender(event) != msg.optString("from")) return
+        onMessage(msg)
     }
 
     private fun event(json: String): JSONObject {
@@ -131,6 +135,8 @@ class Signaling(
 
         fun sha256(data: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(data)
         fun hex(data: ByteArray) = data.joinToString("") { "%02x".format(it) }
+        fun unhex(s: String): ByteArray? =
+            if (s.length % 2 != 0) null else runCatching { ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() } }.getOrNull()
         fun b64url(data: ByteArray): String = Base64.encodeToString(data, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
         /** A new room secret: 16 random bytes, base64url. */

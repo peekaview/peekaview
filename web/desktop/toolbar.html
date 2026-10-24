@@ -19,15 +19,15 @@
         <button id="switch-btn" class="icon-btn" title="Andere Fenster oder anderen Bildschirm teilen" data-icon="switch"></button>
         <span class="sep"></span>
         <div class="modes" role="radiogroup" aria-label="Zuschauer dürfen">
-          <button data-mode="view" class="active" title="Zuschauer dürfen: Zusehen"><i data-icon="view"></i></button>
-          <button data-mode="draw" title="Zuschauer dürfen: Zeigen &amp; Malen"><i data-icon="draw"></i></button>
-          <button data-mode="control" title="Zuschauer dürfen: Steuern"><i data-icon="control"></i></button>
+          <button data-mode="view" class="active" title="Zuschauer dürfen nur zusehen"><i data-icon="view"></i>Ansehen</button>
+          <button data-mode="draw" title="Zuschauer dürfen zeigen und malen"><i data-icon="draw"></i>Zeigen</button>
+          <button data-mode="control" title="Zuschauer dürfen Maus und Tastatur benutzen"><i data-icon="control"></i>Steuern</button>
         </div>
         <span class="sep"></span>
         <div id="avatars" class="avatars"></div>
         <span class="sep"></span>
         <button id="clip-btn" class="icon-btn" title="Gemeinsame Zwischenablage" data-icon="clipboard"></button>
-        <button id="mic-btn" class="icon-btn" title="Sprechen" data-icon="micOff"></button>
+        <button id="mic-btn" class="icon-btn" title="Mikrofon einschalten" data-icon="micOff"></button>
         <button id="rec-btn" class="icon-btn rec" title="Sitzung aufzeichnen"><i data-icon="record"></i><span id="rec-time" hidden></span></button>
         <button id="stop-btn" class="pill danger" title="Freigabe beenden"><i data-icon="stop"></i>Beenden</button>
       </div>
@@ -35,6 +35,19 @@
     </div>
 
     <div id="requests" class="requests" hidden></div>
+
+    <!-- right after the start: what to do next, until somebody knocks -->
+    <div id="guide" class="guide glass" hidden>
+      <ol>
+        <li><b>Link verschicken:</b> <span id="guide-copied">Er ist schon kopiert.</span> In E-Mail oder Chat einfügen <kbd id="paste-key">⌘V</kbd> und abschicken.</li>
+        <li><b>Warten:</b> Öffnet jemand den Link, klingelt es hier.</li>
+        <li><b>„Zulassen“ klicken</b> – dann sieht die Person deinen Bildschirm.</li>
+      </ol>
+      <div class="guide-actions">
+        <button id="guide-copy" class="pill secondary"><i data-icon="link"></i>Link nochmal kopieren</button>
+        <button id="guide-close" class="pill secondary">Verstanden</button>
+      </div>
+    </div>
 
     <div id="toast" class="toast" hidden><i data-icon="check"></i><span></span></div>
   </div>

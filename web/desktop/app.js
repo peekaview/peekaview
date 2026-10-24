@@ -196,6 +196,14 @@ function updateStart() {
   $('start').disabled = !selected.length
   const n = selected.filter((x) => x.startsWith('window:')).length
   $('start-label').textContent = switching ? (n > 1 ? `${n} Fenster teilen` : 'Wechseln') : n > 1 ? `${n} Fenster teilen` : 'Freigabe starten'
+  // say what is missing instead of a silently greyed out button
+  $('picker-title').textContent = switching ? 'Was sollen die anderen stattdessen sehen?' : 'Was sollen die anderen sehen?'
+  $('picker-lead').textContent = kind === 'window'
+    ? 'Klicke auf ein Fenster. Mehrere Fenster: einfach nacheinander anklicken.'
+    : 'Klicke auf deinen Bildschirm – oder oben auf „Fenster“, um nur ein Programm zu zeigen.'
+  $('start-hint').textContent = !selected.length
+    ? 'Zuerst oben etwas anklicken.'
+    : switching ? '' : 'Danach den Link verschicken – die anderen öffnen ihn im Browser.'
 }
 
 let loadedAt = 0
@@ -220,6 +228,7 @@ for (const tab of document.querySelectorAll('.tab')) {
     kind = tab.dataset.kind
     for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t === tab)
     renderGrid()
+    updateStart()
   })
 }
 $('refresh').addEventListener('click', loadSources)
@@ -335,7 +344,7 @@ listen('permission-granted', (e) => {
     // macOS only applies the screen recording permission to a fresh process
     setTimeout(() => invoke('restart_app'), 2500)
   } else {
-    toast('Super – die Fernsteuerung ist freigeschaltet!')
+    toast('Super – Steuern ist jetzt freigeschaltet!')
     rememberPermissions({ accessibility: true })
   }
 })

@@ -44,7 +44,7 @@
   <h2>Eine Bildschirmfreigabe ansehen</h2>
   <ul>
     <li><strong>Der Link:</strong> Der Schlüssel des Raums steht im Link hinter dem „#“. Dieser Teil wird vom Browser nie an einen Server geschickt.</li>
-    <li><strong>Verbindungsaufbau:</strong> Damit sich die Geräte finden, tauschen sie kurze, verschlüsselte Nachrichten über öffentliche Nostr-Relays aus (z. B. nos.lol, relay.primal.net, relay.snort.social, nostr.mom, relay.damus.io). Diese Relays werden von Dritten betrieben. Sie sehen deine IP-Adresse und den Zeitpunkt, aber weder Namen noch Inhalte.</li>
+    <li><strong>Verbindungsaufbau:</strong> Damit sich die Geräte finden, tauschen sie kurze, verschlüsselte und signierte Nachrichten über öffentliche Nostr-Relays aus (z. B. nos.lol, relay.primal.net, relay.snort.social, nostr.mom, relay.damus.io). Diese Relays werden von Dritten betrieben. Sie sehen deine IP-Adresse und den Zeitpunkt, aber weder Namen noch Inhalte.</li>
     <li><strong>Direkte Verbindung:</strong> Bild, Ton und Steuerung laufen per WebRTC direkt zwischen den Geräten und sind Ende-zu-Ende verschlüsselt. Dafür erfahren die Beteiligten gegenseitig ihre IP-Adressen. Um die eigene öffentliche Adresse zu ermitteln, fragen die Geräte STUN-Server von Google und Cloudflare.</li>
     <li><strong>Strenge Firewalls:</strong> Kommt keine direkte Verbindung zustande, kann die teilende Person einen eigenen Relay-Server (TURN) eintragen. Der leitet die verschlüsselten Daten nur weiter.</li>
     <li><strong>Dein Name:</strong> Den Namen, den du eingibst, sehen die teilende Person und die anderen Zuschauer.</li>
@@ -63,7 +63,7 @@
     <li>den Stand laufender Anrufe (wer anruft, wer dabei ist),</li>
     <li>bei Benachrichtigungen: die Push-Adresse deines Browsers.</li>
   </ul>
-  <p>Wir schicken dir E-Mails zur Bestätigung deiner Adresse und Einladungen an die Personen, die du einlädst. Benachrichtigungen bei geschlossener Seite laufen über den Push-Dienst deines Browsers (z. B. Google, Mozilla oder Apple). Bild und Ton eines Anrufs laufen auch hier direkt zwischen den Geräten, nicht über den Server.</p>
+  <p>Wir schicken dir E-Mails zur Bestätigung deiner Adresse und Einladungen an die Personen, die du einlädst. Benachrichtigungen bei geschlossener Seite laufen über den Push-Dienst deines Browsers (z. B. Google, Mozilla oder Apple). Bild und Ton eines Anrufs laufen auch hier direkt zwischen den Geräten, nicht über den Server. Die Schlüssel für den Verbindungsaufbau eines Anrufs verteilt allerdings der Server.</p>
   <p>Rechtsgrundlage ist die Bereitstellung der Kontakte-Funktion, die du nutzen möchtest (Art. 6 Abs. 1 lit. b DSGVO). Möchtest du dein Konto und deine Daten löschen lassen, schreib uns an <!--email_off--><a href="mailto:info@limtec.de">info@limtec.de</a><!--/email_off-->.</p>
 
   <h2>Deine Rechte</h2>

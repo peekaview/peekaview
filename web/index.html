@@ -13,7 +13,11 @@
     #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
     #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+    .brand { flex-wrap: wrap; row-gap: 8px; }
     .brand i { display: flex; color: #fafafa; }
+    .pv-trust { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; background: rgba(34,197,94,.12); color: #86efac; font-size: 11.5px; font-weight: 650; letter-spacing: 0; text-decoration: none; white-space: nowrap; }
+    .pv-trust:hover { background: rgba(34,197,94,.2); }
+    .pv-trust:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     .lead { margin: -8px 0 0; color: #a1a1aa; }
     .title { margin: 4px 0 0; font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -.015em; }
     #start .title + .lead { margin-top: -10px; font-size: 15px; }
@@ -86,7 +90,7 @@
 </head>
 <body>
   <main id="home">
-    <div class="brand"><i id="logo"></i>PeekaView<div id="profile" hidden></div></div>
+    <div class="brand"><i id="logo"></i>PeekaView<a id="trust" class="pv-trust" href="sicherheit.html" data-legal title="Wie PeekaView schützt">P2P · Ende-zu-Ende verschlüsselt</a><div id="profile" hidden></div></div>
     <nav class="home-nav" aria-label="Was möchtest du tun?">
       <button type="button" data-home="link" aria-pressed="true">Link öffnen</button>
       <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
@@ -181,6 +185,8 @@
       $('fixed-room-entry').hidden=homeView!=='contacts'
       $('host-note').hidden=inApp || homeView==='contacts' || !!linkRoom
       for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
+      // calls over contacts get their keys from the contacts server: not end-to-end in the strict sense
+      $('trust').innerHTML=icon('lock',12)+(homeView==='contacts'?'P2P · verschlüsselt':'P2P · Ende-zu-Ende verschlüsselt')
     }
     for(const button of document.querySelectorAll('[data-home]')){
       button.innerHTML=icon(button.dataset.home==='link'?'link':'users',16)+button.textContent
@@ -331,7 +337,8 @@
       if (!secret) return
       status.set(room, { ...status.get(room), checking: !status.get(room)?.seen })
       render()
-      const me = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
+      // the presenter answers our own key (the only "from" it takes from us)
+      let me
       let answered = false
       const signaling = await Signaling.open({
         secret,
@@ -354,6 +361,7 @@
           render()
         },
       })
+      me = signaling.pubkey
       // ask twice while the relays connect (public relays throttle chatty clients)
       for (let i = 0; i < 2 && !answered; i++) {
         signaling.send({ type: 'ping', from: me })

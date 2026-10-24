@@ -54,8 +54,10 @@ Share links point to `https://<npub>.nsite.lol/#…`, not to a web server of our
 - Participants find each other through public Nostr relays (configurable).
 - Messages are ephemeral events: relays don't store them.
 - Each one is AES-256-GCM encrypted with a key derived from the room secret.
-- Participants sign with throw-away keys; the presenter signs with the key from the link.
+- Viewers sign with a key of their own (kept per tab, so a reload need not be let in again); the presenter signs with the key from the link.
 - Viewers accept presenter messages only with a valid signature of that key, so somebody who only knows the room secret cannot pose as the presenter.
+- A viewer's id on the channel is its public key: the presenter (desktop and Android) only takes messages whose `from` is the key that signed them. Somebody who knows the link cannot speak for a viewer who was let in.
+- Calls over contacts get their room secret from the contacts server, so whoever runs that server could in principle join the connection setup.
 
 **After that, everything is P2P**
 - WebRTC runs as a star around the presenter: a video track and a data channel per viewer.

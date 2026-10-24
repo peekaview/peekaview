@@ -19,13 +19,17 @@ const pad = (n) => String(n).padStart(2, '0')
 let link = ''
 let title = ''
 let recording = null
+// the next steps below the bar, until the first viewer knocks (or "Verstanden")
+let viewerCount = 0
+let requestCount = 0
+let guideDone = false
 
 const voice = new Voice({
   send: (msg) => invoke('signal', { msg }),
   onChange: () => {
     const b = $('mic-btn')
     b.classList.toggle('live', voice.on)
-    b.title = voice.on ? 'Mikrofon aus' : 'Sprechen'
+    b.title = voice.on ? 'Mikrofon ausschalten' : 'Mikrofon einschalten'
     b.innerHTML = icon(voice.on ? 'mic' : 'micOff', 17)
     recording?.audio.sync()
   },
@@ -61,20 +65,30 @@ setCollapsed(!!store.get('pv-collapsed'))
 
 // ------------------------------------------------------------------ the running share
 
+function updateGuide() {
+  if (viewerCount || requestCount) guideDone = true
+  $('guide').hidden = guideDone || !link
+}
+$('paste-key').textContent = /Mac/i.test(navigator.platform) ? '⌘V' : 'Strg+V'
+$('guide-close').addEventListener('click', () => {
+  guideDone = true
+  updateGuide()
+})
+$('guide-copy').addEventListener('click', () => $('code-btn').click())
+
 function show(live) {
   link = live.link
   title = live.title || ''
   $('code-btn').title = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
   voice.setSelf(0, live.ice)
   setMode(live.mode, false)
+  updateGuide()
 }
 invoke('live_info').then((live) => {
   if (!live) return
+  $('guide-copied').textContent = live.copied ? 'Er ist schon kopiert.' : 'Unten auf „Link nochmal kopieren“ klicken.'
   show(live)
-  if (live.copied) {
-    markCopied()
-    toast('Link in der Zwischenablage – einfach einfügen und verschicken.')
-  }
+  if (live.copied) markCopied()
 })
 listen('live', (e) => e.payload && show(e.payload))
 
@@ -110,6 +124,8 @@ $('stop-btn').addEventListener('click', () => invoke('stop_share'))
 
 function renderAvatars(peers) {
   const viewers = peers.filter((p) => !p.host)
+  viewerCount = viewers.length
+  updateGuide()
   const box = $('avatars')
   box.title = viewers.length ? viewers.map((p) => p.name).join('\n') : 'Noch keine Zuschauer'
   if (!viewers.length) {
@@ -142,6 +158,8 @@ $('mic-btn').addEventListener('click', () => {
 
 listen('join-requests', (e) => {
   const list = e.payload ?? []
+  requestCount = list.length
+  updateGuide()
   renderRequests($('requests'), list)
   if (list.length) setCollapsed(false)
 })
@@ -167,7 +185,7 @@ function toast(text, kind = 'ok', ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms)
 }
 listen('toast', (e) => toast(String(e.payload)))
-listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – die Fernsteuerung ist freigeschaltet!'))
+listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – Steuern ist jetzt freigeschaltet!'))
 
 // the share ends: voice and recording stop; the window goes
 listen('ended', () => {

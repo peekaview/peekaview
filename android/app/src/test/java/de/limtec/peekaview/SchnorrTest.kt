@@ -1,9 +1,11 @@
 package de.limtec.peekaview
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The official BIP340 test vectors (signing). */
+/** The official BIP340 test vectors (signing and verifying). */
 class SchnorrTest {
     private fun bytes(hex: String) = ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
     private fun hex(b: ByteArray) = b.joinToString("") { "%02X".format(it) }
@@ -11,6 +13,14 @@ class SchnorrTest {
     private fun check(secret: String, public: String, aux: String, message: String, signature: String) {
         assertEquals(public, hex(Schnorr.publicKey(bytes(secret))))
         assertEquals(signature, hex(Schnorr.sign(bytes(message), bytes(secret), bytes(aux))))
+        // verifying: the signature fits – and no longer once message, key or signature change
+        assertTrue(Schnorr.verify(bytes(message), bytes(public), bytes(signature)))
+        val flipped = bytes(message).also { it[0] = (it[0].toInt() xor 1).toByte() }
+        assertFalse(Schnorr.verify(flipped, bytes(public), bytes(signature)))
+        val otherKey = Schnorr.publicKey(bytes("0000000000000000000000000000000000000000000000000000000000000007"))
+        assertFalse(Schnorr.verify(bytes(message), otherKey, bytes(signature)))
+        val badSig = bytes(signature).also { it[63] = (it[63].toInt() xor 1).toByte() }
+        assertFalse(Schnorr.verify(bytes(message), bytes(public), badSig))
     }
 
     @Test

@@ -34,6 +34,19 @@ object Nostr {
             .put("sig", Signaling.hex(sig))
     }
 
+    /** The sender of a received event: its pubkey, when id and signature fit it (NIP-01). */
+    fun verifiedSender(event: JSONObject): String? {
+        val pubkey = event.optString("pubkey")
+        val tags = event.optJSONArray("tags") ?: return null
+        val tagList = (0 until tags.length()).map { i -> tags.getJSONArray(i).let { t -> (0 until t.length()).map { t.getString(it) } } }
+        val serialized = "[0,${str(pubkey)},${event.optLong("created_at")},${event.optInt("kind")},${tagList.joinToString(",", "[", "]") { t -> t.joinToString(",", "[", "]") { str(it) } }},${str(event.optString("content"))}]"
+        val id = Signaling.sha256(serialized.toByteArray())
+        if (Signaling.hex(id) != event.optString("id")) return null
+        val key = Signaling.unhex(pubkey) ?: return null
+        val sig = Signaling.unhex(event.optString("sig")) ?: return null
+        return if (Schnorr.verify(id, key, sig)) pubkey else null
+    }
+
     /** A JSON string exactly as JSON.stringify writes it (the event id depends on it). */
     fun str(s: String): String {
         val out = StringBuilder("\"")

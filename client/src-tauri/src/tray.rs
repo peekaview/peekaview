@@ -51,7 +51,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     if link_refs.is_empty() {
         link_refs.push(&none);
     }
-    let copy = Submenu::with_items(app, "Raumlink kopieren", true, &link_refs)?;
+    let copy = Submenu::with_items(app, "Link eines festen Raums kopieren", true, &link_refs)?;
     // rooms watched in PeekaView (links from the viewer website)
     let recent: Vec<MenuItem<Wry>> = crate::viewers::recent(app)
         .iter()
@@ -82,8 +82,8 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     items.push(Box::new(recent));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "keep_link", "Raumlink beibehalten", true, settings["keep_link"] == true, None::<&str>)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "allow_resize", "Resize/Anordnen erlauben", true, settings["allow_resize"] == true, None::<&str>)?));
+    items.push(Box::new(CheckMenuItem::with_id(app, "keep_link", "Letzten Link beibehalten", true, settings["keep_link"] == true, None::<&str>)?));
+    items.push(Box::new(CheckMenuItem::with_id(app, "allow_resize", "Fenster anordnen erlauben", true, settings["allow_resize"] == true, None::<&str>)?));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(copy));
     items.push(Box::new(MenuItem::with_id(app, "rooms", "Einstellungen & Räume …", true, None::<&str>)?));

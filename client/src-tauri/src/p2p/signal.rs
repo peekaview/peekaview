@@ -3,6 +3,10 @@
 //! topic = SHA-256("peekaview/topic/v1:" + secret), key = SHA-256("peekaview/key/v1:" + secret);
 //! every message is AES-256-GCM encrypted and sent as an ephemeral event (kind 25050) signed by a
 //! throw-away key. Only the WebRTC setup goes this way.
+//!
+//! A viewer is its key: incoming messages only pass with a valid signature, and with "from" set to
+//! exactly the key that signed them – so knowing the link is not enough to speak for a viewer who
+//! was let in (and take over their place).
 
 use std::{
     collections::{HashSet, VecDeque},
@@ -16,7 +20,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use futures_util::{SinkExt, StreamExt};
-use secp256k1::{schnorr, Keypair};
+use secp256k1::{schnorr, Keypair, XOnlyPublicKey};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::{broadcast, mpsc};
@@ -33,6 +37,26 @@ fn sha256(data: impl AsRef<[u8]>) -> [u8; 32] {
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn unhex(s: &str) -> Option<Vec<u8>> {
+    if s.len() % 2 != 0 {
+        return None;
+    }
+    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok()).collect()
+}
+
+/// The event's id matches its content and its signature its pubkey (NIP-01).
+fn verified(event: &Value) -> Option<&str> {
+    let pubkey = event["pubkey"].as_str()?;
+    let id = sha256(json!([0, pubkey, event["created_at"], event["kind"], event["tags"], event["content"]]).to_string());
+    if event["id"].as_str()? != hex(&id) {
+        return None;
+    }
+    let key = XOnlyPublicKey::from_byte_array(unhex(pubkey)?.try_into().ok()?).ok()?;
+    let sig = schnorr::Signature::from_byte_array(unhex(event["sig"].as_str()?)?.try_into().ok()?);
+    schnorr::verify(&sig, &id, &key).ok()?;
+    Some(pubkey)
 }
 
 fn now() -> u64 {
@@ -171,7 +195,10 @@ impl Signaling {
             return None;
         }
         let plain = self.cipher.decrypt(Nonce::from_slice(&raw[..12]), &raw[12..]).ok()?;
-        serde_json::from_slice(&plain).ok()
+        let msg: Value = serde_json::from_slice(&plain).ok()?;
+        // only from whom it says it is from
+        let sender = verified(event)?;
+        (msg["from"].as_str() == Some(sender)).then_some(msg)
     }
 
     pub fn send(&self, msg: &Value) {
@@ -206,6 +233,43 @@ impl Signaling {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn frame(signaling: &Signaling, keypair: &Keypair, msg: &Value) -> String {
+        let mut iv = [0u8; 12];
+        getrandom::fill(&mut iv).unwrap();
+        let cipher = signaling.cipher.encrypt(Nonce::from_slice(&iv), msg.to_string().as_bytes()).unwrap();
+        let content = STANDARD.encode([&iv[..], &cipher].concat());
+        let pubkey = hex(&keypair.x_only_public_key().0.to_byte_array());
+        let created_at = now();
+        let tags = json!([["t", signaling.topic]]);
+        let id = sha256(json!([0, pubkey, created_at, KIND, tags, content]).to_string());
+        let sig = schnorr::sign_no_aux_rand(&id, keypair).to_byte_array();
+        json!(["EVENT", "sub", { "id": hex(&id), "pubkey": pubkey, "created_at": created_at, "kind": KIND, "tags": tags, "content": content, "sig": hex(&sig) }]).to_string()
+    }
+
+    /// A message passes only when "from" is the key that signed it.
+    #[test]
+    fn sender_is_its_key() {
+        tauri::async_runtime::block_on(async {
+            let (signaling, _incoming) = Signaling::open("test-secret-for-binding", &[], new_signing_key());
+            let seen = Mutex::new(HashSet::new());
+            let viewer = Keypair::from_secret_bytes(new_signing_key()).unwrap();
+            let other = Keypair::from_secret_bytes(new_signing_key()).unwrap();
+            let me = hex(&viewer.x_only_public_key().0.to_byte_array());
+
+            let own = frame(&signaling, &viewer, &json!({ "type": "hello", "from": me }));
+            assert_eq!(signaling.receive(&own, &seen).unwrap()["from"], me.as_str());
+            // somebody else with the link speaking for that viewer
+            let forged = frame(&signaling, &other, &json!({ "type": "hello", "from": me }));
+            assert!(signaling.receive(&forged, &seen).is_none());
+            // a valid event with its signature swapped for another one
+            let mut tampered: Value = serde_json::from_str(&frame(&signaling, &viewer, &json!({ "type": "bye", "from": me }))).unwrap();
+            let other_sig: Value = serde_json::from_str(&frame(&signaling, &viewer, &json!({ "type": "hello", "from": me }))).unwrap();
+            tampered[2]["sig"] = other_sig[2]["sig"].clone();
+            assert!(signaling.receive(&tampered.to_string(), &seen).is_none());
+            signaling.close();
+        });
+    }
 
     /// Round trip with a JS peer (web/signal.js) over the public relays:
     /// `PV_SECRET=… cargo test signal_interop -- --ignored` while `node echo.mjs …` runs.

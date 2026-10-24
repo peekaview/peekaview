@@ -12,7 +12,8 @@ import { injectStyle } from './annotate.js'
 import { WindowManager } from './windows.js'
 import { icon } from './icons.js'
 import { Voice } from './voice.js'
-import { Signaling, parseRoom } from './signal.js'
+import { Signaling, hex, parseRoom, viewerKey } from './signal.js'
+import { schnorr } from './vendor/noble-schnorr.js'
 import { ClipPanel, FileChannel, MAX_SIZE, browserCopyable, filesFromClipboard, newId, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
 
 export { peerColor } from './icons.js'
@@ -109,7 +110,7 @@ const CSS = `
 /**
  * @param {HTMLElement} el
  * @param {{room: string, name: string, color?: string, relays?: string[], toolbar?: boolean, voice?: boolean,
- *          peers?: boolean, peerId?: string, onRooms?: () => void, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
+ *          peers?: boolean, onRooms?: () => void, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
  */
 export function mountViewer(el, options) {
   const { room, name, color, relays, toolbar = true, peers = true, voice: voiceEnabled = true, onStatus, onPeers } = options
@@ -232,21 +233,11 @@ export function mountViewer(el, options) {
   // the room has a PIN: {salt, rounds, nonce} of the latest challenge
   let pinChallenge = null
   let busy = false
-  // who we are on the signaling channel (the presenter answers with an offer addressed to it);
-  // kept for this tab and room, so a reload does not have to be let in again
-  const peerKey = `pv-peer-${String(room ?? '').slice(0, 12)}`
-  const peerId = (() => {
-    if (options.peerId && /^[0-9a-f]{16}$/.test(options.peerId)) return options.peerId
-    try {
-      const saved = sessionStorage.getItem(peerKey)
-      if (saved && /^[0-9a-f]{16}$/.test(saved)) return saved
-    } catch {}
-    const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('')
-    try {
-      sessionStorage.setItem(peerKey, id)
-    } catch {}
-    return id
-  })()
+  // who we are on the signaling channel: the public half of our signing key – the presenter only
+  // takes messages from us signed by it (the offer comes addressed to it); kept for this tab and
+  // room, so a reload does not have to be let in again
+  const secretKey = viewerKey(`pv-key-${String(room ?? '').slice(0, 12)}`)
+  const peerId = hex(schnorr.getPublicKey(secretKey))
 
   const send = (m) => dc?.readyState === 'open' && dc.send(JSON.stringify(m))
 
@@ -258,7 +249,7 @@ export function mountViewer(el, options) {
       return update('error')
     }
     const { secret, hostKey } = parseRoom(room)
-    signaling = await Signaling.open({ secret, hostKey, relays, onMessage: onSignal })
+    signaling = await Signaling.open({ secret, hostKey, relays, secretKey, onMessage: onSignal })
     hello()
   }
 
