@@ -29,23 +29,34 @@ export class RoomClient extends EventTarget {
     this.storage.setItem(KEY, JSON.stringify(this.session))
     this.dispatchEvent(new Event('change'))
   }
+  reset() {
+    this.session={api:this.session.api}
+    this.state={contacts:[],rooms:[],calls:[],invitations:[]}
+    this.save()
+  }
   async request(action, body, authenticated = true) {
     const url = new URL(this.session.api)
     url.searchParams.set('action', action)
     url.searchParams.set('v','2')
     const headers = { 'Content-Type': 'application/json' }
-    if (authenticated && this.session.token) headers.Authorization = `Bearer ${this.session.token}`
+    const token=authenticated ? this.session.token : null
+    if (token) headers.Authorization = `Bearer ${token}`
     const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(12000) })
     if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Unter dieser Adresse antwortet kein PeekaView-Server.')
     const data = await response.json()
-    if (!response.ok) throw new Error(data.error || `PeekaView-Server: HTTP ${response.status}`)
+    if (!response.ok) {
+      if(response.status===401 && token && this.session.token===token){this.reset();this.dispatchEvent(new Event('signedout'))}
+      throw new Error(data.error || `PeekaView-Server: HTTP ${response.status}`)
+    }
     return data
   }
   async refresh(callId = '') {
     if (!this.session.token || this.busy) return
     this.busy = true
     try {
-      this.state = await this.request('state')
+      const token=this.session.token,state=await this.request('state')
+      if(this.session.token!==token)return
+      this.state = state
       if (callId && this.state.calls.some(c=>c.id===callId && c.status==='joined')) await this.request('calls/heartbeat',{call:callId})
       this.session.contactsVersion=2
       this.session.rooms = this.state.rooms
@@ -62,8 +73,7 @@ export async function openRoom(call = '') {
   location.href = new URL(`fixed-rooms.html${call ? `#call=${encodeURIComponent(call)}` : ''}`, import.meta.url).href
 }
 async function configureNative(client) {
-  if (!client.session.token) return
-  const session = JSON.stringify({ api: client.session.api, token: client.session.token })
+  const session = JSON.stringify(client.session.token ? { api: client.session.api, token: client.session.token } : null)
   if (platform === 'desktop' && !window.__PV_JOIN__) await window.__TAURI__.core.invoke('fixed_room_configure', { session })
   else (window.PeekaViewHost || window.PeekaViewApp)?.configureRooms(session)
 }
@@ -244,6 +254,60 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     const profile=profileHost.querySelector('.fr-profile')
     if(profile?.open && profile.offsetParent!==null)profile.style.setProperty('--fr-profile-width',`${Math.min(320,innerWidth-32,profile.getBoundingClientRect().right-16)}px`)
   }
+  function confirmAccount(title, description, label, email='') {
+    return new Promise(resolve=>{
+      const dialog=element('dialog',undefined,'fr-pin-dialog fr-account-dialog')
+      dialog.setAttribute('aria-label',title)
+      const f=document.createElement('form');f.method='dialog'
+      f.append(element('h3',title),element('p',description))
+      if(email){
+        const entry=input('Zur Bestätigung deine E-Mail-Adresse eingeben','email')
+        const validate=()=>entry.field.setCustomValidity(entry.field.value.trim().toLowerCase()===email?'':'Bitte gib deine E-Mail-Adresse ein.')
+        entry.field.addEventListener('input',validate);validate();f.append(entry.box)
+      }
+      const buttons=element('div',undefined,'fr-dialog-buttons'),cancel=element('button','Abbrechen')
+      cancel.type='button';cancel.onclick=()=>dialog.close()
+      buttons.append(cancel,element('button',label,'fr-primary'));f.append(buttons);dialog.append(f)
+      let approved=false
+      f.addEventListener('submit',()=>{approved=true})
+      dialog.addEventListener('close',()=>{dialog.remove();resolve(approved)},{once:true})
+      document.body.append(dialog);dialog.showModal();cancel.focus()
+    })
+  }
+  async function forgetSession() {
+    client.reset();profileOpen=false;invitation='';preview=null;emailSent='';callId='';active=null
+    clearTimeout(desktopTimer);desktopProbe=''
+    stopAudio();for(const p of previews.values())p.viewer.destroy();previews.clear()
+    openGroups.clear();openContacts.clear();seen.clear();content.replaceChildren();rendered=''
+    history.replaceState(null,'',location.pathname+location.search);render()
+    await configureNative(client)
+    if(platform==='browser' && 'serviceWorker' in navigator){
+      const registration=await navigator.serviceWorker.getRegistration(new URL('.',import.meta.url).href)
+      if(registration){
+        for(const notification of await registration.getNotifications())notification.close()
+        const subscription=await registration.pushManager.getSubscription()
+        if(subscription)await subscription.unsubscribe()
+      }
+    }
+  }
+  async function removeDevice(device) {
+    if(!await confirmAccount(`„${device.name}“ entfernen?`,'Dieses Gerät verliert seinen Zugang und seinen Fernzugriff. Laufende Gespräche werden beendet. Dein Profil, Kontakte und Gruppen bleiben erhalten.','Gerät entfernen'))return
+    const current=device.id===client.session.device.id
+    await client.request('devices/remove',{device:device.id})
+    if(current)await forgetSession()
+    notice.textContent='Gerät entfernt.'
+  }
+  async function logout() {
+    if(client.state.calls.some(c=>c.status==='joined') && !await confirmAccount('Abmelden?','Laufende Gespräche auf diesem Gerät werden beendet. Dein Profil, Kontakte und Gruppen bleiben erhalten.','Abmelden'))return
+    await client.request('session/logout',{})
+    await forgetSession();notice.textContent='Du bist auf diesem Gerät abgemeldet.'
+  }
+  async function deleteProfile() {
+    const email=client.session.device.email
+    if(!await confirmAccount('Profil endgültig löschen?','Dein Profil, deine Kontakte und die von dir erstellten Gruppen werden gelöscht – auch für deren Mitglieder. Alle deine Geräte werden abgemeldet. Lokal gespeicherte Transkripte bleiben erhalten.','Profil löschen',email))return
+    await client.request('profile/delete',{email})
+    await forgetSession();notice.textContent='Dein Profil wurde gelöscht.'
+  }
   function renderProfile(){
     const key=JSON.stringify([client.session.token,client.session.device,client.state.person])
     if(profileRendered===key)return
@@ -263,12 +327,15 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if(!client.state.person)devices.append(element('p','Geräte werden geladen …','fr-muted'))
     else for(const own of client.state.person.devices){
       const row=element('div',undefined,'fr-profile-device')
-      row.append(element('span',own.name),badge({desktop:'Computer',android:'Android',browser:'Browser'}[own.platform]))
-      if(own.id===device.id)row.append(badge('Dieses Gerät','fr-badge-live'))
+      const info=element('span',undefined,'fr-device-info'),labels=element('span',undefined,'fr-device-labels')
+      labels.append(badge({desktop:'Computer',android:'Android',browser:'Browser'}[own.platform]))
+      if(own.id===device.id)labels.append(badge('Dieses Gerät','fr-badge-live'))
+      info.append(element('strong',own.name),labels);row.append(info)
+      const remove=button('Entfernen',()=>removeDevice(own),'fr-device-remove');remove.setAttribute('aria-label',`${own.name} entfernen`);row.append(remove)
       devices.append(row)
     }
     const help=element('details',undefined,'fr-advanced');help.append(element('summary','Weiteres Gerät verbinden'),element('p','Auf dem anderen Gerät „Anmelden“ wählen und dieselbe E-Mail-Adresse bestätigen.','fr-muted'))
-    panel.append(devices,help);profile.append(panel);profileHost.append(profile)
+    panel.append(devices,help,button('Abmelden',logout),button('Profil löschen …',deleteProfile,'fr-profile-delete'));profile.append(panel);profileHost.append(profile)
   }
   function groupCard(room) {
     const card=element('section',undefined,'fr-room')
@@ -646,11 +713,13 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   async function audio(call) {
     if (voiceSecret===call.secret) return
     stopAudio(); voiceSecret=call.secret
-    signaling=await Signaling.open({secret:call.secret,onMessage:message=>{
+    const connection=await Signaling.open({secret:call.secret,onMessage:message=>{
       if (!voice || !active?.participants.some(p=>Number(p.voice_id)===message.from)) return
       if (message.t==='rtc') voice.handle(message)
       if (message.t==='voice') { const p=active.participants.find(p=>Number(p.voice_id)===message.from);if(p)p.voice=message.on?1:0;renderCall() }
     }})
+    if(disposed || !client.session.token || voiceSecret!==call.secret || active?.id!==call.id){connection.close();return}
+    signaling=connection
     voice=new Voice({send:msg=>{
       if (stoppingAudio) return
       signaling.send({...msg,from:Number(call.voice_id)})
@@ -715,10 +784,13 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     } finally { polling=false }
   }
   const focus=()=>refresh().catch(fail)
-  const changed=()=>{ client.session=readSession(client.storage);if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
+  const signedout=()=>forgetSession().then(()=>{notice.textContent='Dieses Gerät wurde abgemeldet. Du kannst dich erneut per E-Mail anmelden.'}).catch(fail)
+  client.addEventListener('signedout',signedout)
+  const changed=e=>{if(e.key!==KEY && e.key!==null)return;const token=client.session.token;client.session=readSession(client.storage);if(token && !client.session.token){signedout();return}if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus()}
   const dismissProfile=e=>{
     const profile=profileHost.querySelector('.fr-profile')
     if(!profile?.open)return
+    if(document.querySelector('dialog[open]'))return
     if(e.type==='keydown' ? e.key!=='Escape' : profileHost.contains(e.target))return
     profileOpen=false;profile.open=false
     if(e.type==='keydown'){e.preventDefault();profile.querySelector('summary').focus()}
@@ -736,9 +808,10 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
   }
   window.addEventListener('pagehide',unload)
   const recordingListener=platform==='desktop' ? window.__TAURI__.event.listen('fixed-recording',()=>syncTranscriptAudio().catch(fail)) : null
+  const sessionListener=platform==='desktop' ? window.__TAURI__.event.listen('fixed-session-ended',()=>{if(client.session.token)signedout()}) : null
   render(); configureNative(client).catch(fail)
   if(invitation) loadInvitation().catch(fail)
   refresh().catch(fail)
   timer=setInterval(focus,4000)
-  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);clearTimeout(desktopTimer);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);window.removeEventListener('pointerdown',dismissProfile);window.removeEventListener('keydown',dismissProfile);window.removeEventListener('resize',sizeProfile);profileHost.replaceChildren();profileHost.hidden=true;recordingListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
+  return { client, refresh, destroy(){ disposed=true;clearInterval(timer);clearTimeout(desktopTimer);client.removeEventListener('signedout',signedout);window.removeEventListener('storage',changed);window.removeEventListener('focus',focus);window.removeEventListener('pagehide',unload);window.removeEventListener('pointerdown',dismissProfile);window.removeEventListener('keydown',dismissProfile);window.removeEventListener('resize',sizeProfile);profileHost.replaceChildren();profileHost.hidden=true;recordingListener?.then(unlisten=>unlisten());sessionListener?.then(unlisten=>unlisten());stopAudio();for(const p of previews.values())p.viewer.destroy() } }
 }
