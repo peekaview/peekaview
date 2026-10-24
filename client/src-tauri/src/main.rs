@@ -7,6 +7,7 @@ mod guard;
 mod focus;
 mod fixed_rooms;
 mod invite;
+mod local_network;
 mod lock;
 mod p2p;
 #[cfg(target_os = "macos")]
@@ -140,6 +141,17 @@ async fn drag_app(app: AppHandle, kind: String) -> Result<(), String> {
 #[tauri::command]
 async fn open_permission_settings(kind: String) -> Result<(), String> {
     permissions::open_settings(&kind)
+}
+
+/// Whether PeekaView may reach devices in the local network (macOS asks the user once).
+#[tauri::command]
+async fn local_network_status(app: AppHandle) -> bool {
+    local_network::allowed(&app)
+}
+
+#[tauri::command]
+async fn open_local_network_settings() -> Result<(), String> {
+    local_network::open_settings()
 }
 
 /// Shows the PeekaView window (share picker / running share) in front.
@@ -693,6 +705,8 @@ fn main() {
         .manage(invite::PendingInvite::default())
         .setup(|app| {
             settings::get(app.handle());
+            // macOS asks for local network access right away, not when a phone tries to connect
+            local_network::start(app.handle());
             fixed_rooms::start(app.handle());
             if let Some(flow) = resume::permission_flow(app.handle()) {
                 *app.state::<invite::PendingInvite>().0.lock().unwrap() = flow.invite;
@@ -795,6 +809,8 @@ fn main() {
             stop_share,
             switch_source,
             permission_status,
+            local_network_status,
+            open_local_network_settings,
             main_ready,
             main_requested,
             request_permission,

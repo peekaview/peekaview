@@ -111,6 +111,9 @@ pub struct Hub {
     /// peers invited again and again without ever connecting (e.g. an old link whose presenter
     /// key no longer matches): count, last attempt – they are left alone for a while
     failed: Mutex<HashMap<String, (u32, Instant)>>,
+    /// addresses of our own ICE candidates – only to tell in the log whether a viewer is in the
+    /// same network / behind the same router (the log itself names no addresses)
+    local_addresses: Mutex<HashSet<String>>,
 }
 
 struct Events {
@@ -125,6 +128,9 @@ impl PeerConnectionEventHandler for Events {
     async fn on_ice_candidate(&self, event: RTCPeerConnectionIceEvent) {
         if let Ok(init) = event.candidate.to_json() {
             crate::log(&format!("p2p: viewer {} local candidate {}", self.id, candidate_kind(&init.candidate)));
+            if let Some(address) = init.candidate.split_whitespace().nth(4) {
+                self.hub.local_addresses.lock().unwrap().insert(address.to_string());
+            }
             self.hub.signaling.send(&json!({ "type": "candidate", "from": "host", "to": self.peer, "id": self.id, "candidate": init }));
         }
     }
@@ -184,6 +190,7 @@ impl Hub {
             asked_permission: Mutex::new(None),
             rate: Mutex::new((1.0, f64::MAX, Instant::now())),
             failed: Mutex::default(),
+            local_addresses: Mutex::default(),
         });
         tauri::async_runtime::spawn(hub.clone().signals(incoming));
         tauri::async_runtime::spawn(hub.clone().outgoing(out));
@@ -345,7 +352,8 @@ impl Hub {
                 }
                 Some("candidate") if msg["to"] == "host" => {
                     let Ok(candidate) = serde_json::from_value::<RTCIceCandidateInit>(msg["candidate"].clone()) else { continue };
-                    crate::log(&format!("p2p: remote candidate {}", candidate_kind(&candidate.candidate)));
+                    let relation = relation(&candidate.candidate, &self.local_addresses.lock().unwrap());
+                    crate::log(&format!("p2p: remote candidate {} {relation}", candidate_kind(&candidate.candidate)));
                     let ready = {
                         let mut viewers = self.viewers.lock().unwrap();
                         match viewers.values_mut().find(|v| v.peer == from) {
@@ -1087,6 +1095,24 @@ fn candidate_kind(candidate: &str) -> String {
     format!("{kind} {protocol} {place}")
 }
 
+/// A viewer's candidate next to ours: in one of our networks (same /24), behind our router (same
+/// public address), or elsewhere – a phone on mobile data, a guest Wi-Fi.
+fn relation(candidate: &str, local: &HashSet<String>) -> &'static str {
+    let Some(address) = candidate.split_whitespace().nth(4) else { return "" };
+    if local.contains(address) {
+        return "(same address as ours)";
+    }
+    let Ok(std::net::IpAddr::V4(remote)) = address.parse::<std::net::IpAddr>() else { return "" };
+    let ours: Vec<std::net::Ipv4Addr> = local.iter().filter_map(|a| a.parse().ok()).collect();
+    if remote.is_private() {
+        if ours.iter().any(|o| o.is_private() && o.octets()[..3] == remote.octets()[..3]) { "(our network)" } else { "(another network)" }
+    } else if ours.iter().any(|o| *o == remote) {
+        "(behind our router)"
+    } else {
+        "(elsewhere)"
+    }
+}
+
 #[cfg(test)]
 mod candidate_tests {
     #[test]
@@ -1094,5 +1120,10 @@ mod candidate_tests {
         assert_eq!(super::candidate_kind("candidate:1 1 udp 2122260223 4f1c9e2e-8a3b-4c3e-9b1a-0c6f2d7e8a11.local 54321 typ host generation 0"), "host udp mDNS");
         assert_eq!(super::candidate_kind("candidate:2 1 UDP 1686052607 203.0.113.7 61000 typ srflx raddr 0.0.0.0 rport 0"), "srflx udp public");
         assert_eq!(super::candidate_kind("candidate:3 1 udp 2122260223 192.168.178.20 50000 typ host"), "host udp private");
+        let ours: std::collections::HashSet<String> = ["192.168.178.137", "203.0.113.7"].map(String::from).into();
+        assert_eq!(super::relation("candidate:3 1 udp 1 192.168.178.20 50000 typ host", &ours), "(our network)");
+        assert_eq!(super::relation("candidate:3 1 udp 1 10.20.30.40 50000 typ host", &ours), "(another network)");
+        assert_eq!(super::relation("candidate:2 1 udp 1 203.0.113.7 61000 typ srflx", &ours), "(same address as ours)");
+        assert_eq!(super::relation("candidate:2 1 udp 1 198.51.100.9 61000 typ srflx", &ours), "(elsewhere)");
     }
 }

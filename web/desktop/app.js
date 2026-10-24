@@ -440,6 +440,13 @@ async function restoreUi(hosted) {
   if (switching) await invoke('show_picker', { switching: true })
 }
 
+// local network access (macOS): without it phones in the same Wi-Fi never connect
+const showNetwork = (allowed) => ($('net-banner').hidden = allowed !== false)
+listen('local-network', (e) => showNetwork(!!e.payload))
+invoke('local_network_status').then(showNetwork).catch(() => {})
+window.addEventListener('focus', () => invoke('local_network_status').then(showNetwork).catch(() => {}))
+$('net-fix').addEventListener('click', () => invoke('open_local_network_settings').catch((e) => error(String(e))))
+
 let initializing = null
 let initialized = false
 function initialize() {
