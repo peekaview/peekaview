@@ -35,6 +35,7 @@ test('home gives usable entry points, remembers the choice and requests identity
     await browser('open',base+'/')
     await browser('wait','#share-url')
     assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Impressum','Datenschutz','Sicherheit'])
+    assert.equal(await evaluate("document.querySelector('#trust').textContent"),'P2P · Ende-zu-Ende verschlüsselt')
     // the legal pages open over the start page, which stays where it is
     await browser('click','#footer a[href="impressum.html"]')
     await browser('wait','.pv-legal-dialog[open] h1')

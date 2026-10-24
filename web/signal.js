@@ -11,6 +11,10 @@
 // The presenter signs with a room key whose public half is part of the link ("#secret.key").
 // Viewers only accept presenter messages carrying a valid signature of exactly that key – so
 // somebody who merely knows the room secret cannot pose as the presenter.
+//
+// The other way round, a viewer *is* its key: its id on the channel ("from") is its public key,
+// and the presenter only takes messages signed by the key they name. Somebody else who knows the
+// link cannot speak for a viewer who was let in.
 
 import { schnorr } from './vendor/noble-schnorr.js'
 
@@ -47,6 +51,26 @@ async function verifyEvent(e) {
   }
 }
 
+/**
+ * The signing key a viewer is known by in a room – kept for this tab (sessionStorage), so a
+ * reload does not have to be let in again.
+ */
+export function viewerKey(storageKey) {
+  try {
+    const saved = sessionStorage.getItem(storageKey)
+    if (saved && /^[0-9a-f]{64}$/.test(saved)) {
+      const key = unhex(saved)
+      schnorr.getPublicKey(key)
+      return key
+    }
+  } catch {}
+  const key = schnorr.utils.randomSecretKey()
+  try {
+    sessionStorage.setItem(storageKey, hex(key))
+  } catch {}
+  return key
+}
+
 /** A fresh room secret (base64url, 22 characters). */
 export function newRoomSecret() {
   return b64(crypto.getRandomValues(new Uint8Array(16))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -54,24 +78,25 @@ export function newRoomSecret() {
 
 export class Signaling {
   /**
-   * @param {{secret: string, hostKey?: string | null, relays?: string[], onMessage: (msg: object) => void}} options
+   * @param {{secret: string, hostKey?: string | null, relays?: string[], secretKey?: Uint8Array, onMessage: (msg: object) => void}} options
    *   hostKey: the presenter's public key (hex); when given, presenter messages must be signed by it
+   *   secretKey: our own signing key (see viewerKey); a throw-away one without
    */
-  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, onMessage }) {
+  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, secretKey, onMessage }) {
     const topic = hex(await sha256(`peekaview/topic/v1:${secret}`))
     const key = await crypto.subtle.importKey('raw', await sha256(`peekaview/key/v1:${secret}`), 'AES-GCM', false, ['encrypt', 'decrypt'])
-    const signaling = new Signaling(topic, key, relays, onMessage)
+    const signaling = new Signaling(topic, key, relays, onMessage, secretKey)
     signaling.hostKey = hostKey
     signaling.connectAll()
     return signaling
   }
 
-  constructor(topic, key, relays, onMessage) {
+  constructor(topic, key, relays, onMessage, secretKey = schnorr.utils.randomSecretKey()) {
     this.topic = topic
     this.key = key
     this.relays = relays
     this.onMessage = onMessage
-    this.secretKey = schnorr.utils.randomSecretKey()
+    this.secretKey = secretKey
     this.pubkey = hex(schnorr.getPublicKey(this.secretKey))
     this.sockets = new Map()
     this.seen = new Set()
