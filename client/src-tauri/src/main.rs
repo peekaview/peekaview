@@ -707,6 +707,7 @@ fn main() {
             settings::get(app.handle());
             // macOS asks for local network access right away, not when a phone tries to connect
             local_network::start(app.handle());
+            p2p::turn::prefetch();
             fixed_rooms::start(app.handle());
             if let Some(flow) = resume::permission_flow(app.handle()) {
                 *app.state::<invite::PendingInvite>().0.lock().unwrap() = flow.invite;

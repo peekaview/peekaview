@@ -726,7 +726,7 @@ export function mountViewer(el, options) {
                   : 'loading')
     const texts = {
       connecting: 'Verbinde direkt mit der Freigabe …',
-      blocked: 'Die direkte Verbindung kommt nicht zustande. Auf einem Mac muss PeekaView das lokale Netzwerk nutzen dürfen (Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk). In strengen Firmennetzen braucht die teilende Person zusätzlich einen TURN-Server. PeekaView versucht es weiter …',
+      blocked: 'Die Verbindung kommt gerade nicht zustande – PeekaView versucht es weiter … Teilt jemand von einem Mac, muss PeekaView dort das lokale Netzwerk nutzen dürfen (Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk).',
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',

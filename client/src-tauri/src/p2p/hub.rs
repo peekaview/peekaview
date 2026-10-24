@@ -268,7 +268,7 @@ impl Hub {
                                     let hint = if cfg!(target_os = "macos") {
                                         "Ein Zuschauer kommt nicht durch. Erlaube PeekaView unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk."
                                     } else {
-                                        "Ein Zuschauer kommt nicht durch – eine Firewall blockiert die direkte Verbindung (TURN-Server in den Einstellungen)."
+                                        "Ein Zuschauer kommt nicht durch – eine Firewall blockiert die Verbindung, auch über den TURN-Server von PeekaView."
                                     };
                                     let _ = self.app.emit_to("toolbar", "toast", hint);
                                 }

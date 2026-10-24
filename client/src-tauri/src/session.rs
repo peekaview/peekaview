@@ -347,7 +347,13 @@ pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, Stri
     let secret = opts.room.clone().filter(|r| valid_secret(r)).unwrap_or_else(signal::new_room_secret);
     let signing_key = opts.signing_key.as_deref().and_then(parse_key).unwrap_or_else(signal::new_signing_key);
     let key_hex: String = signing_key.iter().map(|b| format!("{b:02x}")).collect();
-    let ice = opts.ice.clone().filter(Value::is_array).unwrap_or_else(|| turn::ice_servers(&opts.turn_urls, opts.turn_secret.as_deref(), "peekaview"));
+    let ice = match opts.ice.clone().filter(Value::is_array) {
+        Some(ice) => ice,
+        None => {
+            let (urls, secret) = (opts.turn_urls.clone(), opts.turn_secret.clone());
+            tauri::async_runtime::spawn_blocking(move || turn::ice_for_share(&urls, secret.as_deref())).await.map_err(|e| e.to_string())?
+        }
+    };
     let relays: Vec<String> = if opts.relays.is_empty() { signal::DEFAULT_RELAYS.iter().map(|r| r.to_string()).collect() } else { opts.relays.clone() };
 
     let (out_tx, out_rx) = mpsc::unbounded_channel::<String>();

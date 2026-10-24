@@ -47,18 +47,10 @@
         <summary>Erweiterte Verbindungseinstellungen</summary>
         <h3>Verbindung</h3>
         <div class="set-group">
-          <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Computern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
+          <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Computern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau. Wo keine direkte Verbindung möglich ist, hilft automatisch ein TURN-Server von PeekaView – er reicht nur verschlüsselte Daten weiter.</p>
           <label class="set-row stack">
             <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
             <textarea id="relays" rows="3" spellcheck="false"></textarea>
-          </label>
-          <label class="set-row stack">
-            <span class="text"><b>TURN-Server</b><small>Fallback für strenge Firewalls, eine Adresse pro Zeile.</small></span>
-            <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
-          </label>
-          <label class="set-row">
-            <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Computer.</small></span>
-            <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
           </label>
         </div>
       </details>
@@ -309,8 +301,6 @@
     const lines = (id) => $(id).value.split(/\s+/).map((l) => l.trim()).filter(Boolean)
     function fill(s) {
       if (document.activeElement !== $('relays')) $('relays').value = (s.relays ?? []).join('\n')
-      if (document.activeElement !== $('turn-urls')) $('turn-urls').value = (s.turn_urls ?? []).join('\n')
-      if (document.activeElement !== $('turn-secret')) $('turn-secret').value = s.turn_secret ?? ''
       if (document.activeElement !== $('own-name')) $('own-name').value = s.name ?? ''
       $('keep-link').checked = !!s.keep_link
       $('allow-resize').checked = !!s.allow_resize
@@ -318,10 +308,10 @@
     fill(await invoke('get_settings'))
     listen('settings', (e) => fill(e.payload ?? {}))
     const push = () =>
-      invoke('set_settings', { patch: { relays: lines('relays'), turn_urls: lines('turn-urls'), turn_secret: $('turn-secret').value.trim() } })
+      invoke('set_settings', { patch: { relays: lines('relays') } })
         .then(() => toast('Gespeichert'))
         .catch(fail)
-    for (const id of ['relays', 'turn-urls', 'turn-secret']) $(id).addEventListener('change', push)
+    for (const id of ['relays']) $(id).addEventListener('change', push)
     const patch = (p) => invoke('set_settings', { patch: p }).then(() => toast('Gespeichert')).catch(fail)
     $('own-name').addEventListener('change', () => patch({ name: $('own-name').value.trim() }))
     $('keep-link').addEventListener('change', () => patch({ keep_link: $('keep-link').checked }))
