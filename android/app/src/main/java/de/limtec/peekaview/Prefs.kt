@@ -6,14 +6,24 @@ import android.content.Context
 object Prefs {
     private fun prefs(context: Context) = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    /** An own viewer website for links; empty: the one this phone publishes over Nostr (nsite). */
-    fun site(context: Context): String = prefs(context).getString("site", "")!!.trim().trimEnd('/')
+    fun shellMode(context: Context) = prefs(context).getBoolean("shell_mode", false)
+    fun adbPort(context: Context) = prefs(context).getInt("adb_port", 0)
+    fun adbPaired(context: Context) = prefs(context).getBoolean("adb_paired", false)
+    fun markAdbPaired(context: Context) = prefs(context).edit().putBoolean("adb_paired", true).apply()
+    fun rememberAdb(context: Context, port: Int) = prefs(context).edit().putInt("adb_port", port).putBoolean("adb_paired", true).apply()
+    fun shellApps(context: Context): Set<String> = prefs(context).getStringSet("shell_apps", emptySet())!!.toSet()
 
-    fun setSite(context: Context, site: String) {
-        val clean = site.trim().trimEnd('/')
-        require(clean.isEmpty() || clean.startsWith("https://") || clean.startsWith("http://")) { "Die Zuschauer-Website muss mit https:// beginnen." }
-        prefs(context).edit().putString("site", clean).apply()
+    fun appsOnly(context: Context) = prefs(context).getBoolean("share_apps_only", false)
+    fun setAppSelection(context: Context, apps: Set<String>, only: Boolean) = prefs(context).edit()
+        .putStringSet("shell_apps", apps).putBoolean("share_apps_only", only).apply()
+
+    fun setShell(context: Context, enabled: Boolean, port: Int, apps: Set<String>) {
+        require(!enabled || android.os.Build.VERSION.SDK_INT >= 30) { "Lokale ADB-Kopplung benötigt Android 11 oder neuer." }
+        require(!enabled || port in 0..65535) { "Bitte einen gültigen Verbindungsport eingeben oder automatisch suchen lassen." }
+        prefs(context).edit().putBoolean("shell_mode", enabled).putInt("adb_port", port).putStringSet("shell_apps", apps).apply()
     }
+
+    const val VIEWER_SITE = "https://peekaview.de"
 
     /** "Raumlink beibehalten": every share uses the room (secret and presenter key) of the last one. */
     fun keepLink(context: Context) = prefs(context).getBoolean("keep_link", false)

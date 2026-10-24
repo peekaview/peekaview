@@ -2,6 +2,7 @@
 // and the join requests while nothing is shared. Opened from the tray icon; while sharing the
 // toolbar takes over (toolbar.js); settings and permanent rooms have a window of their own.
 import { icon, owl } from '../icons.js'
+import { mountRooms } from '../fixed-rooms.js'
 import { renderRequests } from './requests.js'
 
 const { invoke } = window.__TAURI__.core
@@ -22,8 +23,46 @@ let kind = 'screen'
 let selected = []
 const MAX_WINDOWS = 6
 let invite = null
+let fixedCall = null
+let fixedCallName = ''
+let destination = store.get('pv-share-destination') === 'contacts' ? 'contacts' : 'link'
+let choosingContacts = destination === 'contacts'
+mountRooms($('fixed-rooms'),{profileRoot:$('profile')})
+listen('fixed-share', ({payload}) => {
+  fixedCall = payload.id
+  fixedCallName = payload.name
+  destination = 'contacts'
+  store.set('pv-share-destination', destination)
+  choosingContacts = false
+  switching = false
+  applyInvite(null)
+  showView()
+  loadSources()
+})
+function clearFixedCall() {
+  fixedCall = null
+  fixedCallName = ''
+  choosingContacts = destination === 'contacts'
+  showView()
+}
+function chooseDestination(value) {
+  destination = value
+  store.set('pv-share-destination', destination)
+  choosingContacts = value === 'contacts'
+  if (choosingContacts) applyInvite(null)
+  else { fixedCall = null; fixedCallName = '' }
+  error()
+  showView()
+}
+for (const button of document.querySelectorAll('[data-destination]')) {
+  button.addEventListener('click', () => chooseDestination(button.dataset.destination))
+}
+$('fixed-call-change').addEventListener('click', () => chooseDestination('contacts'))
+listen('fixed-call-ended',({payload})=>{if(fixedCall===payload)clearFixedCall()})
+listen('fixed-rooms-open', () => chooseDestination('contacts'))
 // picking new sources for the running share (from its toolbar)
 let switching = false
+let permissionsReady = false
 
 // errors of this window go to PeekaView's log
 window.addEventListener('error', (e) => invoke('log_js', { message: `main: ${e.message} (${e.filename}:${e.lineno})` }).catch(() => {}))
@@ -58,25 +97,26 @@ function renderRoomChoice() {
   select.replaceChildren()
   const add = (v, label) => select.append(Object.assign(document.createElement('option'), { value: v, textContent: label }))
   add('new', 'Neuer Link')
-  add('keep', 'Letzten Link beibehalten')
-  for (const r of rooms) add(`room:${r.id}`, `Raum: ${r.name}${r.pin ? ' (PIN)' : ''}`)
-  add('manage', 'Feste Räume verwalten …')
+  add('keep', 'Letzten Link wiederverwenden')
+  for (const r of rooms) add(`room:${r.id}`, `Fester Link: ${r.name}${r.pin ? ' (PIN)' : ''}`)
+  add('manage', 'Feste Links verwalten …')
   select.value = [...select.options].some((o) => o.value === value) ? value : 'new'
 }
 $('room-choice').addEventListener('change', () => {
   const v = $('room-choice').value
   if (v === 'manage') {
-    invoke('rooms_window')
+    invoke('rooms_window', { links: true })
     return renderRoomChoice()
   }
   // "Letzten Link beibehalten" is the tray's "Raumlink beibehalten"
+  saveUi()
   if ((v === 'keep') !== !!settings.keep_link) invoke('set_settings', { patch: { keep_link: v === 'keep' } }).then((s) => (settings = s))
 })
 listen('rooms', (e) => {
   rooms = e.payload ?? []
   renderRoomChoice()
 })
-Promise.all([invoke('get_settings'), invoke('rooms_list')]).then(([s, r]) => {
+const settingsReady = Promise.all([invoke('get_settings'), invoke('rooms_list')]).then(([s, r]) => {
   settings = s ?? {}
   rooms = r ?? []
   // settings from before they were kept on the Rust side
@@ -112,8 +152,15 @@ listen('ended', (e) => {
 function showView() {
   $('cancel-switch').hidden = !switching
   $('name').hidden = switching
-  $('room-choice').hidden = switching
+  $('room-choice').hidden = switching || !!fixedCall
   $('live-badge').hidden = !switching
+  $('share-destination').hidden = switching || !!invite
+  const groups = choosingContacts && !switching
+  $('picker').hidden = groups
+  $('fixed-rooms').hidden = !groups
+  $('fixed-call-banner').hidden = groups || !fixedCall || switching
+  $('fixed-call-label').textContent = fixedCallName ? `Teilen mit ${fixedCallName}` : 'Mit Kontakt oder Gruppe teilen'
+  for (const button of document.querySelectorAll('[data-destination]')) button.setAttribute('aria-pressed', String(button.dataset.destination === destination))
   updateStart()
   highlight()
   saveUi()
@@ -126,7 +173,7 @@ $('cancel-switch').addEventListener('click', () => {
 
 // red frames around the picked windows while picking (and this window is in front)
 function highlight() {
-  const picking = document.hasFocus()
+  const picking = permissionsReady && !$('picker').hidden && document.hasFocus()
   invoke('highlight', { sources: picking ? selected : [] })
 }
 window.addEventListener('focus', () => {
@@ -156,13 +203,13 @@ function renderGrid(loading = false) {
       const index = selected.indexOf(s.id)
       card.classList.toggle('selected', index >= 0)
       card.innerHTML = '<div class="thumb"></div><div class="meta"><strong></strong><span></span></div>'
-      if (index >= 0 && s.kind === 'window') card.querySelector('.thumb').insertAdjacentHTML('beforeend', `<span class="pick">${index + 1}</span>`)
       const thumb = card.querySelector('.thumb')
       if (s.thumb) thumb.style.backgroundImage = `url("${s.thumb}")`
       else thumb.innerHTML = icon(s.kind, 32)
+      if (index >= 0 && s.kind === 'window') thumb.insertAdjacentHTML('beforeend', `<span class="pick">${index + 1}</span>`)
       // the app's name, below it the (shortened) window title – no tooltip over the picture
-      card.querySelector('strong').textContent = s.kind === 'window' ? s.app : s.title
-      card.querySelector('span').textContent = s.kind === 'window' ? s.title : s.app
+      card.querySelector('.meta strong').textContent = s.kind === 'window' ? s.app : s.title
+      card.querySelector('.meta span').textContent = s.kind === 'window' ? s.title : s.app
       card.addEventListener('click', () => select(s.id))
       card.addEventListener('dblclick', () => {
         if (!selected.includes(s.id)) select(s.id)
@@ -203,11 +250,12 @@ function updateStart() {
     : 'Klicke auf deinen Bildschirm – oder oben auf „Fenster“, um nur ein Programm zu zeigen.'
   $('start-hint').textContent = !selected.length
     ? 'Zuerst oben etwas anklicken.'
-    : switching ? '' : 'Danach den Link verschicken – die anderen öffnen ihn im Browser.'
+    : switching || fixedCall ? '' : 'Danach den Link verschicken – die anderen öffnen ihn im Browser.'
 }
 
 let loadedAt = 0
 async function loadSources() {
+  if (!permissionsReady) return
   loadedAt = Date.now()
   if (!sources.length) renderGrid(true)
   try {
@@ -227,6 +275,7 @@ for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => {
     kind = tab.dataset.kind
     for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t === tab)
+    saveUi()
     renderGrid()
     updateStart()
   })
@@ -251,7 +300,7 @@ async function start() {
   try {
     // "Letzten Link beibehalten": the same room secret and presenter key as last time;
     // a permanent room: its secret and key
-    const choice = invite ? 'new' : $('room-choice').value
+    const choice = (invite || fixedCall) ? 'new' : $('room-choice').value
     settings = await invoke('get_settings')
     const keep = choice === 'keep'
     let kept = keep ? { room: store.get('pv-keep-room'), key: store.get('pv-keep-key') } : {}
@@ -260,7 +309,7 @@ async function start() {
       kept = { room: k.secret, key: k.signingKey }
     }
     const hosted = await invoke('start_share', {
-      site: invite?.site ?? settings.site ?? '',
+      site: 'https://peekaview.de',
       name,
       sources: selected,
       room: invite?.room || kept.room || null,
@@ -270,6 +319,7 @@ async function start() {
       ice: invite?.ice ?? null,
       turnUrls: settings.turn_urls ?? [],
       turnSecret: settings.turn_secret || null,
+      fixedCall,
     })
     if (keep) {
       store.set('pv-keep-room', hosted.secret)
@@ -311,13 +361,14 @@ async function switchSource() {
 
 function applyInvite(data) {
   invite = data
-  saveUi()
+  if (invite) { fixedCall = null; fixedCallName = ''; destination = 'link'; choosingContacts = false }
+  showView()
   $('invite').hidden = !invite
   if (!invite) return
   if (invite.name) $('name').value = invite.name
   $('invite-room').textContent = 'Einladung zu einer Bildschirmfreigabe'
   // always show where the viewers will watch
-  $('invite-server').textContent = invite.site ? `Zuschauer-Website: ${new URL(invite.site).host}` : 'Zuschauer sind über die einladende Anwendung verbunden'
+  $('invite-server').textContent = 'Zuschauer-Website: peekaview.de'
   loadSources()
 }
 
@@ -337,17 +388,13 @@ function toast(text, kind = 'ok', ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms)
 }
 
-listen('permission-granted', (e) => {
-  if (e.payload === 'screen') {
-    $('perm-banner').hidden = true
-    toast('Super – es kann losgehen! PeekaView startet kurz neu …')
-    // macOS only applies the screen recording permission to a fresh process
-    setTimeout(() => invoke('restart_app'), 2500)
-  } else {
-    toast('Super – Steuern ist jetzt freigeschaltet!')
-    rememberPermissions({ accessibility: true })
-  }
+listen('permission-granted', () => {
+  if (initialized) {
+    toast('PeekaView ist freigeschaltet.')
+    invoke('main_ready')
+  } else initialize()
 })
+listen('initialize', () => initialize())
 
 // The last known permission state survives restarts: a permission granted in the meantime
 // (PeekaView or macOS restarted the app for it) is greeted right after the start.
@@ -361,40 +408,66 @@ function rememberPermissions(update) {
 }
 
 $('perm-fix').addEventListener('click', () => invoke('request_permission', { kind: 'screen' }))
-const permissionCheck = invoke('permission_status').then((status) => {
-  const before = rememberPermissions(status)
-  const justGranted = (before.screen === false && status.screen) || (before.accessibility === false && status.accessibility)
-  if (justGranted) toast('Super – es kann losgehen!', 'ok', 5000)
-  $('perm-banner').hidden = status.screen
-  if (!status.screen) invoke('request_permission', { kind: 'screen' })
-  return justGranted
-})
-
 // ------------------------------------------------------------------ continue after a restart
 
 // e.g. macOS "Beenden & erneut öffnen" after granting a permission
 function saveUi() {
-  store.set('pv-ui', JSON.stringify({ at: Date.now(), selected, kind, invite }))
+  if (!permissionsReady) return
+  store.set('pv-ui', JSON.stringify({ selected, kind, invite, switching, fixedCall, fixedCallName, destination, choosingContacts, room: $('room-choice').value }))
 }
 
-async function restoreUi() {
+async function restoreUi(hosted) {
+  await settingsReady
   let ui
   try {
     ui = JSON.parse(store.get('pv-ui') ?? 'null')
   } catch {}
-  if (ui && Date.now() - ui.at < 3 * 60 * 1000) {
-    if (ui.invite) applyInvite(ui.invite)
-    kind = ui.kind ?? 'screen'
+  if (ui) {
+    fixedCall = hosted?.fixedCall || ui.fixedCall || null
+    fixedCallName = fixedCall ? ui.fixedCallName || '' : ''
+    const savedDestination = store.get('pv-share-destination') || ui.destination
+    destination = fixedCall || ['contacts','group'].includes(savedDestination) || ui.kind === 'rooms' ? 'contacts' : 'link'
+    choosingContacts = ui.choosingContacts ?? ui.choosingGroup ?? (destination === 'contacts' && !fixedCall)
+    if (!invite && ui.invite && !fixedCall) applyInvite(ui.invite)
+    kind = ui.kind === 'window' ? 'window' : 'screen'
     for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.kind === kind)
     selected = Array.isArray(ui.selected) ? ui.selected : []
+    if ([...$('room-choice').options].some((option) => option.value === ui.room)) $('room-choice').value = ui.room
+    switching = !!hosted && !!ui.switching
   }
   await loadSources()
+  showView()
+  if (switching) await invoke('show_picker', { switching: true })
 }
 
-invoke('resume')
-  .then(async (hosted) => {
-    if (!hosted) return restoreUi()
-    const justGranted = await permissionCheck.catch(() => false)
-    invoke('toast', { text: justGranted ? 'Super – es kann losgehen! Deine Freigabe läuft weiter.' : 'Freigabe fortgesetzt – alle sind wieder verbunden.' })
-  })
-  .catch((e) => error(String(e)))
+let initializing = null
+let initialized = false
+function initialize() {
+  if (initializing) return initializing
+  initializing = (async () => {
+    if (!(await invoke('main_requested'))) return
+    const status = await invoke('permission_status')
+    const before = rememberPermissions(status)
+    $('perm-banner').hidden = status.screen
+    if (!status.screen) {
+      await invoke('request_permission', { kind: 'screen' })
+      return
+    }
+    permissionsReady = true
+    try {
+      const hosted = await invoke('resume')
+      const current = await invoke('permission_status')
+      if (!current.screen || (current.accessibilityRequired && !current.accessibility)) {
+        permissionsReady = false
+        return
+      }
+      await restoreUi(hosted)
+      if (hosted) invoke('toast', { text: 'Freigabe fortgesetzt.' })
+      else if (before.screen === false || before.accessibility === false) toast('PeekaView ist freigeschaltet.')
+    } catch (e) { error(String(e)) }
+    initialized = true
+    await invoke('main_ready')
+  })().catch((e) => error(String(e))).finally(() => { initializing = null })
+  return initializing
+}
+initialize()

@@ -110,7 +110,7 @@ const CSS = `
 /**
  * @param {HTMLElement} el
  * @param {{room: string, name: string, color?: string, relays?: string[], toolbar?: boolean, voice?: boolean,
- *          peers?: boolean, onRooms?: () => void, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
+ *          peers?: boolean, device?: string, onRooms?: () => void, onStatus?: (status: string) => void, onPeers?: (list: any[]) => void}} options
  */
 export function mountViewer(el, options) {
   const { room, name, color, relays, toolbar = true, peers = true, voice: voiceEnabled = true, onStatus, onPeers } = options
@@ -238,6 +238,8 @@ export function mountViewer(el, options) {
   // room, so a reload does not have to be let in again
   const secretKey = viewerKey(`pv-key-${String(room ?? '').slice(0, 12)}`)
   const peerId = hex(schnorr.getPublicKey(secretKey))
+  // a call over contacts: the presenter lets its members in by their device
+  const callDevice = /^[0-9a-f]{16}$/.test(options.device ?? '') ? { device: options.device } : {}
 
   const send = (m) => dc?.readyState === 'open' && dc.send(JSON.stringify(m))
 
@@ -261,7 +263,7 @@ export function mountViewer(el, options) {
     let gap = 3000
     const say = () => {
       if (destroyed || dc?.readyState === 'open') return
-      signaling?.send({ type: 'hello', from: peerId, name, color })
+      signaling?.send({ type: 'hello', from: peerId, name, color, ...callDevice })
       helloTimer = setTimeout(say, gap)
       gap = Math.min(10000, Math.round(gap * 1.6))
     }
@@ -270,7 +272,7 @@ export function mountViewer(el, options) {
   }
 
   async function onSignal(m) {
-    if (m.type === 'host' && !dc) signaling.send({ type: 'hello', from: peerId, name, color })
+    if (m.type === 'host' && !dc) signaling.send({ type: 'hello', from: peerId, name, color, ...callDevice })
     if (m.to !== peerId) return
     if (m.type === 'waiting') {
       busy = false
@@ -291,7 +293,7 @@ export function mountViewer(el, options) {
     if (m.type === 'pin-wrong') {
       pinError(m.locked ? 'Zu viele falsche Versuche – bitte später noch einmal.' : m.left ? `PIN falsch – noch ${m.left} ${m.left === 1 ? 'Versuch' : 'Versuche'}.` : 'PIN falsch.')
       // a fresh challenge comes with the next answer to our hello
-      signaling.send({ type: 'hello', from: peerId, name, color })
+      signaling.send({ type: 'hello', from: peerId, name, color, ...callDevice })
       return
     }
     if (m.type === 'denied') {

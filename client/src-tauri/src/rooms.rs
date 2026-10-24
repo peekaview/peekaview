@@ -66,6 +66,12 @@ pub struct App {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Screen {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Room {
     pub id: String,
     pub name: String,
@@ -82,6 +88,8 @@ pub struct Room {
     /// viewers may also share the whole desktop
     #[serde(default)]
     pub desktop: bool,
+    #[serde(default)]
+    pub screens: Vec<Screen>,
 }
 
 impl Room {
@@ -92,9 +100,9 @@ impl Room {
     }
 
     /// For the UI – everything but the secrets.
-    pub fn view(&self, site: &str) -> Value {
+    pub fn view(&self) -> Value {
         json!({
-            "id": self.id, "name": self.name, "link": format!("{}/#{}", site.trim().trim_end_matches('/'), self.fragment()),
+            "id": self.id, "name": self.name, "link": format!("{}/#{}", crate::settings::VIEWER_SITE, self.fragment()),
             "pin": self.pin.is_some(), "remote": self.remote, "apps": self.apps, "desktop": self.desktop,
         })
     }
@@ -105,6 +113,7 @@ impl Room {
         if self.desktop {
             list.push(json!({ "id": "desktop", "name": "Gesamter Desktop", "kind": "desktop" }));
         }
+        list.extend(self.screens.iter().map(|s|json!({"id":s.id,"name":s.name,"kind":"desktop"})));
         list
     }
 }
@@ -152,6 +161,7 @@ fn new_room(name: &str) -> Room {
         remote: false,
         apps: vec![],
         desktop: false,
+        screens: vec![],
     }
 }
 
@@ -159,7 +169,7 @@ fn new_room(name: &str) -> Room {
 pub fn save(app: &AppHandle, v: &Value) -> Result<Room, String> {
     let mut rooms = all(app);
     let name: String = v["name"].as_str().unwrap_or("").trim().chars().take(60).collect();
-    let name = if name.is_empty() { format!("Raum {}", rooms.len() + 1) } else { name };
+    let name = if name.is_empty() { format!("Link {}", rooms.len() + 1) } else { name };
     let idx = v["id"].as_str().and_then(|id| rooms.iter().position(|r| r.id == id));
     let room = match idx {
         Some(i) => &mut rooms[i],
@@ -304,6 +314,14 @@ pub fn pids_of(path: &str) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn share_link_uses_public_viewer_and_preserves_identity() {
+        let room = new_room("Team");
+        let fragment = room.fragment();
+        assert_eq!(room.view()["link"], format!("https://peekaview.de/#{fragment}"));
+        assert_eq!(room.fragment(), fragment);
+    }
 
     #[test]
     fn pin_challenge_response() {

@@ -11,7 +11,7 @@ import java.security.SecureRandom
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** Nostr basics shared by signaling and the nsite: events, signatures, publishing, npub. */
+/** Nostr events and signatures for signaling. */
 object Nostr {
     private val random = SecureRandom()
     val http: OkHttpClient = OkHttpClient.Builder().pingInterval(20, TimeUnit.SECONDS).build()

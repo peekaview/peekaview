@@ -23,6 +23,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -33,10 +35,24 @@ import org.json.JSONObject
 class ShareActivity : ComponentActivity() {
     private lateinit var web: WebView
     private var starting = false
+    private var preparing = false
     private var error: String? = null
     private var pendingName = "Android"
+    private var pendingStart = false
+    private var pendingPort = 0
+    private var helperRequested = false
+    private var adbSettingsOpen = false
+    private val adbSettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { adbSettingsOpen=false }
+    private var startGeneration = 0
+    private val setupHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var fixedCall: String? = null
+    private var openedFixedCall: String? = null
+    private val askRoomNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if(granted) RoomCalls.enable(this)
+    }
 
     private val capture = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if(!starting)return@registerForActivityResult
         val data = result.data
         if (result.resultCode != RESULT_OK || data == null) {
             starting = false
@@ -47,10 +63,19 @@ class ShareActivity : ComponentActivity() {
         val service = Intent(this, HostService::class.java)
             .putExtra(HostService.EXTRA_DATA, data)
             .putExtra(HostService.EXTRA_NAME, pendingName)
+            .putExtra("fixed_call",fixedCall)
         ContextCompat.startForegroundService(this, service)
     }
 
-    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { askCapture() }
+    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { if(starting)askCapture() }
+    private val askSetupNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if(!pendingStart)return@registerForActivityResult
+        if (granted) beginAdbSetup() else {
+            pendingStart=false;starting=false;helperRequested=false
+            error = "Erlaube PeekaView Benachrichtigungen, damit du den Kopplungscode direkt beim geöffneten Android-Dialog eingeben kannst."
+            update()
+        }
+    }
 
     // shared clipboard: files from the phone
     private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -87,11 +112,32 @@ class ShareActivity : ComponentActivity() {
         return FileProvider.getUriForFile(this, "de.limtec.peekaview.files", file) to item.mime
     }
 
-    private val listener: () -> Unit = { runOnUiThread { starting = false; update() } }
+    private val listener: () -> Unit = { runOnUiThread {
+        starting = false; update()
+        val current=HostService.host
+        if(current?.fixedCall!=null && current.link.isNotEmpty() && openedFixedCall!=current.fixedCall){
+            openedFixedCall=current.fixedCall
+            RoomCalls.open(this,current.fixedCall)
+        }
+    } }
+    private val adbListener: () -> Unit = { runOnUiThread {
+        if(pendingStart && ShellHelperService.link!=null){closeAdbSettings();continueShare()}
+        else if(pendingStart && pendingPort==0 && !AdbSetupService.active && AdbSetupService.state().optString("phase") in listOf("idle","error")){
+            pendingStart=false;starting=false;helperRequested=false
+            error=if(AdbSetupService.state().optString("phase")=="error")AdbSetupService.state().optString("message") else null
+        }
+        update()
+    } }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        fixedCall=if(savedInstanceState?.containsKey("pending_call")==true)savedInstanceState.getString("pending_call") else intent.getStringExtra("fixed_call")
+        pendingName=savedInstanceState?.getString("pending_name") ?: "Android"
+        pendingPort=savedInstanceState?.getInt("pending_port") ?: 0
+        pendingStart=savedInstanceState?.getBoolean("pending_share") == true && HostService.host==null
+        adbSettingsOpen=savedInstanceState?.getBoolean("adb_settings_open") == true
+        RoomCalls.restore(this)
         web = WebView(this)
         // edge to edge (Android 15): the page sits between status and navigation bar
         val frame = android.widget.FrameLayout(this).apply { addView(web) }
@@ -114,9 +160,17 @@ class ShareActivity : ComponentActivity() {
         web.addJavascriptInterface(Bridge(), "PeekaViewHost")
         web.loadUrl("${Assets.UI}share.html")
         HostService.listeners += listener
-        Nsite.listeners += listener
-        // the viewer site for this phone's share links, kept up to date over Nostr
-        if (Prefs.site(this).isEmpty()) Nsite.publishIfNeeded(this)
+        AdbSetupService.listeners += adbListener
+        ShellHelperService.listeners += adbListener
+        // The lifecycle reaches RESUMED after Android's onResume/onPostResume callbacks.
+        lifecycle.addObserver(LifecycleEventObserver { _,event ->
+            if(event==Lifecycle.Event.ON_RESUME && pendingStart){
+                if(!Prefs.shellMode(this) || ShellHelperService.link!=null)continueShare()
+                else if(!AdbSetupService.active)prepareHelper()
+                update()
+            }
+        })
+        if(pendingStart && ShellHelperService.link!=null)closeAdbSettings()
     }
 
     override fun onResume() {
@@ -126,13 +180,41 @@ class ShareActivity : ComponentActivity() {
         update()
     }
 
+    override fun onSaveInstanceState(outState:Bundle){
+        outState.putBoolean("pending_share",pendingStart)
+        outState.putString("pending_name",pendingName)
+        outState.putString("pending_call",fixedCall)
+        outState.putInt("pending_port",pendingPort)
+        outState.putBoolean("adb_settings_open",adbSettingsOpen)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onNewIntent(intent:Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if(pendingStart && !intent.hasExtra("fixed_call")){continueShare();return}
+        cancelStart()
+        fixedCall=intent.getStringExtra("fixed_call")
+        openedFixedCall=null
+        web.evaluateJavascript("window.pvShareInCall && window.pvShareInCall()", null)
+    }
+
     override fun onDestroy() {
+        setupHandler.removeCallbacksAndMessages(null)
+        if(isFinishing)cancelStart()
         HostService.listeners -= listener
-        Nsite.listeners -= listener
+        AdbSetupService.listeners -= adbListener
+        ShellHelperService.listeners -= adbListener
         super.onDestroy()
     }
 
     private fun askCapture() {
+        if (Prefs.shellMode(this)) {
+            ContextCompat.startForegroundService(this, Intent(this, HostService::class.java)
+                .putExtra(HostService.EXTRA_SHELL, true).putExtra(HostService.EXTRA_NAME, pendingName)
+                .putExtra("fixed_call",fixedCall))
+            return
+        }
         val projection = getSystemService(MediaProjectionManager::class.java)
         capture.launch(projection.createScreenCaptureIntent())
     }
@@ -141,11 +223,20 @@ class ShareActivity : ComponentActivity() {
         val host = HostService.host
         val o = JSONObject()
             .put("sharing", host != null)
-            .put("starting", starting)
+            .put("fixedCall", host?.fixedCall ?: fixedCall ?: JSONObject.NULL)
+            .put("starting", starting || preparing || pendingStart)
             .put("error", error ?: HostService.lastError)
             .put("controlEnabled", ControlService.enabled(this))
+            .put("shell", host?.shellMode ?: Prefs.shellMode(this))
+            .put("shellSupported", Build.VERSION.SDK_INT >= 30)
+            .put("appSharingSupported", Build.VERSION.SDK_INT >= 34)
+            .put("appsOnly", host?.appsOnly ?: Prefs.appsOnly(this))
+            .put("appVisible", host?.appVisible ?: true)
+            .put("adbSetup", AdbSetupService.state())
+            .put("adbPaired", Prefs.adbPaired(this))
+            .put("helperReady", ShellHelperService.link != null)
+            .put("notificationsAllowed", AdbSetupService.notificationsAllowed(this))
             .put("overlayAllowed", Overlay.allowed(this))
-            .put("nsite", JSONObject().put("url", Nsite.url(this)).put("state", Nsite.state.name.lowercase()).put("error", Nsite.error))
         if (host != null) {
             o.put("link", host.link).put("mode", host.mode)
             o.put("viewers", JSONArray(host.viewers().map { JSONObject().put("name", it.name).put("color", it.color) }))
@@ -161,17 +252,107 @@ class ShareActivity : ComponentActivity() {
 
     private fun toast(text: String) = android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_SHORT).show()
 
+    private fun beginAdbSetup() {
+        if(!pendingStart)return
+        error = null
+        if(pendingPort>0){
+            val generation=startGeneration
+            try {
+                ShellHelperService.activate(this,pendingPort).whenComplete{_,problem->runOnUiThread{
+                    if(isDestroyed || generation!=startGeneration || !pendingStart)return@runOnUiThread
+                    if(problem!=null){pendingStart=false;starting=false;helperRequested=false;error=problem.cause?.message ?: problem.message}
+                    else continueShare()
+                    update()
+                }}
+            }catch(e:Exception){pendingStart=false;starting=false;helperRequested=false;error=e.message;update()}
+            return
+        }
+        ContextCompat.startForegroundService(this, Intent(this, AdbSetupService::class.java))
+        update()
+        val generation=startGeneration
+        setupHandler.postDelayed({
+            if(!isDestroyed && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) && generation==startGeneration && pendingStart && ShellHelperService.link==null &&
+                AdbSetupService.state().optString("phase") in listOf("searching","pair","code"))openAdbSettings()
+        },2000)
+    }
+
+    private fun prepareHelper(){
+        if(ShellHelperService.link!=null){continueShare();return}
+        if(helperRequested)return
+        helperRequested=true
+        if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+            askSetupNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }else beginAdbSetup()
+    }
+
+    private fun continueShare(){
+        if(!pendingStart || !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))return
+        if(Prefs.shellMode(this) && ShellHelperService.link==null)return
+        if(HostService.host!=null){pendingStart=false;starting=false;helperRequested=false;error="Es läuft bereits eine Freigabe.";update();return}
+        pendingStart=false
+        helperRequested=false
+        starting=true
+        HostService.lastError=null
+        update()
+        if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED){
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }else askCapture()
+    }
+
+    private fun cancelStart(){
+        if(starting && HostService.host==null)stopService(Intent(this,HostService::class.java))
+        if(pendingStart && pendingPort>0 && ShellHelperService.link==null)stopService(Intent(this,ShellHelperService::class.java))
+        startGeneration++
+        pendingStart=false;starting=false;preparing=false;helperRequested=false;adbSettingsOpen=false
+        setupHandler.removeCallbacksAndMessages(null)
+        stopService(Intent(this,AdbSetupService::class.java))
+    }
+
+    private fun openAdbSettings() {
+        if(adbSettingsOpen)return
+        // Android 17 redacts DEVELOPMENT_SETTINGS_ENABLED to 0 for third-party apps.
+        // Open the public settings action; an actual discovered endpoint confirms the setup.
+        try {
+            adbSettingsOpen=true
+            adbSettings.launch(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+        }
+        catch (_: android.content.ActivityNotFoundException) {
+            adbSettingsOpen=false
+            error = "Öffne Androids Einstellungen selbst: „Über das Telefon“ zum Aktivieren der Entwickleroptionen, danach „System“ → „Entwickleroptionen“ → „Debugging über WLAN“."
+            update()
+        }
+    }
+
+    private fun closeAdbSettings(){
+        if(!adbSettingsOpen || isDestroyed || isFinishing)return
+        adbSettingsOpen=false
+        // Return through our own task so nested Settings pages close along with their parent.
+        startActivity(Intent(this,ShareActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    }
+
     private fun clipShareNow(id: String) {
         val (uri, mime) = shareable(id) ?: return
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Teilen"))
     }
 
     inner class Bridge {
+        @JavascriptInterface fun configureRooms(session:String) = RoomCalls.configure(this@ShareActivity,session)
+        @JavascriptInterface fun roomAccessOptions(room:String):String = RoomCalls.accessOptions(this@ShareActivity,room)
+        @JavascriptInterface fun configureRoomAccess(room:String,selection:String):String = RoomCalls.configureAccess(this@ShareActivity,room,selection)
+        @JavascriptInterface fun rooms(call:String) = runOnUiThread {RoomCalls.open(this@ShareActivity,call)}
+        @JavascriptInterface fun shareInCall(call:String) = runOnUiThread {
+            require(call.matches(Regex("[0-9a-f]{16}")))
+            startActivity(Intent(this@ShareActivity,ShareActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT).putExtra("fixed_call",call))
+        }
+        @JavascriptInterface fun shareViaLink() = runOnUiThread { fixedCall=null; update() }
+        @JavascriptInterface fun enableRoomCalls() = runOnUiThread {
+            if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this@ShareActivity,Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED) askRoomNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            else RoomCalls.enable(this@ShareActivity)
+        }
+        @JavascriptInterface fun leaveRoom(call:String) = RoomCalls.leave(this@ShareActivity,call)
         @JavascriptInterface
         fun state(): String = this@ShareActivity.state()
-
-        @JavascriptInterface
-        fun site(): String = Prefs.site(this@ShareActivity)
 
         @JavascriptInterface
         fun keepLink(): Boolean = Prefs.keepLink(this@ShareActivity)
@@ -179,55 +360,99 @@ class ShareActivity : ComponentActivity() {
         @JavascriptInterface
         fun hasPin(): Boolean = Prefs.pin(this@ShareActivity) != null
 
-        /** `usePin`: with the PIN (`pin` new, or empty = keep the one set). */
         @JavascriptInterface
-        fun start(name: String, site: String, keep: Boolean, usePin: Boolean, pin: String) {
-            runOnUiThread {
-                starting = true
-                error = null
-                update()
-            }
-            // the PIN's key takes a moment (PBKDF2) – not on the UI thread
+        fun shellSettings(): String = JSONObject().put("enabled", Prefs.shellMode(this@ShareActivity))
+            .put("port", Prefs.adbPort(this@ShareActivity)).put("appsOnly", Prefs.appsOnly(this@ShareActivity)).put("apps", PhoneApps.choices(this@ShareActivity)).toString()
+
+        @JavascriptInterface
+        fun pair(port: Int, code: String) {
             Thread {
                 val problem = try {
-                    Prefs.setSite(this@ShareActivity, site)
-                    when {
-                        !usePin -> Prefs.setPin(this@ShareActivity, null)
-                        pin.isNotBlank() -> Prefs.setPin(this@ShareActivity, pin)
-                        Prefs.pin(this@ShareActivity) == null -> throw IllegalArgumentException("Bitte eine PIN eingeben.")
-                    }
+                    LocalAdb().use { it.pairLocal(port, code) }
+                    Prefs.markAdbPaired(this@ShareActivity)
                     null
-                } catch (e: IllegalArgumentException) {
-                    e.message
+                } catch (e: Exception) {
+                    "Kopplung fehlgeschlagen: ${e.message}"
                 }
-                runOnUiThread { begin(name, site, keep, problem) }
+                runOnUiThread {
+                    web.evaluateJavascript("window.pvPairResult(${JSONObject.quote(problem ?: "")})", null)
+                }
             }.start()
         }
 
-        private fun begin(name: String, site: String, keep: Boolean, problem: String?) {
-            if (problem != null) {
-                starting = false
-                error = problem
-                update()
-                return
-            }
-            Prefs.setKeepLink(this@ShareActivity, keep)
-            pendingName = name.take(32).ifBlank { "Android" }
-            // the phone's own viewer site over Nostr – or, with an own website, not anymore
-            if (site.isBlank()) Nsite.publishIfNeeded(this@ShareActivity) else Nsite.unpublish(this@ShareActivity)
-            starting = true
-            error = null
-            HostService.lastError = null
-            update()
-            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this@ShareActivity, Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                askCapture()
-            }
+        @JavascriptInterface
+        fun debuggingSettings() = runOnUiThread { openAdbSettings() }
+
+        @JavascriptInterface
+        fun deviceInfoSettings() = runOnUiThread { startActivity(Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)) }
+
+        @JavascriptInterface
+        fun adbSetupStop() = runOnUiThread { cancelStart();error=null;update() }
+
+        @JavascriptInterface
+        fun notificationSettings() = runOnUiThread {
+            startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
         }
 
         @JavascriptInterface
-        fun stop() = runOnUiThread { stopService(Intent(this@ShareActivity, HostService::class.java)) }
+        fun setSharedApps(only: Boolean, apps: String) {
+            fun result(problem: String?) = runOnUiThread {
+                if (!isFinishing) {
+                    web.evaluateJavascript("window.pvAppsResult(${JSONObject.quote(problem ?: "")})", null)
+                    update()
+                }
+            }
+            Thread {
+                try {
+                    val json = JSONArray(apps)
+                    val ids = (0 until json.length()).map { json.getString(it) }.toSet()
+                    val selected = PhoneApps.selection(this@ShareActivity, ids, only)
+                    val current = HostService.host
+                    if (current != null) current.setApps(selected, only, ::result)
+                    else { Prefs.setAppSelection(this@ShareActivity, ids, only); result(null) }
+                } catch (e: Exception) { result(e.message ?: "App-Auswahl konnte nicht geändert werden.") }
+            }.start()
+        }
+
+        /** Prepare one share; the same action continues after Android's setup step. */
+        @JavascriptInterface
+        fun start(name: String, keep: Boolean, usePin: Boolean, pin: String, shell: Boolean, port: Int, apps: String, appsOnly: Boolean) = runOnUiThread {
+            if(starting || preparing || pendingStart || HostService.host!=null)return@runOnUiThread
+            val generation=++startGeneration
+            val call=fixedCall
+            preparing=true;helperRequested=false;error=null;HostService.lastError=null;update()
+            Thread {
+                val problem=try {
+                    val selected=JSONArray(apps)
+                    val allowed=(0 until selected.length()).map{selected.getString(it)}.toSet()
+                    require(!appsOnly || shell){"Wähle „Handy fernsteuern“, um nur ausgewählte Apps zu zeigen."}
+                    PhoneApps.selection(this@ShareActivity,allowed,appsOnly)
+                    Prefs.setShell(this@ShareActivity,shell,port,allowed)
+                    Prefs.setAppSelection(this@ShareActivity,allowed,appsOnly)
+                    if(call==null){
+                        when {
+                            !usePin->Prefs.setPin(this@ShareActivity,null)
+                            pin.isNotBlank()->Prefs.setPin(this@ShareActivity,pin)
+                            Prefs.pin(this@ShareActivity)==null->error("Bitte eine PIN eingeben.")
+                        }
+                        Prefs.setKeepLink(this@ShareActivity,keep)
+                    }
+                    null
+                }catch(e:Exception){e.message ?: "Die Freigabe konnte nicht vorbereitet werden."}
+                runOnUiThread {
+                    if(isDestroyed || generation!=startGeneration)return@runOnUiThread
+                    preparing=false;starting=false
+                    if(problem!=null){error=problem;update();return@runOnUiThread}
+                    pendingName=name.take(32).ifBlank{"Android"}
+                    pendingPort=port;pendingStart=true
+                    if(shell)prepareHelper() else continueShare()
+                    update()
+                }
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun stop() = runOnUiThread { HostService.stopCapture() }
 
         @JavascriptInterface
         fun admit(peer: String, allow: Boolean) {

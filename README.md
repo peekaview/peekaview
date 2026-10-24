@@ -17,19 +17,12 @@ Screen sharing with **pointing, drawing, remote control, voice and session recor
                      STUN for direct connections · optional own TURN (coturn) for strict firewalls
 ```
 
-## The viewer site comes over Nostr
+## The viewer site
 
-Share links point to `https://<npub>.nsite.lol/#…`, not to a web server of our own.
-- **Publishing:** the desktop client carries the viewer site and publishes it itself as an **nsite** (NIP-5A), under a key of its own:
-  - the files go to public Blossom servers, addressed by their SHA-256;
-  - a signed manifest (kind 15128) maps each path to its hash;
-  - its server list (10063) and relay list (10002) let gateways find everything.
-- **When:** again whenever the bundled site changes, and otherwise once a week.
-- **Serving:** any nsite gateway serves the same files and checks their hashes. The gateway is the https origin of the page, so it is trusted like any web host.
-- **Cleanup:** after each new version, files of earlier versions are deleted from the Blossom servers.
-- **Own site:** an address entered under Einstellungen → Zuschauer-Website (e.g. your own static hosting) replaces the nsite. The nsite is then taken down: its files are deleted, and its manifest gets a NIP-09 deletion event.
-- **Development builds:** they never publish. Links point to `http://localhost:8090` (`python3 -m http.server -d web 8090`), and a site published by an earlier test is taken down.
-- **No room data on Blossom:** only the viewer site lives on the Blossom servers. Room keys, picture, sound and clipboard files never pass through them.
+Share links always point to `https://peekaview.de/#…`, including development builds and saved links.
+The static viewer is deployed to Cloudflare by `.github/workflows/viewer.yml`.
+The fragment keeps the room secret and presenter identity; Nostr is still used for signaling,
+and screen, audio and clipboard data travel over WebRTC.
 
 ## Layout
 
@@ -125,15 +118,17 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 ## Desktop client
 
 - **Toolbar**
-  - Can be moved with the grip on its left and folded down to a small handle. The viewer's toolbar can do the same.
+  - Can be moved with the grip on its left and folded down to a small handle. The viewer's toolbar stays at the top and can be folded; shared windows initially fit below it and can be moved underneath it without scrolling.
   - Idle: Teilen (opens a picker with thumbnails) · settings · quit.
   - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
   - The selected source has a red frame on the desktop.
 - **Restarts:** after macOS restarts the app for a permission, the share continues automatically. It keeps the same room, the same link and the same mode, and viewers reconnect on their own.
-- **Permissions:** screen recording and accessibility (remote control) are granted in one go.
-  - A small helper sticks to the System Settings window and follows it.
-  - It opens the pane of each missing permission in turn, accessibility first and screen recording last, because only that one needs a restart of the app.
-  - It shows the progress, offers the app icon to drag into the list, and explains the rest with an animation instead of text.
+- **Permissions:** a checklist shows what is granted and what the requested feature needs. Screen recording is required for sharing; accessibility is requested for remote control. Viewer-only launches do not request host permissions.
+  - A small helper stays on top, takes focus when opened, and follows the System Settings window, even before screen recording is authorized.
+  - Once all permissions are granted, it closes the System Settings window only if PeekaView opened that window; an already open window is preserved.
+  - System colors and a large draggable app icon match the Settings UI. When both permissions are needed, accessibility comes first and screen recording last.
+  - The share picker stays hidden until mandatory permissions and restoration are complete. A permission restart restores the selected tab, sources, room and running share even after a long visit to Settings.
+  - It guides each action: hold the marked app icon, drag it into the app list in the marked System Settings window, release, then enable PeekaView. The click-through marker follows the settings window; a cancelled drag can be retried, and an app already in the list can skip straight to its switch.
 - **Missing accessibility during a share:** if remote control finds the permission missing, the presenter is asked right away and the viewer gets a hint.
 - **Settings**
   - viewer website address
@@ -141,28 +136,29 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - TURN servers and TURN secret
   - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
 
-## Permanent room links and remote access
+## Permanent links and remote access
 
 PeekaView keeps running in the tray / menu bar. Ending a share or closing the toolbar (×) only hides it, and a click on the tray icon brings it back. You quit PeekaView from the tray menu. Its menu offers:
-- **Raumlink beibehalten:** every share reuses the last link.
-- **Resize/Anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
+- **Letzten Link beibehalten:** every share reuses the last link.
+- **Fenster anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
   - Resizing a window resizes it here, so it shows 1:1 for them.
   - Moving a window, or arranging all side by side, moves the windows to the same relative place on their screen.
   - Picking a window (click or dock) brings it to the front here.
-- **Raumlink kopieren:** copies the link of one of the permanent rooms.
-- **Raumlinks & Remote-Zugriff …:** opens the room manager.
+- **Sprache aktiv / Transkript aktiv:** the voice channel and the local transcript of a share.
+- **Festen Link kopieren:** copies one of the permanent links.
+- **Einstellungen … / Kontakte … / Transkripte …:** settings with the permanent links, contacts and calls, saved transcripts.
 
-**Permanent room links** never change unless you renew them. You can have as many as you like, each with:
+**Permanent links** (*feste Links*) never change unless you renew them. You can have as many as you like, each with:
 - **PIN (optional):** viewers wait for approval as usual, and below that they get a PIN field. If you are not at your desk, they can come in with the PIN instead.
   - The PIN never travels: the viewer answers a one-time challenge with HMAC(PBKDF2(PIN)).
   - After 5 wrong tries a viewer is turned away. After 20 wrong tries in 10 minutes the PIN is locked for everybody.
   - Only the PBKDF2 key is stored.
-- **Remote-Zugriff:** the room waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
+- **Fernzugriff:** the link waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
   - a session in that room with remote control on;
   - the room's chosen **applications** in the dock, marked as such, and **Gesamter Desktop** if enabled.
   - Starting one launches it on this computer, or brings it forward if it runs already, and shares its window. The session ends a minute after the last viewer left.
 
-Sharing from the picker can also go into a permanent room ("Raum: …").
+Sharing from the picker can also go into a permanent link ("Fester Link: …").
 
 ## Shared clipboard
 
@@ -180,13 +176,24 @@ Everybody in the session, the presenter included, can open a small **Zwischenabl
 
 ## Session recording
 
-**Sitzung aufzeichnen** writes a self-contained HTML report to `~/Documents/PeekaView/`:
+**Transkript aktiv** in the tray menu starts a self-contained HTML report automatically with
+each share and saves it to `~/Documents/PeekaView/`. The toolbar's record button controls the
+same persistent switch.
 - **Screenshots:** a screenshot of the shared source on every click or ping (position marked) and after text entry. Keystrokes themselves are never stored.
 - **Transcript:** the conversation, placed under the matching screenshot.
   - macOS: on-device Apple speech recognition.
   - Otherwise: OpenAI `gpt-4o-transcribe`.
 
 Viewers see that the session is being recorded.
+
+**Transkripte …** in the tray menu opens an archive with dated thumbnails, newest first.
+New reports retain their contact or group identity and can be filtered by that conversation.
+Older reports remain available without an inferred association. Link-only shares are grouped by
+their room as “Freigabe per Link”; room secrets and access tokens are never stored in the report.
+Each report opens in its own PeekaView window. Existing HTML reports appear in the same archive.
+**Sprache aktiv** controls voice chat for the entire share: both microphone buttons are hidden
+when it is off. Microphones start muted; muting preserves incoming audio for listening and
+transcription. A transcript never opens a separate microphone behind the mute control.
 
 ## Performance
 
@@ -241,10 +248,9 @@ cd client && npx @tauri-apps/cli@2 build --debug --bundles app
 ```
 
 On a Mac, `./build.sh` builds the release app and installs it to `/Applications` (`--debug` for a test build).
-It signs the app with the keychain certificate "PeekaView Local" when there is one – a self-signed
-code signing certificate is enough (Keychain Access → Certificate Assistant → Create a Certificate).
-Without it the app is signed ad hoc, and macOS asks for screen recording and accessibility again
-after every build.
+The script requires the local keychain identity "ltdev" (certificate and private key), signs the complete
+bundle and verifies its signature before replacing the installed app. Use `--no-open` to install without
+launching it. Missing signing identity or build errors leave the installed version intact.
 
 CI (`.github/workflows/client.yml`) runs the unit tests and builds Windows, macOS and Linux bundles. It runs **only on demand** (Actions → "desktop client" → Run workflow), because every run builds on three platforms.
 

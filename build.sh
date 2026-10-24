@@ -1,69 +1,83 @@
 #!/usr/bin/env bash
-# Builds the PeekaView desktop app for macOS and installs it to /Applications.
-#
-#   ./build.sh            release build (viewer site over Nostr), install, start
-#   ./build.sh --debug    debug build (viewer site http://localhost:8090 for local tests)
-#   ./build.sh --no-open  install without starting it
-#
-# macOS ties granted permissions (screen recording, accessibility) to the app's signature. An ad
-# hoc signed build counts as a new app every time – the permissions are asked for again. So the
-# app is signed with the certificate "PeekaView Local" from the keychain when there is one (a
-# self-signed one is enough: Keychain Access → Certificate Assistant → Create a Certificate,
-# name "PeekaView Local", type "Code Signing"); PEEKAVIEW_SIGN_IDENTITY picks another one.
+# Local build with the keychain identity "ltdev", verified install to /Applications.
+# ./build.sh [--debug] [--no-open] [Tauri build options]
 set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
-cd "$(dirname "$0")"
-
-profile=release
 open_app=1
+build_args=(--ci)
+has_bundle=0
 for arg in "$@"; do
   case "$arg" in
-    --debug) profile=debug ;;
     --no-open) open_app=0 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
-    *) echo "Unbekannte Option: $arg" >&2; exit 1 ;;
+    --bundles|-b|--bundles=*|-b?*) has_bundle=1; build_args+=("$arg") ;;
+    *) build_args+=("$arg") ;;
   esac
 done
 
-[[ "$(uname)" == "Darwin" ]] || { echo "build.sh baut die macOS-App – bitte auf einem Mac ausführen." >&2; exit 1; }
-command -v cargo >/dev/null || { echo "Rust fehlt: https://rustup.rs" >&2; exit 1; }
-command -v npx >/dev/null || { echo "Node.js (npx) fehlt: brew install node" >&2; exit 1; }
+for tool in pnpm cargo rustc; do
+  command -v "$tool" >/dev/null || { printf 'Fehler: %s fehlt im PATH.\n' "$tool" >&2; exit 1; }
+done
+pnpm_version="$(pnpm --version)"
+[[ "${pnpm_version%%.*}" -ge 11 ]] || { echo 'Fehler: pnpm >= 11 erforderlich.' >&2; exit 1; }
 
-echo "▸ Baue PeekaView ($profile) …"
-args=(build --bundles app)
-[[ $profile == debug ]] && args+=(--debug)
-(cd client && npx --yes @tauri-apps/cli@2 "${args[@]}")
-
-app="target/$profile/bundle/macos/PeekaView.app"
-[[ -d "$app" ]] || { echo "Build fehlgeschlagen: $app fehlt" >&2; exit 1; }
-
-identity="${PEEKAVIEW_SIGN_IDENTITY:-}"
-# self-signed certificates are not "valid" for find-identity -v, but codesign takes them
-if [[ -z "$identity" ]] && security find-identity -p codesigning | grep -q '"PeekaView Local"'; then
-  identity="PeekaView Local"
-fi
-if [[ -n "$identity" ]]; then
-  echo "▸ Signiere mit: $identity"
-  codesign --force --deep --sign "$identity" "$app"
-else
-  echo "ℹ︎ Ohne Zertifikat „PeekaView Local“ fragt macOS nach jedem Build die Berechtigungen neu ab."
-  echo "  Einmalig anlegen: Schlüsselbundverwaltung → Zertifikatsassistent → Zertifikat erstellen …"
-  echo "  Name „PeekaView Local“, Identitätstyp „Selbst signierter Stamm“, Zertifikattyp „Codesignatur“."
+if [[ "$(uname -s)" == Darwin ]]; then
+  [[ "$has_bundle" == 1 ]] || build_args+=(--bundles app)
+  # Include self-signed identities: security's -v filter excludes local certificates.
+  identity="$(security find-identity -p codesigning | awk '$3 == "\"ltdev\"" && !seen[$2]++ { print $2 }')"
+  [[ "$identity" =~ ^[[:xdigit:]]{40}$ ]] || {
+    echo 'Fehler: Genau eine Codesignatur-Identität "ltdev" mit privatem Schlüssel im Schlüsselbund erforderlich.' >&2
+    exit 1
+  }
+  export APPLE_SIGNING_IDENTITY="$identity"
 fi
 
-echo "▸ Installiere nach /Applications …"
-# a running PeekaView is quit first (a running share stops)
-if pgrep -x peekaview >/dev/null; then
-  osascript -e 'tell application "PeekaView" to quit' >/dev/null 2>&1 || true
-  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x peekaview >/dev/null || break; sleep 0.5; done
-  pkill -x peekaview 2>/dev/null || true
-fi
-rm -rf /Applications/PeekaView.app
-ditto "$app" /Applications/PeekaView.app
-# peekaview:// links (join links from the viewer website) go to this copy
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/PeekaView.app || true
+[[ "$(uname -s)" == Darwin ]] || { echo 'Dieser Build benötigt macOS.' >&2; exit 1; }
+(cd client && pnpm dlx @tauri-apps/cli@2.12.4 build "${build_args[@]}" -- --locked)
 
-echo "✓ PeekaView ist installiert: /Applications/PeekaView.app"
-if [[ $open_app == 1 ]]; then
-  open /Applications/PeekaView.app
+[[ "$(uname -s)" == Darwin ]] || exit 0
+
+profile=release
+target="${CARGO_BUILD_TARGET:-}"
+for ((i=0; i<${#build_args[@]}; i++)); do
+  case "${build_args[$i]}" in
+    --target|-t) i=$((i+1)); target="${build_args[$i]}" ;;
+    --target=*) target="${build_args[$i]#*=}" ;;
+    -t?*) target="${build_args[$i]#-t}" ;;
+    --debug|-d) profile=debug ;;
+    --no-bundle|--help|-h|--version|-V) exit 0 ;;
+    --) break ;;
+  esac
+done
+app="${CARGO_TARGET_DIR:-target}${target:+/$target}/$profile/bundle/macos/PeekaView.app"
+dest="/Applications/PeekaView.app"
+[[ -d "$app" ]] || { printf 'Fehler: App-Bundle fehlt: %s\n' "$app" >&2; exit 1; }
+# Verify the seal, signing identity and microphone access before replacing anything.
+requirement="certificate leaf = H\"$identity\" and entitlement[\"com.apple.security.device.audio-input\"] exists"
+codesign --verify --deep --strict -R="$requirement" "$app"
+
+stage="$(mktemp -d /Applications/.PeekaView.XXXXXX)"
+cleanup() {
+  if [[ -d "$stage/previous.app" && ! -e "$dest" ]]; then mv -- "$stage/previous.app" "$dest"; fi
+  rm -rf -- "$stage"
+}
+trap cleanup EXIT
+ditto "$app" "$stage/PeekaView.app"
+codesign --verify --deep --strict -R="$requirement" "$stage/PeekaView.app"
+
+if pgrep -x 'peekaview' >/dev/null; then
+  osascript -e 'tell application id "de.limtec.peekaview" to quit'
+  for _ in {1..20}; do
+    pgrep -x 'peekaview' >/dev/null || break
+    sleep 0.5
+  done
+  if pgrep -x 'peekaview' >/dev/null; then
+    echo 'Fehler: PeekaView läuft noch. Offene Arbeit sichern und die App beenden; die installierte Version wurde nicht ersetzt.' >&2
+    exit 1
+  fi
 fi
+[[ ! -e "$dest" ]] || mv -- "$dest" "$stage/previous.app"
+mv -- "$stage/PeekaView.app" "$dest"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$dest"
+printf 'Installiert und mit ltdev signiert: %s\n' "$dest"
+if [[ "$open_app" == 1 ]]; then open "$dest"; fi

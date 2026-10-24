@@ -690,7 +690,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     for (const p of wanted.values()) if (!previews.has(p.id)) {
       const panel=element('section',undefined,'fr-stream'); const label=element('h3',p.person_name);const stage=element('div',undefined,'fr-viewer')
       panel.append(label,stage);streams.append(panel)
-      previews.set(p.id,{el:panel,stream:p.stream,viewer:mountViewer(stage,{room:p.stream,name:client.session.device.name,voice:false,peers:false})})
+      previews.set(p.id,{el:panel,stream:p.stream,viewer:mountViewer(stage,{room:p.stream,name:client.session.device.name,device:client.session.device.id,voice:false,peers:false})})
     }
     if (!wanted.size) {
       let wait=streams.querySelector('.fr-wait');if(!wait){wait=element('p','','fr-wait');streams.append(wait)}

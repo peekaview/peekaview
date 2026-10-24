@@ -19,7 +19,7 @@ export function renderRequests(box, list) {
     ...list.map((r) => {
       const row = document.createElement('div')
       row.className = 'request glass'
-      row.innerHTML = '<span class="who"></span><div><strong></strong><span>möchte zusehen</span></div><button class="pill secondary" data-deny>Ablehnen</button><button class="pill primary" data-allow>Zulassen</button>'
+      row.innerHTML = '<span class="who"></span><div><strong></strong><span>Möchte deine Freigabe ansehen.</span></div><button class="pill secondary" data-deny>Ablehnen</button><button class="pill primary" data-allow>Zulassen</button>'
       if (r.room) {
         const label = row.querySelector('div span')
         label.textContent = 'möchte in „'
