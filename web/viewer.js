@@ -314,12 +314,16 @@ export function mountViewer(el, options) {
     pinChallenge = null
     closePeer()
     offerId = m.id
-    // no data channel after a while: direct connections are blocked in this network
+    // no more hellos while this connection comes about: to the presenter a hello means "my
+    // connection is gone" – it would start over every few seconds and never let ICE finish
+    clearTimeout(helloTimer)
+    // no data channel after a while: direct connections are blocked in this network – say so,
+    // and try again (keeps saying so until a connection opens)
     clearTimeout(blockTimer)
     blockTimer = setTimeout(() => {
       if (dc?.readyState === 'open') return
       blocked = true
-      update()
+      lost()
     }, 15000)
     pc = new RTCPeerConnection({ iceServers: Array.isArray(m.ice) ? m.ice : [] })
     // trickle ICE: candidates go out as soon as they are found
@@ -722,7 +726,7 @@ export function mountViewer(el, options) {
                   : 'loading')
     const texts = {
       connecting: 'Verbinde direkt mit der Freigabe …',
-      blocked: 'Direkte Verbindung nicht möglich – in diesem Netz wird ein TURN-Server benötigt. Bitte die teilende Person, einen in PeekaView einzutragen.',
+      blocked: 'Die direkte Verbindung kommt nicht zustande. Auf einem Mac muss PeekaView das lokale Netzwerk nutzen dürfen (Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk). In strengen Firmennetzen braucht die teilende Person zusätzlich einen TURN-Server. PeekaView versucht es weiter …',
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',

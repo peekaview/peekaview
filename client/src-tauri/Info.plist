@@ -4,6 +4,8 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>PeekaView nutzt das Mikrofon für den Sprachkanal und – wenn du eine Sitzung aufzeichnest – für das Transkript.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>PeekaView verbindet sich direkt mit Zuschauern in deinem Netzwerk – zum Beispiel mit deinem Handy im selben WLAN.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>PeekaView wandelt das Gespräch einer aufgezeichneten Sitzung lokal auf deinem Mac in Text um.</string>
 </dict>

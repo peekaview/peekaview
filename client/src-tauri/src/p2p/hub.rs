@@ -124,6 +124,7 @@ impl PeerConnectionEventHandler for Events {
     /// trickle ICE: every local candidate goes out as soon as it is found
     async fn on_ice_candidate(&self, event: RTCPeerConnectionIceEvent) {
         if let Ok(init) = event.candidate.to_json() {
+            crate::log(&format!("p2p: viewer {} local candidate {}", self.id, candidate_kind(&init.candidate)));
             self.hub.signaling.send(&json!({ "type": "candidate", "from": "host", "to": self.peer, "id": self.id, "candidate": init }));
         }
     }
@@ -248,10 +249,22 @@ impl Hub {
                         Some((id, true)) => {
                             let never_connected = self.viewers.lock().unwrap().get(&id).is_some_and(|v| v.connected_at.is_none());
                             if never_connected {
-                                let mut failed = self.failed.lock().unwrap();
-                                let entry = failed.entry(from.clone()).or_insert((0, Instant::now()));
-                                entry.0 += 1;
-                                entry.1 = Instant::now();
+                                let first = {
+                                    let mut failed = self.failed.lock().unwrap();
+                                    let entry = failed.entry(from.clone()).or_insert((0, Instant::now()));
+                                    entry.0 += 1;
+                                    entry.1 = Instant::now();
+                                    entry.0 == 1
+                                };
+                                // let in, but no connection came about: tell the presenter what to check
+                                if first {
+                                    let hint = if cfg!(target_os = "macos") {
+                                        "Ein Zuschauer kommt nicht durch. Erlaube PeekaView unter Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk."
+                                    } else {
+                                        "Ein Zuschauer kommt nicht durch – eine Firewall blockiert die direkte Verbindung (TURN-Server in den Einstellungen)."
+                                    };
+                                    let _ = self.app.emit_to("toolbar", "toast", hint);
+                                }
                             }
                             crate::log(&format!("p2p: viewer {id} says hello again – reconnecting"));
                             self.remove(id).await;
@@ -332,6 +345,7 @@ impl Hub {
                 }
                 Some("candidate") if msg["to"] == "host" => {
                     let Ok(candidate) = serde_json::from_value::<RTCIceCandidateInit>(msg["candidate"].clone()) else { continue };
+                    crate::log(&format!("p2p: remote candidate {}", candidate_kind(&candidate.candidate)));
                     let ready = {
                         let mut viewers = self.viewers.lock().unwrap();
                         match viewers.values_mut().find(|v| v.peer == from) {
@@ -1050,5 +1064,35 @@ impl Hub {
                 let _ = track.sample_writer(ssrc, pt).write_sample(&sample).await;
             }
         }
+    }
+}
+
+/// What kind of ICE candidate this is, for the log – type, protocol and whether the address is an
+/// mDNS name (browsers hide local addresses that way), a private or a public one. No addresses.
+fn candidate_kind(candidate: &str) -> String {
+    let parts: Vec<&str> = candidate.split_whitespace().collect();
+    let protocol = parts.get(2).copied().unwrap_or("?").to_lowercase();
+    let address = parts.get(4).copied().unwrap_or("");
+    let kind = parts.iter().position(|p| *p == "typ").and_then(|i| parts.get(i + 1)).copied().unwrap_or("?");
+    let place = if address.ends_with(".local") {
+        "mDNS"
+    } else {
+        match address.parse::<std::net::IpAddr>() {
+            Ok(std::net::IpAddr::V4(ip)) if ip.is_private() || ip.is_link_local() || ip.is_loopback() => "private",
+            Ok(std::net::IpAddr::V6(ip)) if ip.is_loopback() || (ip.segments()[0] & 0xfe00) == 0xfc00 || (ip.segments()[0] & 0xffc0) == 0xfe80 => "private",
+            Ok(_) => "public",
+            Err(_) => "?",
+        }
+    };
+    format!("{kind} {protocol} {place}")
+}
+
+#[cfg(test)]
+mod candidate_tests {
+    #[test]
+    fn kinds() {
+        assert_eq!(super::candidate_kind("candidate:1 1 udp 2122260223 4f1c9e2e-8a3b-4c3e-9b1a-0c6f2d7e8a11.local 54321 typ host generation 0"), "host udp mDNS");
+        assert_eq!(super::candidate_kind("candidate:2 1 UDP 1686052607 203.0.113.7 61000 typ srflx raddr 0.0.0.0 rport 0"), "srflx udp public");
+        assert_eq!(super::candidate_kind("candidate:3 1 udp 2122260223 192.168.178.20 50000 typ host"), "host udp private");
     }
 }

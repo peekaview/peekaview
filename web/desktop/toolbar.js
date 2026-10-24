@@ -222,7 +222,11 @@ function toast(text, kind = 'ok', ms = 3500) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms)
 }
-listen('toast', (e) => toast(String(e.payload)))
+// long hints stay long enough to read
+listen('toast', (e) => {
+  const text = String(e.payload)
+  toast(text, text.length > 60 ? 'info' : 'ok', Math.max(3500, text.length * 70))
+})
 listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – Steuern ist jetzt freigeschaltet!'))
 
 // the share ends: voice and recording stop; the window goes
