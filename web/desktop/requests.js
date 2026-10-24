@@ -29,8 +29,14 @@ export function renderRequests(box, list) {
       who.textContent = initials(r.name || 'Gast')
       who.style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'
       row.querySelector('strong').textContent = r.name || 'Gast'
-      row.querySelector('[data-allow]').addEventListener('click', () => invoke('admit', { peer: r.peer, allow: true }))
-      row.querySelector('[data-deny]').addEventListener('click', () => invoke('admit', { peer: r.peer, allow: false }))
+      // answered: right away, not only when the list comes back
+      const answer = (allow) => {
+        for (const b of row.querySelectorAll('button')) b.disabled = true
+        row.querySelector(allow ? '[data-allow]' : '[data-deny]').textContent = allow ? 'Wird zugelassen …' : 'Abgelehnt'
+        invoke('admit', { peer: r.peer, allow })
+      }
+      row.querySelector('[data-allow]').addEventListener('click', () => answer(true))
+      row.querySelector('[data-deny]').addEventListener('click', () => answer(false))
       return row
     }),
   )
@@ -38,7 +44,11 @@ export function renderRequests(box, list) {
     const all = document.createElement('button')
     all.className = 'pill secondary all'
     all.innerHTML = `${icon('check', 14)}Alle ${list.length} zulassen`
-    all.addEventListener('click', () => invoke('admit', { allow: true }))
+    all.addEventListener('click', () => {
+      for (const b of box.querySelectorAll('button')) b.disabled = true
+      all.textContent = 'Alle werden zugelassen …'
+      invoke('admit', { allow: true })
+    })
     box.append(all)
   }
 }

@@ -14,7 +14,7 @@ const address=`127.0.0.1:${portProbe.address().port}`
 await new Promise(resolve=>portProbe.close(resolve))
 const api=`http://${address}/api.php`
 const processPhp=spawn('php',['-d',`sendmail_path=php ${resolve(here,'mail.php')}`,'-S',address,'-t',resolve(here,'../public')],{
-  env:{...process.env,PEEKAVIEW_DATA_DIR:resolve(folder,'data'),PEEKAVIEW_TEST_MAILBOX:resolve(folder,'mail'),PEEKAVIEW_API_URL:api,PEEKAVIEW_MAIL_FROM:'test@example.test',PEEKAVIEW_SITE:'http://127.0.0.1:8872',PEEKAVIEW_ORIGINS:'http://127.0.0.1:8872'},stdio:['ignore','ignore','pipe'],
+  env:{...process.env,PEEKAVIEW_DATA_DIR:resolve(folder,'data'),PEEKAVIEW_TEST_MAILBOX:resolve(folder,'mail'),PEEKAVIEW_API_URL:api,PEEKAVIEW_MAIL_FROM:'test@example.test',PEEKAVIEW_SITE:'http://127.0.0.1:8872',PEEKAVIEW_ORIGINS:'http://127.0.0.1:8872',PEEKAVIEW_TURN_URLS:'turn:turn.example.test:3478?transport=udp',PEEKAVIEW_TURN_SECRET:'test-turn-secret'},stdio:['ignore','ignore','pipe'],
 })
 let logs='';processPhp.stderr.on('data',d=>{logs+=d})
 async function request(action,body,token){
@@ -29,6 +29,11 @@ try {
     await new Promise(r=>setTimeout(r,100))
   }
   assert.ok(ready,'PHP-Testserver ist nicht bereit: '+logs)
+  // presenters get short-lived TURN credentials without an account; the secret stays here
+  const turn=await request('turn',{});assert.equal(turn.response.status,200)
+  assert.deepEqual(turn.data.iceServers[0].urls,['turn:turn.example.test:3478?transport=udp'])
+  assert.match(turn.data.iceServers[0].username,/^\d+:peekaview$/)
+  assert.equal(JSON.stringify(turn.data).includes('test-turn-secret'),false)
   const unauth=await request('state');assert.equal(unauth.response.status,401)
   const bad=await fetch(`${api}?action=config`,{headers:{Origin:'https://evil.example.test'}});assert.equal(bad.status,403)
   async function register(email,name){

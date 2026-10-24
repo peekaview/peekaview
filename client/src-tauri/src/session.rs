@@ -347,7 +347,13 @@ pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, Stri
     let secret = opts.room.clone().filter(|r| valid_secret(r)).unwrap_or_else(signal::new_room_secret);
     let signing_key = opts.signing_key.as_deref().and_then(parse_key).unwrap_or_else(signal::new_signing_key);
     let key_hex: String = signing_key.iter().map(|b| format!("{b:02x}")).collect();
-    let ice = opts.ice.clone().filter(Value::is_array).unwrap_or_else(|| turn::ice_servers(&opts.turn_urls, opts.turn_secret.as_deref(), "peekaview"));
+    let ice = match opts.ice.clone().filter(Value::is_array) {
+        Some(ice) => ice,
+        None => {
+            let (urls, secret) = (opts.turn_urls.clone(), opts.turn_secret.clone());
+            tauri::async_runtime::spawn_blocking(move || turn::ice_for_share(&urls, secret.as_deref())).await.map_err(|e| e.to_string())?
+        }
+    };
     let relays: Vec<String> = if opts.relays.is_empty() { signal::DEFAULT_RELAYS.iter().map(|r| r.to_string()).collect() } else { opts.relays.clone() };
 
     let (out_tx, out_rx) = mpsc::unbounded_channel::<String>();
@@ -404,7 +410,16 @@ pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, Stri
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
     let link = format!("{site}/#{room}");
     // secret + signing key let the UI keep the same link for the next share
-    let hosted = json!({ "room": room, "link": link, "ice": ice, "secret": secret, "signingKey": key_hex, "fixedCall": opts.fixed_call });
+    // how long the link works: a permanent link always, a kept one also for the next shares,
+    // otherwise only while this share runs
+    let link_kind = if crate::rooms::by_secret(&app, &secret).is_some() {
+        "fixed"
+    } else if crate::settings::get(&app)["keep_link"] == true {
+        "kept"
+    } else {
+        "once"
+    };
+    let hosted = json!({ "room": room, "link": link, "linkKind": link_kind, "ice": ice, "secret": secret, "signingKey": key_hex, "fixedCall": opts.fixed_call });
     *LIVE.lock().unwrap() = Some(hosted.clone());
     if let Some(call)=opts.fixed_call.clone(){
         let stream=room.clone();

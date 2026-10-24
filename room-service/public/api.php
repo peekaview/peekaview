@@ -52,6 +52,11 @@ try {
     $device = $token !== '' ? $service->device($token) : null;
     if ($action === 'config' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $result=['vapidPublicKey'=>getenv('PEEKAVIEW_VAPID_PUBLIC_KEY') ?: null];
+    } elseif ($action === 'turn' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        // short-lived TURN credentials for a presenter (coturn use-auth-secret): nobody has to
+        // set up a TURN server, and the secret never leaves this server
+        $service->limit('turn:'.($_SERVER['REMOTE_ADDR'] ?? ''),120,3600);
+        $result=['iceServers'=>Rooms::turnServers(getenv('PEEKAVIEW_TURN_URLS') ?: '',getenv('PEEKAVIEW_TURN_SECRET') ?: '',time())];
     } elseif ($action === 'invitation/preview' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $service->limit('preview:'.($_SERVER['REMOTE_ADDR'] ?? ''),60,60);
         $result=$service->preview((string)($body['invitation'] ?? ''));

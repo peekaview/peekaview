@@ -314,12 +314,16 @@ export function mountViewer(el, options) {
     pinChallenge = null
     closePeer()
     offerId = m.id
-    // no data channel after a while: direct connections are blocked in this network
+    // no more hellos while this connection comes about: to the presenter a hello means "my
+    // connection is gone" – it would start over every few seconds and never let ICE finish
+    clearTimeout(helloTimer)
+    // no data channel after a while: direct connections are blocked in this network – say so,
+    // and try again (keeps saying so until a connection opens)
     clearTimeout(blockTimer)
     blockTimer = setTimeout(() => {
       if (dc?.readyState === 'open') return
       blocked = true
-      update()
+      lost()
     }, 15000)
     pc = new RTCPeerConnection({ iceServers: Array.isArray(m.ice) ? m.ice : [] })
     // trickle ICE: candidates go out as soon as they are found
@@ -722,7 +726,7 @@ export function mountViewer(el, options) {
                   : 'loading')
     const texts = {
       connecting: 'Verbinde direkt mit der Freigabe …',
-      blocked: 'Direkte Verbindung nicht möglich – in diesem Netz wird ein TURN-Server benötigt. Bitte die teilende Person, einen in PeekaView einzutragen.',
+      blocked: 'Die Verbindung kommt gerade nicht zustande – PeekaView versucht es weiter … Teilt jemand von einem Mac, muss PeekaView dort das lokale Netzwerk nutzen dürfen (Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk).',
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
@@ -800,6 +804,7 @@ export function mountViewer(el, options) {
     if (!me) return
     send({ t: 'clear' })
     wm.clearOwn(me.id)
+    toast('Deine Zeichnungen sind gelöscht.')
   }
 
   /** Light enough that white initials would vanish (the presenter is white by default). */

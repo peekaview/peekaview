@@ -95,6 +95,22 @@ final class Rooms
         if ($v === '' || strlen($v) > $max || preg_match('/[\x00-\x1f]/', $v)) throw new Problem(400, "Ungültiges Feld: $key");
         return $v;
     }
+    /** How long TURN credentials are valid: a long share keeps its relay. */
+    public const TURN_TTL = 8 * 3600;
+
+    /**
+     * TURN servers with credentials as coturn's use-auth-secret expects them: username
+     * "expiry:peekaview", password base64(HMAC-SHA1(secret, username)). Empty without configuration.
+     * @return list<array{urls:list<string>,username:string,credential:string}>
+     */
+    public static function turnServers(string $urls, string $secret, int $now): array
+    {
+        $list = array_values(array_filter(array_map('trim', explode(',', $urls)), static fn(string $u): bool => (bool)preg_match('/^turns?:[^\s]+$/', $u)));
+        if (!$list || $secret === '') return [];
+        $username = ($now + self::TURN_TTL).':peekaview';
+        return [['urls' => $list, 'username' => $username, 'credential' => base64_encode(hash_hmac('sha1', $username, $secret, true))]];
+    }
+
     public function limit(string $key, int $max, int $seconds): void
     {
         $this->run('INSERT INTO limits(key,count,start) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN start < ? THEN 1 ELSE count+1 END, start=CASE WHEN start < ? THEN excluded.start ELSE start END', [$key, time(), time()-$seconds, time()-$seconds]);

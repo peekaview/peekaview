@@ -14,7 +14,7 @@ Screen sharing with **pointing, drawing, remote control, voice and session recor
  └──────────────┬───────────────┘                                            └──────────┬───────────┘
                 │      connection setup only (encrypted, a few KB):                     │
                 └─────────────▶  public Nostr relays  ◀─────────────────────────────────┘
-                     STUN for direct connections · optional own TURN (coturn) for strict firewalls
+                     STUN for direct connections · TURN from the PeekaView service for strict firewalls
 ```
 
 ## The viewer site
@@ -61,10 +61,9 @@ and screen, audio and clipboard data travel over WebRTC.
 **Firewalls**
 - STUN usually gets a direct connection.
 - Where it does not, a TURN server relays the encrypted traffic. Typical cases are symmetric NAT on both sides or corporate firewalls blocking UDP.
-- TURN is optional; an existing coturn with `use-auth-secret` works, for example the one from v1.
-- The **TURN secret only lives in the desktop client** (settings), or an integration hands over ready-made credentials.
-- From it the client derives short-lived credentials for each session and passes them to the viewers inside the encrypted signaling. The website never contains a secret.
-- If a viewer cannot connect, they get a clear message after 15 s saying that a TURN server is needed.
+- Nobody sets up a TURN server: the presenter fetches short-lived credentials from the PeekaView service (`room-service`, `?action=turn`). It derives them from the `static-auth-secret` of a coturn with `use-auth-secret`, which only the service knows; no secret is in the apps or on the website. An integration can still hand over ready-made credentials.
+- The presenter passes them to the viewers inside the encrypted signaling.
+- If a viewer still cannot connect, they get a message after 15 s and the presenter a hint in the toolbar; both keep trying.
 
 **Who gets in**
 - Every viewer has to be **let in by the presenter**. The toolbar shows each request with "Zulassen" or "Ablehnen", and "Alle zulassen" when several are waiting.
@@ -133,7 +132,6 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 - **Settings**
   - viewer website address
   - Nostr relays
-  - TURN servers and TURN secret
   - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
 
 ## Permanent links and remote access

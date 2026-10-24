@@ -49,6 +49,12 @@ bleiben Peer-to-Peer; der Dienst speichert keine Aufnahmen oder Transkripte.
 `room-sw.js`. Standard: `https://peekaview.de`. Die aktualisierten Viewer-Dateien
 müssen vor Einladungen veröffentlicht sein. Alternativ den öffentlichen Viewer
 aus `deploy/dist/` selbst hosten und `PEEKAVIEW_SITE` entsprechend setzen.
+`PEEKAVIEW_TURN_URLS` (kommasepariert, z. B. `turn:turn.example.org:3478?transport=udp,turn:turn.example.org:3478?transport=tcp`)
+und `PEEKAVIEW_TURN_SECRET` (das `static-auth-secret` eines coturn mit `use-auth-secret`) in
+`.env` eintragen: Dann holt sich jede teilende Person unter `?action=turn` kurzlebige
+TURN-Zugangsdaten (8 Stunden gültig, höchstens 120 Abrufe pro IP und Stunde). Das Secret bleibt
+auf dem Server; ohne diese Einträge gibt es nur direkte Verbindungen.
+
 `PEEKAVIEW_ORIGINS` kann bei eigener Viewer-Domain um die exakte Origin ergänzt
 werden (kommasepariert; Desktop und Android benötigen zusätzlich ihre in
 `public/api.php` aufgeführten lokalen Origins).

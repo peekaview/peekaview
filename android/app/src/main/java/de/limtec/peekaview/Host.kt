@@ -113,10 +113,15 @@ class Host(
     private val source: VideoSource
     private val track: VideoTrack
     private val textures: SurfaceTextureHelper
-    private val ice = listOf(PeerConnection.IceServer.builder(listOf("stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478")).createIceServer())
-    private val iceJson = JSONArray().put(JSONObject().put("urls", JSONArray().put("stun:stun.l.google.com:19302").put("stun:stun.cloudflare.com:3478")))
+    // STUN right away, TURN from PeekaView's service as soon as it answered (phones on mobile
+    // data, strict firewalls)
+    @Volatile private var ice = Turn.iceServers(null)
+    @Volatile private var iceJson = Turn.iceJson(null)
 
     init {
+        Thread {
+            Turn.fromService()?.let { turn -> post { ice = Turn.iceServers(turn); iceJson = Turn.iceJson(turn) } }
+        }.start()
         // the user (or the system) stopped the capture
         shell = if (shellMode) ShellCapture(checkNotNull(ShellHelperService.link) { "Shell-Helfer ist nicht aktiv. Bitte erneut aktivieren." }, { post { broadcast(state()); changed() } }, onEnded, appsOnly, apps) else null
         capturer = shell ?: ScreenCapture(requireNotNull(projectionData)) { onEnded(null) }

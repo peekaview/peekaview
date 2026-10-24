@@ -320,7 +320,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     summary.append(avatar(device),document.createTextNode('Profil'));profile.append(summary)
     const panel=element('section',undefined,'fr-profile-panel');panel.setAttribute('aria-label','Dein Profil')
     const heading=element('div',undefined,'fr-profile-head')
-    const reload=button('',()=>refresh(),'fr-icon-button');reload.innerHTML=icon('refresh',16);reload.title='Neu laden';reload.setAttribute('aria-label','Neu laden')
+    const reload=button('',async()=>{await refresh();notice.textContent='Aktualisiert.'},'fr-icon-button');reload.innerHTML=icon('refresh',16);reload.title='Neu laden';reload.setAttribute('aria-label','Neu laden')
     heading.append(element('h3','Dein Profil'),reload)
     panel.append(heading,element('p',device.email,'fr-profile-email'),element('strong','Deine Geräte'))
     const devices=element('div',undefined,'fr-profile-devices')

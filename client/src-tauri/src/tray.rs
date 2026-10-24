@@ -1,6 +1,7 @@
 //! Tray / menu bar icon: a click opens the PeekaView window to pick what to share – or, while
-//! sharing, brings up the toolbar; its menu has the running share's controls, the switches, the
-//! permanent rooms, the last viewer connections and the settings.
+//! sharing, brings up the toolbar. Its menu is ordered by what people want to do: share (or
+//! control the running share), call contacts, watch again; then permanent links, the options
+//! (one submenu, so the switches do not crowd the actions), transcripts and settings.
 
 use serde_json::json;
 use tauri::{
@@ -13,7 +14,8 @@ use crate::session::Mode;
 
 const ID: &str = "peekaview";
 
-const MODES: [(Mode, &str); 3] = [(Mode::View, "Zusehen"), (Mode::Draw, "Zeigen & Malen"), (Mode::Control, "Steuern")];
+// the same names as on the toolbar, with what they mean
+const MODES: [(Mode, &str); 3] = [(Mode::View, "Ansehen – nur zusehen"), (Mode::Draw, "Zeigen – zeigen und malen"), (Mode::Control, "Steuern – Maus und Tastatur")];
 
 /// The tray icon's click: an open PeekaView window closes; otherwise the running share's
 /// toolbar comes up, or the PeekaView window to pick what to share.
@@ -42,7 +44,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let links: Vec<MenuItem<Wry>> = rooms
         .iter()
         .map(|r| {
-            let label = format!("{}{}{}", r.name, if r.pin.is_some() { " · PIN" } else { "" }, if r.remote { " · Remote" } else { "" });
+            let label = format!("{}{}{}", r.name, if r.pin.is_some() { " · PIN" } else { "" }, if r.remote { " · Fernzugriff" } else { "" });
             MenuItem::with_id(app, format!("copy:{}", r.id), label, true, None::<&str>)
         })
         .collect::<tauri::Result<_>>()?;
@@ -58,18 +60,28 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .enumerate()
         .map(|(i, r)| MenuItem::with_id(app, format!("join:{i}"), r.label(), true, None::<&str>))
         .collect::<tauri::Result<_>>()?;
-    let no_recent = MenuItem::with_id(app, "recent-none", "Noch keine", false, None::<&str>)?;
+    let no_recent = MenuItem::with_id(app, "recent-none", "Noch nichts angesehen", false, None::<&str>)?;
     let mut recent_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = recent.iter().map(|l| l as &dyn tauri::menu::IsMenuItem<Wry>).collect();
     if recent_refs.is_empty() {
         recent_refs.push(&no_recent);
     }
-    let recent = Submenu::with_items(app, "Letzte Verbindungen", true, &recent_refs)?;
+    let recent = Submenu::with_items(app, "Wieder ansehen", true, &recent_refs)?;
+    // the switches in one place, named by what they do
+    let options: Vec<CheckMenuItem<Wry>> = vec![
+        CheckMenuItem::with_id(app, "keep_link", "Gleichen Link wiederverwenden", true, settings["keep_link"] == true, None::<&str>)?,
+        CheckMenuItem::with_id(app, "allow_resize", "Zuschauer dürfen Fenster anordnen", true, settings["allow_resize"] == true, None::<&str>)?,
+        CheckMenuItem::with_id(app, "voice_enabled", "Sprachchat", true, settings["voice_enabled"] != false, None::<&str>)?,
+        CheckMenuItem::with_id(app, "transcript_enabled", "Gespräch mitschreiben (Transkript)", true, settings["transcript_enabled"] == true, None::<&str>)?,
+    ];
+    let option_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = options.iter().map(|o| o as &dyn tauri::menu::IsMenuItem<Wry>).collect();
+    let options = Submenu::with_items(app, "Optionen", true, &option_refs)?;
     let live = crate::session::live(app);
     let mut items: Vec<Box<dyn tauri::menu::IsMenuItem<Wry>>> = Vec::new();
     match &live {
         Some((_, mode)) => {
-            items.push(Box::new(MenuItem::with_id(app, "open", "Freigabe läuft …", true, None::<&str>)?));
-            items.push(Box::new(MenuItem::with_id(app, "copy_live", "Link kopieren", true, None::<&str>)?));
+            items.push(Box::new(MenuItem::with_id(app, "open", "Freigabe läuft – Leiste zeigen", true, None::<&str>)?));
+            items.push(Box::new(MenuItem::with_id(app, "copy_live", "Link zum Zuschauen kopieren", true, None::<&str>)?));
+            items.push(Box::new(MenuItem::with_id(app, "switch", "Etwas anderes teilen …", true, None::<&str>)?));
             let modes: Vec<CheckMenuItem<Wry>> = MODES
                 .iter()
                 .map(|(m, label)| CheckMenuItem::with_id(app, format!("mode:{}", m.as_str()), *label, true, m == mode, None::<&str>))
@@ -78,19 +90,15 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             items.push(Box::new(Submenu::with_items(app, "Zuschauer dürfen", true, &refs)?));
             items.push(Box::new(MenuItem::with_id(app, "stop", "Freigabe beenden", true, None::<&str>)?));
         }
-        None => items.push(Box::new(MenuItem::with_id(app, "open", "Teilen …", true, None::<&str>)?)),
+        None => items.push(Box::new(MenuItem::with_id(app, "open", "Bildschirm teilen …", true, None::<&str>)?)),
     }
+    items.push(Box::new(MenuItem::with_id(app, "fixed_rooms", "Kontakte anrufen …", true, None::<&str>)?));
     items.push(Box::new(recent));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "keep_link", "Letzten Link beibehalten", true, settings["keep_link"] == true, None::<&str>)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "allow_resize", "Fenster anordnen erlauben", true, settings["allow_resize"] == true, None::<&str>)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "voice_enabled", "Sprache aktiv", true, settings["voice_enabled"] != false, None::<&str>)?));
-    items.push(Box::new(CheckMenuItem::with_id(app, "transcript_enabled", "Transkript aktiv", true, settings["transcript_enabled"] == true, None::<&str>)?));
-    items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(copy));
-    items.push(Box::new(MenuItem::with_id(app, "rooms", "Einstellungen …", true, None::<&str>)?));
-    items.push(Box::new(MenuItem::with_id(app, "fixed_rooms", "Kontakte …", true, None::<&str>)?));
+    items.push(Box::new(options));
     items.push(Box::new(MenuItem::with_id(app, "transcripts", "Transkripte …", true, None::<&str>)?));
+    items.push(Box::new(MenuItem::with_id(app, "rooms", "Einstellungen …", true, None::<&str>)?));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(MenuItem::with_id(app, "quit", "PeekaView beenden", true, None::<&str>)?));
     let refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = items.iter().map(|i| i.as_ref()).collect();
@@ -125,6 +133,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                     }
                 }
                 "stop" => crate::session::stop(app, None, true),
+                "switch" => crate::show_picker(app.clone(), true),
                 "keep_link" | "allow_resize" | "voice_enabled" | "transcript_enabled" => {
                     let value = &crate::settings::get(app)[&id];
                     let on = if id == "voice_enabled" { value == false } else { value != true };

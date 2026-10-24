@@ -70,7 +70,11 @@ if (id) {
   } catch (error) { fail(error) }
 } else {
   $('conversation').addEventListener('change',load)
-  $('refresh').addEventListener('click', load)
+  $('refresh').addEventListener('click', async () => {
+    $('refresh').classList.add('busy')
+    $('refresh').disabled = true
+    try { await load() } finally { $('refresh').classList.remove('busy'); $('refresh').disabled = false }
+  })
   await listen('transcripts-changed', load)
   await load()
 }

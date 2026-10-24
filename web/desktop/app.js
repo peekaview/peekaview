@@ -91,12 +91,18 @@ listen('toast', (e) => toast(String(e.payload)))
 // a new link, the last one again ("Raumlink beibehalten", also in the tray menu), or a permanent room
 
 let rooms = []
+// how long the chosen link works
+function linkValidity() {
+  const choice = $('room-choice').value
+  return choice === 'keep' ? 'Er bleibt auch für deine nächsten Freigaben gleich.' : choice.startsWith('room:') ? 'Ein fester Link bleibt immer gleich.' : 'Er gilt nur für diese Freigabe.'
+}
+
 function renderRoomChoice() {
   const select = $('room-choice')
   const value = select.value || (settings.keep_link ? 'keep' : 'new')
   select.replaceChildren()
   const add = (v, label) => select.append(Object.assign(document.createElement('option'), { value: v, textContent: label }))
-  add('new', 'Neuer Link')
+  add('new', 'Neuer Link (einmalig)')
   add('keep', 'Letzten Link wiederverwenden')
   for (const r of rooms) add(`room:${r.id}`, `Fester Link: ${r.name}${r.pin ? ' (PIN)' : ''}`)
   add('manage', 'Feste Links verwalten …')
@@ -108,8 +114,9 @@ $('room-choice').addEventListener('change', () => {
     invoke('rooms_window', { links: true })
     return renderRoomChoice()
   }
-  // "Letzten Link beibehalten" is the tray's "Raumlink beibehalten"
+  // "Letzten Link wiederverwenden" is the tray's "Letzten Link beibehalten"
   saveUi()
+  updateStart()
   if ((v === 'keep') !== !!settings.keep_link) invoke('set_settings', { patch: { keep_link: v === 'keep' } }).then((s) => (settings = s))
 })
 listen('rooms', (e) => {
@@ -250,7 +257,7 @@ function updateStart() {
     : 'Klicke auf deinen Bildschirm – oder oben auf „Fenster“, um nur ein Programm zu zeigen.'
   $('start-hint').textContent = !selected.length
     ? 'Zuerst oben etwas anklicken.'
-    : switching || fixedCall ? '' : 'Danach den Link verschicken – die anderen öffnen ihn im Browser.'
+    : switching || fixedCall ? '' : `Danach den Link verschicken – die anderen öffnen ihn im Browser. ${linkValidity()}`
 }
 
 let loadedAt = 0
@@ -280,7 +287,18 @@ for (const tab of document.querySelectorAll('.tab')) {
     updateStart()
   })
 }
-$('refresh').addEventListener('click', loadSources)
+$('refresh').addEventListener('click', async () => {
+  const b = $('refresh')
+  b.classList.add('busy')
+  b.disabled = true
+  try {
+    await loadSources()
+    toast('Liste aktualisiert', 'ok', 1500)
+  } finally {
+    b.classList.remove('busy')
+    b.disabled = false
+  }
+})
 
 // ------------------------------------------------------------------ sharing
 
@@ -297,6 +315,8 @@ async function start() {
   const name = $('name').value.trim() || 'Host'
   store.set('pv-name', $('name').value.trim())
   $('start').disabled = true
+  // starting takes a moment (capture, connection data): say so
+  $('start-label').textContent = 'Wird gestartet …'
   try {
     // "Letzten Link beibehalten": the same room secret and presenter key as last time;
     // a permanent room: its secret and key
@@ -439,6 +459,13 @@ async function restoreUi(hosted) {
   showView()
   if (switching) await invoke('show_picker', { switching: true })
 }
+
+// local network access (macOS): without it phones in the same Wi-Fi never connect
+const showNetwork = (allowed) => ($('net-banner').hidden = allowed !== false)
+listen('local-network', (e) => showNetwork(!!e.payload))
+invoke('local_network_status').then(showNetwork).catch(() => {})
+window.addEventListener('focus', () => invoke('local_network_status').then(showNetwork).catch(() => {}))
+$('net-fix').addEventListener('click', () => invoke('open_local_network_settings').catch((e) => error(String(e))))
 
 let initializing = null
 let initialized = false
