@@ -55,6 +55,9 @@ jobs:
     # Apple Silicon; the apple-metal crate needs the macOS 26 SDK (Xcode 26)
     runs-on: macos-26
     timeout-minutes: 60
+    env:
+      # Developer ID signing and notarization; secrets are missing for pull requests from forks
+      DEVELOPER_ID: ${{ secrets.CSC_LINK != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
@@ -66,19 +69,89 @@ jobs:
       - name: Unit tests
         run: cargo test -p peekaview --locked
 
-      # what build.sh does, without installing to /Applications and without a keychain
-      # certificate: signed ad hoc, so macOS asks for the permissions again with every build
+      # what build.sh does, without installing to /Applications
       - name: Build app
         working-directory: client
         run: npx --yes @tauri-apps/cli@2 build --bundles app
 
-      - name: Sign ad hoc and zip
+      # Developer ID certificate (base64 .p12 in CSC_LINK) in a keychain of its own
+      - name: Import Developer ID certificate
+        if: env.DEVELOPER_ID == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(openssl rand -hex 24)
+          p12="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$CSC_LINK" | base64 --decode > "$p12" \
+            || { echo "::error::CSC_LINK is not a base64 encoded .p12"; exit 1; }
+          # validity of the certificate(s) in the .p12, for the log
+          /usr/bin/openssl pkcs12 -in "$p12" -nokeys -passin env:CSC_KEY_PASSWORD 2>/dev/null \
+            | /usr/bin/openssl x509 -noout -subject -enddate || true
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign \
+            || { echo "::error::Cannot import CSC_LINK (wrong CSC_KEY_PASSWORD?)"; exit 1; }
+          rm "$p12"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+          identity=$(security find-identity -v -p codesigning "$keychain" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -n 1 | tr -d '"')
+          [ -n "$identity" ] \
+            || { echo "::error::No valid 'Developer ID Application' certificate in CSC_LINK (expired or revoked?)"; exit 1; }
+          echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "SIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      # hardened runtime with the entitlements of client/src-tauri/entitlements.plist; without the
+      # secrets (pull requests from forks) signed ad hoc, so macOS asks for the permissions again
+      # with every build
+      - name: Sign
         working-directory: target/release/bundle/macos
         run: |
-          codesign --force --deep --sign - PeekaView.app
-          codesign --verify --deep --strict PeekaView.app
-          # ditto keeps the bundle's symlinks and executable bits (upload-artifact does not)
-          ditto -c -k --keepParent PeekaView.app PeekaView-macos-arm64.zip
+          if [ "$DEVELOPER_ID" = true ]; then
+            codesign --force --options runtime --timestamp --keychain "$SIGN_KEYCHAIN" \
+              --entitlements "$GITHUB_WORKSPACE/client/src-tauri/entitlements.plist" \
+              --sign "$SIGN_IDENTITY" PeekaView.app
+          else
+            codesign --force --sign - PeekaView.app
+          fi
+          codesign --verify --strict --verbose=2 PeekaView.app
+          codesign --display --verbose=2 --entitlements - PeekaView.app
+
+      - name: Notarize and staple
+        if: env.DEVELOPER_ID == 'true'
+        working-directory: target/release/bundle/macos
+        env:
+          APPLEID: ${{ secrets.APPLEID }}
+          APPLEIDPASS: ${{ secrets.APPLEIDPASS }}
+          TEAMID: ${{ secrets.TEAMID }}
+        run: |
+          ditto -c -k --keepParent PeekaView.app "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLEID" --password "$APPLEIDPASS" --team-id "$TEAMID" \
+            --wait --timeout 30m --output-format json > "$RUNNER_TEMP/notarize.json" || true
+          cat "$RUNNER_TEMP/notarize.json"
+          status=$(jq -r '.status // empty' "$RUNNER_TEMP/notarize.json" 2>/dev/null || true)
+          if [ "$status" != Accepted ]; then
+            id=$(jq -r '.id // empty' "$RUNNER_TEMP/notarize.json" 2>/dev/null || true)
+            if [ -n "$id" ]; then
+              xcrun notarytool log "$id" --apple-id "$APPLEID" --password "$APPLEIDPASS" --team-id "$TEAMID" || true
+            fi
+            echo "::error::Notarization failed (status: ${status:-none}); without an id the credentials APPLEID / APPLEIDPASS / TEAMID were rejected"
+            exit 1
+          fi
+          xcrun stapler staple PeekaView.app
+          xcrun stapler validate PeekaView.app
+          spctl --assess --type execute -vv PeekaView.app 2>&1 | tee "$RUNNER_TEMP/spctl.txt"
+          grep -q 'source=Notarized Developer ID' "$RUNNER_TEMP/spctl.txt"
+
+      # ditto keeps the bundle's symlinks and executable bits (upload-artifact does not)
+      - name: Zip
+        working-directory: target/release/bundle/macos
+        run: ditto -c -k --keepParent PeekaView.app PeekaView-macos-arm64.zip
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

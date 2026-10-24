@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- hardened runtime (Developer ID builds): voice channel and session transcript. Screen
+       recording, accessibility and speech recognition only need the user's TCC approval -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>
