@@ -19,7 +19,7 @@
 
     <section id="rooms-page" hidden>
       <header class="page-head">
-        <p class="muted">Fester Link. Zuschauer treten mit deiner Bestätigung oder PIN bei.</p>
+        <p class="muted">Ein fester Link bleibt immer gleich – zum Beispiel für Kunden oder den eigenen Computer. Wer ihn öffnet, braucht deine Bestätigung oder die PIN.</p>
         <button id="add" class="pill primary"><i data-icon="link"></i>Neuer fester Link</button>
       </header>
       <div id="list" class="room-list"></div>
@@ -47,6 +47,7 @@
         <summary>Erweiterte Verbindungseinstellungen</summary>
         <h3>Verbindung</h3>
         <div class="set-group">
+          <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Computern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
           <label class="set-row stack">
             <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
             <textarea id="relays" rows="3" spellcheck="false"></textarea>
@@ -65,7 +66,7 @@
       <h3>Aufzeichnung &amp; Transkript</h3>
       <div class="set-group">
         <label class="set-row" id="local-stt-row">
-          <span class="text"><b>Lokale Spracherkennung</b><small>Auf diesem Mac verarbeiten.</small></span>
+          <span class="text"><b>Lokale Spracherkennung</b><small>Die Spracherkennung von macOS – nichts verlässt den Computer (empfohlen).</small></span>
           <input type="checkbox" class="switch" id="local-stt" checked>
         </label>
       </div>
@@ -168,7 +169,7 @@
           <span class="pin-edit"><input class="room-pin" type="password" inputmode="numeric" placeholder="mind. 4 Zeichen" autocomplete="new-password"><button class="pill secondary" data-pin>Setzen</button></span>
         </div>
         <label class="set-row">
-          <span class="text"><b>Anwendungen aus der Ferne starten</b><small>Teilnehmende dürfen die hier ausgewählten Anwendungen starten.</small></span>
+          <span class="text"><b>Fernzugriff</b><small>Der Link wartet auch, wenn du nichts teilst – Teilnehmende starten die hier ausgewählten Anwendungen selbst.</small></span>
           <input type="checkbox" class="switch" data-remote>
         </label>
         <div class="room-apps">

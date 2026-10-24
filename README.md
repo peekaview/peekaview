@@ -136,28 +136,29 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - TURN servers and TURN secret
   - transcription: local Apple speech recognition or an OpenAI key, optionally from `.env`
 
-## Permanent room links and remote access
+## Permanent links and remote access
 
 PeekaView keeps running in the tray / menu bar. Ending a share or closing the toolbar (×) only hides it, and a click on the tray icon brings it back. You quit PeekaView from the tray menu. Its menu offers:
-- **Raumlink beibehalten:** every share reuses the last link.
-- **Resize/Anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
+- **Letzten Link beibehalten:** every share reuses the last link.
+- **Fenster anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
   - Resizing a window resizes it here, so it shows 1:1 for them.
   - Moving a window, or arranging all side by side, moves the windows to the same relative place on their screen.
   - Picking a window (click or dock) brings it to the front here.
-- **Raumlink kopieren:** copies the link of one of the permanent rooms.
-- **Raumlinks & Remote-Zugriff …:** opens the room manager.
+- **Sprache aktiv / Transkript aktiv:** the voice channel and the local transcript of a share.
+- **Festen Link kopieren:** copies one of the permanent links.
+- **Einstellungen … / Kontakte … / Transkripte …:** settings with the permanent links, contacts and calls, saved transcripts.
 
-**Permanent room links** never change unless you renew them. You can have as many as you like, each with:
+**Permanent links** (*feste Links*) never change unless you renew them. You can have as many as you like, each with:
 - **PIN (optional):** viewers wait for approval as usual, and below that they get a PIN field. If you are not at your desk, they can come in with the PIN instead.
   - The PIN never travels: the viewer answers a one-time challenge with HMAC(PBKDF2(PIN)).
   - After 5 wrong tries a viewer is turned away. After 20 wrong tries in 10 minutes the PIN is locked for everybody.
   - Only the PBKDF2 key is stored.
-- **Remote-Zugriff:** the room waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
+- **Fernzugriff:** the link waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
   - a session in that room with remote control on;
   - the room's chosen **applications** in the dock, marked as such, and **Gesamter Desktop** if enabled.
   - Starting one launches it on this computer, or brings it forward if it runs already, and shares its window. The session ends a minute after the last viewer left.
 
-Sharing from the picker can also go into a permanent room ("Raum: …").
+Sharing from the picker can also go into a permanent link ("Fester Link: …").
 
 ## Shared clipboard
 

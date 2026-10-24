@@ -283,7 +283,7 @@
             const pin = st.pin ?? r.pin
             const remote = st.remote ?? r.remote
             const tag = (cls, html, title) => strong.lastChild.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
-            if (permanent === true) tag('permanent', 'fester Raum', 'Fester Raum – der Link bleibt immer gleich')
+            if (permanent === true) tag('permanent', 'fester Link', 'Fester Link – bleibt immer gleich')
             else if (permanent === false) tag('', 'einmalig', 'Link nur für diese eine Freigabe')
             if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')
             if (remote) tag('remote', 'Fernzugriff', 'Fernzugriff: Programme selbst starten')
