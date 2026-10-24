@@ -59,6 +59,7 @@
           // not in front (covered or behind another window in parts): half transparent
           document.body.classList.toggle('covered', win?.reachable === false)
           document.body.classList.toggle('behind', win?.reachable !== false && win?.front === false)
+          if (win?.paused || win?.reachable === false || win?.front === false) ann.reset()
           paint()
         } else if (m.t === 'reset') {
           live = false

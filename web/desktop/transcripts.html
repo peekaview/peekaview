@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Transkripte</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="rooms transcripts">
+  <header class="app-head">
+    <span id="logo" class="logo"></span>
+    <strong id="title">Transkripte</strong>
+    <button id="refresh" class="icon-btn" title="Aktualisieren" aria-label="Aktualisieren"></button>
+  </header>
+  <main id="archive">
+    <label for="conversation">Kontakt oder Gruppe</label>
+    <select id="conversation" aria-label="Transkripte nach Kontakt oder Gruppe filtern"></select>
+    <p id="empty" class="empty" hidden>Noch keine Transkripte.</p>
+    <p id="error" class="error" role="alert" hidden></p>
+    <div id="list"></div>
+  </main>
+  <iframe id="report" class="transcript-report" title="Transkript" sandbox hidden></iframe>
+  <script type="module" src="transcripts.js"></script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="../web/fixed-rooms.css">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>PeekaView – Teilen</title>
   <style>
@@ -16,6 +17,8 @@
     .title { margin: 4px 0 -2px; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
     #stop { flex: none; }
     .badge { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 4px 11px; border-radius: 999px; background: rgba(239,68,68,.14); color: #fca5a5; font-size: 13px; font-weight: 600; }
+    header > .badge { min-width:0;overflow:hidden;white-space:nowrap; }
+    header #profile, header .dot { flex-shrink:0; }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(239,68,68,.25); } 50% { box-shadow: 0 0 0 6px rgba(239,68,68,.08); } }
     .card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
@@ -29,6 +32,11 @@
     .btn { flex: 1; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; }
     .btn.primary { border: 0; background: var(--accent); color: #fff; }
     .btn.danger { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); color: #fca5a5; }
+    .share-destination { display: flex; gap: 8px; }
+    .share-destination button { flex: 1; min-height: 48px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--muted); font-weight: 600; }
+    .share-destination button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); }
+    #group-context { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    #group-context .btn { flex: none; padding: 0 12px; }
     code { display: block; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font: 12.5px/1.4 ui-monospace, monospace; word-break: break-all; user-select: text; }
     .muted { color: var(--muted); font-size: 13px; }
     .modes { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--bg); }
@@ -52,10 +60,19 @@
     .hint { padding: 12px 14px; border-radius: 12px; background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3); color: #fde68a; font-size: 14px; }
     .hint button { margin-top: 8px; padding: 8px 12px; border-radius: 9px; border: 0; background: rgba(234,179,8,.2); color: #fde68a; font-weight: 600; }
     .error { color: #fca5a5; }
-    #nsite { word-break: break-all; }
     label.check { display: flex; align-items: center; gap: 10px; color: var(--fg); font-size: 15px; }
     label.check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
-    label.check .muted { font-size: 13px; }
+    #shell-options { display: flex; flex-direction: column; gap: 12px; }
+    #app-choices { display: flex; flex-direction: column; gap: 10px; max-height: 240px; overflow-y: auto; }
+    details summary { cursor: pointer; color: var(--muted); }
+    .options > :not(summary) { margin-top: 12px; }
+    .options p { margin-bottom: 0; }
+    .adb-wizard { display: flex; flex-direction: column; gap: 12px; }
+    .adb-wizard p { margin: 0; }
+    .adb-wizard > .btn { flex: none; }
+    .adb-status { padding: 12px; border-radius: 10px; background: var(--raised); font-size: 14px; }
+    #adb-manual { padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+    #adb-manual label, #adb-manual .btn { margin-top: 10px; }
     .clip-head { display: flex; align-items: baseline; gap: 8px; }
     .clip-head strong { font-size: 16px; }
     .clip-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -79,21 +96,72 @@
       <i id="logo" class="logo"></i>
       <strong>PeekaView</strong>
       <span id="live" class="badge" hidden><i class="dot"></i>Freigabe läuft</span>
+      <div id="profile" hidden></div>
     </header>
     <h1 class="title">Bildschirm teilen</h1>
+    <div id="share-destination" class="share-destination" role="group" aria-label="Wie möchtest du teilen?">
+      <button id="share-link" type="button" aria-pressed="true">Per Link teilen</button>
+      <button id="share-group" type="button" aria-pressed="false">Kontakte</button>
+    </div>
+    <div id="group-context" hidden><strong>Mit Kontakt oder Gruppe teilen</strong><button id="change-group" class="btn" type="button">Empfänger ändern</button></div>
+    <section id="fixed-rooms" hidden style="margin-bottom:16px"></section>
 
     <div id="requests"></div>
 
     <!-- before the share -->
     <section id="setup" class="card">
       <label>Dein Name <input id="name" maxlength="32" autocomplete="name"></label>
-      <label>Zuschauer-Website <input id="site" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="über Nostr (nsite)"></label>
-      <p id="nsite" class="muted"></p>
-      <label class="check"><input type="checkbox" id="keep"> Raumlink beibehalten <span class="muted">– derselbe Link wie beim letzten Mal</span></label>
-      <label class="check"><input type="checkbox" id="use-pin"> Mit PIN <span class="muted">– wer sie kennt, kommt ohne Zulassen herein</span></label>
-      <input id="pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="PIN (mindestens 4 Zeichen)" hidden>
-      <p class="muted">Android fragt gleich, ob PeekaView den Bildschirm aufnehmen darf. Wer den Link öffnet, muss von dir zugelassen werden.</p>
+      <label class="check"><input type="checkbox" id="shell"> Handy fernsteuern</label>
+      <p id="shell-unsupported" class="muted" hidden>Fernsteuerung benötigt Android 11 oder neuer.</p>
+      <div id="shell-options" hidden>
+        <div class="adb-wizard">
+          <p id="adb-status" class="adb-status" role="status" aria-live="polite"></p>
+          <div id="helper-actions" class="row" hidden><button id="adb-cancel" class="btn" hidden>Abbrechen</button></div>
+          <button id="debugging-settings" class="btn" hidden>Entwickleroptionen öffnen</button>
+          <button id="notification-settings" class="btn" hidden>Benachrichtigungen erlauben</button>
+        </div>
+        <details id="adb-help" class="options">
+          <summary>Hilfe zur Einrichtung</summary>
+          <details id="developer-help" class="options">
+            <summary>Entwickleroptionen fehlen?</summary>
+            <p class="muted">Öffne die Geräteinfos und tippe siebenmal auf „Build-Nummer“ (ggf. unter „Softwareinformationen“). Bestätige deine Bildschirmsperre.</p>
+            <button id="device-info-settings" class="btn">Geräteinfos öffnen</button>
+          </details>
+          <p class="muted">Unter „Entwickleroptionen“ → „Debugging über WLAN“ einschalten und Androids Abfrage bestätigen. Zum Koppeln „Gerät über einen Kopplungscode koppeln“ öffnen. Den Dialog offen lassen und den Code in der PeekaView-Benachrichtigung eingeben.</p>
+          <details id="adb-manual" class="options">
+            <summary>Manuell koppeln</summary>
+            <p class="muted">PeekaView und Einstellungen in geteilter Ansicht öffnen. Den Kopplungscode-Dialog offen lassen und Port sowie Code übernehmen.</p>
+            <label>Kopplungsport <input id="pair-port" type="number" inputmode="numeric" min="1" max="65535" autocomplete="off"></label>
+            <label>Sechsstelliger Code <input id="pair-code" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+            <button id="pair" class="btn">Koppeln</button>
+            <p id="pair-result" class="muted" role="status"></p>
+            <label class="check"><input id="manual-port" type="checkbox"> Verbindungsport selbst eingeben</label>
+            <label id="manual-port-field" hidden>Verbindungsport <input id="adb-port" type="number" inputmode="numeric" min="1" max="65535" autocomplete="off"></label>
+            <p class="muted">Verbindungsport: „IP-Adresse &amp; Port“ auf der WLAN-Debugging-Hauptseite. Dieser unterscheidet sich vom Kopplungsport.</p>
+          </details>
+          <p class="muted">PeekaView stellt die Verbindung beim Teilen automatisch her. Nur nach einem Handy-Neustart oder beendeter Fernsteuerung kann Android erneut „Debugging über WLAN“ verlangen. Eine gespeicherte Kopplung wird weiterverwendet.</p>
+        </details>
+      </div>
+      <div id="setup-apps">
+        <details id="shell-app-options" class="options" hidden>
+          <summary>Apps auswählen</summary>
+          <fieldset id="app-selection" style="border:0;padding:0;margin:0;min-width:0">
+            <label class="check"><input id="apps-only" type="checkbox"> Nur ausgewählte Apps zeigen</label>
+            <p id="apps-scope" class="muted"></p>
+            <div id="app-choices"></div>
+          </fieldset>
+          <p id="apps-error" class="error" role="alert" hidden></p>
+          <p id="apps-visibility" class="muted" hidden>Keine ausgewählte App ist gerade sichtbar.</p>
+        </details>
+      </div>
       <button id="start" class="big">Freigabe starten</button>
+      <details id="share-options" class="options">
+        <summary id="share-options-title">Freigabeoptionen</summary>
+        <label class="check"><input type="checkbox" id="keep"> Letzten Link beibehalten</label>
+        <label class="check"><input type="checkbox" id="use-pin"> Zugang mit PIN</label>
+        <p id="pin-hint" class="muted" hidden>Mit PIN treten Zuschauer ohne deine Bestätigung bei.</p>
+        <input id="pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="PIN (mindestens 4 Zeichen)" hidden>
+      </details>
       <p id="error" class="error" hidden></p>
     </section>
 
@@ -117,12 +185,13 @@
           <button data-mode="control">Steuern</button>
         </div>
       </div>
+      <div id="running-apps"></div>
       <div id="overlay-hint" class="hint" hidden>
-        Damit du Zeiger und Zeichnungen der Zuschauer auf dem Handy siehst, muss PeekaView einmalig „Über anderen Apps einblenden“ dürfen.
+        Für Zeiger und Zeichnungen „Über anderen Apps einblenden“ erlauben.
         <br><button id="overlay-settings">Erlauben</button>
       </div>
       <div id="control-hint" class="hint" hidden>
-        Zum Steuern muss „PeekaView Fernsteuerung“ einmalig in den Bedienungshilfen eingeschaltet werden.
+        Zum Steuern „PeekaView Fernsteuerung“ in den Bedienungshilfen einschalten.
         <br><button id="control-settings">Einstellungen öffnen</button>
       </div>
       <div>
@@ -148,11 +217,22 @@
 
   <script type="module">
     import { owl } from '../web/icons.js'
+    import { mountRooms } from '../web/fixed-rooms.js'
     document.getElementById('logo').innerHTML = owl(26)
     const host = window.PeekaViewHost
     const $ = (id) => document.getElementById(id)
     const initials = (name) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     let known = new Set()
+    let choosingContacts = localStorage.getItem('pv-share-destination') === 'contacts' && !JSON.parse(host.state()).fixedCall
+    $('share-group').addEventListener('click', () => { choosingContacts = true; localStorage.setItem('pv-share-destination','contacts'); window.pvHostUpdate(JSON.parse(host.state())) })
+    $('change-group').addEventListener('click', () => $('share-group').click())
+    $('share-link').addEventListener('click', () => {
+      choosingContacts = false
+      localStorage.setItem('pv-share-destination','link')
+      host.shareViaLink()
+      window.pvHostUpdate(JSON.parse(host.state()))
+    })
+    window.pvShareInCall = () => { choosingContacts = false; localStorage.setItem('pv-share-destination','contacts'); window.pvHostUpdate(JSON.parse(host.state())) }
 
     // the own name, remembered as typed (the viewer's start page uses the same)
     $('name').value = localStorage.getItem('pv-name') ?? ''
@@ -181,21 +261,112 @@
         }),
       )
     }
-    $('site').value = host.site()
     $('keep').checked = host.keepLink()
+    const shellSettings = JSON.parse(host.shellSettings())
+    $('shell').checked = !!shellSettings.enabled
+    $('adb-port').value = shellSettings.port || ''
+    $('apps-only').checked = !!shellSettings.appsOnly
+    const appIds = () => [...$('app-choices').querySelectorAll('input:checked')].map(input => input.value)
+    const renderApps = (apps) => $('app-choices').replaceChildren(...apps.map((app) => {
+      const label = document.createElement('label')
+      label.className = 'check'
+      const input = document.createElement('input')
+      input.type = 'checkbox'
+      input.value = app.id
+      input.checked = app.selected
+      input.dataset.shareable = String(app.shareable !== false)
+      label.append(input, document.createTextNode(app.name))
+      return label
+    }))
+    renderApps(shellSettings.apps)
+    let appsBusy = false
+    const updateAppScope = () => {
+      const only = $('apps-only').checked
+      $('apps-scope').textContent = only
+        ? 'Andere Apps und Systemeinblendungen bleiben schwarz. System-Apps mit gemeinsamer Identität sind nicht einzeln teilbar.'
+        : 'Der ganze Handybildschirm ist sichtbar. Ausgewählte Apps werden als Startknöpfe angeboten.'
+      for (const input of $('app-choices').querySelectorAll('input')) {
+        input.disabled = only && input.dataset.shareable === 'false'
+        if (input.disabled) input.checked = false
+      }
+    }
+    const saveAppSelection = () => {
+      updateAppScope()
+      appsBusy = true
+      $('app-selection').disabled = true
+      $('apps-error').hidden = true
+      host.setSharedApps($('apps-only').checked, JSON.stringify(appIds()))
+    }
+    window.pvAppsResult = (problem) => {
+      appsBusy = false
+      $('app-selection').disabled = false
+      $('apps-error').textContent = problem || ''
+      $('apps-error').hidden = !problem
+      if (problem) {
+        const actual = JSON.parse(host.shellSettings())
+        $('apps-only').checked = !!actual.appsOnly
+        renderApps(actual.apps)
+      }
+      updateAppScope()
+    }
+    $('app-choices').addEventListener('change', saveAppSelection)
+    $('apps-only').addEventListener('change', saveAppSelection)
+    updateAppScope()
+    const showShell = () => {
+      $('shell-options').hidden = !$('shell').checked
+      $('shell-app-options').hidden = !$('shell').checked && !$('apps-only').checked
+      if (window.pvHostUpdate) window.pvHostUpdate(JSON.parse(host.state()))
+    }
+    $('shell').addEventListener('change', showShell)
+    showShell()
+    $('device-info-settings').addEventListener('click', () => host.deviceInfoSettings())
+    $('adb-cancel').addEventListener('click', () => host.adbSetupStop())
+    $('notification-settings').addEventListener('click', () => host.notificationSettings())
+    $('manual-port').addEventListener('change', () => {
+      $('manual-port-field').hidden = !$('manual-port').checked
+      window.pvHostUpdate(JSON.parse(host.state()))
+    })
+    $('debugging-settings').addEventListener('click', () => host.debuggingSettings())
+    $('pair').addEventListener('click', () => {
+      $('pair').disabled = true
+      $('pair-result').textContent = 'Kopplung läuft …'
+      host.pair(Number($('pair-port').value), $('pair-code').value.trim())
+      $('pair-code').value = ''
+    })
+    window.pvPairResult = (error) => {
+      $('pair').disabled = false
+      $('pair-result').textContent = error || ($('manual-port').checked ? 'Gekoppelt. Jetzt den Verbindungsport eintragen.' : 'Gekoppelt. Die Verbindung wird hergestellt …')
+      $('pair-result').classList.toggle('error', !!error)
+      window.pvHostUpdate(JSON.parse(host.state()))
+    }
     // the PIN: set once, kept (only its key is stored) – a new one replaces it
     const hasPin = host.hasPin()
     $('use-pin').checked = hasPin
     $('pin').placeholder = hasPin ? 'PIN ist gesetzt – leer lassen zum Behalten' : 'PIN (mindestens 4 Zeichen)'
-    const showPin = () => ($('pin').hidden = !$('use-pin').checked)
+    const showPin = () => {
+      $('pin').hidden = !$('use-pin').checked
+      $('pin-hint').hidden = !$('use-pin').checked
+      $('share-options-title').textContent = $('use-pin').checked ? 'Freigabeoptionen · PIN aktiv' : 'Freigabeoptionen'
+    }
     $('use-pin').addEventListener('change', showPin)
     showPin()
-    $('site').addEventListener('input', () => window.pvHostUpdate(JSON.parse(host.state())))
     $('start').addEventListener('click', () => {
+      const state = JSON.parse(host.state())
+      const manualPort = Number($('adb-port').value)
+      if ($('shell').checked && !state.helperReady && $('manual-port').checked && (!Number.isInteger(manualPort) || manualPort < 1 || manualPort > 65535)) {
+        $('error').hidden = false
+        $('error').textContent = 'Bitte einen gültigen Verbindungsport von 1 bis 65535 eintragen oder die manuelle Porteingabe ausschalten.'
+        $('adb-help').open = true
+        $('adb-manual').open = true
+        $('adb-port').focus()
+        return
+      }
       const name = $('name').value.trim() || 'Android'
       localStorage.setItem('pv-name', $('name').value.trim())
       $('start').disabled = true
-      host.start(name, $('site').value.trim(), $('keep').checked, $('use-pin').checked, $('pin').value)
+      $('start').textContent = 'Freigabe wird vorbereitet …'
+      const apps = [...$('app-choices').querySelectorAll('input:checked')].map((input) => input.value)
+      host.start(name, $('keep').checked, $('use-pin').checked, $('pin').value, $('shell').checked, $('manual-port').checked ? Number($('adb-port').value) : 0, JSON.stringify(apps), $('apps-only').checked)
       $('pin').value = ''
     })
     $('copy').addEventListener('click', () => {
@@ -212,22 +383,47 @@
     // called by the app with the current state
     window.pvHostUpdate = (st) => {
       $('live').hidden = !st.sharing
-      $('setup').hidden = st.sharing
-      $('watch').hidden = st.sharing
+      const groups = choosingContacts && !st.sharing
+      $('share-destination').hidden = st.sharing || st.starting
+      $('share-link').setAttribute('aria-pressed', String(!groups && !st.fixedCall))
+      $('share-group').setAttribute('aria-pressed', String(groups || !!st.fixedCall))
+      $('fixed-rooms').hidden = !groups
+      $('group-context').hidden = groups || !st.fixedCall || st.sharing
+      $('setup').hidden = st.sharing || groups
+      $('watch').hidden = st.sharing || groups || !!st.fixedCall
+      $('share-options').hidden = !!st.fixedCall
       $('clip').hidden = !st.sharing
       renderClip(st.clip ?? [])
       $('running').hidden = !st.sharing
-      $('start').disabled = !!st.starting
+      const appParent = st.sharing ? $('running-apps') : $('setup-apps')
+      if ($('shell-app-options').parentElement !== appParent) appParent.append($('shell-app-options'))
+      $('shell-app-options').hidden = !(st.sharing ? st.shell : ($('shell').checked || $('apps-only').checked))
+      $('apps-only').disabled = st.appSharingSupported === false
+      $('app-selection').disabled = appsBusy || !!st.starting
+      $('apps-visibility').hidden = !(st.sharing && st.appsOnly && st.appVisible === false)
+      const adb = st.adbSetup ?? {}
+      $('start').textContent = st.starting ? 'Freigabe wird vorbereitet …' : 'Freigabe starten'
+      $('start').disabled = appsBusy || !!st.starting
+      const phase = adb.phase ?? 'idle'
+      const adbText = st.helperReady ? 'Fernsteuerung bereit.'
+        : phase === 'idle' ? 'Die Verbindung wird beim Teilen automatisch eingerichtet.'
+        : adb.message ?? 'Einrichtung läuft …'
+      if ($('adb-status').textContent !== adbText) $('adb-status').textContent = adbText
+      $('adb-status').classList.toggle('error', !st.helperReady && phase === 'error')
+      $('adb-help').hidden = !!st.helperReady || (!st.starting && !adb.active && phase !== 'error')
+      $('developer-help').hidden = !!st.adbPaired
+      $('debugging-settings').hidden = !!st.helperReady || phase === 'activating' || (!adb.active && !st.starting && phase !== 'error')
+      $('helper-actions').hidden = !adb.active && !st.starting
+      $('adb-cancel').hidden = !adb.active && !st.starting
+      $('notification-settings').hidden = !!st.notificationsAllowed || !!st.helperReady || (!st.starting && phase !== 'error')
+      $('shell').disabled = !st.shellSupported || !!st.starting
+      $('name').disabled = !!st.starting
+      $('shell-unsupported').hidden = !!st.shellSupported
       $('error').hidden = !st.error
       $('error').textContent = st.error ?? ''
       $('link').textContent = st.link ?? ''
-      // the viewer site this phone publishes over Nostr (unless an own one is set)
-      const ns = st.nsite ?? {}
-      const states = { idle: 'wird gleich veröffentlicht', publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${ns.error ?? ''}` }
-      $('nsite').hidden = !!$('site').value.trim()
-      $('nsite').textContent = `Leer: ${ns.url?.replace('https://', '') ?? ''} · ${states[ns.state] ?? ''}`
       for (const b of document.querySelectorAll('.modes button')) b.classList.toggle('active', b.dataset.mode === st.mode)
-      $('control-hint').hidden = !(st.mode === 'control' && !st.controlEnabled)
+      $('control-hint').hidden = !(st.mode === 'control' && !st.shell && !st.controlEnabled)
       $('overlay-hint').hidden = !(st.sharing && st.mode !== 'view' && !st.overlayAllowed)
       const people = st.viewers ?? []
       $('people').replaceChildren(
@@ -250,7 +446,7 @@
         ...requests.map((r) => {
           const row = document.createElement('div')
           row.className = 'request'
-          row.innerHTML = '<i class="who"></i><strong></strong><span>möchte zusehen</span><div class="row"><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button></div>'
+          row.innerHTML = '<i class="who"></i><strong></strong><span>Möchte deine Freigabe ansehen.</span><div class="row"><button class="btn">Ablehnen</button><button class="btn primary">Zulassen</button></div>'
           row.querySelector('strong').textContent = r.name || 'Gast'
           row.querySelector('.who').textContent = initials(r.name || 'Gast')
           row.querySelector('.who').style.background = /^#[0-9a-f]{6}$/i.test(r.color ?? '') ? r.color : '#52525b'
@@ -287,6 +483,7 @@
       } catch {}
     }
 
+    mountRooms($('fixed-rooms'),{profileRoot:$('profile')})
     window.pvHostUpdate(JSON.parse(host.state()))
   </script>
 </body>

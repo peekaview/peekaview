@@ -524,6 +524,7 @@ impl Hub {
 
     /// Routing of a viewer's message – what a relay server used to do.
     async fn from_viewer(&self, id: u32, mut v: Value) {
+        if !crate::settings::voice_enabled() && matches!(v["t"].as_str(), Some("voice" | "rtc" | "level")) { return; }
         v["from"] = json!(id);
         let mode = self.shared.mode();
         match v["t"].as_str().unwrap_or("") {
@@ -581,7 +582,7 @@ impl Hub {
                 });
             }
             // "Resize/Anordnen erlauben": the viewer activated / moved a window in their window manager
-            "activate" | "arrange" if mode == Mode::Control && crate::settings::allow_resize() => {
+            "activate" | "arrange" if crate::settings::allow_resize() && (v["t"] == "activate" || mode == Mode::Control) => {
                 let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());
                 let (x, y, w, h) = (v["x"].as_f64(), v["y"].as_f64(), v["hw"].as_f64(), v["hh"].as_f64());
                 let shared = self.shared.clone();
@@ -630,6 +631,15 @@ impl Hub {
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
             "ptr" | "draw" | "ping" | "clear" | "hide" if mode != Mode::View => {
+                if matches!(v["t"].as_str(), Some("ptr" | "draw" | "ping"))
+                    && !self.shared.stream_of(&v).is_some_and(|s| s.visible() && s.front && s.reachable)
+                {
+                    // Pointer motion may still belong to an ongoing control drag.
+                    if v["t"] == "ptr" {
+                        let _ = self.ctrl.send(Cmd::Input(v));
+                    }
+                    return;
+                }
                 self.broadcast(&v, Some(id)).await;
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
@@ -642,6 +652,7 @@ impl Hub {
 
     /// Voice chat messages of the presenter's PeekaView window.
     pub async fn from_host(&self, mut v: Value) {
+        if !crate::settings::voice_enabled() { return; }
         v["from"] = json!(0);
         match v["t"].as_str() {
             Some("voice") => {
@@ -656,6 +667,14 @@ impl Hub {
             Some("level") => self.broadcast(&v, None).await,
             _ => {}
         }
+    }
+
+    pub async fn voice_changed(&self) {
+        if !crate::settings::voice_enabled() {
+            self.host.lock().unwrap().2 = false;
+            for viewer in self.viewers.lock().unwrap().values_mut() { viewer.voice = false; }
+        }
+        self.announce_peers().await;
     }
 
     async fn send_to(&self, id: u32, v: &Value) {

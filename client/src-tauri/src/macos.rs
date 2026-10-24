@@ -9,6 +9,15 @@ const FULL_SCREEN_AUXILIARY: usize = 1 << 8;
 // NSStatusWindowLevel: above normal and floating windows (e.g. System Settings)
 const STATUS_LEVEL: isize = 25;
 
+/// Shows a toolbar without taking the focus back from the shared application.
+///
+/// # Safety
+/// `ns_window` must be a valid NSWindow pointer; main thread only.
+pub unsafe fn show_without_focus(ns_window: *mut std::ffi::c_void) {
+    let window = &*(ns_window as *const AnyObject);
+    let _: () = msg_send![window, orderFrontRegardless];
+}
+
 /// Raises a window above the floating ones (the red frames are floating) or back to normal.
 ///
 /// # Safety

@@ -45,7 +45,7 @@ screencapturekit = { version = "11", features = ["macos_14_2"] }
 drag = "2"
 objc2 = "0.6"
 objc2-foundation = "0.3"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSRunningApplication", "NSPasteboard"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSRunningApplication", "NSPasteboard", "NSScreen", "NSAppearance", "NSWindow"] }
 objc2-speech = "0.3"
 block2 = "0.6"
 objc2-core-foundation = "0.3"

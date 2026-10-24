@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private var pendingPermission: PermissionRequest? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private val askRoomNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if(granted) RoomCalls.enable(this)
+    }
 
     private val askMicrophone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val request = pendingPermission ?: return@registerForActivityResult
@@ -99,6 +103,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         web.addJavascriptInterface(Bridge(), "PeekaViewApp")
+        RoomCalls.restore(this)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -107,8 +112,6 @@ class MainActivity : ComponentActivity() {
         })
 
         if (savedInstanceState == null) open(intent) else web.restoreState(savedInstanceState)
-        // the viewer site for this phone's share links, kept up to date over Nostr
-        if (Prefs.site(this).isEmpty()) Nsite.publishIfNeeded(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -123,6 +126,11 @@ class MainActivity : ComponentActivity() {
 
     /** The start page, or a room from a link. */
     private fun open(intent: Intent?) {
+        if(intent?.hasExtra("fixed_call")==true || intent?.data?.host=="rooms"){
+            val fragment=if(intent.data?.host=="rooms") intent.data?.encodedFragment ?: "" else "call=${intent.getStringExtra("fixed_call") ?: ""}"
+            web.loadUrl("${Assets.ROOT}fixed-rooms.html#$fragment")
+            return
+        }
         val room = intent?.data?.takeIf { it.scheme == "peekaview" && it.host == "join" }?.getQueryParameter("room")?.takeIf(::valid)
         // "app=1": joins right away when the name is known, never sends the link on to the app
         val url = "${Assets.ROOT}index.html?app=1" + (room?.let { "#$it" } ?: "")
@@ -133,6 +141,18 @@ class MainActivity : ComponentActivity() {
 
     /** For the bundled pages only (no other page is ever loaded). */
     inner class Bridge {
+        @JavascriptInterface fun configureRooms(session:String) = RoomCalls.configure(this@MainActivity,session)
+        @JavascriptInterface fun roomAccessOptions(room:String):String = RoomCalls.accessOptions(this@MainActivity,room)
+        @JavascriptInterface fun configureRoomAccess(room:String,selection:String):String = RoomCalls.configureAccess(this@MainActivity,room,selection)
+        @JavascriptInterface fun enableRoomCalls() = runOnUiThread {
+            if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(this@MainActivity,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) askRoomNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+            else RoomCalls.enable(this@MainActivity)
+        }
+        @JavascriptInterface fun shareInCall(call:String) = runOnUiThread {
+            require(call.matches(Regex("[0-9a-f]{16}")))
+            startActivity(Intent(this@MainActivity,ShareActivity::class.java).putExtra("fixed_call",call))
+        }
+        @JavascriptInterface fun leaveRoom(call:String) = RoomCalls.leave(this@MainActivity,call)
         /** Shares this phone's screen: back to the app's start. */
         @JavascriptInterface
         fun share() {

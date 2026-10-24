@@ -1,73 +1,52 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="system-appearance">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PeekaView freischalten</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="permission">
+<body class="permission" data-phase="ready">
   <main>
-    <!-- how it works, without words: the app icon goes into the list, its switch goes on -->
-    <svg class="perm-art" viewBox="0 0 264 132" aria-hidden="true">
-      <defs>
-        <linearGradient id="win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a2e"/><stop offset="1" stop-color="#1e1e21"/></linearGradient>
-      </defs>
-      <rect x="6" y="6" width="190" height="120" rx="11" fill="url(#win)" stroke="rgba(255,255,255,.1)"/>
-      <circle cx="20" cy="18" r="3.2" fill="#ef4444" opacity=".8"/><circle cx="31" cy="18" r="3.2" fill="#eab308" opacity=".8"/><circle cx="42" cy="18" r="3.2" fill="#22c55e" opacity=".8"/>
-      <!-- an app already in the list -->
-      <rect x="18" y="34" width="166" height="30" rx="7" fill="rgba(255,255,255,.04)"/>
-      <rect x="26" y="41" width="16" height="16" rx="4" fill="#3f3f46"/>
-      <rect x="50" y="46" width="62" height="6" rx="3" fill="#52525b"/>
-      <rect x="152" y="43" width="24" height="14" rx="7" fill="#22c55e"/><circle cx="169" cy="50" r="5.2" fill="#fff"/>
-      <!-- the slot PeekaView drops into -->
-      <rect x="18" y="72" width="166" height="30" rx="7" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4">
-        <animate attributeName="stroke-opacity" values="1;1;0;0;1" keyTimes="0;.35;.42;.95;1" dur="4s" repeatCount="indefinite"/>
-      </rect>
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.4;.42;.95;1" dur="4s" repeatCount="indefinite"/>
-        <rect x="50" y="84" width="54" height="6" rx="3" fill="#a1a1aa"/>
-      </g>
-      <!-- its switch goes on -->
-      <g opacity="0">
-        <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;.4;.42;.95;1" dur="4s" repeatCount="indefinite"/>
-        <rect x="152" y="81" width="24" height="14" rx="7" fill="#52525b">
-          <animate attributeName="fill" values="#52525b;#52525b;#22c55e;#22c55e" keyTimes="0;.62;.7;1" dur="4s" repeatCount="indefinite"/>
-        </rect>
-        <circle cx="159" cy="88" r="5.2" fill="#fff">
-          <animate attributeName="cx" values="159;159;169;169" keyTimes="0;.62;.7;1" dur="4s" repeatCount="indefinite"/>
-        </circle>
-      </g>
-      <!-- the PeekaView icon travels from the helper into the list -->
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="200 6;200 6;0 0;0 0;200 6" keyTimes="0;.08;.4;.95;1" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;0 0 1 1"/>
-        <rect x="26" y="79" width="16" height="16" rx="4" fill="#ef4444"/>
-        <path d="M29.5 87s1.6-3 4.5-3 4.5 3 4.5 3-1.6 3-4.5 3-4.5-3-4.5-3Z" fill="none" stroke="#fff" stroke-width="1.2"/>
-        <circle cx="34" cy="87" r="1.3" fill="#fff"/>
-        <path d="M38 91l0 9 2.4-2.2 1.6 3.6 1.5-.7-1.6-3.5h3.2z" fill="#fafafa" stroke="#09090b" stroke-width=".8">
-          <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;.42;.48;.95;1" dur="4s" repeatCount="indefinite"/>
-        </path>
-      </g>
-      <!-- click on the switch -->
-      <circle cx="164" cy="88" r="11" fill="none" stroke="#fafafa" stroke-width="1.5" opacity="0">
-        <animate attributeName="opacity" values="0;0;.8;0;0" keyTimes="0;.6;.64;.75;1" dur="4s" repeatCount="indefinite"/>
-        <animate attributeName="r" values="6;6;6;14;14" keyTimes="0;.6;.64;.75;1" dur="4s" repeatCount="indefinite"/>
-      </circle>
-    </svg>
-
-    <ul class="perm-list">
-      <li data-kind="accessibility"><i data-icon="control"></i><span>Bedienungshilfen</span><b></b></li>
-      <li data-kind="screen"><i data-icon="screen"></i><span>Bildschirmaufnahme</span><b></b></li>
+    <header class="perm-heading">
+      <p>Einmalig freischalten</p>
+      <h1 id="permission-title">Bedienungshilfen erlauben</h1>
+    </header>
+    <ul class="perm-list" aria-label="Berechtigungen">
+      <li data-kind="accessibility"><i data-icon="control"></i><span><strong>Bedienungshilfen</strong><small>Fernsteuerung</small></span><b>Offen</b></li>
+      <li data-kind="screen"><i data-icon="screen"></i><span><strong>Bildschirmaufnahme</strong><small>Bildschirm teilen</small></span><b>Offen</b></li>
     </ul>
 
-    <div id="drag" class="drag-tile" title="In die Liste der Systemeinstellungen ziehen">
-      <img src="app-icon.png" alt="" draggable="false">
-      <div><strong>PeekaView</strong><span id="hint">reinziehen, Schalter an</span></div>
-      <i data-icon="point"></i>
-    </div>
-
-    <div id="done" class="perm-done" hidden><i data-icon="check"></i><span>Super – es kann losgehen!</span></div>
-    <p id="note" class="perm-note">PeekaView startet danach einmal kurz neu.</p>
+    <p id="instruction" class="perm-instruction" role="status" aria-live="polite">Die Systemeinstellungen werden geöffnet …</p>
+    <button id="open-settings" class="perm-settings" type="button" hidden>Systemeinstellungen öffnen</button>
+    <p id="error" class="error" role="alert" hidden></p>
+    <ol id="guide" class="perm-steps">
+      <li data-guide="grab">
+        <span class="step-number">1</span>
+        <div>
+          <button id="drag" class="drag-tile" type="button" aria-label="PeekaView.app in die markierte App-Liste ziehen" disabled>
+            <img src="app-icon.png" alt="" draggable="false">
+            <span><strong>PeekaView.app</strong><small>Dieses App-Icon ziehen →</small></span>
+          </button>
+        </div>
+      </li>
+      <li data-guide="drop" hidden>
+        <span class="step-number">2</span>
+        <div><strong>In die markierte App-Liste ziehen und dort loslassen.</strong></div>
+      </li>
+      <li data-guide="enable" hidden>
+        <span class="step-number">3</span>
+        <div>
+          <p>macOS-Abfrage bestätigen, falls sie erscheint.</p>
+          <div class="perm-switch-example" role="img" aria-label="Beispiel: Schalter neben PeekaView einschalten"><img src="app-icon.png" alt=""><span>PeekaView <small>(Beispiel)</small></span><span class="example-switch" aria-hidden="true"></span></div>
+        </div>
+      </li>
+    </ol>
+    <button id="already-listed" class="perm-link" type="button">PeekaView steht schon in der Liste</button>
+    <button id="retry" class="perm-link" type="button" hidden>Icon erneut ziehen</button>
+    <div id="done" class="perm-done" hidden><i data-icon="check"></i><span>Berechtigungen sind bereit.</span></div>
+    <button id="quit" class="perm-link" type="button" hidden>PeekaView beenden</button>
+    <p id="note" class="perm-note" hidden>PeekaView startet danach einmal neu.</p>
   </main>
   <script type="module" src="permission.js"></script>
 </body>

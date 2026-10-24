@@ -83,6 +83,23 @@ mod imp {
         raised
     }
 
+    /// Presses only the close button of the specified window, without quitting its app.
+    pub fn close_window(pid: i32, window_id: u32) -> bool {
+        let mut closed = false;
+        unsafe {
+            with_window(pid, window_id, |window| {
+                let attr = cf("AXCloseButton");
+                let mut button = std::ptr::null();
+                if AXUIElementCopyAttributeValue(window, (&*attr as *const CFString).cast(), &mut button) == 0 && !button.is_null() {
+                    let press = cf("AXPress");
+                    closed = AXUIElementPerformAction(button, (&*press as *const CFString).cast()) == 0;
+                    CFRelease(button);
+                }
+            });
+        }
+        closed
+    }
+
     /// Moves / resizes a window (screen points, top-left origin).
     pub fn set_frame(pid: u32, window_id: u32, x: f64, y: f64, w: f64, h: f64) -> bool {
         #[repr(C)]
@@ -146,3 +163,5 @@ mod imp {
 }
 
 pub use imp::{bring_to_front, set_frame};
+#[cfg(target_os = "macos")]
+pub use imp::close_window;

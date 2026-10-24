@@ -33,6 +33,12 @@
 .fr-profile-devices { display:flex;flex-direction:column;gap:7px; }
 .fr-profile-device { display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:9px;border-radius:8px;background:#27272a; }
 .fr-profile-device > span:first-child { flex:1;min-width:0;overflow-wrap:anywhere; }
+.fixed-rooms .fr-device-remove { padding:4px 6px;font-size:11px; }
+.fr-device-info { display:flex;flex-direction:column;gap:4px; }
+.fr-device-labels { display:flex;flex-wrap:wrap;gap:4px; }
+.fixed-rooms .fr-profile-delete { border:0;background:none;color:#fca5a5;font-size:12px; }
+.fr-account-dialog h3 { margin:0;font-size:17px; }
+.fr-account-dialog p { margin:0;line-height:1.5;color:#a1a1aa; }
 .fr-page-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px; }
 .fr-page-head h1 { margin:0; }
 .fr-room, .fr-person, .fr-ring { background: #18181b; border: 1px solid #27272a; border-radius: 10px; }

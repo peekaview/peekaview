@@ -115,6 +115,7 @@ pub struct Shared {
     pub secret: String,
     /// a remote session in a permanent room: viewers may start its applications
     pub remote: Option<Room>,
+    pub fixed_call: Option<String>,
 }
 
 impl Shared {
@@ -193,10 +194,11 @@ impl Shared {
             "paused": !streams.iter().any(Stream::visible),
             "reachable": streams.iter().any(|s| s.reachable),
             "recording": self.recorder.lock().unwrap().is_some(),
+            "voice_enabled": self.fixed_call.is_none() && crate::settings::voice_enabled(),
             // remote access: what viewers can start themselves
             "remote": self.remote.is_some(),
             "apps": self.remote.as_ref().map(Room::launchers).unwrap_or_default(),
-            // viewers may resize, arrange and activate shared windows on this screen
+            // Viewers may activate shared windows; resizing/arranging also requires control mode.
             // (tray menu "Resize/Anordnen erlauben")
             "resize": crate::settings::allow_resize(),
             // the presenter's screen is locked (in a room with remote access viewers may unlock it)
@@ -315,6 +317,7 @@ pub struct StartOptions {
     pub admitted: Vec<String>,
     /// remote session in a permanent room (started by a viewer that was let in)
     pub remote: Option<Room>,
+    pub fixed_call: Option<String>,
 }
 
 pub fn parse_key(hex: &str) -> Option<[u8; 32]> {
@@ -327,7 +330,15 @@ fn valid_secret(s: &str) -> bool {
 }
 
 /// Returns {room, link, ice, secret, signingKey}.
-pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> {
+pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, String> {
+    opts.site = crate::settings::VIEWER_SITE.into();
+    if let (Some(call),Some(remote))=(opts.fixed_call.clone(),opts.remote.clone()) {
+        let app=app.clone();
+        tauri::async_runtime::spawn_blocking(move||crate::fixed_rooms::remote_for_resume(&app,&remote.id,&call)).await.map_err(|e|e.to_string())??;
+    }
+    if let Some(id)=opts.fixed_call.clone() {
+        opts.admitted=tauri::async_runtime::spawn_blocking(move||crate::fixed_rooms::admitted(&id)).await.map_err(|e|e.to_string())??;
+    }
     stop(&app, None, false);
     // a remote session starts with nothing shared – the viewer picks what to start
     let streams = if opts.sources.is_empty() && opts.remote.is_some() { vec![] } else { open_streams(&opts.sources, &[])? };
@@ -351,6 +362,7 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         viewports: Mutex::default(),
         secret: secret.clone(),
         remote: opts.remote.clone(),
+        fixed_call: opts.fixed_call.clone(),
     });
 
     let mut videos = Vec::new();
@@ -368,8 +380,6 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
         let (app, shared) = (app.clone(), shared.clone());
         std::thread::spawn(move || capture::run(app, shared, videos, frame_tx));
     }
-    focus_streams(&streams);
-
     shared.send_state();
     resume::save(
         &app,
@@ -377,22 +387,31 @@ pub async fn start(app: AppHandle, opts: StartOptions) -> Result<Value, String> 
             "site": opts.site, "name": opts.name, "sources": opts.sources, "room": secret, "color": opts.color,
             "relays": relays, "ice": opts.ice, "turn_urls": opts.turn_urls, "turn_secret": opts.turn_secret, "mode": "view",
             "signing_key": key_hex, "admitted": opts.admitted, "remote_room": opts.remote.as_ref().map(|r| r.id.clone()),
+            "fixed_call": opts.fixed_call,
         }),
     );
     *app.state::<SessionState>().0.lock().unwrap() = Some(Session { shared, ctrl, hub });
     // a permanent room waiting for remote access is this share now
     lobby::sync(&app, false);
-    // the viewer site: configured, or served over Nostr (nsite)
-    let site = crate::nsite::resolve(&app, &opts.site);
+    let site = crate::settings::VIEWER_SITE;
     // the presenter key after the "." lets viewers check who is presenting
     let room = format!("{secret}.{}", signal::public_key_b64(signing_key));
     let link = format!("{site}/#{room}");
     // secret + signing key let the UI keep the same link for the next share
-    let hosted = json!({ "room": room, "link": link, "ice": ice, "secret": secret, "signingKey": key_hex });
+    let hosted = json!({ "room": room, "link": link, "ice": ice, "secret": secret, "signingKey": key_hex, "fixedCall": opts.fixed_call });
     *LIVE.lock().unwrap() = Some(hosted.clone());
+    if let Some(call)=opts.fixed_call.clone(){
+        let stream=room.clone();
+        let result=tauri::async_runtime::spawn_blocking(move||crate::fixed_rooms::publish(&call,Some(&stream),None)).await.map_err(|e|e.to_string())?;
+        if let Err(e)=result{stop(&app,None,true);return Err(e)}
+    }
+    if let (Some(call),Some(remote))=(&opts.fixed_call,&opts.remote){crate::fixed_rooms::mark_automatic(&remote.id,call);}
     crate::tray::refresh(&app);
     // the share's toolbar comes up
     crate::open_toolbar(&app);
+    // Finish the picker/toolbar handoff before activating the selected windows once.
+    crate::hide_main(&app);
+    focus_streams(&streams);
     Ok(hosted)
 }
 
@@ -525,12 +544,15 @@ pub fn switch_sources(app: &AppHandle, ids: &[String]) -> Result<Value, String> 
 }
 
 /// Starts recording the running session.
-pub fn start_recording(app: &AppHandle, opts: crate::recording::Options) -> Result<&'static str, String> {
+pub fn start_recording(app: &AppHandle, expected: &Arc<Shared>, opts: crate::recording::Options) -> Result<&'static str, String> {
     let guard = app.state::<SessionState>();
     let guard = guard.0.lock().unwrap();
     let session = guard.as_ref().ok_or("Keine laufende Freigabe")?;
+    if !Arc::ptr_eq(&session.shared, expected) { return Err("Die Freigabe wurde inzwischen beendet".into()); }
     let source = session.shared.streams.lock().unwrap().first().map(|s| s.source.clone()).ok_or("Keine Quelle")?;
+    if session.shared.recorder.lock().unwrap().is_some() { return Err("Es läuft bereits eine Aufzeichnung".into()); }
     let rec = Recorder::new(source, opts);
+    rec.shot("Beginn der Freigabe".into(), None);
     let label = rec.engine_label();
     *session.shared.recorder.lock().unwrap() = Some(rec);
     session.shared.send_state();
@@ -592,11 +614,12 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
         std::thread::spawn(move || {
             if let Ok(path) = rec.finish() {
                 let _ = app.emit_to("toolbar", "report", path.display().to_string());
-                crate::open_path(&path);
+                crate::transcripts::saved(&app, &path);
             }
         });
     }
     session.shared.stop.store(true, Ordering::Relaxed);
+    if let (Some(call),Some(previous))=(session.shared.fixed_call.clone(),LIVE.lock().unwrap().as_ref().and_then(|v|v["room"].as_str().map(str::to_string))){std::thread::spawn(move||{let _=crate::fixed_rooms::publish(&call,None,Some(&previous));});}
     let _ = session.ctrl.send(Cmd::Release);
     session.hub.close();
     // the shared clipboard ends with the share
@@ -627,7 +650,7 @@ pub fn shutdown(app: &AppHandle, forget: bool) {
     let rec = app.state::<SessionState>().0.lock().unwrap().as_ref().and_then(|s| s.shared.recorder.lock().unwrap().take());
     if let Some(rec) = rec {
         if let Ok(path) = rec.finish() {
-            crate::open_path(&path);
+            crate::transcripts::saved(app, &path);
         }
     }
     stop(app, None, forget);
@@ -636,8 +659,9 @@ pub fn shutdown(app: &AppHandle, forget: bool) {
 /// Continues a share that was interrupted by a restart (e.g. after granting a permission).
 pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, String> {
     let Some(saved) = resume::load(&app) else { return Ok(None) };
-    if !crate::permissions::granted("screen") {
-        return Ok(None); // keep it – the permission flow will restart the app again
+    if !crate::permissions::ready() || (saved["mode"].as_str() == Some("control") && !crate::permissions::granted("accessibility")) {
+        crate::permissions::request(&app, if saved["mode"].as_str() == Some("control") { "accessibility" } else { "screen" });
+        return Ok(None); // retain the checkpoint until the requested mode is available
     }
     let text = |k: &str| saved[k].as_str().map(str::to_string);
     let list = |k: &str| saved[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
@@ -656,7 +680,10 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
         turn_secret: text("turn_secret"),
         signing_key: text("signing_key"),
         admitted: list("admitted"),
-        remote: text("remote_room").and_then(|id| crate::rooms::get(&app, &id)),
+        remote: if let (Some(call),Some(room))=(text("fixed_call"),text("remote_room")) {
+            Some(crate::fixed_rooms::remote_for_resume(&app,&room,&call)?)
+        } else { text("remote_room").and_then(|id| crate::rooms::get(&app, &id)) },
+        fixed_call: text("fixed_call"),
     };
     match start(app.clone(), opts.clone()).await {
         Ok(mut hosted) => {
@@ -664,7 +691,7 @@ pub async fn continue_after_restart(app: AppHandle) -> Result<Option<Value>, Str
             set_mode(&app, mode);
             hosted["mode"] = json!(mode.as_str());
             hosted["sources"] = json!(opts.sources);
-            hosted["site"] = json!(opts.site);
+            hosted["site"] = json!(crate::settings::VIEWER_SITE);
             Ok(Some(hosted))
         }
         Err(e) => {
@@ -803,7 +830,7 @@ mod tests {
 
 // ------------------------------------------------------------------ shared clipboard (presenter)
 
-fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
+pub(crate) fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
     app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.shared.clone()).ok_or_else(|| "Keine laufende Freigabe".into())
 }
 
@@ -1031,7 +1058,7 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
     if active_secret(app).is_some() {
         return Err("Es läuft schon eine Freigabe".into());
     }
-    let site = crate::settings::text(app, "site").unwrap_or_default();
+    let site = crate::settings::VIEWER_SITE.into();
     let opts = StartOptions {
         site,
         name: crate::settings::text(app, "name").unwrap_or_else(|| "Host".into()),
@@ -1045,6 +1072,7 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
         signing_key: Some(room.key.clone()),
         admitted: vec![peer],
         remote: Some(room.clone()),
+        fixed_call: None,
     };
     let mut hosted = start(app.clone(), opts).await?;
     set_mode(app, Mode::Control);
@@ -1080,6 +1108,10 @@ pub fn remote_viewers_gone(app: &AppHandle, shared: &Arc<Shared>) {
 pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
     let shared = running(app)?;
     let room = shared.remote.clone().ok_or("Kein Remote-Zugriff")?;
+    if let Some(call)=&shared.fixed_call{crate::fixed_rooms::target_allowed(app,&room.id,call,id)?;}
+    if room.screens.iter().any(|s|s.id==id) {
+        return switch_sources(app,&[id.to_string()]).map(|_|());
+    }
     if id == "desktop" {
         if !room.desktop {
             return Err("Nicht freigegeben".into());
@@ -1108,7 +1140,7 @@ pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
         let pids = crate::rooms::pids_of(&entry.path);
         let now = windows();
         // a new window of the app, or (it ran already) its frontmost window
-        let new = now.iter().find(|w| w.id().is_ok_and(|id| !before.contains(&id)) && (pids.is_empty() || w.pid().is_ok_and(|p| pids.contains(&p))));
+        let new = now.iter().find(|w| w.id().is_ok_and(|id| !before.contains(&id)) && w.pid().is_ok_and(|p| pids.contains(&p)));
         let existing = (started.elapsed() > std::time::Duration::from_millis(2500)).then(|| now.iter().find(|w| w.pid().is_ok_and(|p| pids.contains(&p)))).flatten();
         if let Some(w) = new.or(existing) {
             break Some(w.id().map_err(|e| e.to_string())?);
@@ -1118,6 +1150,8 @@ pub fn launch(app: &AppHandle, id: &str) -> Result<(), String> {
         }
     };
     let id = found.ok_or_else(|| format!("„{}“ hat kein Fenster geöffnet", entry.name))?;
+    if !Arc::ptr_eq(&shared,&running(app)?){return Err("Die Freigabe wurde inzwischen beendet.".into())}
+    if let Some(call)=&shared.fixed_call{crate::fixed_rooms::target_allowed(app,&room.id,call,&entry.id)?;}
     let mut ids: Vec<String> = shared.streams.lock().unwrap().iter().filter(|s| s.kind == "window").map(|s| s.id.clone()).collect();
     let new_id = format!("window:{id}");
     if !ids.contains(&new_id) {
@@ -1142,6 +1176,10 @@ pub fn resize_window(app: &AppHandle, slot: u8, pw: u32, ph: u32) -> Result<(), 
 pub fn settings_changed(app: &AppHandle) {
     if let Ok(shared) = running(app) {
         shared.send_state();
+    }
+    let hub = app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.hub.clone());
+    if let Some(hub) = hub {
+        tauri::async_runtime::spawn(async move { hub.voice_changed().await });
     }
 }
 

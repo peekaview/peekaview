@@ -19,13 +19,24 @@ const pad = (n) => String(n).padStart(2, '0')
 let link = ''
 let title = ''
 let recording = null
+let sharing = false
+let fixedCall = false
+let settings = { voice_enabled: false, transcript_enabled: false }
+let recordingTask = Promise.resolve()
+// the next steps below the bar, until the first viewer knocks (or "Verstanden")
+let viewerCount = 0
+let requestCount = 0
+let guideDone = false
 
 const voice = new Voice({
   send: (msg) => invoke('signal', { msg }),
   onChange: () => {
     const b = $('mic-btn')
     b.classList.toggle('live', voice.on)
-    b.title = voice.on ? 'Mikrofon aus' : 'Sprechen'
+    b.disabled = voice.starting
+    b.title = voice.starting ? 'Mikrofon wird freigegeben …' : voice.on ? 'Mikrofon ausschalten' : 'Mikrofon einschalten'
+    b.setAttribute('aria-label', b.title)
+    b.setAttribute('aria-pressed', String(voice.on))
     b.innerHTML = icon(voice.on ? 'mic' : 'micOff', 17)
     recording?.audio.sync()
   },
@@ -61,20 +72,35 @@ setCollapsed(!!store.get('pv-collapsed'))
 
 // ------------------------------------------------------------------ the running share
 
+function updateGuide() {
+  if (viewerCount || requestCount) guideDone = true
+  $('guide').hidden = guideDone || !link || fixedCall
+}
+$('paste-key').textContent = /Mac/i.test(navigator.platform) ? '⌘V' : 'Strg+V'
+$('guide-close').addEventListener('click', () => {
+  guideDone = true
+  updateGuide()
+})
+$('guide-copy').addEventListener('click', () => $('code-btn').click())
+
 function show(live) {
+  sharing = true
   link = live.link
   title = live.title || ''
+  fixedCall = !!live.fixedCall
+  $('mic-btn').hidden = !!live.fixedCall || settings.voice_enabled === false
+  voice.setEnabled(!live.fixedCall && settings.voice_enabled !== false)
   $('code-btn').title = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
   voice.setSelf(0, live.ice)
   setMode(live.mode, false)
+  syncRecording()
+  updateGuide()
 }
 invoke('live_info').then((live) => {
   if (!live) return
+  $('guide-copied').textContent = live.copied ? 'Er ist schon kopiert.' : 'Unten auf „Link nochmal kopieren“ klicken.'
   show(live)
-  if (live.copied) {
-    markCopied()
-    toast('Link in der Zwischenablage – einfach einfügen und verschicken.')
-  }
+  if (live.copied) markCopied()
 })
 listen('live', (e) => e.payload && show(e.payload))
 
@@ -110,6 +136,8 @@ $('stop-btn').addEventListener('click', () => invoke('stop_share'))
 
 function renderAvatars(peers) {
   const viewers = peers.filter((p) => !p.host)
+  viewerCount = viewers.length
+  updateGuide()
   const box = $('avatars')
   box.title = viewers.length ? viewers.map((p) => p.name).join('\n') : 'Noch keine Zuschauer'
   if (!viewers.length) {
@@ -127,21 +155,49 @@ function renderAvatars(peers) {
   if (viewers.length > 4) box.insertAdjacentHTML('beforeend', `<span class="more">+${viewers.length - 4}</span>`)
 }
 renderAvatars([])
-invoke('peers').then((list) => Array.isArray(list) && renderAvatars(list))
+invoke('peers').then((list) => { if (Array.isArray(list)) { renderAvatars(list); voice.setPeers(list) } })
 listen('peers', (e) => {
   renderAvatars(e.payload)
   voice.setPeers(e.payload)
 })
 listen('rtc', (e) => voice.handle(e.payload))
 $('mic-btn').addEventListener('click', () => {
+  if (settings.voice_enabled === false) return
   if (voice.on) voice.stop()
-  else voice.start().catch(() => toast('Kein Zugriff auf das Mikrofon.', 'info'))
+  else voice.start().catch(error => {
+    invoke('log_js', { message: `microphone: ${error.name}: ${error.message}` }).catch(() => {})
+    toast(error.name === 'NotAllowedError' || error.name === 'SecurityError'
+      ? 'Mikrofon für PeekaView erlauben: Systemeinstellungen → Datenschutz & Sicherheit → Mikrofon.'
+      : `Mikrofon konnte nicht gestartet werden: ${error.message}`, 'info', 7000)
+  })
 })
+
+function applySettings(value) {
+  settings = value ?? {}
+  $('mic-btn').hidden = fixedCall || settings.voice_enabled === false
+  voice.setEnabled(!fixedCall && settings.voice_enabled !== false)
+  syncRecording()
+}
+listen('settings', e => applySettings(e.payload))
+invoke('get_settings').then(applySettings)
+window.addEventListener('storage', e => {
+  if (['pv-local-stt', 'pv-openai-key', 'pv-use-env'].includes(e.key)) syncRecording()
+})
+
+function syncRecording() {
+  recordingTask = recordingTask.then(async () => {
+    if (!sharing) return
+    if (settings.transcript_enabled && !recording) await startRecording()
+    else if (!settings.transcript_enabled && recording) await stopRecording()
+  }).catch(error => toast(String(error), 'info', 5000))
+}
 
 // ------------------------------------------------------------------ join requests (with doorbell)
 
 listen('join-requests', (e) => {
   const list = e.payload ?? []
+  requestCount = list.length
+  updateGuide()
   renderRequests($('requests'), list)
   if (list.length) setCollapsed(false)
 })
@@ -167,12 +223,13 @@ function toast(text, kind = 'ok', ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms)
 }
 listen('toast', (e) => toast(String(e.payload)))
-listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – die Fernsteuerung ist freigeschaltet!'))
+listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – Steuern ist jetzt freigeschaltet!'))
 
 // the share ends: voice and recording stop; the window goes
 listen('ended', () => {
+  sharing = false
   invoke('dismiss_permission', { kind: 'accessibility' })
-  voice.stop()
+  voice.setEnabled(false)
   endRecordingUi()
 })
 
@@ -180,20 +237,15 @@ listen('ended', () => {
 
 // Own microphone + all voice chat partners, mixed to 16 kHz mono PCM and streamed to the
 // recorder (which transcribes it in chunks).
-async function startAudio(ctx) {
+function startAudio(ctx) {
   const sink = ctx.createScriptProcessor(4096, 1, 1)
   const mute = ctx.createGain()
   mute.gain.value = 0
   sink.connect(mute).connect(ctx.destination)
-  let mic = null
-  try {
-    mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-  } catch {
-    toast('Kein Mikrofon – das Transkript enthält nur die anderen Stimmen.', 'info', 5000)
-  }
   const nodes = new Map()
   const sync = () => {
-    const streams = [mic, ...voice.remoteStreams()].filter((s) => s?.getAudioTracks().length)
+    const streams = [voice.local, ...voice.remoteStreams()].filter((s) => s?.getAudioTracks().length)
+    if (streams.length && ctx.state === 'suspended') ctx.resume().catch(error => toast(String(error), 'info'))
     for (const s of streams) {
       if (nodes.has(s)) continue
       const node = ctx.createMediaStreamSource(s)
@@ -231,14 +283,14 @@ async function startAudio(ctx) {
     sync,
     stop() {
       sink.onaudioprocess = null
-      mic?.getTracks().forEach((t) => t.stop())
+      for (const node of nodes.values()) node.disconnect()
       ctx.close()
     },
   }
 }
 
 async function startRecording() {
-  // created inside the click so the browser lets it start
+  // The transcript starts with the share; audio sources join only when their microphones are on.
   const ctx = new AudioContext({ sampleRate: 16000 })
   const now = new Date()
   let engine
@@ -250,15 +302,17 @@ async function startRecording() {
       useEnv: store.get('pv-use-env') === 'true',
       title: title || 'Bildschirmfreigabe',
       startedLabel: now.toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' }),
-      fileStamp: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`,
+      fileStamp: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${String(now.getMilliseconds()).padStart(3, '0')}`,
     })
   } catch (e) {
     ctx.close()
     return toast(String(e), 'info', 5000)
   }
-  recording = { started: Date.now(), audio: await startAudio(ctx) }
+  if (!sharing) { ctx.close(); return }
+  if (!settings.transcript_enabled) { ctx.close(); await invoke('stop_recording'); return }
+  recording = { started: Date.now(), audio: startAudio(ctx) }
   $('rec-btn').classList.add('live')
-  $('rec-btn').title = 'Aufzeichnung beenden und Bericht erstellen'
+  $('rec-btn').title = 'Transkript deaktivieren'
   $('rec-time').hidden = false
   const tick = () => {
     const s = Math.floor((Date.now() - recording.started) / 1000)
@@ -266,7 +320,7 @@ async function startRecording() {
   }
   tick()
   recording.timer = setInterval(tick, 1000)
-  toast(`Aufzeichnung läuft · Transkript: ${engine}`, 'info', 5000)
+  toast(`Transkript läuft · ${engine}`, 'info', 5000)
 }
 
 function endRecordingUi() {
@@ -275,7 +329,7 @@ function endRecordingUi() {
   clearInterval(recording.timer)
   recording = null
   $('rec-btn').classList.remove('live')
-  $('rec-btn').title = 'Sitzung aufzeichnen'
+  $('rec-btn').title = 'Transkript aktivieren'
   $('rec-time').hidden = true
 }
 
@@ -284,11 +338,11 @@ async function stopRecording() {
   toast('Bericht wird erstellt …', 'info', 60000)
   try {
     await invoke('stop_recording')
-    toast('Bericht gespeichert und geöffnet')
+    toast('Transkript gespeichert')
   } catch (e) {
     toast(String(e), 'info', 5000)
   }
 }
 
-$('rec-btn').addEventListener('click', () => (recording ? stopRecording() : startRecording()))
-listen('report', () => toast('Bericht gespeichert und geöffnet'))
+$('rec-btn').addEventListener('click', () => invoke('set_settings', { patch: { transcript_enabled: !settings.transcript_enabled } }).then(applySettings))
+listen('report', () => toast('Transkript gespeichert'))
