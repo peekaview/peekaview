@@ -87,7 +87,8 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(239, 68, 68, .25); } 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, .08); } }
 
 .modes { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: var(--bg); }
-.modes button { display: grid; place-items: center; width: 34px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+.modes button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.modes button svg { width: 15px; height: 15px; }
 .modes button:hover { color: var(--fg); }
 .modes button.active { background: var(--fg); color: var(--bg); }
 .modes button[data-mode="control"].active { background: var(--accent); color: #fff; }
@@ -109,6 +110,15 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 @keyframes blink { 50% { opacity: .35; } }
 .toast.info { background: var(--panel); border: 1px solid var(--line); }
 
+/* next steps after the start */
+.guide { width: 340px; padding: 12px 14px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); animation: toast-in .25s ease-out; }
+.guide ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+.guide b { color: var(--fg); font-weight: 650; }
+.guide kbd { padding: 0 4px; border-radius: 4px; background: var(--raised); color: var(--fg); font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.guide-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.guide-actions .pill { height: 28px; padding: 0 10px; font-size: 12px; }
+body.collapsed #guide { display: none !important; }
+
 /* join requests: nobody watches without the presenter's OK */
 .requests { display: flex; flex-direction: column; gap: 6px; }
 .toolbar .requests { width: 340px; }
@@ -125,6 +135,10 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 .request .room { color: var(--fg); }
 
 /* ------------------------------------------------ picker */
+.picker-title { margin: 2px 0 0; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+.picker-lead { margin: 2px 0 12px; color: var(--muted); font-size: 13px; }
+.start-hint { margin: 8px 2px 0; color: var(--muted); font-size: 12px; text-align: right; }
+.start-hint:empty { display: none; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .panel-foot { display: flex; gap: 8px; margin-top: 12px; }
 .panel-foot input { margin: 0; flex: 1; }

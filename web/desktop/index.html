@@ -29,6 +29,8 @@
 
     <!-- what to share (also to change a running share) -->
     <section id="picker">
+      <h1 class="picker-title" id="picker-title">Was sollen die anderen sehen?</h1>
+      <p class="picker-lead" id="picker-lead">Klicke auf deinen Bildschirm oder auf ein Fenster.</p>
       <div class="panel-head">
         <div class="tabs" role="tablist">
           <button class="tab active" data-kind="screen"><i data-icon="screen"></i>Bildschirme</button>
@@ -39,10 +41,11 @@
       <div id="grid" class="grid"></div>
       <div class="panel-foot">
         <select id="room-choice" class="room-choice" title="In welchen Raum geteilt wird – wer den Link kennt, muss trotzdem erst zugelassen werden"></select>
-        <input id="name" maxlength="32" placeholder="Dein Name">
+        <input id="name" maxlength="32" placeholder="Dein Name (sehen die Zuschauer)">
         <button id="cancel-switch" class="pill secondary" hidden>Abbrechen</button>
         <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>
       </div>
+      <p class="start-hint" id="start-hint"></p>
     </section>
 
     <p id="error" class="error" hidden></p>
