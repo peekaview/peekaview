@@ -1204,12 +1204,9 @@ pub fn settings_changed(app: &AppHandle) {
     }
 }
 
-/// "Resize/Anordnen erlauben": a viewer activated a window in their window manager – it comes
-/// to the front here, too.
+/// A viewer (Zeigen or Steuern) picked a shared window – it comes to the front here, too, so what
+/// they point at or draw on is visible.
 pub fn activate_window(app: &AppHandle, slot: u8) -> Result<(), String> {
-    if !crate::settings::allow_resize() {
-        return Err("Nicht erlaubt".into());
-    }
     let stream = running(app)?.stream(slot).ok_or("Fenster wird nicht mehr geteilt")?;
     if let (Some(pid), Some(id)) = (stream.pid, stream.window_id) {
         crate::focus::bring_to_front(pid as u32, id);
