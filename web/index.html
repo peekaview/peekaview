@@ -9,8 +9,17 @@
   <style>
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     [hidden] { display: none !important; }
-    body { font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    body { display: flow-root; font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
     #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
+    #contacts-dialog { box-sizing: border-box; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3f3f46; border-radius: 18px; background: #18181b; color: #fafafa; box-shadow: 0 24px 80px #0009; }
+    #contacts-dialog[open] { display: flex; flex-direction: column; }
+    #contacts-dialog::backdrop { background: #0009; }
+    .contacts-head { flex: none; display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #27272a; }
+    .contacts-head h2 { margin: 0; font-size: 20px; }
+    #contacts-close { flex: none; display: grid; place-items: center; width: 38px; height: 38px; margin-left: auto; padding: 0; border: 1px solid #3f3f46; border-radius: 50%; background: #27272a; color: #fafafa; cursor: pointer; }
+    #contacts-close:hover { background: #3f3f46; }
+    #contacts-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
+    #contacts-content { min-height: 0; overflow-y: auto; padding: 20px; }
     #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(460px, calc(100% - 32px)); margin: 9vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     .brand { flex-wrap: wrap; row-gap: 8px; }
@@ -121,6 +130,10 @@
   <section id="fixed-room-entry" hidden><div id="fixed-rooms"></div></section>
     <div id="host-note"></div>
   </main>
+  <dialog id="contacts-dialog" aria-labelledby="contacts-title">
+    <header class="contacts-head"><h2 id="contacts-title">Kontakte</h2><button id="contacts-close" type="button" aria-label="Kontakte schließen" autofocus></button></header>
+    <div id="contacts-content"></div>
+  </dialog>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
@@ -153,6 +166,21 @@
     const KEY = 'pv-rooms'
     const MAX = 10
     $('logo').innerHTML = owl(32)
+    $('contacts-close').innerHTML = icon('close',18)
+    $('contacts-close').addEventListener('click',()=>$('contacts-dialog').close())
+    $('contacts-dialog').addEventListener('close',()=>{
+      $('fixed-room-entry').append($('fixed-rooms'))
+      const profile=$('profile')
+      const menu=profile.querySelector('details')
+      if(menu)menu.open=false
+      document.querySelector('.brand').append(profile)
+    })
+    function showContacts(){
+      if($('contacts-dialog').open)return
+      $('contacts-content').append($('fixed-rooms'))
+      $('contacts-close').before($('profile'))
+      $('contacts-dialog').showModal()
+    }
 
     const load = () => {
       try {
@@ -424,7 +452,7 @@
       $('viewer').hidden = false
       gaveUp = null
       viewer = mountViewer($('viewer'), {
-        onRooms: () => openRoom(),
+        onRooms: showContacts,
         room,
         name,
         onStatus: (status) => {
@@ -444,6 +472,7 @@
 
     /** Back to the start page. */
     function leave() {
+      $('contacts-dialog').close()
       clearTimeout(giveUpTimer)
       giveUpTimer = undefined
       viewer?.destroy()
