@@ -25,9 +25,8 @@ concurrency:
 
 jobs:
   windows:
-    # our own runner: pull requests from forks must not run code on it
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Windows, X64]
+    # the same GitHub-hosted runner as bwclient's Windows builds
+    runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
