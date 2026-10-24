@@ -29,7 +29,7 @@ const voice = new Voice({
   onChange: () => {
     const b = $('mic-btn')
     b.classList.toggle('live', voice.on)
-    b.title = voice.on ? 'Mikrofon aus' : 'Sprechen'
+    b.title = voice.on ? 'Mikrofon ausschalten' : 'Mikrofon einschalten'
     b.innerHTML = icon(voice.on ? 'mic' : 'micOff', 17)
     recording?.audio.sync()
   },
@@ -185,7 +185,7 @@ function toast(text, kind = 'ok', ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms)
 }
 listen('toast', (e) => toast(String(e.payload)))
-listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – die Fernsteuerung ist freigeschaltet!'))
+listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – Steuern ist jetzt freigeschaltet!'))
 
 // the share ends: voice and recording stop; the window goes
 listen('ended', () => {

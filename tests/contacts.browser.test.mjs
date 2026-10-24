@@ -180,6 +180,10 @@ test('contacts and groups show five each, expand independently and call the chos
     assert.equal(await evaluate("qa.requests.some(r=>r.action==='calls/direct')"),false)
     await browser('open',`http://127.0.0.1:${server.address().port}/contacts.html?signup=1`)
     assert.equal(await evaluate("document.querySelector('input[type=email]')===null"),true)
+    // no own-server option; a session without a server (the former option) falls back to PeekaView's
+    assert.equal(await evaluate("!document.body.innerText.includes('Server')"),true)
+    await evaluate("localStorage.setItem('pv-fixed-rooms-v1','{}');window.dispatchEvent(new StorageEvent('storage',{key:'pv-fixed-rooms-v1'}));true")
+    await browser('wait','--text','Direkt anrufen – ohne Link')
     await browser('find','role','button','click','--name','Person einladen')
     await browser('fill','input[type="email"]','friend@example.test')
     await browser('click','form button')

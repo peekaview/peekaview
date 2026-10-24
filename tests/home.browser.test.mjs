@@ -12,7 +12,7 @@ const web=resolve(dirname(fileURLToPath(import.meta.url)),'../web')
 const room='a'.repeat(22)+'.'+'b'.repeat(43)
 const own={id:'0000000000000000',email:'own@example.test',name:'Mein Browser',platform:'browser'}
 const state={device:own,person:{id:'1111111111111111',email:own.email,name:'Ich',devices:[own]},contacts:[],rooms:[],calls:[],invitations:[]}
-const shim=`<script>window.qa={requests:[]};window.fetch=async(url,options)=>{const action=new URL(url).searchParams.get('action');qa.requests.push({action,body:options.body?JSON.parse(options.body):null});return Response.json(action==='state'?${JSON.stringify(state)}:{sent:true})};</script>`
+const shim=`<script>window.qa={requests:[]};const pageFetch=window.fetch;window.fetch=async(url,options)=>{if(!String(url).includes('api.php'))return pageFetch(url,options);const action=new URL(url).searchParams.get('action');qa.requests.push({action,body:options.body?JSON.parse(options.body):null});return Response.json(action==='state'?${JSON.stringify(state)}:{sent:true})};</script>`
 
 test('home gives usable entry points, remembers the choice and requests identity only for the chosen action',{timeout:90000},async()=>{
   const server=createServer(async(request,response)=>{
@@ -34,6 +34,18 @@ test('home gives usable entry points, remembers the choice and requests identity
     const base='http://127.0.0.1:'+server.address().port
     await browser('open',base+'/')
     await browser('wait','#share-url')
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Impressum','Datenschutz','Sicherheit'])
+    // the legal pages open over the start page, which stays where it is
+    await browser('click','#footer a[href="impressum.html"]')
+    await browser('wait','.pv-legal-dialog[open] h1')
+    assert.equal(await evaluate("document.querySelector('.pv-legal-dialog h1').textContent+'|'+location.pathname+'|'+!!document.querySelector('.pv-legal-dialog .back')"),'Impressum|/|false')
+    await browser('click','.pv-legal-close')
+    assert.equal(await evaluate("document.querySelector('.pv-legal-dialog').open"),false)
+    await browser('click','#footer a[href="sicherheit.html"]')
+    await browser('wait','.pv-legal-dialog[open] h1')
+    assert.equal(await evaluate("document.querySelector('.pv-legal-dialog h1').textContent"),'Sicherheit')
+    await browser('press','Escape')
+    assert.equal(await evaluate("document.querySelector('.pv-legal-dialog').open"),false)
     assert.equal(await evaluate("document.querySelector('#name-box').hidden && document.querySelector('#connect').hidden"),true)
     assert.equal(await evaluate("document.querySelectorAll('[data-home]').length"),2)
     await browser('click','[data-home="contacts"]')
@@ -89,6 +101,7 @@ test('home gives usable entry points, remembers the choice and requests identity
     await browser('click','#connect')
     await browser('wait','#viewer:not([hidden])')
     assert.equal(await evaluate("document.querySelector('#home').hidden"),true)
+    assert.equal(await evaluate("document.querySelector('#footer').hidden"),true)
     assert.equal(await evaluate('qa.requests.length'),0)
     await evaluate('history.back();true')
     await browser('wait','#home:not([hidden])')

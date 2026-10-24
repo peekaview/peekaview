@@ -344,7 +344,7 @@ listen('permission-granted', (e) => {
     // macOS only applies the screen recording permission to a fresh process
     setTimeout(() => invoke('restart_app'), 2500)
   } else {
-    toast('Super – die Fernsteuerung ist freigeschaltet!')
+    toast('Super – Steuern ist jetzt freigeschaltet!')
     rememberPermissions({ accessibility: true })
   }
 })

@@ -131,7 +131,7 @@ export function mountViewer(el, options) {
         <span class="pv-live"><i class="pv-dot"></i><span class="pv-title"></span></span>
         <span class="pv-mode" role="img"></span>
         <span class="pv-rec" role="img" aria-label="Wird aufgezeichnet" title="Wird aufgezeichnet" hidden><i class="pv-dot"></i></span>
-        <span class="pv-paused" role="img" aria-label="Steuerung pausiert" title="Steuerung pausiert – Fenster ist beim Host verdeckt" hidden>${icon('control', 15)}</span>
+        <span class="pv-paused" role="img" aria-label="Steuerung pausiert" title="Steuerung pausiert – das Fenster ist bei der teilenden Person verdeckt" hidden>${icon('control', 15)}</span>
       </div>
       <span class="pv-tasks"></span>
       <button data-tile data-tip="Fenster nebeneinander">${icon('tile')}</button>
@@ -143,7 +143,7 @@ export function mountViewer(el, options) {
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
       <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" ${options.onRooms ? '' : 'hidden'}>${icon('window')}</button>
-      <button data-voice data-tip="Mikrofon stumm – einschalten" aria-label="Mikrofon stumm – einschalten" aria-pressed="false">${icon('micOff')}</button>
+      <button data-voice data-tip="Mikrofon einschalten" aria-label="Mikrofon einschalten" aria-pressed="false">${icon('micOff')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
     <textarea class="pv-keys" aria-hidden="true" tabindex="-1" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>`
@@ -195,7 +195,7 @@ export function mountViewer(el, options) {
       b.disabled = voice.starting
       b.setAttribute('aria-busy', String(voice.starting))
       b.setAttribute('aria-pressed', String(voice.on))
-      b.dataset.tip = voice.starting ? 'Mikrofon wird freigegeben …' : voice.on ? 'Mikrofon an – stummschalten' : 'Mikrofon stumm – einschalten'
+      b.dataset.tip = voice.starting ? 'Mikrofon wird freigegeben …' : voice.on ? 'Mikrofon ausschalten' : 'Mikrofon einschalten'
       b.setAttribute('aria-label', b.dataset.tip)
       b.innerHTML = icon(voice.on ? 'mic' : 'micOff')
     },
@@ -556,10 +556,10 @@ export function mountViewer(el, options) {
       case 'blocked':
         toast(
           m.why === 'permission'
-            ? 'Beim Host fehlt noch die Freigabe „Bedienungshilfen“ – er wurde gerade darum gebeten.'
+            ? 'Die teilende Person muss das Steuern noch erlauben (macOS: „Bedienungshilfen“) – sie wurde gerade darum gebeten.'
             : m.why === 'focus'
               ? 'Zum Tippen zuerst in das geteilte Fenster klicken.'
-              : 'Diese Stelle ist beim Host verdeckt – der Klick kommt dort nicht an.',
+              : 'Diese Stelle ist bei der teilenden Person verdeckt – der Klick kommt dort nicht an.',
         )
         return
       default:
@@ -732,14 +732,14 @@ export function mountViewer(el, options) {
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
-      busy: 'Gerade nicht verfügbar – auf diesem Rechner läuft schon eine andere Freigabe.',
-      pick: 'Remote-Zugriff: Starte oben in der Toolbar eine Anwendung oder den Desktop.',
+      busy: 'Gerade nicht verfügbar – auf diesem Computer läuft schon eine andere Freigabe.',
+      pick: 'Fernzugriff: Starte oben in der Leiste ein Programm oder den ganzen Desktop.',
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
       locked: state.remote && state.mode === 'control'
-        ? 'Der Bildschirm des Hosts ist gesperrt.'
-        : 'Der Bildschirm des Hosts ist gesperrt – warte, bis die teilende Person ihn entsperrt.',
+        ? 'Der Bildschirm der teilenden Person ist gesperrt.'
+        : 'Der Bildschirm der teilenden Person ist gesperrt – warte, bis sie ihn entsperrt.',
       live: '',
     }
     const notice = typeof RTCPeerConnection === 'undefined'
@@ -948,7 +948,7 @@ export function mountViewer(el, options) {
         toast(r.files.length === 1 ? `„${r.files[0].name}“ liegt in der gemeinsamen Zwischenablage.` : `${r.files.length} Dateien liegen in der gemeinsamen Zwischenablage.`)
         openClip()
       } else if (r.timeout) {
-        toast('Kopieren hat nicht geklappt – keine Antwort vom Host.')
+        toast('Kopieren hat nicht geklappt – keine Antwort vom geteilten Computer.')
       }
     })
   }

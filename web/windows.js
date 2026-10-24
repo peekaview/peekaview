@@ -166,11 +166,11 @@ export class WindowManager {
       // Annotation coordinates only make sense while the host's whole window is in front.
       const covered = !info.paused && (info.front === false || info.reachable === false)
       win.el.classList.toggle('covered', covered)
-      win.el.querySelector('.pv-win-flag').textContent = covered ? 'Beim Host im Hintergrund' : ''
+      win.el.querySelector('.pv-win-flag').textContent = covered ? 'Im Hintergrund' : ''
       if (!this.canAnnotate(win)) win.ann.reset()
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
-      paused.textContent = 'Fenster ist beim Host gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
+      paused.textContent = 'Das Fenster ist bei der teilenden Person gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
       // a phone screen with remote control: soft buttons below it
       const nav = !!info.nav && control
       win.el.querySelector('.pv-nav').hidden = !nav
@@ -360,7 +360,7 @@ export class WindowManager {
         el.style.top = `${oy + (r.y - D.y) * k}px`
         el.style.width = `${r.w * k}px`
         el.style.height = `${r.h * k}px`
-        el.innerHTML = `<span>${this.screens.length > 1 ? `Bildschirm ${i + 1} des Hosts` : 'Bildschirm des Hosts'}</span>`
+        el.innerHTML = `<span>${this.screens.length > 1 ? `Bildschirm ${i + 1} der teilenden Person` : 'Bildschirm der teilenden Person'}</span>`
         return el
       }),
     )
@@ -638,7 +638,7 @@ export class WindowManager {
       ghost.style.height = `${Math.round(remote ? target.h + BAR : win.el.offsetHeight)}px`
       const label = ghost.querySelector('span')
       if (remote) {
-        label.innerHTML = '<b></b><small>neue Fenstergröße beim Host</small>'
+        label.innerHTML = '<b></b><small>neue Fenstergröße bei der teilenden Person</small>'
         const k = this.mirror ? (this.map ?? this.mirrorMap()).k : 1 / d
         label.querySelector('b').textContent = `${Math.round(target.w / k)} × ${Math.round(target.h / k)}`
       } else {

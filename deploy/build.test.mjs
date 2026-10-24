@@ -13,6 +13,7 @@ test('public build includes all viewer modules and excludes private and desktop 
   const files = await readdir(dist, { recursive: true })
   assert.ok(files.includes('index.html'))
   assert.ok(files.includes('download.html'))
+  for (const page of ['impressum.html', 'datenschutz.html', 'sicherheit.html', 'legal.css', 'legal.js']) assert.ok(files.includes(page), page)
   assert.ok(files.includes('windows.js'))
   assert.ok(files.includes('vendor/pdfjs/pdf.worker.min.mjs'))
   assert.ok(files.includes('LICENSE.txt'))

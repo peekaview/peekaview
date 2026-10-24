@@ -5,6 +5,12 @@ import { Signaling } from './signal.js'
 import { icon, peerColor } from './icons.js'
 
 const KEY = 'pv-fixed-rooms-v1'
+const API = 'https://peekaview.devxpert.de/api.php'
+// sessions without a server (e.g. from the former "own server" option) use PeekaView's
+function readSession(storage) {
+  const session = JSON.parse(storage.getItem(KEY) || '{}')
+  return { ...session, api: session.api || API }
+}
 export const platform = window.__TAURI__ ? 'desktop' : window.PeekaViewApp || window.PeekaViewHost ? 'android' : 'browser'
 export function apiURL(value) {
   const url = new URL(value)
@@ -16,7 +22,7 @@ export class RoomClient extends EventTarget {
   constructor(storage = localStorage) {
     super()
     this.storage = storage
-    this.session = JSON.parse(storage.getItem(KEY) || '{"api":"https://peekaview.devxpert.de/api.php"}')
+    this.session = readSession(storage)
     this.state = { contacts: this.session.contactsVersion===2 ? this.session.contacts : [], rooms: this.session.contactsVersion===2 ? this.session.rooms : [], calls: [], invitations: [] }
   }
   save() {
@@ -72,6 +78,18 @@ const element = (tag, text, className) => {
   if (text !== undefined) el.textContent = text
   if (className) el.className = className
   return el
+}
+/** The way to sharing one's own screen: PeekaView Desktop (start page and contacts). */
+export function downloadCard() {
+  const card=element('a',undefined,'pv-download')
+  // a tab of its own: a running call or a half-done sign-up stays open
+  card.href=new URL('download.html',import.meta.url).href;card.target='_blank';card.rel='noopener'
+  const art=element('span',undefined,'pv-download-icon');art.innerHTML=icon('screen',22)
+  const text=element('span',undefined,'pv-download-text')
+  text.append(element('strong','Selbst den Bildschirm zeigen?'),element('small','Dafür brauchst du PeekaView Desktop – kostenlos.'))
+  const action=element('span',undefined,'pv-download-action');action.innerHTML=icon('download',16);action.append('PeekaView Desktop herunterladen')
+  card.append(art,text,action)
+  return card
 }
 export function mountRooms(root, { callId = '', invitation = '', invitationApi = '', handoff = '', profileRoot = null, onIncoming, onOpen = openRoom } = {}) {
   const client = new RoomClient()
@@ -179,11 +197,6 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       list.append(item)
     })
     return list
-  }
-  function downloadHint(){
-    const hint=element('p','Du möchtest selbst deinen Bildschirm zeigen? ','fr-muted fr-download-hint')
-    const link=element('a','PeekaView für den Computer herunterladen');link.href=new URL('download.html',import.meta.url).href;link.target='_blank';link.rel='noopener'
-    hint.append(link);return hint
   }
   const FLOW={contact:['Person','Deine E-Mail','Bestätigen'],group:['Deine E-Mail','Bestätigen','Gruppe'],login:['Deine E-Mail','Bestätigen']}
   function beginConnection(nextAction){client.session.nextAction=nextAction;client.save();rendered='';render()}
@@ -332,14 +345,14 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       const sync=()=>{pinField.hidden=!pinEnabled.checked;pinField.required=pinEnabled.checked && !room.pin;save.hidden=pinEnabled.checked===!!room.pin && !pinField.value}
       pinEnabled.addEventListener('change',sync);pinField.addEventListener('input',sync);sync()
       f.append(label,pinField,save)
-      if (room.pin_required) f.append(element('small','Für unbeaufsichtigten Zugriff erforderlich.','fr-muted'))
+      if (room.pin_required) f.append(element('small','Für den Fernzugriff nötig.','fr-muted'))
       if (room.active_call) f.append(element('small','Eine PIN-Änderung beendet den Gruppenanruf.','fr-muted'))
       f.addEventListener('submit',e=>{e.preventDefault();action(async()=>{
         save.disabled=true
         try {
           await client.request('rooms/settings',{room:room.id,pin_enabled:pinEnabled.checked,pin:pinEnabled.checked?pinField.value:''});pinField.value='';room.pin=pinEnabled.checked
           if(pendingAccess && room.pin){pendingAccess=false;await choose()}
-          else notice.textContent='Gruppen-PIN gespeichert.'
+          else notice.textContent='PIN gespeichert.'
         }
         finally {save.disabled=false}
       })})
@@ -360,9 +373,9 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         unattended.checked=false
         if (pinEnabled) {
           pendingAccess=true;pinEnabled.checked=true;pinEnabled.dispatchEvent(new Event('change'));pinField.focus()
-          notice.textContent='Lege zuerst eine Gruppen-PIN mit mindestens 6 Zeichen fest. Danach wählst du aus, was freigegeben werden darf.';return
+          notice.textContent='Lege zuerst eine PIN mit mindestens 6 Zeichen fest. Danach wählst du aus, was freigegeben werden darf.';return
         }
-        throw new Error('Bitte den Gruppenersteller, zuerst eine Gruppen-PIN festzulegen.')
+        throw new Error('Bitte die Person, die die Gruppe erstellt hat, zuerst eine PIN festzulegen.')
       }
       const options=platform==='desktop' ? await window.__TAURI__.core.invoke('fixed_access_options',{room:room.id}) : JSON.parse(native.roomAccessOptions(room.id))
       if (options.error) throw new Error(options.error)
@@ -387,7 +400,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         const value={enabled:true,screens:[],apps:[]}
         for (const {check,kind} of choices) if (check.checked) value[kind].push(check.value)
         if (!value.screens.length && !value.apps.length) throw new Error('Wähle mindestens einen Bildschirm oder eine Anwendung.')
-        await configure(value);selection.replaceChildren();notice.textContent='Unbeaufsichtigter Zugriff ist für die ausgewählten Inhalte bereit.'
+        await configure(value);selection.replaceChildren();notice.textContent='Fernzugriff ist für die ausgewählten Inhalte an.'
       },'fr-primary')
       const sync=()=>{activate.disabled=!choices.some(c=>c.check.checked)}
       for(const choice of choices)choice.check.addEventListener('change',sync)
@@ -395,7 +408,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     }
     unattended.addEventListener('change',()=>action(async()=>{
       unattended.disabled=true
-      try {if(unattended.checked) await choose();else {pendingAccess=false;await configure({enabled:false,screens:[],apps:[]});selection.replaceChildren();notice.textContent='Unbeaufsichtigter Zugriff ist aus.'}}
+      try {if(unattended.checked) await choose();else {pendingAccess=false;await configure({enabled:false,screens:[],apps:[]});selection.replaceChildren();notice.textContent='Fernzugriff ist aus.'}}
       catch(e){unattended.checked=!!room.unattended;throw e}
       finally{unattended.disabled=false}
     }))
@@ -458,7 +471,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
           content.append(acceptance)
         }else{
           // the main action first; the installed app is the alternative
-          const app=button(mobile?'In der PeekaView-App öffnen':'In PeekaView öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` },kind==='device'?'fr-primary fr-big':'fr-text-button')
+          const app=button(mobile?'In der PeekaView-App öffnen':'In PeekaView Desktop öffnen',()=>{ location.href=`peekaview://rooms#${new URLSearchParams({api:client.session.api,invite:invitation})}` },kind==='device'?'fr-primary fr-big':'fr-text-button')
           if(kind==='device')content.append(app,acceptance)
           else content.append(acceptance,element('p','PeekaView schon installiert? Dann kannst du die Einladung auch dort annehmen:','fr-muted'),app)
         }
@@ -466,13 +479,6 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         return
       }
       content.append(acceptance)
-      return
-    }
-    if (!client.session.api) {
-      content.append(element('h3','Eigener Server'))
-      content.append(form([['Server-Adresse','url','']],'Verbinden',async api=>{
-        client.session.api=apiURL(api); await client.request('config',undefined,false); client.save()
-      }))
       return
     }
     if (!client.session.token) {
@@ -499,8 +505,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
         if(client.session.pendingContactEmail)content.append(button(`Andere Person statt ${client.session.pendingContactEmail}`,()=>{delete client.session.pendingContactEmail;client.save();rendered='';render()},'fr-text-button'))
       }
       if(client.session.nextAction)content.append(button('Zurück',()=>{delete client.session.nextAction;delete client.session.pendingEmail;delete client.session.pendingContactEmail;client.save();emailSent='';rendered='';render()}))
-      if(platform==='browser' && !client.session.nextAction)content.append(downloadHint())
-      if(!client.session.nextAction){const connection=element('details',undefined,'fr-advanced');connection.append(element('summary','Für Firmen: eigener Server'),button('Eigenen Server verwenden',()=>{client.session={};emailSent='';client.save()}));content.append(connection)}
+      if(platform==='browser' && !client.session.nextAction)content.append(downloadCard())
       return
     }
     const pending=client.state.calls.find(c=>c.id===callId && ['requested','rejected'].includes(c.status))
@@ -547,8 +552,8 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     if(!client.state.contacts.length && !client.state.rooms.length)return
     if (platform==='browser') {
       if ('serviceWorker' in navigator && 'PushManager' in window && (!client.session.pushEnabled || Notification.permission!=='granted')) content.append(button('Anrufe auch bei geschlossener Seite erhalten',enablePush,'fr-push'))
-      content.append(downloadHint())
-    } else if (platform==='android') content.append(button('Anrufe im Hintergrund empfangen',()=> (window.PeekaViewHost||window.PeekaViewApp).enableRoomCalls()))
+      content.append(downloadCard())
+    } else if (platform==='android') content.append(button('Anrufe auch bei geschlossener App erhalten',()=> (window.PeekaViewHost||window.PeekaViewApp).enableRoomCalls()))
   }
   async function loadInvitation() {
     const api=apiURL(invitationApi || client.session.api)
@@ -586,7 +591,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
       if (platform!=='browser') bar.append(button('Bildschirm teilen',()=>shareCall(active.id)))
       call.append(bar,element('div',undefined,'fr-admissions'),element('div',undefined,'fr-call-invite'),element('p','','fr-call-people'),element('div',undefined,'fr-streams'))
       content.append(call)
-      if (platform==='browser') content.append(downloadHint())
+      if (platform==='browser') content.append(downloadCard())
     }
     const admissions=content.querySelector('.fr-admissions')
     const requests=active.requests || []
@@ -710,7 +715,7 @@ export function mountRooms(root, { callId = '', invitation = '', invitationApi =
     } finally { polling=false }
   }
   const focus=()=>refresh().catch(fail)
-  const changed=()=>{ client.session=JSON.parse(client.storage.getItem(KEY)||'{}');if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
+  const changed=()=>{ client.session=readSession(client.storage);if(client.session.token)emailSent='';configureNative(client).catch(fail);rendered='';focus() }
   const dismissProfile=e=>{
     const profile=profileHost.querySelector('.fr-profile')
     if(!profile?.open)return
