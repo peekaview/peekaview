@@ -143,7 +143,7 @@ export function mountViewer(el, options) {
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
-      <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" ${options.onRooms ? '' : 'hidden'}>${icon('window')}</button>
+      <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" aria-haspopup="dialog" ${options.onRooms ? '' : 'hidden'}>${icon('users')}</button>
       <button data-voice data-tip="Mikrofon einschalten" aria-label="Mikrofon einschalten" aria-pressed="false">${icon('micOff')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>

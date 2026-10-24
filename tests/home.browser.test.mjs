@@ -22,7 +22,8 @@ test('home gives usable entry points, remembers the choice and requests identity
     try{
       let body=await readFile(file,'utf8')
       if(extname(file)==='.html')body=body.replace('<head>','<head>'+shim)
-      if(path==='/signal.js')body+='\nSignaling.open=async()=>({pubkey:"00".repeat(32),send(){},close(){}});'
+      if(path==='/signal.js')body+='\nSignaling.open=async options=>{const connection={pubkey:"00".repeat(32),closed:false,send(){},close(){this.closed=true}};if(options.secretKey)qa.viewerConnection=connection;return connection};'
+      if(path==='/viewer.js')body=body.replace("  setTool('point')\n  update('connecting')","  window.qa.receive=onText\n  setTool('point')\n  update('connecting')")
       response.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css'})[extname(file)]??'application/octet-stream');response.end(body)
     }catch{response.writeHead(404).end()}
   })
@@ -34,6 +35,11 @@ test('home gives usable entry points, remembers the choice and requests identity
     const base='http://127.0.0.1:'+server.address().port
     await browser('open',base+'/')
     await browser('wait','#share-url')
+    for(const [width,height] of [[1280,900],[393,852],[320,700],[844,390]]){
+      await browser('set','viewport',String(width),String(height))
+      const layout=await evaluate("({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,footer:document.querySelector('#footer').getBoundingClientRect().bottom})")
+      assert.deepEqual([layout.width,layout.height],[width,Math.max(height,Math.round(layout.footer))],'the home page only scrolls when its content exceeds the viewport')
+    }
     assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Impressum','Datenschutz','Sicherheit'])
     assert.equal(await evaluate("document.querySelector('#trust').textContent"),'P2P · Ende-zu-Ende verschlüsselt')
     // the legal pages open over the start page, which stays where it is
@@ -103,9 +109,30 @@ test('home gives usable entry points, remembers the choice and requests identity
     await browser('wait','#viewer:not([hidden])')
     assert.equal(await evaluate("document.querySelector('#home').hidden"),true)
     assert.equal(await evaluate("document.querySelector('#footer').hidden"),true)
+    assert.deepEqual(await evaluate('[document.documentElement.scrollWidth,document.documentElement.scrollHeight]'),[393,852],'joining leaves no page scroll area behind the fixed viewer')
     assert.equal(await evaluate('qa.requests.length'),0)
+    await evaluate("qa.receive({t:'welcome',id:1});qa.receive({t:'state',mode:'control',windows:[{w:0,kind:'window',title:'Testfenster',pw:1280,ph:720}]});qa.video=document.querySelector('#viewer video');qa.contacts=document.querySelector('#fixed-rooms');true")
+    await browser('click','[data-fixed-rooms]')
+    assert.equal(await evaluate("!!document.querySelector('#contacts-dialog[open] #fixed-rooms')"),true,'contacts open over the viewer instead of navigating away')
+    for(const [width,height] of [[1280,900],[393,852],[320,480]]){
+      await browser('set','viewport',String(width),String(height))
+      assert.equal(await evaluate("(()=>{const r=document.querySelector('#contacts-dialog').getBoundingClientRect();return r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight})()"),true)
+    }
+    if(process.env.PV_CONTACTS_DIALOG_SCREENSHOT)await browser('screenshot',process.env.PV_CONTACTS_DIALOG_SCREENSHOT)
+    await browser('press','Escape')
+    await browser('wait','--fn',"!!document.querySelector('#fixed-room-entry #fixed-rooms')")
+    assert.equal(await evaluate("!document.querySelector('#contacts-dialog').open && document.activeElement.matches('[data-fixed-rooms]')"),true)
+    await browser('click','[data-fixed-rooms]')
+    assert.equal(await evaluate("document.querySelector('#contacts-dialog #fixed-rooms')===qa.contacts"),true,'reopening reuses the contact UI')
+    await browser('click','#contacts-close')
+    await browser('wait','--fn',"!!document.querySelector('#fixed-room-entry #fixed-rooms')")
+    assert.equal(await evaluate("!qa.viewerConnection.closed && document.querySelector('#viewer video')===qa.video && !document.querySelector('#viewer').hidden"),true,'the same viewer connection remains open')
+    assert.equal(await evaluate('location.hash'),'#'+room)
+    await browser('set','viewport','393','852')
+    await browser('click','[data-fixed-rooms]')
     await evaluate('history.back();true')
     await browser('wait','#home:not([hidden])')
+    assert.equal(await evaluate("!document.querySelector('#contacts-dialog').open && !!document.querySelector('#fixed-room-entry #fixed-rooms')"),true,'leaving also closes the contact dialog and restores the home view')
     assert.equal(await evaluate("location.hash==='' && document.querySelector('#name-box').hidden"),true)
     await evaluate("localStorage.removeItem('pv-name');localStorage.setItem('pv-start-view','contacts');true")
     await browser('open',base+'/?app=1#'+room)
