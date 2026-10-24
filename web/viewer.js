@@ -509,6 +509,7 @@ export function mountViewer(el, options) {
         voice.setEnabled(voiceEnabled && state.voice_enabled === true)
         // "Resize/Anordnen erlauben": the windows where they are on the presenter's screen
         wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode === 'control' && m.resize === true, screens: m.screens ?? [] })
+        stopBlockedAnnotations()
         renderTasks()
         wm.handle(m)
         break
@@ -1017,9 +1018,16 @@ export function mountViewer(el, options) {
   let hover = null
   let lastMove = 0
 
+  function stopBlockedAnnotations() {
+    if (tool === 'control') return
+    for (const win of new Set([down, hover])) if (win && !wm.canAnnotate(win)) send({ t: 'hide', w: win.slot })
+    if (down && !wm.canAnnotate(down)) down = null
+    if (hover && !wm.canAnnotate(hover)) hover = null
+  }
+
   stage.addEventListener('pointerdown', (e) => {
     const win = wm.at(e)
-    if (!win || !active()) return
+    if (!win || !active() || (tool !== 'control' && !wm.canAnnotate(win))) return
     e.preventDefault()
     e.target.setPointerCapture?.(e.pointerId)
     down = win
@@ -1038,7 +1046,9 @@ export function mountViewer(el, options) {
 
   stage.addEventListener('pointermove', (e) => {
     if (!active()) return
-    const win = down ?? wm.at(e)
+    stopBlockedAnnotations()
+    const target = down ?? wm.at(e)
+    const win = target && (tool === 'control' || wm.canAnnotate(target)) ? target : null
     // left a window: its cursor disappears there
     if (!down && hover && hover !== win) send({ t: 'hide', w: hover.slot })
     hover = down ? hover : win
@@ -1059,7 +1069,7 @@ export function mountViewer(el, options) {
     const win = down
     if (!win) return
     down = null
-    if (!active()) return
+    if (!active() || (tool !== 'control' && !wm.canAnnotate(win))) return
     const p = { ...wm.pos(win, e), w: win.slot }
     if (tool === 'draw') {
       send({ t: 'draw', s: 'end', ...p })

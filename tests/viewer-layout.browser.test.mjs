@@ -23,7 +23,9 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   if(!file.startsWith(web+sep)){response.writeHead(403).end();return}
   try{
    let content=await readFile(file)
-   if(path==='/viewer.js')content=Buffer.from(content.toString().replace("  setTool('point')\n  update('connecting')", "  window.qa = {wm, receive: onText}\n  setTool('point')\n  update('connecting')"))
+   if(path==='/viewer.js')content=Buffer.from(content.toString()
+    .replace("  setTool('point')\n  update('connecting')", "  window.qa = {wm, receive: onText, sent: []}\n  setTool('point')\n  update('connecting')")
+    .replace("const send = (m) => dc?.readyState === 'open' && dc.send(JSON.stringify(m))", "const send = (m) => {window.qa?.sent.push(m);return dc?.readyState === 'open' && dc.send(JSON.stringify(m))}"))
    response.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css'})[extname(file)]??'application/octet-stream');response.end(content)
   }catch{response.writeHead(404).end()}
  })
@@ -89,6 +91,42 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   assert.equal(await evaluate('qa.wm.list.every(w=>w.y>=qa.wm.area(true).top-1)'),true)
   await evaluate(`qa.receive(${JSON.stringify(state(1,{windows:[{w:0,kind:'screen',title:'Phone',pw:720,ph:1600,nav:true}]}))});true`);await settle()
   assert.equal(await evaluate("document.querySelector('.pv-nav').getBoundingClientRect().bottom<=innerHeight+1"),true)
+  // Host foreground, not local viewer focus, determines where pointing and drawing work.
+  await browser('click','.pv-fold');await settle()
+  const foreground=state(4,{mode:'draw'})
+  foreground.windows[0].front=true
+  foreground.windows[1].front=false;foreground.windows[1].reachable=true
+  foreground.windows[2].front=false;foreground.windows[2].reachable=false
+  foreground.windows[3].front=true;foreground.windows[3].paused=true
+  await evaluate(`qa.receive(${JSON.stringify(foreground)});qa.sent=[];
+   qa.pointer=(slot,type)=>{const view=qa.wm.wins.get(slot).view,r=view.getBoundingClientRect();view.setPointerCapture=()=>{};view.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:9,button:0}))};true`)
+  await settle()
+  assert.deepEqual(await evaluate('qa.wm.list.map(w=>w.el.classList.contains("covered"))'),[false,true,true,false])
+  await browser('wait','--fn','getComputedStyle(qa.wm.wins.get(1).video).filter.includes("grayscale(1)")')
+  assert.equal(await evaluate('getComputedStyle(qa.wm.wins.get(1).view).cursor'),'not-allowed')
+  await evaluate("qa.wm.focus(1);for(const w of qa.wm.list){qa.pointer(w.slot,'pointerdown');qa.pointer(w.slot,'pointerup')};true")
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="ping").map(m=>m.w)'),[0])
+  assert.equal(await evaluate('qa.wm.canAnnotate(qa.wm.wins.get(1))'),false)
+  await evaluate("for(const w of [0,1,2,3])for(const t of ['ptr','ping','draw'])qa.receive({t,from:2,w,x:.2,y:.3,s:'start'});true")
+  assert.equal(await evaluate('qa.wm.wins.get(0).ann.active.has(2)'),true)
+  assert.equal(await evaluate('qa.wm.list.slice(1).every(w=>!w.ann.active.size && !w.ann.cursors.size && !w.ann.root.querySelector(".pv-ping"))'),true)
+  await browser('click','.pv-dock [data-tool="draw"]')
+  await evaluate("qa.sent=[];qa.pointer(0,'pointerdown');true")
+  assert.equal(await evaluate('qa.wm.wins.get(0).ann.active.has(1)'),true)
+  foreground.windows[0].front=false
+  await evaluate(`qa.receive(${JSON.stringify(foreground)});qa.pointer(0,'pointermove');qa.pointer(0,'pointerup');true`)
+  assert.equal(await evaluate('qa.wm.wins.get(0).ann.strokes.length===0 && qa.wm.wins.get(0).ann.cursors.size===0 && !qa.wm.wins.get(0).ann.root.querySelector(".pv-ping")'),true)
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="draw").map(m=>m.s)'),['start'])
+  foreground.windows[0].front=true
+  await evaluate(`qa.receive(${JSON.stringify(foreground)});qa.pointer(0,'pointermove');qa.pointer(0,'pointerup');true`)
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="draw").map(m=>m.s)'),['start'],'A covered gesture cannot resume after the host brings the window back')
+  await evaluate("qa.pointer(0,'pointerdown');qa.pointer(0,'pointerup');true")
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="draw").map(m=>m.s)'),['start','start','end'])
+  // Remote control keeps its existing host-side input guard and can still activate a window.
+  await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'control'})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="mouse").map(m=>m.a)'),['down','up'])
+  await evaluate(`qa.receive(${JSON.stringify(state(1,{mode:'draw',windows:[{w:0,kind:'screen',title:'Phone',pw:720,ph:1600}]}))});qa.sent=[];qa.pointer(0,'pointerdown');qa.pointer(0,'pointerup');true`)
+  assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="ping").map(m=>m.w)'),[0],'Shared screens without window foreground metadata remain usable')
   // Embedding in part of a page keeps the toolbar at the viewer edge, not the page edge.
   await evaluate("Object.assign(document.querySelector('#viewer').style,{position:'absolute',top:'65px',left:'80px',width:'620px',height:'420px'});true");await settle()
   assert.equal(await evaluate("Math.round(document.querySelector('.pv-dock').getBoundingClientRect().top-document.querySelector('#viewer').getBoundingClientRect().top)"),12)

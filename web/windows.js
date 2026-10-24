@@ -52,9 +52,11 @@ const STYLE = `
 .pv-wins.solo .pv-win .pv-view { border-radius: 0; }
 .pv-wins.solo .pv-win-bar, .pv-wins.solo .pv-grab { display: none; }
 .pv-wins.moving .pv-view { pointer-events: none; }
-/* covered completely on the presenter's screen */
+/* behind another window on the presenter's screen, even if still partly visible */
 .pv-win.covered .pv-view video { filter: grayscale(1) brightness(.5); transition: filter .3s; }
 .pv-win.covered .pv-win-bar { color: #71717a; }
+.pv-viewer[data-tool="point"] .pv-win.covered .pv-view,
+.pv-viewer[data-tool="draw"] .pv-win.covered .pv-view { cursor: not-allowed; }
 /* mirror of the presenter's screen ("Resize/Anordnen erlauben") */
 .pv-desk { position: absolute; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .14);
   background: radial-gradient(ellipse at 30% 20%, rgba(59, 130, 246, .10), transparent 60%), linear-gradient(160deg, #1f1f24, #121215); }
@@ -129,7 +131,7 @@ export class WindowManager {
   }
 
   /**
-   * Shared windows from the presenter's state: [{w, kind, title, app, paused, reachable, rect, z}].
+   * Shared windows from the presenter's state: [{w, kind, title, app, paused, reachable, front, rect, z}].
    * `mirror`: the viewer may arrange the presenter's windows – show them where they are on the
    * presenter's `screens`.
    */
@@ -161,10 +163,11 @@ export class WindowManager {
       const badge = win.el.querySelector('.pv-win-app')
       badge.textContent = (name || '?').slice(0, 1).toUpperCase()
       badge.style.background = appColor(name)
-      // covered completely on the presenter's screen: greyed out
-      const covered = info.reachable === false && !info.paused
+      // Annotation coordinates only make sense while the host's whole window is in front.
+      const covered = !info.paused && (info.front === false || info.reachable === false)
       win.el.classList.toggle('covered', covered)
-      win.el.querySelector('.pv-win-flag').textContent = covered ? 'verdeckt' : ''
+      win.el.querySelector('.pv-win-flag').textContent = covered ? 'Beim Host im Hintergrund' : ''
+      if (!this.canAnnotate(win)) win.ann.reset()
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
       paused.textContent = 'Fenster ist beim Host gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
@@ -701,8 +704,13 @@ export class WindowManager {
 
   /** Annotation messages: to the window they belong to, or to all. */
   handle(m) {
-    if (m.w != null) this.wins.get(m.w)?.ann.handle(m)
-    else for (const win of this.wins.values()) win.ann.handle(m)
+    const annotation = ['ptr', 'ping', 'draw'].includes(m.t)
+    const wins = m.w != null ? [this.wins.get(m.w)].filter(Boolean) : this.wins.values()
+    for (const win of wins) if (!annotation || this.canAnnotate(win)) win.ann.handle(m)
+  }
+
+  canAnnotate(win) {
+    return this.wins.get(win.slot) === win && !win.info.paused && win.info.front !== false && win.info.reachable !== false
   }
 
   reset() {

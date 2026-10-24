@@ -156,6 +156,7 @@ export class Annotations {
     for (const id of [...this.cursors.keys()]) if (id !== keep) this.removeCursor(id)
     this.strokes = []
     this.active.clear()
+    for (const ping of this.root.querySelectorAll('.pv-ping')) ping.remove()
     this.render()
   }
 
