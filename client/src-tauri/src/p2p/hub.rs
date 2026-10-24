@@ -603,8 +603,13 @@ impl Hub {
                     shared.send_state();
                 });
             }
-            // "Resize/Anordnen erlauben": the viewer activated / moved a window in their window manager
-            "activate" | "arrange" if crate::settings::allow_resize() && (v["t"] == "activate" || mode == Mode::Control) => {
+            // bringing a shared window to the front: in Zeigen and Steuern always (to draw on it),
+            // while watching with "Zuschauer dürfen Fenster anordnen"; moving it: with that option in
+            // Zeigen and Steuern
+            "activate" | "arrange"
+                if (v["t"] == "activate" && (mode != Mode::View || crate::settings::allow_resize()))
+                    || (v["t"] == "arrange" && mode != Mode::View && crate::settings::allow_resize()) =>
+            {
                 let (app, slot, kind) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8, v["t"].as_str().unwrap_or("").to_string());
                 let (x, y, w, h) = (v["x"].as_f64(), v["y"].as_f64(), v["hw"].as_f64(), v["hh"].as_f64());
                 let shared = self.shared.clone();
@@ -621,7 +626,7 @@ impl Hub {
                 });
             }
             // … and resized it
-            "resize" if mode == Mode::Control && crate::settings::allow_resize() => {
+            "resize" if mode != Mode::View && crate::settings::allow_resize() => {
                 let (app, slot) = (self.app.clone(), v["w"].as_u64().unwrap_or(0) as u8);
                 let (pw, ph) = (v["pw"].as_u64().unwrap_or(0) as u32, v["ph"].as_u64().unwrap_or(0) as u32);
                 std::thread::spawn(move || {

@@ -138,10 +138,10 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 
 PeekaView keeps running in the tray / menu bar. Ending a share or closing the toolbar (×) only hides it, and a click on the tray icon brings it back. You quit PeekaView from the tray menu. Its menu offers:
 - **Letzten Link beibehalten:** every share reuses the last link.
-- **Fenster anordnen erlauben:** with remote control on, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
+- **Zuschauer dürfen Fenster anordnen** (Optionen): in Zeigen and Steuern, viewers see a **mirror of this screen**. The shared windows sit where they are, at the same relative size and in the same stacking order. The window manager then acts on the real windows on this screen.
   - Resizing a window resizes it here, so it shows 1:1 for them.
   - Moving a window, or arranging all side by side, moves the windows to the same relative place on their screen.
-  - Picking a window (click or dock) brings it to the front here.
+  - Picking a window (click or dock) brings it to the front here – in Zeigen and Steuern always, also without this option, and so does starting to point or draw on a window that is covered here.
 - **Sprache aktiv / Transkript aktiv:** the voice channel and the local transcript of a share.
 - **Festen Link kopieren:** copies one of the permanent links.
 - **Einstellungen … / Kontakte … / Transkripte …:** settings with the permanent links, contacts and calls, saved transcripts.

@@ -248,6 +248,8 @@ export class WindowManager {
           window.removeEventListener('pointerup', up, true)
           window.removeEventListener('pointercancel', up, true)
           if (ev.type === 'pointerup' && activate && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) {
+            // the title bar picks a window; a click into the picture only with arranging (a ping
+            // must not pull the presenter's focus around – covered windows come forward on their own)
             this.activate(win, titleBar ? !!this.options.canActivate?.() : !!this.options.canResize?.())
           }
         }

@@ -26,6 +26,7 @@ const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'F
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 
 const CSS = `
+.pv-viewer:fullscreen { width: 100%; height: 100%; background: var(--pv-bg); }
 .pv-viewer {
   --pv-accent: #ef4444; --pv-bg: #09090b; --pv-fg: #fafafa; --pv-muted: #a1a1aa;
   --pv-glass: rgba(24, 24, 27, .78); --pv-line: rgba(255, 255, 255, .09);
@@ -143,8 +144,9 @@ export function mountViewer(el, options) {
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
-      <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" ${options.onRooms ? '' : 'hidden'}>${icon('window')}</button>
+      <button data-fixed-rooms data-tip="Kontakte" aria-label="Kontakte" aria-haspopup="dialog" ${options.onRooms ? '' : 'hidden'}>${icon('users')}</button>
       <button data-voice data-tip="Mikrofon einschalten" aria-label="Mikrofon einschalten" aria-pressed="false">${icon('micOff')}</button>
+      <button data-fullscreen data-tip="Vollbild" aria-label="Vollbild" aria-pressed="false" hidden>${icon('maximize')}</button>
       <button class="pv-fold" data-tip="Einklappen">${icon('collapse', 16)}</button>
     </div>
     <textarea class="pv-keys" aria-hidden="true" tabindex="-1" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>`
@@ -162,10 +164,10 @@ export function mountViewer(el, options) {
     voice: voiceEnabled,
     // how large each window is shown here – the presenter encodes no more pixels than that
     onSizes: (sizes) => send({ t: 'view-size', sizes }),
-    // "Resize/Anordnen erlauben" on the presenter's side: windows resized, moved or activated
-    // here follow there
-    canResize: () => state.mode === 'control' && state.resize === true,
-    canActivate: () => state.resize === true,
+    // pointing, drawing or controlling: a window picked here comes to the front there, too;
+    // "Zuschauer dürfen Fenster anordnen": windows resized or moved here follow there
+    canResize: () => state.mode !== 'view' && state.resize === true,
+    canActivate: () => state.mode !== 'view' || state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
     onActivate: (slot) => send({ t: 'activate', w: slot }),
     onNav: (slot, a) => send({ t: 'nav', a, w: slot }),
@@ -506,7 +508,7 @@ export function mountViewer(el, options) {
         state = m
         voice.setEnabled(voiceEnabled && state.voice_enabled === true)
         // "Resize/Anordnen erlauben": the windows where they are on the presenter's screen
-        wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode === 'control' && m.resize === true, screens: m.screens ?? [] })
+        wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode !== 'view' && m.resize === true, screens: m.screens ?? [] })
         stopBlockedAnnotations()
         renderTasks()
         wm.handle(m)
@@ -833,6 +835,28 @@ export function mountViewer(el, options) {
   for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool))
   q('[data-clear]').addEventListener('click', clear)
   q('[data-fixed-rooms]').addEventListener('click', () => options.onRooms?.())
+  // full screen: on a phone the whole display for the shared windows (controlling with a finger)
+  const fullscreenButton = q('[data-fullscreen]')
+  const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null
+  fullscreenButton.hidden = !(document.fullscreenEnabled || document.webkitFullscreenEnabled)
+  const syncFullscreen = () => {
+    const on = fullscreenElement() === el
+    fullscreenButton.innerHTML = icon(on ? 'restore' : 'maximize')
+    fullscreenButton.dataset.tip = on ? 'Vollbild beenden' : 'Vollbild'
+    fullscreenButton.setAttribute('aria-label', fullscreenButton.dataset.tip)
+    fullscreenButton.setAttribute('aria-pressed', String(on))
+  }
+  fullscreenButton.addEventListener('click', async () => {
+    try {
+      if (fullscreenElement()) await (document.exitFullscreen ?? document.webkitExitFullscreen).call(document)
+      else await (el.requestFullscreen ?? el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' })
+    } catch {
+      toast('Vollbild ist in diesem Browser nicht möglich.')
+    }
+  })
+  document.addEventListener('fullscreenchange', syncFullscreen)
+  document.addEventListener('webkitfullscreenchange', syncFullscreen)
+
   q('[data-voice]').addEventListener('click', () => {
     if (!voiceEnabled || state.voice_enabled !== true || !me) return
     if (voice.on) voice.stop()
@@ -1024,8 +1048,20 @@ export function mountViewer(el, options) {
     if (hover && !wm.canAnnotate(hover)) hover = null
   }
 
+  // pointing or drawing on a window that is behind others at the presenter's: it comes forward
+  // first (nobody would see the strokes there otherwise)
+  let raisedAt = 0
+  function raise(win) {
+    if (!win || win.info.paused || state.mode === 'view' || Date.now() - raisedAt < 1500) return
+    raisedAt = Date.now()
+    wm.activate(win, true)
+    toast('Das Fenster kommt bei der teilenden Person nach vorne – gleich kannst du zeichnen.')
+  }
+
   stage.addEventListener('pointerdown', (e) => {
     const win = wm.at(e)
+    // (the picture itself – the title bar has its own click)
+    if (win && active() && tool !== 'control' && !wm.canAnnotate(win)) return win.view.contains(e.target) && raise(win)
     if (!win || !active() || (tool !== 'control' && !wm.canAnnotate(win))) return
     e.preventDefault()
     e.target.setPointerCapture?.(e.pointerId)
@@ -1152,6 +1188,9 @@ export function mountViewer(el, options) {
       resetVideo()
       stageObserver.disconnect()
       window.removeEventListener('keydown', onGlobalKey)
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreen)
+      if (fullscreenElement() === el) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document)
       document.removeEventListener('visibilitychange', onVisibility)
       clearTimeout(viewportTimer)
       dockObserver.disconnect()
