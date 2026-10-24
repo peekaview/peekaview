@@ -83,6 +83,13 @@ $('guide-close').addEventListener('click', () => {
 })
 $('guide-copy').addEventListener('click', () => $('code-btn').click())
 
+// how long a link works – people should know whether they can send it again next time
+const VALIDITY = {
+  once: 'Er gilt nur für diese Freigabe – nach „Beenden“ funktioniert er nicht mehr.',
+  kept: 'Er bleibt auch für deine nächsten Freigaben gleich.',
+  fixed: 'Fester Link – er bleibt immer gleich.',
+}
+
 function show(live) {
   sharing = true
   link = live.link
@@ -90,7 +97,8 @@ function show(live) {
   fixedCall = !!live.fixedCall
   $('mic-btn').hidden = !!live.fixedCall || settings.voice_enabled === false
   voice.setEnabled(!live.fixedCall && settings.voice_enabled !== false)
-  $('code-btn').title = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren`
+  $('code-btn').title = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren\n${VALIDITY[live.linkKind] ?? ''}`.trim()
+  $('guide-validity').textContent = VALIDITY[live.linkKind] ?? ''
   voice.setSelf(0, live.ice)
   setMode(live.mode, false)
   syncRecording()
