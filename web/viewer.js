@@ -165,6 +165,7 @@ export function mountViewer(el, options) {
     // "Resize/Anordnen erlauben" on the presenter's side: windows resized, moved or activated
     // here follow there
     canResize: () => state.mode === 'control' && state.resize === true,
+    canActivate: () => state.resize === true,
     onResize: (slot, pw, ph) => send({ t: 'resize', w: slot, pw, ph }),
     onActivate: (slot) => send({ t: 'activate', w: slot }),
     onNav: (slot, a) => send({ t: 'nav', a, w: slot }),

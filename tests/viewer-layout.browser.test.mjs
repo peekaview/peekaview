@@ -125,6 +125,28 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   // Remote control keeps its existing host-side input guard and can still activate a window.
   await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'control'})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
   assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="mouse").map(m=>m.a)'),['down','up'])
+  // An explicit title-bar click can raise a background window with arrangement permission,
+  // including while watching or annotating. Only a new host state unlocks annotations.
+  await evaluate(`qa.titlePointer=(type,selector='.pv-win-bar',dx=0,id=11)=>{const bar=qa.wm.wins.get(1).el.querySelector(selector),r=bar.getBoundingClientRect();bar.setPointerCapture=()=>{};bar.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:r.left+15+dx,clientY:r.top+10,pointerId:id,button:0}))};true`)
+  for(const mode of ['view','draw','control']){
+   await evaluate(`qa.receive(${JSON.stringify({...foreground,mode,resize:true})});qa.wm.wins.get(1).activated=0;qa.sent=[];qa.titlePointer('pointerdown');qa.titlePointer('pointerup');true`)
+   assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="activate").map(m=>m.w)'),[1],mode)
+   assert.equal(await evaluate('qa.wm.wins.get(1).el.classList.contains("covered") && !qa.wm.canAnnotate(qa.wm.wins.get(1))'),true)
+   assert.equal(await evaluate('qa.wm.wins.get(1).el.querySelector(".pv-win-bar").title'),'Bei der teilenden Person in den Vordergrund holen')
+  }
+  await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'draw',resize:false})});qa.wm.wins.get(1).activated=0;qa.sent=[];qa.titlePointer('pointerdown');qa.titlePointer('pointerup');true`)
+  assert.equal(await evaluate('qa.sent.some(m=>m.t==="activate")'),false)
+  assert.equal(await evaluate('qa.wm.wins.get(1).el.querySelector(".pv-win-bar").title'),'')
+  await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'draw',resize:true})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
+  assert.equal(await evaluate('qa.sent.some(m=>m.t==="activate" || m.t==="ping" || m.t==="draw")'),false,'The gray picture itself does not activate or annotate')
+  await evaluate("qa.titlePointer('pointerdown');qa.titlePointer('pointercancel');qa.titlePointer('pointerup');true")
+  assert.equal(await evaluate('qa.sent.some(m=>m.t==="activate")'),false,'Canceled gestures cannot activate a window')
+  await evaluate("qa.titlePointer('pointerdown');qa.titlePointer('pointermove','.pv-win-bar',40);qa.titlePointer('pointerup','.pv-win-bar',40);true")
+  assert.equal(await evaluate('qa.sent.some(m=>m.t==="activate" || m.t==="arrange")'),false,'Dragging a local preview is not a host activation click')
+  await evaluate("qa.titlePointer('pointerdown','[data-min]');qa.titlePointer('pointerup','[data-min]');true")
+  assert.equal(await evaluate('qa.sent.some(m=>m.t==="activate")'),false,'Minimize and resize controls do not activate the host window')
+  await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'draw',resize:true,windows:foreground.windows.map(w=>({...w,front:true,reachable:true,paused:false}))})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
+  assert.equal(await evaluate('qa.wm.canAnnotate(qa.wm.wins.get(1)) && qa.sent.some(m=>m.t==="ping" && m.w===1)'),true,'The host foreground update unlocks annotations')
   await evaluate(`qa.receive(${JSON.stringify(state(1,{mode:'draw',windows:[{w:0,kind:'screen',title:'Phone',pw:720,ph:1600}]}))});qa.sent=[];qa.pointer(0,'pointerdown');qa.pointer(0,'pointerup');true`)
   assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="ping").map(m=>m.w)'),[0],'Shared screens without window foreground metadata remain usable')
   // Embedding in part of a page keeps the toolbar at the viewer edge, not the page edge.
