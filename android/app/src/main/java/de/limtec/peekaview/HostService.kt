@@ -20,10 +20,15 @@ import java.util.concurrent.CopyOnWriteArraySet
  * the background. A join request shows up as a notification with sound.
  */
 class HostService : Service() {
+    @Volatile private var armed = false
+    private var publishedRoomStream = ""
+    private var roomMonitor: java.util.concurrent.ScheduledFuture<*>? = null
+    private var stopping = false
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        instance=this
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Freigabe läuft", NotificationManager.IMPORTANCE_LOW))
         manager.createNotificationChannel(NotificationChannel(CHANNEL_REQUESTS, "Beitrittsanfragen", NotificationManager.IMPORTANCE_HIGH))
@@ -35,36 +40,87 @@ class HostService : Service() {
             intent.getStringExtra(EXTRA_PEER)?.let { host?.admit(it, intent.getBooleanExtra(EXTRA_ALLOW, false)) }
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_STOP) {
+            if(host==null){armed=false;RoomCalls.disableAccess(this);stopSelf()}else stopCurrent()
+            return START_NOT_STICKY
+        }
+        if(intent?.getBooleanExtra(EXTRA_ARM,false)==true){
+            armed=true
+            if(host==null) foreground(true)
+            return START_NOT_STICKY
+        }
+        if (host != null) return START_NOT_STICKY
+        val shell = intent?.getBooleanExtra(EXTRA_SHELL, false) == true
+        foreground(shell)
+        try {beginCapture(checkNotNull(intent))}
+        catch(e:Exception){lastError=e.message ?: e.toString();stopCurrent()}
+        return START_NOT_STICKY
+    }
+
+    private fun foreground(shell:Boolean) {
         // first the notification, then the capture (Android's order for media projection)
         val notification = running()
         if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            startForeground(ID, notification, if (shell && Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else if (shell) 0 else ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         } else {
             startForeground(ID, notification)
         }
-        if (host != null) return START_NOT_STICKY
-        val data = intent?.let { if (Build.VERSION.SDK_INT >= 33) it.getParcelableExtra(EXTRA_DATA, Intent::class.java) else @Suppress("DEPRECATION") it.getParcelableExtra(EXTRA_DATA) }
-        if (data == null) {
+    }
+    private fun beginCapture(intent:Intent) {
+        check(host==null){"Es läuft bereits eine Freigabe."}
+        val shell=intent.getBooleanExtra(EXTRA_SHELL,false)
+        val data = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(EXTRA_DATA, Intent::class.java) else @Suppress("DEPRECATION") intent.getParcelableExtra(EXTRA_DATA)
+        if (data == null && !shell) {
             stopSelf()
-            return START_NOT_STICKY
+            error("Bildschirmfreigabe wurde nicht erlaubt.")
         }
         val (width, height) = screenSize()
-        try {
-            host = Host(
+            lateinit var capture:Host
+            capture = Host(
                 context = applicationContext,
                 name = intent.getStringExtra(EXTRA_NAME) ?: "Android",
                 projectionData = data,
+                shellMode = shell,
+                fixedCall = intent.getStringExtra("fixed_call"),
+                automaticRoom = intent.getStringExtra("fixed_access_room"),
                 width = width,
                 height = height,
                 onChange = ::changed,
-                onEnded = { stopSelf() },
-            ).also { it.start() }
-        } catch (e: Exception) {
-            lastError = e.message ?: e.toString()
-            stopSelf()
-        }
+                onEnded = { error ->
+                    if (error != null) lastError = error
+                    android.os.Handler(mainLooper).post { if(host===capture) stopCurrent() }
+                },
+            )
+            host=capture
+            capture.start()
+            host?.takeIf{it.fixedCall!=null}?.let{roomMonitor=RoomCalls.monitor(this,it)}
+        if(intent.hasExtra("fixed_access_room")) host?.setMode("control")
+        getSystemService(NotificationManager::class.java).notify(ID,running())
         changed()
-        return START_NOT_STICKY
+    }
+    private fun stopCurrent() {
+        clearCapture {
+            if(instance===this){if(armed) foreground(true) else stopSelf()}
+        }
+    }
+    private fun clearCapture(onStopped:()->Unit = {}) {
+        if(stopping)return
+        stopping=true
+        roomMonitor?.cancel(false);roomMonitor=null
+        val current=host
+        current?.let{
+            current.fixedCall?.let{if(current.link.isNotEmpty())RoomCalls.publish(this,it,null,current.link.substringAfter('#'));if(current.automaticRoom!=null)RoomCalls.endAutomatic(this,it)}
+        }
+        // A new share may use the helper only after the old capture has released it.
+        val released=current?.stop() ?: java.util.concurrent.CompletableFuture.completedFuture(Unit)
+        released.whenComplete{_,problem->android.os.Handler(mainLooper).post{
+            if(host===current)host=null
+            stopping=false;publishedRoomStream=""
+            if(problem!=null)lastError=problem.message ?: "Die Freigabe konnte nicht vollständig beendet werden."
+            val manager=getSystemService(NotificationManager::class.java)
+            for(id in announced.values)manager.cancel(id)
+            announced.clear();changed();onStopped()
+        }}
     }
 
     // turned: the capture follows
@@ -83,12 +139,8 @@ class HostService : Service() {
     }
 
     override fun onDestroy() {
-        host?.stop()
-        host = null
-        val manager = getSystemService(NotificationManager::class.java)
-        for (id in announced.values) manager.cancel(id)
-        announced.clear()
-        changed()
+        if(instance===this)instance=null
+        clearCapture()
         super.onDestroy()
     }
 
@@ -96,6 +148,12 @@ class HostService : Service() {
     private val announced = HashMap<String, Int>()
 
     private fun changed() {
+        host?.let{current -> current.fixedCall?.let{call ->
+            if(current.link.isNotEmpty() && current.link!=publishedRoomStream){
+                publishedRoomStream=current.link
+                RoomCalls.publish(this,call,current.link.substringAfter('#'))
+            }
+        }}
         // every join request: a notification that rings, to let in or turn away right there
         val requests = host?.requests().orEmpty()
         val manager = getSystemService(NotificationManager::class.java)
@@ -135,10 +193,12 @@ class HostService : Service() {
     private fun running(): Notification =
         Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("PeekaView – Bildschirm wird geteilt")
-            .setContentText("Tippen für Link, Zuschauer und Beenden")
+            .setContentTitle(if(host==null && armed) "PeekaView – Unbeaufsichtigter Zugriff bereit" else "PeekaView – Bildschirm wird geteilt")
+            .setContentText(if(host==null && armed) "Nur ausgewählte Bildschirme und Anwendungen" else "Tippen für Link, Zuschauer und Beenden")
             .setContentIntent(openShare())
             .setOngoing(true)
+            .addAction(Notification.Action.Builder(null, if(host==null && armed) "Deaktivieren" else "Beenden", PendingIntent.getService(this, 1,
+                Intent(this, HostService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)).build())
             // a group of its own: Android would fold the join requests into it, and their
             // buttons would only show after unfolding
             .setGroup("share")
@@ -147,6 +207,31 @@ class HostService : Service() {
     companion object {
         const val EXTRA_DATA = "data"
         const val EXTRA_NAME = "name"
+        const val EXTRA_SHELL = "shell"
+        const val EXTRA_ARM = "arm_access"
+        @Volatile private var instance:HostService?=null
+        fun isArmed()=instance?.armed==true
+        fun stopCapture(){instance?.let{s->android.os.Handler(s.mainLooper).post{s.stopCurrent()}}}
+        fun disarm(){instance?.let{s->android.os.Handler(s.mainLooper).post{s.armed=false;if(host==null)s.stopSelf()}}}
+        fun startAutomatic(call:String,room:String):java.util.concurrent.CompletableFuture<Unit>{
+            val result=java.util.concurrent.CompletableFuture<Unit>()
+            val service=instance
+            if(service==null || !service.armed){result.completeExceptionally(IllegalStateException("Unbeaufsichtigter Zugriff ist nicht bereit."));return result}
+            android.os.Handler(service.mainLooper).post{
+                if(result.isDone)return@post
+                try{
+                    check(service.armed && RoomCalls.access(service,room)!=null){"Zugriff wurde deaktiviert."}
+                    service.beginCapture(Intent().putExtra(EXTRA_SHELL,true).putExtra("fixed_call",call).putExtra("fixed_access_room",room))
+                    if(host?.accessCurrent()!=true){service.stopCurrent();error("Die Zugriffsauswahl wurde inzwischen geändert.")}
+                    result.complete(Unit)
+                }catch(e:Exception){
+                    if(host?.fixedCall==call && host?.automaticRoom==room)service.stopCurrent()
+                    lastError=e.message;result.completeExceptionally(e)
+                }
+            }
+            return result
+        }
+        private const val ACTION_STOP = "de.limtec.peekaview.STOP"
         private const val ACTION_ADMIT = "de.limtec.peekaview.ADMIT"
         private const val EXTRA_PEER = "peer"
         private const val EXTRA_ALLOW = "allow"

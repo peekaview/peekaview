@@ -4,13 +4,15 @@
   <meta charset="utf-8">
   <title>PeekaView</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../fixed-rooms.css">
 </head>
 <body class="app">
   <header class="app-head">
     <span id="logo" class="logo"></span>
     <strong>PeekaView</strong>
     <span id="live-badge" class="live-badge" hidden><i class="dot"></i>Freigabe läuft – Auswahl ändern</span>
-    <button id="settings-btn" class="icon-btn" title="Einstellungen &amp; Räume" data-icon="settings"></button>
+    <div id="profile" hidden></div>
+    <button id="settings-btn" class="icon-btn" title="Einstellungen" data-icon="settings"></button>
   </header>
 
   <main>
@@ -26,6 +28,12 @@
       <div><strong id="invite-room"></strong><span id="invite-server"></span></div>
       <button id="invite-clear" class="icon-btn" title="Einladung verwerfen" data-icon="close"></button>
     </div>
+    <div id="share-destination" class="share-destination" role="group" aria-label="Wie möchtest du teilen?">
+      <button type="button" data-destination="link" aria-pressed="true"><i data-icon="link"></i>Per Link teilen</button>
+      <button type="button" data-destination="contacts" aria-pressed="false"><i data-icon="users"></i>Kontakte</button>
+    </div>
+    <div id="fixed-call-banner" class="banner" hidden><strong id="fixed-call-label"></strong><button id="fixed-call-change" class="pill secondary">Empfänger ändern</button></div>
+    <div id="fixed-rooms" hidden></div>
 
     <!-- what to share (also to change a running share) -->
     <section id="picker">
@@ -40,7 +48,7 @@
       </div>
       <div id="grid" class="grid"></div>
       <div class="panel-foot">
-        <select id="room-choice" class="room-choice" title="In welchen Raum geteilt wird – wer den Link kennt, muss trotzdem erst zugelassen werden"></select>
+        <select id="room-choice" class="room-choice" title="Freigabelink auswählen"></select>
         <input id="name" maxlength="32" placeholder="Dein Name (sehen die Zuschauer)">
         <button id="cancel-switch" class="pill secondary" hidden>Abbrechen</button>
         <button id="start" class="pill primary" disabled><i data-icon="share"></i><span id="start-label">Freigabe starten</span></button>

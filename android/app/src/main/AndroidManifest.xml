@@ -7,10 +7,18 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- viewers' pointers and drawings on top of the shared screen -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -30,6 +38,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="peekaview" android:host="join" />
+                <data android:scheme="peekaview" android:host="rooms" />
             </intent-filter>
         </activity>
 
@@ -60,7 +69,34 @@
         <service
             android:name=".HostService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started screen sharing and remote control through a locally paired ADB shell helper, without MediaProjection. The foreground notification allows stopping the session." />
+        </service>
+
+        <service
+            android:name=".RoomCallsService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Explicitly enabled incoming calls for confirmed PeekaView rooms. An ongoing notification allows stopping reachability." />
+        </service>
+
+        <service
+            android:name=".AdbSetupService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started local ADB pairing assistant: discovers this phone's debugging ports and accepts a pairing code through a notification while Android's pairing dialog remains open. Stops on completion, cancellation or after five minutes." />
+        </service>
+
+        <service
+            android:name=".ShellHelperService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-activated local shell helper for screen sharing and remote control. ADB is used only for startup; authenticated loopback TLS keeps it available across Wi-Fi changes. A visible notification allows stopping the helper at any time." />
+        </service>
 
         <!-- remote control: viewers' taps and swipes (only if switched on in the system settings) -->
         <service

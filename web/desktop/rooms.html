@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>Einstellungen & Räume</title>
+  <title>Einstellungen</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="rooms">
@@ -13,77 +13,75 @@
   </header>
   <main>
     <div class="tabs page-tabs" role="tablist">
-      <button class="tab active" data-page="rooms-page"><i data-icon="link"></i>Feste Räume</button>
-      <button class="tab" data-page="settings-page"><i data-icon="settings"></i>Einstellungen</button>
+      <button class="tab active" data-page="settings-page"><i data-icon="settings"></i>Einstellungen</button>
+      <button class="tab" data-page="rooms-page"><i data-icon="link"></i>Feste Links</button>
     </div>
 
-    <section id="rooms-page">
+    <section id="rooms-page" hidden>
       <header class="page-head">
-        <p class="muted">Ein fester Raum hat einen Link, der immer gleich bleibt – z. B. für Kunden oder den eigenen Computer. Wer beitreten will, wird von dir zugelassen.</p>
-        <button id="add" class="pill primary"><i data-icon="link"></i>Neuer Raum</button>
+        <p class="muted">Fester Link. Zuschauer treten mit deiner Bestätigung oder PIN bei.</p>
+        <button id="add" class="pill primary"><i data-icon="link"></i>Neuer fester Link</button>
       </header>
       <div id="list" class="room-list"></div>
-      <p id="empty" class="empty" hidden>Noch keine festen Räume.</p>
+      <p id="empty" class="empty" hidden>Noch keine festen Links.</p>
     </section>
 
-    <section id="settings-page" hidden>
+    <section id="settings-page">
       <h3>Freigabe</h3>
       <div class="set-group">
         <label class="set-row">
-          <span class="text"><b>Dein Name</b><small>So sehen dich die Zuschauer.</small></span>
+          <span class="text"><b>Dein Name</b></span>
           <input id="own-name" maxlength="32" autocomplete="name">
         </label>
         <label class="set-row">
-          <span class="text"><b>Letzten Link beibehalten</b><small>Jede Freigabe nutzt den Link der letzten.</small></span>
+          <span class="text"><b>Letzten Link beibehalten</b><small>Derselbe Link für jede Freigabe.</small></span>
           <input type="checkbox" class="switch" id="keep-link">
         </label>
         <label class="set-row">
-          <span class="text"><b>Fenster anordnen erlauben</b><small>Zuschauer dürfen geteilte Fenster verschieben, in der Größe ändern und nach vorn holen.</small></span>
+          <span class="text"><b>Fenster anordnen erlauben</b><small>Zuschauer dürfen Fenster nach vorn holen, verschieben und ihre Größe ändern.</small></span>
           <input type="checkbox" class="switch" id="allow-resize">
         </label>
       </div>
 
-      <h3>Zuschauer-Website</h3>
-      <div class="set-group">
-        <label class="set-row stack">
-          <span class="text"><b>Adresse</b><small>Leer lassen: die Seite liegt auf Nostr, ganz ohne eigenen Webserver.</small></span>
-          <input id="site" spellcheck="false" autocomplete="off" placeholder="über Nostr (nsite)">
-          <span id="nsite" class="nsite"></span>
-        </label>
-      </div>
-
-      <h3>Verbindung</h3>
-      <div class="set-group">
-        <p class="set-note">Bild, Ton und Steuerung laufen direkt zwischen den Computern (WebRTC). Nostr-Relays vermitteln nur den verschlüsselten Verbindungsaufbau.</p>
-        <label class="set-row stack">
-          <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
-          <textarea id="relays" rows="3" spellcheck="false"></textarea>
-        </label>
-        <label class="set-row stack">
-          <span class="text"><b>TURN-Server</b><small>Fallback für strenge Firewalls, eine Adresse pro Zeile.</small></span>
-          <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
-        </label>
-        <label class="set-row">
-          <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Computer.</small></span>
-          <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
-        </label>
-      </div>
+      <details class="settings-details">
+        <summary>Erweiterte Verbindungseinstellungen</summary>
+        <h3>Verbindung</h3>
+        <div class="set-group">
+          <label class="set-row stack">
+            <span class="text"><b>Nostr-Relays</b><small>Eine Adresse pro Zeile, leer = Standard.</small></span>
+            <textarea id="relays" rows="3" spellcheck="false"></textarea>
+          </label>
+          <label class="set-row stack">
+            <span class="text"><b>TURN-Server</b><small>Fallback für strenge Firewalls, eine Adresse pro Zeile.</small></span>
+            <textarea id="turn-urls" rows="2" spellcheck="false" placeholder="turns:turn.example.com:443?transport=tcp"></textarea>
+          </label>
+          <label class="set-row">
+            <span class="text"><b>TURN-Secret</b><small>coturn static-auth-secret – bleibt auf diesem Computer.</small></span>
+            <input id="turn-secret" type="password" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+      </details>
 
       <h3>Aufzeichnung &amp; Transkript</h3>
       <div class="set-group">
         <label class="set-row" id="local-stt-row">
-          <span class="text"><b>Lokale Spracherkennung</b><small>Die Spracherkennung von macOS – nichts verlässt den Computer (empfohlen).</small></span>
+          <span class="text"><b>Lokale Spracherkennung</b><small>Auf diesem Mac verarbeiten.</small></span>
           <input type="checkbox" class="switch" id="local-stt" checked>
         </label>
-        <label class="set-row">
-          <span class="text"><b>OpenAI-API-Key</b><small>Für das Transkript, falls lokal nicht möglich.</small></span>
-          <input id="openai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…">
-        </label>
-        <label class="set-row">
-          <span class="text"><b>Key aus .env verwenden</b><small>OPENAI_API_KEY <span id="env-status"></span></small></span>
-          <input type="checkbox" class="switch" id="use-env">
-        </label>
       </div>
+      <details id="cloud-transcript" class="settings-details">
+        <summary>Cloud-Transkript</summary>
+        <div class="set-group">
+          <label class="set-row">
+            <span class="text"><b>OpenAI-API-Key</b><small>Für das Transkript, falls lokal nicht möglich.</small></span>
+            <input id="openai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…">
+          </label>
+          <label class="set-row">
+            <span class="text"><b>Key aus .env verwenden</b><small>OPENAI_API_KEY <span id="env-status"></span></small></span>
+            <input type="checkbox" class="switch" id="use-env">
+          </label>
+        </div>
+      </details>
     </section>
   </main>
 
@@ -156,9 +154,9 @@
       el.className = 'set-group room-card'
       el.innerHTML = `
         <div class="room-head">
-          <input class="room-name" maxlength="60" placeholder="Raumname" title="Umbenennen">
+          <input class="room-name" maxlength="60" placeholder="Linkname" title="Umbenennen">
           <span class="tags"></span>
-          <button class="icon-btn" data-delete title="Raum löschen">${icon('trash', 16)}</button>
+          <button class="icon-btn" data-delete title="Link löschen">${icon('trash', 16)}</button>
         </div>
         <div class="room-link"><code></code>
           <button class="pill secondary" data-copy>${icon('copy', 15)}Kopieren</button>
@@ -170,7 +168,7 @@
           <span class="pin-edit"><input class="room-pin" type="password" inputmode="numeric" placeholder="mind. 4 Zeichen" autocomplete="new-password"><button class="pill secondary" data-pin>Setzen</button></span>
         </div>
         <label class="set-row">
-          <span class="text"><b>Fernzugriff</b><small>Der Raum wartet auch, wenn du nichts teilst – Zuschauer starten die freigegebenen Anwendungen selbst.</small></span>
+          <span class="text"><b>Anwendungen aus der Ferne starten</b><small>Teilnehmende dürfen die hier ausgewählten Anwendungen starten.</small></span>
           <input type="checkbox" class="switch" data-remote>
         </label>
         <div class="room-apps">
@@ -191,7 +189,7 @@
       q('code').textContent = room.link
       q('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(room.link).then(() => toast('Link kopiert')).catch(fail))
       twice(q('[data-renew]'), 'Der bisherige Link funktioniert dann nicht mehr.', () => invoke('room_renew', { id: room.id }).catch(fail))
-      twice(q('[data-delete]'), `Raum „${room.name}“ löschen`, () => invoke('room_delete', { id: room.id }).catch(fail))
+      twice(q('[data-delete]'), `Link „${room.name}“ löschen`, () => invoke('room_delete', { id: room.id }).catch(fail))
       // PIN: set → state with "Ändern"/"Entfernen", otherwise (or while changing) the field
       const editPin = (on) => {
         q('.pin-set').hidden = on
@@ -282,26 +280,33 @@
     render()
 
     // ------------------------------------------------------------ pages
-    for (const tab of document.querySelectorAll('.page-tabs .tab')) {
-      tab.addEventListener('click', () => {
-        for (const t of document.querySelectorAll('.page-tabs .tab')) {
-          t.classList.toggle('active', t === tab)
-          $(t.dataset.page).hidden = t !== tab
-        }
-      })
+    function selectPage(tab) {
+      for (const t of document.querySelectorAll('.page-tabs .tab')) {
+        t.classList.toggle('active', t === tab)
+        $(t.dataset.page).hidden = t !== tab
+      }
+      try { localStorage.setItem('pv-settings-page', tab.dataset.page) } catch {}
     }
+    for (const tab of document.querySelectorAll('.page-tabs .tab')) tab.addEventListener('click', () => selectPage(tab))
+    try {
+      const saved = location.hash==='#links'?'rooms-page':localStorage.getItem('pv-settings-page')
+      const tab = [...document.querySelectorAll('.page-tabs .tab')].find((t) => t.dataset.page === saved)
+      if (tab) selectPage(tab)
+    } catch {}
+    await listen('settings-page',({payload})=>{
+      const tab=[...document.querySelectorAll('.page-tabs .tab')].find(t=>t.dataset.page===payload)
+      if(tab)selectPage(tab)
+    })
 
     // ------------------------------------------------------------ settings
-    // viewer site and connection: on the Rust side (shares, rooms waiting for remote access);
+    // connection: on the Rust side (shares, rooms waiting for remote access);
     // transcription: this computer's web storage, read by the PeekaView window when recording
     const store = {
       get: (k) => { try { return localStorage.getItem(k) } catch { return null } },
       set: (k, v) => { try { localStorage.setItem(k, v) } catch {} },
     }
     const lines = (id) => $(id).value.split(/\s+/).map((l) => l.trim()).filter(Boolean)
-    const site = () => $('site').value.trim().replace(/\/+$/, '')
     function fill(s) {
-      if (document.activeElement !== $('site')) $('site').value = (s.site ?? '').replace(/^http:\/\/localhost:8090\/?$/, '')
       if (document.activeElement !== $('relays')) $('relays').value = (s.relays ?? []).join('\n')
       if (document.activeElement !== $('turn-urls')) $('turn-urls').value = (s.turn_urls ?? []).join('\n')
       if (document.activeElement !== $('turn-secret')) $('turn-secret').value = s.turn_secret ?? ''
@@ -312,38 +317,26 @@
     fill(await invoke('get_settings'))
     listen('settings', (e) => fill(e.payload ?? {}))
     const push = () =>
-      invoke('set_settings', { patch: { site: site(), relays: lines('relays'), turn_urls: lines('turn-urls'), turn_secret: $('turn-secret').value.trim() } })
+      invoke('set_settings', { patch: { relays: lines('relays'), turn_urls: lines('turn-urls'), turn_secret: $('turn-secret').value.trim() } })
         .then(() => toast('Gespeichert'))
         .catch(fail)
-    for (const id of ['site', 'relays', 'turn-urls', 'turn-secret']) $(id).addEventListener('change', push)
+    for (const id of ['relays', 'turn-urls', 'turn-secret']) $(id).addEventListener('change', push)
     const patch = (p) => invoke('set_settings', { patch: p }).then(() => toast('Gespeichert')).catch(fail)
     $('own-name').addEventListener('change', () => patch({ name: $('own-name').value.trim() }))
     $('keep-link').addEventListener('change', () => patch({ keep_link: $('keep-link').checked }))
     $('allow-resize').addEventListener('change', () => patch({ allow_resize: $('allow-resize').checked }))
-
-    // the viewer site on Nostr: address and publishing state
-    function renderNsite(st) {
-      const el = $('nsite')
-      el.hidden = !!site() || !st?.url
-      if (el.hidden) return
-      const states = { publishing: 'wird veröffentlicht …', ok: 'veröffentlicht ✓', error: `Fehler: ${st.error ?? ''}`, idle: 'noch nicht veröffentlicht', dev: 'Entwicklungs-Build: lokaler Testserver statt Nostr' }
-      el.innerHTML = `${st.state === 'dev' ? 'Viewer-Seite' : 'Über Nostr'}: <code></code> · <span></span> <button class="link" type="button">jetzt veröffentlichen</button>`
-      el.querySelector('code').textContent = st.url.replace(/^https:\/\//, '')
-      el.querySelector('span').textContent = states[st.state] ?? ''
-      el.classList.toggle('error', st.state === 'error')
-      el.querySelector('button').hidden = st.state === 'publishing' || st.state === 'dev'
-      el.querySelector('button').addEventListener('click', () => invoke('nsite_publish'))
-    }
-    listen('nsite', (e) => renderNsite(e.payload))
-    invoke('nsite_status').then(renderNsite)
-    $('site').addEventListener('input', () => invoke('nsite_status').then(renderNsite))
 
     $('local-stt-row').hidden = !/Mac/.test(navigator.platform)
     $('local-stt').checked = store.get('pv-local-stt') !== 'false'
     $('openai-key').value = store.get('pv-openai-key') ?? ''
     $('use-env').checked = store.get('pv-use-env') === 'true'
     $('openai-key').disabled = $('use-env').checked
-    $('local-stt').addEventListener('change', () => store.set('pv-local-stt', String($('local-stt').checked)))
+    const showCloud = () => { $('cloud-transcript').open = !$('local-stt').checked || $('local-stt-row').hidden }
+    showCloud()
+    $('local-stt').addEventListener('change', () => {
+      store.set('pv-local-stt', String($('local-stt').checked))
+      showCloud()
+    })
     $('openai-key').addEventListener('change', () => store.set('pv-openai-key', $('openai-key').value.trim()))
     $('use-env').addEventListener('change', () => {
       store.set('pv-use-env', String($('use-env').checked))

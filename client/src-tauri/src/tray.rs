@@ -51,7 +51,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     if link_refs.is_empty() {
         link_refs.push(&none);
     }
-    let copy = Submenu::with_items(app, "Link eines festen Raums kopieren", true, &link_refs)?;
+    let copy = Submenu::with_items(app, "Freigabelink kopieren", true, &link_refs)?;
     // rooms watched in PeekaView (links from the viewer website)
     let recent: Vec<MenuItem<Wry>> = crate::viewers::recent(app)
         .iter()
@@ -84,9 +84,13 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(CheckMenuItem::with_id(app, "keep_link", "Letzten Link beibehalten", true, settings["keep_link"] == true, None::<&str>)?));
     items.push(Box::new(CheckMenuItem::with_id(app, "allow_resize", "Fenster anordnen erlauben", true, settings["allow_resize"] == true, None::<&str>)?));
+    items.push(Box::new(CheckMenuItem::with_id(app, "voice_enabled", "Sprache aktiv", true, settings["voice_enabled"] != false, None::<&str>)?));
+    items.push(Box::new(CheckMenuItem::with_id(app, "transcript_enabled", "Transkript aktiv", true, settings["transcript_enabled"] == true, None::<&str>)?));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(copy));
-    items.push(Box::new(MenuItem::with_id(app, "rooms", "Einstellungen & Räume …", true, None::<&str>)?));
+    items.push(Box::new(MenuItem::with_id(app, "rooms", "Einstellungen …", true, None::<&str>)?));
+    items.push(Box::new(MenuItem::with_id(app, "fixed_rooms", "Kontakte …", true, None::<&str>)?));
+    items.push(Box::new(MenuItem::with_id(app, "transcripts", "Transkripte …", true, None::<&str>)?));
     items.push(Box::new(PredefinedMenuItem::separator(app)?));
     items.push(Box::new(MenuItem::with_id(app, "quit", "PeekaView beenden", true, None::<&str>)?));
     let refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> = items.iter().map(|i| i.as_ref()).collect();
@@ -101,10 +105,13 @@ pub fn refresh(app: &AppHandle) {
 }
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let mut builder = TrayIconBuilder::with_id(ID).tooltip("PeekaView").menu(&menu(app)?).show_menu_on_left_click(false);
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
-    }
+    let bytes: &[u8] = if cfg!(target_os = "macos") { include_bytes!("../icons/tray.png") } else { include_bytes!("../icons/32x32.png") };
+    let builder = TrayIconBuilder::with_id(ID)
+        .tooltip("PeekaView")
+        .menu(&menu(app)?)
+        .show_menu_on_left_click(false)
+        .icon(tauri::image::Image::from_bytes(bytes)?)
+        .icon_as_template(cfg!(target_os = "macos"));
     builder
         .on_menu_event(|app, event| {
             let id = event.id().as_ref().to_string();
@@ -118,14 +125,19 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                     }
                 }
                 "stop" => crate::session::stop(app, None, true),
-                "keep_link" | "allow_resize" => {
-                    let on = crate::settings::get(app)[&id] != true;
+                "keep_link" | "allow_resize" | "voice_enabled" | "transcript_enabled" => {
+                    let value = &crate::settings::get(app)[&id];
+                    let on = if id == "voice_enabled" { value == false } else { value != true };
                     let settings = crate::settings::set(app, &json!({ id.clone(): on }));
                     let _ = app.emit("settings", settings);
                     crate::session::settings_changed(app);
                     refresh(app);
                 }
                 "rooms" => crate::open_rooms_window(app),
+                "fixed_rooms" => { let _=crate::fixed_rooms::fixed_room_window(app.clone(),String::new()); },
+                "transcripts" => {
+                    if let Err(error) = crate::transcripts::open(app, None) { crate::toast(app.clone(), error); }
+                }
                 "quit" => {
                     crate::session::shutdown(app, true);
                     app.exit(0);
@@ -144,8 +156,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                 }
                 other => {
                     if let Some(room) = other.strip_prefix("copy:").and_then(|id| crate::rooms::get(app, id)) {
-                        let site = crate::nsite::resolve(app, &crate::settings::text(app, "site").unwrap_or_default());
-                        let link = room.view(&site)["link"].as_str().unwrap_or_default().to_string();
+                        let link = room.view()["link"].as_str().unwrap_or_default().to_string();
                         if crate::clip::os::write(Some(link), None, None, &[]).is_ok() {
                             let to = if crate::session::live(app).is_some() { "toolbar" } else { "main" };
                             let _ = app.emit_to(to, "toast", format!("Link von „{}“ kopiert", room.name));

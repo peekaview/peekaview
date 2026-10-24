@@ -43,6 +43,8 @@ pub enum PinResult {
 pub struct Admission {
     pin: Option<Pin>,
     admitted: HashSet<String>,
+    /// a call over contacts: the members' devices, let in by the contacts server
+    devices: HashSet<String>,
     denied: HashSet<String>,
     requests: Vec<Request>,
     failures: HashMap<String, u32>,
@@ -55,6 +57,7 @@ impl Admission {
         Admission {
             pin,
             admitted: admitted.into_iter().collect(),
+            devices: HashSet::new(),
             denied: HashSet::new(),
             requests: Vec::new(),
             failures: HashMap::new(),
@@ -67,8 +70,19 @@ impl Admission {
         self.admitted.iter().cloned().collect()
     }
 
+    /// Members of a call over contacts come in without asking: the viewer names its device.
+    /// (A viewer's id is its key, unknown to the contacts server; only call members get the
+    /// stream's secret, so only they can name a device here.)
+    pub fn allow_devices(&mut self, devices: impl IntoIterator<Item = String>) {
+        self.devices.extend(devices);
+    }
+
     pub fn hello(&mut self, peer: &str, hello: &Value) -> Hello {
         if self.admitted.contains(peer) {
+            return Hello::Invite;
+        }
+        if hello["device"].as_str().is_some_and(|d| self.devices.contains(d)) {
+            self.admitted.insert(peer.to_string());
             return Hello::Invite;
         }
         if self.denied.contains(peer) {
@@ -200,5 +214,16 @@ mod tests {
             a.pin("p", "00");
         }
         assert!(matches!(a.hello("p", &json!({})), Hello::Denied));
+    }
+
+    #[test]
+    fn call_members_by_device() {
+        let mut a = Admission::new(None, []);
+        a.allow_devices(["0123456789abcdef".to_string()]);
+        assert!(matches!(a.hello("key-a", &json!({ "device": "0123456789abcdef" })), Hello::Invite));
+        // from then on the key itself is let in
+        assert!(matches!(a.hello("key-a", &json!({})), Hello::Invite));
+        // another device asks first
+        assert!(matches!(a.hello("key-b", &json!({ "device": "fedcba9876543210" })), Hello::Waiting { .. }));
     }
 }

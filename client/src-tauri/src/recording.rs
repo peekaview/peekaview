@@ -18,6 +18,7 @@ use std::{
 };
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use xcap::image::{codecs::jpeg::JpegEncoder, imageops, DynamicImage};
 
@@ -48,11 +49,19 @@ impl Engine {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Conversation {
+    pub id: String,
+    pub kind: String,
+    pub name: String,
+}
+
 pub struct Options {
     pub title: String,
     pub started_label: String,
     pub file_stamp: String,
     pub engine: Engine,
+    pub conversation: Option<Conversation>,
 }
 
 struct Shot {
@@ -228,7 +237,7 @@ impl Recorder {
             let _ = w.join();
         }
 
-        let dir = std::env::var_os("PEEKAVIEW_REPORT_DIR").map(PathBuf::from).unwrap_or_else(|| dirs_documents().join("PeekaView"));
+        let dir = report_dir();
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = dir.join(format!("PeekaView-Sitzung-{}.html", self.opts.file_stamp));
         std::fs::write(&path, self.render()).map_err(|e| e.to_string())?;
@@ -284,6 +293,7 @@ impl Recorder {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{conversation_meta}
 <title>PeekaView – Sitzung {started}</title>
 <style>
   :root {{ --accent: #ef4444; --fg: #18181b; --muted: #71717a; --line: #e4e4e7; font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }}
@@ -309,6 +319,7 @@ impl Recorder {
 <body>
 <div class="head"><div class="logo">PV</div><h1>Sitzungsbericht</h1></div>
 <dl>
+  {conversation_label}
   <dt>Geteilt</dt><dd>{title}</dd>
   <dt>Beginn</dt><dd>{started}</dd>
   <dt>Dauer</dt><dd>{duration}</dd>
@@ -322,6 +333,8 @@ impl Recorder {
 </html>
 "#,
             title = esc(&self.opts.title),
+            conversation_meta = self.opts.conversation.as_ref().map(|c| format!("<meta name=\"peekaview-conversation\" content=\"{}\">", esc(&serde_json::to_string(c).unwrap()))).unwrap_or_default(),
+            conversation_label = self.opts.conversation.as_ref().map(|c| format!("<dt>{}</dt><dd>{}</dd>", if c.kind=="contact" {"Kontakt"} else {"Gruppe"}, esc(&c.name))).unwrap_or_default(),
             started = esc(&self.opts.started_label),
             duration = clock(self.started.elapsed().as_secs_f64()),
             names = esc(&names.join(", ")),
@@ -329,6 +342,10 @@ impl Recorder {
             engine = self.engine_label(),
         )
     }
+}
+
+pub fn report_dir() -> PathBuf {
+    std::env::var_os("PEEKAVIEW_REPORT_DIR").map(PathBuf::from).unwrap_or_else(|| dirs_documents().join("PeekaView"))
 }
 
 fn esc(s: &str) -> String {
@@ -457,7 +474,7 @@ mod tests {
         let monitor = xcap::Monitor::all().unwrap().into_iter().find(|m| m.is_primary().unwrap_or(false)).unwrap();
         let rec = Recorder::new(
             Source::Screen(monitor),
-            Options { title: "Bildschirm 1".into(), started_label: "Testlauf".into(), file_stamp: "test".into(), engine: Engine::None },
+            Options { title: "Bildschirm 1".into(), started_label: "Testlauf".into(), file_stamp: "test".into(), engine: Engine::None, conversation: None },
         );
         rec.set_peers(&serde_json::json!([{ "id": 0, "name": "Pat", "host": true }, { "id": 1, "name": "Anna" }]));
         rec.shot(format!("Klick – {}", rec.name(0)), Some((0.25, 0.4)));

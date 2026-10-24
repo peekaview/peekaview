@@ -26,6 +26,11 @@ window.__TAURI__={core:{invoke:async(cmd,args)=>{
 window.fetch=async(url,options)=>{
  const action=new URL(url).searchParams.get('action');
  qa.requests.push({action,body:options.body?JSON.parse(options.body):null});
+ if(action==='state' && qa.unauthorized)return Response.json({error:'Gerät wurde abgemeldet.'},{status:401});
+ if(action==='devices/remove'){
+  if(qa.failRemove)return Response.json({error:'Test: Entfernen fehlgeschlagen.'},{status:503});
+  qa.state.person.devices=qa.state.person.devices.filter(d=>d.id!==JSON.parse(options.body).device);
+ }
  if(action==='rooms/settings')qa.state.rooms.find(r=>r.id===JSON.parse(options.body).room).pin=JSON.parse(options.body).pin_enabled;
  if(action==='rooms/add-contact'){const body=JSON.parse(options.body);qa.state.rooms.find(r=>r.id===body.room).people.push(qa.state.contacts.find(c=>c.id===body.person));}
  if(action==='calls/admit'){const body=JSON.parse(options.body);qa.state.calls[0].requests=qa.state.calls[0].requests.filter(p=>p.id!==body.device);}
@@ -41,7 +46,8 @@ window.fetch=async(url,options)=>{
 };
 if(new URLSearchParams(location.search).has('signup'))localStorage.setItem('pv-fixed-rooms-v1',JSON.stringify({api:'https://rooms.example.test/api.php'}));
 if(new URLSearchParams(location.search).has('browser'))delete window.__TAURI__;
-</script><script type="module">import {Signaling} from '/signal.js';Signaling.open=async()=>({send(){},close(){}});import {mountRooms} from '/fixed-rooms.js';const ui=mountRooms(document.querySelector('main'),{profileRoot:document.getElementById('profile'),callId:new URLSearchParams(location.search).get('call')||'',invitation:new URLSearchParams(location.search).get('invite')||'',onOpen:async id=>qa.opened.push(id)});qa.refresh=ui.refresh;</script></html>`
+if(new URLSearchParams(location.search).has('android')){delete window.__TAURI__;window.PeekaViewApp={configureRooms:session=>qa.native.push({cmd:'configureRooms',args:{session}})}}
+</script><script type="module">import {Signaling} from '/signal.js';Signaling.open=async()=>new URLSearchParams(location.search).has('slow')?new Promise(resolve=>{qa.finishSignaling=()=>resolve({send(){},close(){qa.signalingClosed=true}})}):({send(){},close(){}});import {mountRooms} from '/fixed-rooms.js';const ui=mountRooms(document.querySelector('main'),{profileRoot:document.getElementById('profile'),callId:new URLSearchParams(location.search).get('call')||'',invitation:new URLSearchParams(location.search).get('invite')||'',onOpen:async id=>qa.opened.push(id)});qa.refresh=ui.refresh;</script></html>`
 
 test('contacts and groups show five each, expand independently and call the chosen destination', {timeout:90000}, async () => {
   const server=createServer(async(request,response)=>{
@@ -239,4 +245,83 @@ test('contacts and groups show five each, expand independently and call the chos
     await evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Stattdessen diesen Browser hinzufügen').click();true")
     assert.equal(await evaluate("document.querySelector('form').hidden"),false)
   } finally {try {await browser('close')} finally {await new Promise(resolve=>server.close(resolve))}}
+})
+
+test('profile actions confirm deletion, remove selected devices and clear revoked sessions', {timeout:90000}, async()=>{
+ const server=createServer(async(request,response)=>{
+  const path=new URL(request.url,'http://localhost').pathname
+  if(path==='/contacts.html'){response.setHeader('Content-Type','text/html; charset=utf-8');response.end(fixture);return}
+  const file=resolve(web,'.'+path)
+  if(!file.startsWith(web+sep)){response.writeHead(403).end();return}
+  try{response.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css'})[extname(file)]??'application/octet-stream');response.end(await readFile(file))}catch{response.writeHead(404).end()}
+ })
+ const session=`pv-profile-actions-${process.pid}`
+ const browser=async(...args)=>(await promisify(execFile)('agent-browser',['--session',session,...args],{encoding:'utf8',timeout:30000})).stdout
+ const evaluate=async code=>JSON.parse(await browser('eval',code))
+ try{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+  const base=`http://127.0.0.1:${server.address().port}/contacts.html`
+  const open=async(query='')=>{await browser('open',base+query);await browser('wait','.fr-profile > summary');await browser('click','.fr-profile > summary')}
+  const cleared=async()=>{
+   await browser('wait','--fn',"document.getElementById('profile').hidden")
+   assert.deepEqual(await evaluate("Object.keys(JSON.parse(localStorage.getItem('pv-fixed-rooms-v1')))"),['api'])
+   assert.equal(await evaluate("document.querySelectorAll('.fr-contact,.fr-room,.fr-stream').length"),0)
+  }
+  await open()
+  await browser('set','viewport','393','852')
+  assert.equal(await evaluate("(()=>{const name=document.querySelector('.fr-device-info strong');return name.offsetHeight<=parseFloat(getComputedStyle(name).lineHeight)*1.1})()"),true)
+  await browser('screenshot','/tmp/peekaview-profile-actions.png')
+  await browser('find','role','button','click','--name','Mein Handy entfernen','--exact')
+  await browser('wait','.fr-account-dialog[open]')
+  await browser('press','Escape')
+  await browser('wait','--fn',"!document.querySelector('.fr-account-dialog')")
+  assert.equal(await evaluate("qa.requests.some(r=>r.action==='devices/remove')"),false)
+  await evaluate('qa.failRemove=true;true')
+  await browser('find','role','button','click','--name','Mein Handy entfernen','--exact')
+  await browser('find','role','button','click','--name','Gerät entfernen','--exact')
+  await browser('wait','--text','Test: Entfernen fehlgeschlagen.')
+  assert.equal(await evaluate("JSON.parse(localStorage.getItem('pv-fixed-rooms-v1')).token"),'test-token')
+  assert.equal(await evaluate("document.querySelectorAll('.fr-profile-device').length"),2)
+  await evaluate('qa.failRemove=false;true')
+  await browser('find','role','button','click','--name','Mein Handy entfernen','--exact')
+  await browser('find','role','button','click','--name','Gerät entfernen','--exact')
+  await browser('wait','--fn',"document.querySelectorAll('.fr-profile-device').length===1")
+  assert.deepEqual(await evaluate("qa.requests.findLast(r=>r.action==='devices/remove').body"),{device:'8888888888888888'})
+  await browser('find','role','button','click','--name','Abmelden','--exact')
+  await cleared()
+  assert.equal(await evaluate("qa.requests.filter(r=>r.action==='session/logout').length"),1)
+  assert.equal(await evaluate("qa.native.some(r=>r.cmd==='fixed_room_configure' && r.args.session==='null')"),true)
+  await open()
+  await browser('find','role','button','click','--name','Mein Computer entfernen','--exact')
+  await browser('find','role','button','click','--name','Gerät entfernen','--exact')
+  await cleared()
+  await open()
+  await browser('find','role','button','click','--name','Profil löschen …','--exact')
+  await browser('wait','.fr-account-dialog[open] input')
+  await browser('fill','.fr-account-dialog input','wrong@example.test')
+  await browser('find','role','button','click','--name','Profil löschen','--exact')
+  assert.equal(await evaluate("qa.requests.some(r=>r.action==='profile/delete')"),false)
+  await browser('press','Escape')
+  assert.equal(await evaluate("qa.requests.some(r=>r.action==='profile/delete')"),false)
+  await browser('find','role','button','click','--name','Profil löschen …','--exact')
+  await browser('fill','.fr-account-dialog input','me@example.test')
+  await browser('find','role','button','click','--name','Profil löschen','--exact')
+  await cleared()
+  assert.deepEqual(await evaluate("qa.requests.find(r=>r.action==='profile/delete').body"),{email:'me@example.test'})
+  await open('?android=1')
+  await evaluate('qa.unauthorized=true;qa.refresh().catch(()=>true)')
+  await cleared()
+  assert.equal(await evaluate("qa.native.some(r=>r.cmd==='configureRooms' && r.args.session==='null')"),true)
+  await open('?call=1234567890abcdef&slow=1')
+  await browser('wait','--fn',"typeof qa.finishSignaling==='function'")
+  await browser('find','role','button','click','--name','Abmelden','--exact')
+  await browser('wait','.fr-account-dialog[open]')
+  await browser('find','role','button','click','--name','Abmelden','--exact')
+  await cleared()
+  await evaluate('qa.finishSignaling();true')
+  await browser('wait','--fn','qa.signalingClosed===true')
+  await open('?browser=1')
+  await evaluate("localStorage.setItem('pv-fixed-rooms-v1',JSON.stringify({api:'https://rooms.example.test/api.php'}));window.dispatchEvent(new StorageEvent('storage',{key:'pv-fixed-rooms-v1'}));true")
+  await cleared()
+ }finally{try{await browser('close')}finally{await new Promise(resolve=>server.close(resolve))}}
 })

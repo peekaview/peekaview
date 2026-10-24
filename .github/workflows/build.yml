@@ -105,7 +105,7 @@ jobs:
           echo "SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
           echo "SIGN_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
 
-      # hardened runtime with the entitlements of client/src-tauri/entitlements.plist; without the
+      # hardened runtime with the entitlements of client/src-tauri/Entitlements.plist; without the
       # secrets (pull requests from forks) signed ad hoc, so macOS asks for the permissions again
       # with every build
       - name: Sign
@@ -113,7 +113,7 @@ jobs:
         run: |
           if [ "$DEVELOPER_ID" = true ]; then
             codesign --force --options runtime --timestamp --keychain "$SIGN_KEYCHAIN" \
-              --entitlements "$GITHUB_WORKSPACE/client/src-tauri/entitlements.plist" \
+              --entitlements "$GITHUB_WORKSPACE/client/src-tauri/Entitlements.plist" \
               --sign "$SIGN_IDENTITY" PeekaView.app
           else
             codesign --force --sign - PeekaView.app

@@ -26,6 +26,7 @@ object Assets {
         "mjs" to "text/javascript",
         "css" to "text/css",
         "json" to "application/json",
+        "webmanifest" to "application/manifest+json",
         "svg" to "image/svg+xml",
         "png" to "image/png",
         "wasm" to "application/wasm",

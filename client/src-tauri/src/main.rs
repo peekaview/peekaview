@@ -5,12 +5,12 @@ mod clip;
 mod control;
 mod guard;
 mod focus;
+mod fixed_rooms;
 mod invite;
 mod lock;
 mod p2p;
 #[cfg(target_os = "macos")]
 mod macos;
-mod nsite;
 mod permissions;
 mod recording;
 mod resume;
@@ -22,6 +22,7 @@ mod session;
 mod settings;
 mod sources;
 mod tray;
+mod transcripts;
 mod video;
 mod viewers;
 
@@ -64,6 +65,7 @@ async fn start_share(
     turn_urls: Option<Vec<String>>,
     turn_secret: Option<String>,
     signing_key: Option<String>,
+    fixed_call: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let room = room.filter(|r| !r.trim().is_empty());
     let clean = |l: Option<Vec<String>>| l.unwrap_or_default().into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
@@ -80,6 +82,7 @@ async fn start_share(
         signing_key: signing_key.filter(|k| !k.is_empty()),
         admitted: vec![],
         remote: None,
+        fixed_call,
     };
     let hosted = session::start(app.clone(), opts).await.inspect_err(|e| log(&format!("start_share: {e}")))?;
     // the link is ready to paste right away (the toolbar says so)
@@ -88,8 +91,6 @@ async fn start_share(
             session::link_copied();
         }
     }
-    // the share runs: the PeekaView window steps aside for the toolbar
-    hide_main(&app);
     Ok(hosted)
 }
 
@@ -113,6 +114,7 @@ fn toast(app: AppHandle, text: String) {
 }
 
 fn hide_main(app: &AppHandle) {
+    MAIN_REQUESTED.store(false, std::sync::atomic::Ordering::SeqCst);
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.hide();
     }
@@ -131,16 +133,27 @@ async fn request_permission(app: AppHandle, kind: String) {
 }
 
 #[tauri::command]
-async fn drag_app(app: AppHandle) -> Result<(), String> {
-    permissions::drag_app(&app)
+async fn drag_app(app: AppHandle, kind: String) -> Result<(), String> {
+    permissions::drag_app(&app, &kind)
+}
+
+#[tauri::command]
+async fn open_permission_settings(kind: String) -> Result<(), String> {
+    permissions::open_settings(&kind)
 }
 
 /// Shows the PeekaView window (share picker / running share) in front.
+static MAIN_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static MAIN_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn show_main(app: &AppHandle) {
-    // without the screen recording permission there is nothing to share: the permission helper
-    // instead (it asks for the accessibility permission in the same go)
-    if !permissions::granted("screen") {
+    MAIN_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
+    if !permissions::ready() {
         permissions::request(app, "screen");
+        return;
+    }
+    if !MAIN_READY.load(std::sync::atomic::Ordering::SeqCst) {
+        let _ = app.emit_to("main", "initialize", ());
         return;
     }
     if let Some(main) = app.get_webview_window("main") {
@@ -151,10 +164,24 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
+#[tauri::command]
+fn main_requested() -> bool {
+    MAIN_REQUESTED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Show only after permission checks and restoration have finished in the hidden webview.
+#[tauri::command]
+fn main_ready(app: AppHandle) {
+    if !permissions::ready_for_request() { return; }
+    MAIN_READY.store(true, std::sync::atomic::Ordering::SeqCst);
+    if MAIN_REQUESTED.load(std::sync::atomic::Ordering::SeqCst) { show_main(&app); }
+    resume::finish_permissions(&app);
+}
+
 /// Windows that bring the Dock icon along (macOS). The toolbar and the frames do not: a running
 /// share without any of these lives in the tray only.
 fn in_dock(label: &str) -> bool {
-    matches!(label, "main" | "rooms" | "permission" | "clipboard") || label.starts_with("viewer-")
+    matches!(label, "main" | "rooms" | "permission" | "clipboard" | "transcripts" | "fixed-rooms") || label.starts_with("viewer-") || label.starts_with("transcript-") || label.starts_with("fixed-call-")
 }
 
 /// Dock icon (and ⌘-Tab) only while one of PeekaView's windows is open – once they are closed or
@@ -233,6 +260,10 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     // size before position (Cocoa keeps the bottom-left corner when resizing)
     window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
     window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    // `show` makes the toolbar key on macOS, undoing the initial focus of the shared window.
+    #[cfg(target_os = "macos")]
+    return window.with_webview(|view| unsafe { macos::show_without_focus(view.ns_window()) }).map_err(|e| e.to_string());
+    #[cfg(not(target_os = "macos"))]
     window.show().map_err(|e| e.to_string())
 }
 
@@ -252,6 +283,7 @@ pub fn open_toolbar(app: &AppHandle) {
         .always_on_top(true)
         .visible_on_all_workspaces(true)
         .skip_taskbar(true)
+        .focused(false)
         .visible(false)
         .theme(Some(tauri::Theme::Dark))
         .build()
@@ -291,17 +323,6 @@ fn drag_window(window: tauri::WebviewWindow) -> Result<(), String> {
 // ------------------------------------------------------------------ settings & permanent rooms
 
 /// The viewer site on Nostr: {url, state: idle|publishing|ok|error, error?, published?}.
-#[tauri::command]
-fn nsite_status(app: AppHandle) -> serde_json::Value {
-    nsite::status(&app)
-}
-
-/// Publishes the viewer site on Nostr again now.
-#[tauri::command]
-fn nsite_publish(app: AppHandle) {
-    nsite::publish_if_needed(&app, true);
-}
-
 /// Puts text on the system clipboard (the share link right after starting).
 #[tauri::command]
 fn copy_text(text: String) -> Result<(), String> {
@@ -316,15 +337,7 @@ fn get_settings(app: AppHandle) -> serde_json::Value {
 /// Settings kept on the Rust side (shares, tray, rooms waiting for remote access).
 #[tauri::command]
 fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
-    let own_site_before = settings::text(&app, "site").is_some();
     let settings = settings::set(&app, &patch);
-    // an own viewer site replaces the nsite (taken down); back to Nostr publishes it again
-    let own_site = settings::text(&app, "site").is_some();
-    if own_site && !own_site_before {
-        nsite::unpublish(&app);
-    } else if !own_site && own_site_before {
-        nsite::publish_if_needed(&app, true);
-    }
     session::settings_changed(&app);
     tray::refresh(&app);
     // every window shows the same (PeekaView window, settings window)
@@ -334,8 +347,7 @@ fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
 
 #[tauri::command]
 fn rooms_list(app: AppHandle) -> Vec<serde_json::Value> {
-    let site = nsite::resolve(&app, &settings::text(&app, "site").unwrap_or_default());
-    rooms::all(&app).iter().map(|r| r.view(&site)).collect()
+    rooms::all(&app).iter().map(|r| r.view()).collect()
 }
 
 fn rooms_changed(app: &AppHandle) {
@@ -348,8 +360,7 @@ fn rooms_changed(app: &AppHandle) {
 fn room_save(app: AppHandle, room: serde_json::Value) -> Result<serde_json::Value, String> {
     let saved = rooms::save(&app, &room)?;
     rooms_changed(&app);
-    let site = nsite::resolve(&app, &settings::text(&app, "site").unwrap_or_default());
-    Ok(saved.view(&site))
+    Ok(saved.view())
 }
 
 #[tauri::command]
@@ -388,23 +399,43 @@ async fn apps_installed() -> Vec<serde_json::Value> {
 }
 
 #[tauri::command]
-fn rooms_window(app: AppHandle) {
-    open_rooms_window(&app);
+fn rooms_window(app: AppHandle, links: Option<bool>) {
+    open_settings(&app, links.unwrap_or(false));
+}
+
+#[tauri::command]
+async fn transcripts_list() -> Result<Vec<transcripts::Entry>, String> {
+    tauri::async_runtime::spawn_blocking(transcripts::list).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn transcript_read(id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || transcripts::read(&id)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn transcripts_window(app: AppHandle, id: Option<String>) -> Result<(), String> {
+    transcripts::open(&app, id.as_deref())
 }
 
 /// The window to manage permanent room links, PINs and remote access.
 pub fn open_rooms_window(app: &AppHandle) {
+    open_settings(app, false);
+}
+fn open_settings(app: &AppHandle, links: bool) {
     set_dock(app, true);
     if let Some(w) = app.get_webview_window("rooms") {
+        if links { let _ = w.emit("settings-page", "rooms-page"); }
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
     let _ = tauri::WebviewWindowBuilder::new(app, "rooms", tauri::WebviewUrl::App("desktop/rooms.html".into()))
-        .title("PeekaView – Einstellungen & Räume")
+        .title("PeekaView – Einstellungen")
         .inner_size(640.0, 680.0)
         .min_inner_size(520.0, 480.0)
         .theme(Some(tauri::Theme::Dark))
+        .initialization_script(if links { "location.hash='links';" } else { "" })
         .build();
 }
 
@@ -533,6 +564,8 @@ async fn start_recording(
     started_label: String,
     file_stamp: String,
 ) -> Result<String, String> {
+    // A speech permission prompt may outlive the share that requested it.
+    let expected = session::running(&app)?;
     #[cfg(target_os = "macos")]
     let apple = local && speech::authorize() && speech::available();
     #[cfg(not(target_os = "macos"))]
@@ -544,9 +577,26 @@ async fn start_recording(
         (_, Some(key)) => recording::Engine::OpenAi(key),
         _ => recording::Engine::None,
     };
+    if matches!(engine, recording::Engine::None) {
+        return Err("Keine Spracherkennung verfügbar. Bitte unter Einstellungen → Aufzeichnung & Transkript einrichten.".into());
+    }
+    if settings::get(&app)["transcript_enabled"] != true { return Err("Transkript ist deaktiviert".into()); }
     let file_stamp: String = file_stamp.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
-    let opts = recording::Options { title, started_label, file_stamp, engine };
-    session::start_recording(&app, opts).map(str::to_string)
+    let conversation = if let Some(call)=expected.fixed_call.clone() {
+        Some(tauri::async_runtime::spawn_blocking(move||fixed_rooms::conversation(&call)).await.map_err(|e|e.to_string())??)
+    } else {
+        use sha2::{Digest, Sha256};
+        let room=rooms::by_secret(&app,&expected.secret);
+        Some(recording::Conversation {
+            id: room.as_ref().map(|r|r.id.clone()).unwrap_or_else(||format!("link-{:x}",Sha256::digest(expected.secret.as_bytes()))),
+            kind: "group".into(),
+            name: room.map(|r|r.name).unwrap_or_else(||"Freigabe per Link".into()),
+        })
+    };
+    let opts = recording::Options { title, started_label, file_stamp, engine, conversation };
+    let engine=session::start_recording(&app, &expected, opts).map(str::to_string)?;
+    if let Some(call)=&expected.fixed_call{let _=app.emit_to(format!("fixed-call-{call}"),"fixed-recording",true);}
+    Ok(engine)
 }
 
 /// Raw 16 kHz mono PCM (i16 LE) from the PeekaView window's audio mix.
@@ -559,8 +609,9 @@ fn recording_audio(app: AppHandle, request: tauri::ipc::Request) {
 
 #[tauri::command]
 async fn stop_recording(app: AppHandle) -> Result<String, String> {
-    let path = tauri::async_runtime::spawn_blocking(move || session::stop_recording(&app)).await.map_err(|e| e.to_string())??;
-    open_path(&path);
+    let handle = app.clone();
+    let path = tauri::async_runtime::spawn_blocking(move || session::stop_recording(&handle)).await.map_err(|e| e.to_string())??;
+    transcripts::saved(&app, &path);
     Ok(path.display().to_string())
 }
 
@@ -642,6 +693,10 @@ fn main() {
         .manage(invite::PendingInvite::default())
         .setup(|app| {
             settings::get(app.handle());
+            fixed_rooms::start(app.handle());
+            if let Some(flow) = resume::permission_flow(app.handle()) {
+                *app.state::<invite::PendingInvite>().0.lock().unwrap() = flow.invite;
+            }
             if let Err(e) = tray::create(app.handle()) {
                 log(&format!("tray: {e}"));
             }
@@ -652,8 +707,6 @@ fn main() {
             }
             // permanent rooms with remote access wait for viewers
             p2p::lobby::sync(app.handle(), false);
-            // the viewer site, served over Nostr
-            nsite::publish_if_needed(app.handle(), false);
             // keep the window out of screen captures (macOS: the capture filter excludes our windows)
             #[cfg(not(target_os = "macos"))]
             if let Some(main) = app.get_webview_window("main") {
@@ -664,7 +717,7 @@ fn main() {
             let handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
-                    if !viewers::handle(&handle, &url) {
+                    if !fixed_rooms::handle(&handle, &url) && !viewers::handle(&handle, &url) {
                         invite::handle(&handle, &url);
                     }
                 }
@@ -689,9 +742,9 @@ fn main() {
                         signing_key: std::env::var("PEEKAVIEW_DEV_KEY").ok(),
                         admitted: vec![],
                         remote: None,
+                        fixed_call: None,
                     };
                     let result = session::start(handle.clone(), opts).await;
-                    hide_main(&handle);
                     crate::log(&format!("dev share: {result:?}"));
                     if let Ok(mode) = std::env::var("PEEKAVIEW_DEV_MODE") {
                         if let Some(mode) = session::Mode::parse(&mode) {
@@ -709,7 +762,7 @@ fn main() {
             }
             if let Ok(Some(urls)) = app.deep_link().get_current() {
                 for url in urls {
-                    if !viewers::handle(app.handle(), &url) {
+                    if !fixed_rooms::handle(app.handle(), &url) && !viewers::handle(app.handle(), &url) {
                         invite::handle(app.handle(), &url);
                     }
                 }
@@ -728,13 +781,24 @@ fn main() {
             toast,
             log_js,
             start_share,
+            fixed_rooms::fixed_room_window,
+            fixed_rooms::fixed_room_configure,
+            fixed_rooms::fixed_access_options,
+            fixed_rooms::fixed_access_configure,
+            fixed_rooms::fixed_share_picker,
+            fixed_rooms::fixed_stop_share,
+            fixed_rooms::fixed_recording_enabled,
+            fixed_rooms::fixed_recording_audio,
             take_invite,
             set_mode,
             signal,
             stop_share,
             switch_source,
             permission_status,
+            main_ready,
+            main_requested,
             request_permission,
+            open_permission_settings,
             drag_app,
             dismiss_permission,
             fit_window,
@@ -743,8 +807,6 @@ fn main() {
             admit,
             get_settings,
             copy_text,
-            nsite_status,
-            nsite_publish,
             set_settings,
             rooms_list,
             room_save,
@@ -754,6 +816,9 @@ fn main() {
             room_keys,
             apps_installed,
             rooms_window,
+            transcripts_window,
+            transcripts_list,
+            transcript_read,
             clip_list,
             clip_add_paths,
             clip_from_os,
