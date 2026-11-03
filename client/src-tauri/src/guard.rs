@@ -102,14 +102,23 @@ pub fn reachable(target: Target, rect: Rect) -> bool {
 
 const GRID: usize = 5;
 
-/// The parts of the shared window that other windows lie over (screen coordinates, clipped to
-/// `rect`): viewer input is refused there. Empty for a shared screen and where the platform does
-/// not tell.
-pub fn covers(target: Target, rect: Rect) -> Vec<Rect> {
-    if target.is_none() {
-        return vec![];
-    }
-    let mut out: Vec<Rect> = imp::covers(target).iter().filter_map(|r| r.intersect(&rect)).filter(|r| r.w >= MIN_COVER && r.h >= MIN_COVER).collect();
+/// A part of the shared picture where viewer input is refused.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Cover {
+    pub rect: Rect,
+    /// one of PeekaView's own windows (toolbar, main window) – never in the picture itself
+    pub own: bool,
+}
+
+/// The parts of a shared window or screen (`rect`) that windows lie over (screen coordinates,
+/// clipped to it): viewer input is refused there. For a window: other windows above it; for a
+/// screen: PeekaView's own windows on it. Empty where the platform does not tell.
+pub fn covers(target: Target, rect: Rect) -> Vec<Cover> {
+    let mut out: Vec<Cover> = imp::covers(target)
+        .into_iter()
+        .filter_map(|c| Some(Cover { rect: c.rect.intersect(&rect)?, own: c.own }))
+        .filter(|c| c.rect.w >= MIN_COVER && c.rect.h >= MIN_COVER)
+        .collect();
     out.truncate(MAX_COVERS);
     out
 }
@@ -296,19 +305,25 @@ mod imp {
 
     /// Windows lying over the shared one, as `any_allowed` judges them: PeekaView's own windows
     /// count (input is never allowed there), its click-through overlays and the window's own
-    /// dialogs / menus do not.
-    pub fn covers(target: super::Target) -> Vec<Rect> {
-        let Some((id, pid)) = target else { return vec![] };
+    /// dialogs / menus do not. A shared screen: only PeekaView's own windows.
+    pub fn covers(target: super::Target) -> Vec<super::Cover> {
+        let me = std::process::id() as i32;
         let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();
         let windows = list(false);
+        let visible = |w: &&Info| w.alpha > 0.0 && !overlays.contains(&w.id);
+        let cover = |w: &Info| super::Cover { rect: w.rect, own: w.pid == me };
+        let Some((id, pid)) = target else {
+            return windows.iter().filter(visible).filter(|w| w.pid == me).map(cover).collect();
+        };
         let displays = displays();
         let Some(own) = windows.iter().find(|w| w.id == id).map(|w| w.rect) else { return vec![] };
         windows
             .iter()
             .take_while(|w| w.id != id)
-            .filter(|w| w.alpha > 0.0 && !overlays.contains(&w.id) && !is_screen_overlay(w, &displays))
+            .filter(visible)
+            .filter(|w| !is_screen_overlay(w, &displays))
             .filter(|w| !(w.pid == pid && part_of(w, &own)))
-            .map(|w| w.rect)
+            .map(cover)
             .collect()
     }
 
@@ -374,12 +389,14 @@ mod imp {
 mod imp {
     use std::ffi::c_void;
 
+    use super::Cover;
+
     use windows_sys::core::BOOL;
     use windows_sys::Win32::{
         Foundation::{HWND, LPARAM, POINT, RECT},
         Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
         UI::WindowsAndMessaging::{
-            EnumWindows, GetAncestor, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
+            EnumWindows, GetAncestor, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
             WindowFromPoint, GA_ROOT, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
         },
     };
@@ -387,21 +404,30 @@ mod imp {
     use super::Rect;
 
     struct Walk {
-        id: u32,
-        owner: i32,
-        out: Vec<Rect>,
+        /// the shared window: stop there; `None` (a shared screen): all windows, only our own count
+        target: super::Target,
+        me: u32,
+        out: Vec<Cover>,
     }
 
-    /// One top-level window, front to back – until the shared one.
+    /// Is it one of our overlays (red frame)? Click-through, apart from the moment the presenter's
+    /// pointer is on its badge – then it has no WS_EX_TRANSPARENT, but must not count either.
+    fn is_overlay(hwnd: HWND) -> bool {
+        let mut title = [0u16; 64];
+        let n = unsafe { GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32) };
+        n > 0 && String::from_utf16_lossy(&title[..n as usize]) == crate::OVERLAY_TITLE
+    }
+
+    /// One top-level window, front to back.
     unsafe extern "system" fn each(hwnd: HWND, data: LPARAM) -> BOOL {
         let walk = unsafe { &mut *(data as *mut Walk) };
-        if hwnd as usize as u32 == walk.id {
+        if walk.target.is_some_and(|(id, _)| hwnd as usize as u32 == id) {
             return 0;
         }
         if unsafe { IsWindowVisible(hwnd) } == 0 || unsafe { IsIconic(hwnd) } != 0 {
             return 1;
         }
-        // click-through windows (our overlays) never take input – WindowFromPoint skips them too
+        // click-through windows never take input – WindowFromPoint skips them too
         let ex = unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) } as u32;
         if ex & WS_EX_LAYERED != 0 && ex & WS_EX_TRANSPARENT != 0 {
             return 1;
@@ -411,10 +437,17 @@ mod imp {
         if unsafe { DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED as _, &mut cloaked as *mut u32 as *mut c_void, 4) } == 0 && cloaked != 0 {
             return 1;
         }
-        // the shared window's own dialogs and menus count as part of it
         let mut pid = 0u32;
         unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
-        if pid as i32 == walk.owner {
+        let own = pid == walk.me;
+        match walk.target {
+            // a shared screen: only PeekaView's own windows (toolbar, main window) are in the way
+            None if !own => return 1,
+            // the shared window's own dialogs and menus count as part of it
+            Some((_, owner)) if !own && pid as i32 == owner => return 1,
+            _ => {}
+        }
+        if own && is_overlay(hwnd) {
             return 1;
         }
         // the visible frame, without the invisible resize borders
@@ -423,15 +456,19 @@ mod imp {
         if frame != 0 && unsafe { GetWindowRect(hwnd, &mut r) } == 0 {
             return 1;
         }
-        walk.out.push(Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top });
+        walk.out.push(Cover { rect: Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top }, own });
         1
     }
 
-    pub fn covers(target: super::Target) -> Vec<Rect> {
-        let Some((id, owner)) = target else { return vec![] };
-        let mut walk = Walk { id, owner, out: Vec::new() };
+    pub fn covers(target: super::Target) -> Vec<Cover> {
+        let mut walk = Walk { target, me: std::process::id(), out: Vec::new() };
         unsafe { EnumWindows(Some(each), &mut walk as *mut Walk as LPARAM) };
         walk.out
+    }
+
+    /// PeekaView's own visible windows (overlays aside).
+    fn own_windows() -> Vec<Rect> {
+        covers(None).into_iter().map(|c| c.rect).collect()
     }
 
     pub fn window_geometry(win: &xcap::Window) -> Option<(Rect, bool)> {
@@ -439,7 +476,12 @@ mod imp {
         Some((rect, !win.is_minimized().unwrap_or(true)))
     }
 
-    fn input_allowed(target: super::Target, x: i32, y: i32) -> bool {
+    fn input_allowed(target: super::Target, own: &[Rect], x: i32, y: i32) -> bool {
+        // never on one of our own windows: WindowFromPoint looks through a transparent window
+        // where it has no pixels (the toolbar's WebView), so they are checked by their frames
+        if own.iter().any(|r| r.contains(x, y)) {
+            return false;
+        }
         // WindowFromPoint skips click-through (layered + transparent) windows like our overlay.
         let root = unsafe { GetAncestor(WindowFromPoint(POINT { x, y }), GA_ROOT) };
         if root.is_null() {
@@ -452,7 +494,8 @@ mod imp {
     }
 
     pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
-        points.iter().any(|&(x, y)| input_allowed(target, x, y))
+        let own = own_windows();
+        points.iter().any(|&(x, y)| input_allowed(target, &own, x, y))
     }
 
     pub fn focused((window_id, owner): (u32, i32)) -> bool {
@@ -470,7 +513,7 @@ mod imp {
 mod imp {
     use super::Rect;
 
-    pub fn covers(_target: super::Target) -> Vec<Rect> {
+    pub fn covers(_target: super::Target) -> Vec<super::Cover> {
         vec![]
     }
 
@@ -561,7 +604,12 @@ mod tests {
         println!("window {id} {rect:?} visible={visible} focused={}", super::focused(target));
         println!("input_allowed(center)={} reachable={}", super::input_allowed(Some(target), cx, cy), super::reachable(Some(target), rect));
         for c in super::covers(Some(target), rect) {
-            println!("  covered: {c:?} = {:?}", c.within(&rect));
+            println!("  covered: {c:?} = {:?}", c.rect.within(&rect));
+        }
+        let screen = xcap::Monitor::from_point(cx, cy).unwrap();
+        let screen = super::Rect { x: screen.x().unwrap(), y: screen.y().unwrap(), w: screen.width().unwrap() as i32, h: screen.height().unwrap() as i32 };
+        for c in super::covers(None, screen) {
+            println!("  own on the screen: {c:?}");
         }
         for w in super::imp::list(false).iter().filter(|w| w.rect.contains(cx, cy)) {
             println!("  at center: id={} pid={} layer={} alpha={} {:?}", w.id, w.pid, w.layer, w.alpha, w.rect);

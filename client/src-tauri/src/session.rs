@@ -77,8 +77,8 @@ pub struct Stream {
     pub z: u32,
     /// no other app's window over it (the frame is fully red only then)
     pub front: bool,
-    /// the parts other windows lie over (screen coordinates) – input does not arrive there
-    pub covers: Vec<Rect>,
+    /// the parts other windows (or PeekaView's own) lie over – input does not arrive there
+    pub covers: Vec<crate::guard::Cover>,
 }
 
 impl Stream {
@@ -96,9 +96,16 @@ impl Stream {
         ((x - self.rect.x) as f64 / self.rect.w.max(1) as f64, (y - self.rect.y) as f64 / self.rect.h.max(1) as f64)
     }
 
-    /// The covered parts for the viewers: [x, y, w, h] normalized to the window (0..1).
-    pub fn cover(&self) -> Vec<[f64; 4]> {
-        self.covers.iter().map(|r| r.within(&self.rect)).collect()
+    /// The covered parts for the viewers: [x, y, w, h, own] – normalized to the window (0..1),
+    /// own = 1 for one of PeekaView's own windows.
+    pub fn cover(&self) -> Vec<[f64; 5]> {
+        self.covers
+            .iter()
+            .map(|c| {
+                let [x, y, w, h] = c.rect.within(&self.rect);
+                [x, y, w, h, if c.own { 1.0 } else { 0.0 }]
+            })
+            .collect()
     }
 }
 

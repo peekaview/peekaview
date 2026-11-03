@@ -61,9 +61,15 @@ const STYLE = `
 .pv-cover[hidden] { display: none; }
 .pv-cover-fill { position: absolute; inset: 0; opacity: .72; }
 .pv-cover-fill div { position: absolute; background: repeating-linear-gradient(135deg, #09090b 0 7px, #3f3f46 7px 14px); }
+.pv-cover-fill div.own { background: repeating-linear-gradient(135deg, #09090b 0 7px, #7f1d1d 7px 14px); }
 .pv-cover-label { position: absolute; display: grid; place-items: center; overflow: hidden; }
-.pv-cover-label span { max-width: calc(100% - 12px); padding: 4px 10px; border-radius: 8px; background: rgba(9, 9, 11, .88); color: #fde68a; font: 600 12px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: center; }
-.pv-cover-label small { display: block; color: #d4d4d8; font-weight: 500; font-size: 11px; }
+.pv-cover-label span { max-width: calc(100% - 12px); padding: 4px 10px; border-radius: 8px; background: rgba(9, 9, 11, .88); color: #fde68a; font: 500 11px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-cover-label b { display: block; font-weight: 600; font-size: 12px; }
+.pv-cover-label small { display: block; color: #d4d4d8; font-size: 11px; }
+/* PeekaView's own windows are often just a toolbar's height: one line */
+.pv-cover-label.own span { padding: 2px 8px; color: #fecaca; }
+.pv-cover-label.own b, .pv-cover-label.own small { display: inline; }
+.pv-cover-label.own small::before { content: " · "; }
 .pv-viewer[data-tool="point"] .pv-win.covered .pv-view,
 .pv-viewer[data-tool="draw"] .pv-win.covered .pv-view { cursor: not-allowed; }
 /* mirror of the presenter's screen ("Resize/Anordnen erlauben") */
@@ -211,12 +217,14 @@ export class WindowManager {
    * the window) – remote control clicks do not arrive there.
    */
   showCover(win, cover) {
-    const rects = (Array.isArray(cover) ? cover : []).filter((r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite))
+    const parts = (Array.isArray(cover) ? cover : [])
+      .filter((r) => Array.isArray(r) && r.length >= 4 && r.every(Number.isFinite))
+      .map(([x, y, w, h, own]) => ({ r: [x, y, w, h], own: own === 1 }))
     const layer = win.el.querySelector('.pv-cover')
-    const key = JSON.stringify(rects)
+    const key = JSON.stringify(parts)
     if (layer.dataset.key === key) return
     layer.dataset.key = key
-    layer.hidden = !rects.length
+    layer.hidden = !parts.length
     const place = (el, [x, y, w, h]) => {
       el.style.left = `${x * 100}%`
       el.style.top = `${y * 100}%`
@@ -224,11 +232,31 @@ export class WindowManager {
       el.style.height = `${h * 100}%`
       return el
     }
-    layer.querySelector('.pv-cover-fill').replaceChildren(...rects.map((r) => place(document.createElement('div'), r)))
-    // the hint in the largest part
-    const largest = rects.reduce((a, r) => (!a || r[2] * r[3] > a[2] * a[3] ? r : a), null)
-    if (largest) place(layer.querySelector('.pv-cover-label'), largest)
+    const label = (part, text, hint) => {
+      const el = place(document.createElement('div'), part.r)
+      el.className = 'pv-cover-label' + (part.own ? ' own' : '')
+      el.innerHTML = '<span><b></b><small></small></span>'
+      el.querySelector('b').textContent = text
+      el.querySelector('small').textContent = hint
+      return el
+    }
+    layer.querySelector('.pv-cover-fill').replaceChildren(
+      ...parts.map((p) => {
+        const el = place(document.createElement('div'), p.r)
+        if (p.own) el.className = 'own'
+        return el
+      }),
+    )
+    // other windows: one hint in the largest part; PeekaView's own windows (toolbar) each say so –
+    // they are left out of the picture, so the viewer would not know what is there
+    const others = parts.filter((p) => !p.own)
+    const largest = others.reduce((a, p) => (!a || p.r[2] * p.r[3] > a.r[2] * a.r[3] ? p : a), null)
+    layer.querySelector('.pv-cover-labels').replaceChildren(
+      ...(largest ? [label(largest, 'Verdeckt', 'Klicks kommen hier nicht an')] : []),
+      ...parts.filter((p) => p.own).map((p) => label(p, 'PeekaView', 'nicht steuerbar')),
+    )
   }
+
 
   create(slot) {
     const el = document.createElement('div')
@@ -237,7 +265,7 @@ export class WindowManager {
     el.innerHTML = `
       <div class="pv-win-bar"><span class="pv-win-app"></span><span class="pv-win-title"></span><span class="pv-win-flag"></span>
         <button data-min title="Minimieren">${icon('minimize', 15)}</button><button data-max title="Maximieren">${icon('maximize', 13)}</button></div>
-      <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-cover" hidden><div class="pv-cover-fill"></div><div class="pv-cover-label"><span>Verdeckt<small>Klicks kommen hier nicht an</small></span></div></div><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
+      <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-cover" hidden><div class="pv-cover-fill"></div><div class="pv-cover-labels"></div></div><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
       <div class="pv-nav" hidden>
         <button data-nav="back" title="Zurück"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4.5v15L5.5 12z"/></svg></button>
         <button data-nav="home" title="Startbildschirm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="7.5"/></svg></button>
