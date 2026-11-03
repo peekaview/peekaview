@@ -6,7 +6,9 @@
 //   - no TURN request leaves the page
 //   - share.html?browser=firefox: as in Firefox, no Picture-in-Picture window a page can open
 //
-//   node tests/light-fixture.mjs [port]   – a server for the browser preview
+//   node tests/light-fixture.mjs [port]          – a server for the browser preview
+//   node tests/light-fixture.mjs [port] --real   – web/ as it is (real relays and screen), never
+//                                                  cached: for trying it out on this computer
 import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { dirname, extname, resolve, sep } from 'node:path'
@@ -92,15 +94,15 @@ navigator.mediaDevices.getDisplayMedia = async () => {
 }
 </script>`
 
-export function startServer(port = 0) {
+export function startServer(port = 0, { real = false } = {}) {
   const server = createServer(async (request, response) => {
     const path = new URL(request.url, 'http://localhost').pathname
     const file = resolve(web, path === '/' ? 'index.html' : '.' + path)
     if (!file.startsWith(web + sep)) return response.writeHead(403).end()
     try {
-      let body = await readFile(file, 'utf8')
-      if (path === '/signal.js') body += fakeRelay
-      if (path === '/share.html') body = body.replace('<head>', '<head>' + fakeScreen)
+      let body = await readFile(file)
+      if (path === '/signal.js' && !real) body = body.toString() + fakeRelay
+      if (path === '/share.html' && !real) body = body.toString().replace('<head>', '<head>' + fakeScreen)
       response.setHeader('Content-Type', { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' }[extname(file)] ?? 'application/octet-stream')
       response.setHeader('Cache-Control', 'no-cache')
       response.end(body)
@@ -112,6 +114,7 @@ export function startServer(port = 0) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const server = await startServer(Number(process.argv[2] ?? 8091))
-  console.log(`light fixture on http://127.0.0.1:${server.address().port}/share.html`)
+  const real = process.argv.includes('--real')
+  const server = await startServer(Number(process.argv.find((a) => /^\d+$/.test(a)) ?? 8091), { real })
+  console.log(`${real ? 'web/' : 'light fixture'} on http://127.0.0.1:${server.address().port}/share.html`)
 }
