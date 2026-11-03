@@ -77,6 +77,10 @@
     .step-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
     .text-button { padding: 2px 4px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .text-button:hover { color: #fafafa; }
+    /* the mini window's picture: shown while setting it up, afterwards it keeps playing out of
+       sight (a hidden video would end its Picture-in-Picture) */
+    .mini-video { display: block; width: 100%; max-width: 300px; aspect-ratio: 16 / 10; margin: 4px 0; border-radius: 10px; border: 1px solid #3f3f46; background: #18181b; }
+    .step.away, .offscreen { position: fixed; left: -10000px; top: 0; width: 400px; }
     .stop { align-self: center; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
@@ -111,6 +115,16 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span></div>
+      <div class="step" id="mini-step" hidden>
+        <span class="step-icon" data-icon="windows"></span>
+        <div class="step-body">
+          <strong id="mini-title">Mini-Fenster einschalten</strong>
+          <p id="mini-text"></p>
+          <video id="mini-video" class="mini-video" muted playsinline autoplay></video>
+          <p class="error" id="mini-error" role="alert" hidden></p>
+          <div class="step-actions"><button class="pill primary" id="mini-on" type="button"></button><button class="text-button" id="mini-done" type="button"></button></div>
+        </div>
+      </div>
       <div class="step" id="locate-step" hidden>
         <span class="step-icon" data-icon="screen"></span>
         <div class="step-body">
@@ -153,13 +167,21 @@
   </main>
   <footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
   <div class="toast" id="toast" role="status" hidden></div>
+  <!-- what is shared, for still pictures where the browser has no ImageCapture -->
+  <video id="src-video" class="offscreen" muted playsinline autoplay></video>
+  <video id="src-screen" class="offscreen" muted playsinline autoplay></video>
 
   <script type="module">
-    // "Bildschirmfreigabe light": the presenter's page. Shares with getDisplayMedia (light-host.js)
-    // and opens a small helper window that waits in a corner of the screen and jumps to the spot
-    // where a viewer points or draws (share-helper.html). The helper reaches this page through
-    // window.opener.pvLight.
+    // "Bildschirmfreigabe light": the presenter's page. Shares with getDisplayMedia (light-host.js).
+    //   - Takes a still picture when somebody points or starts to draw (light-capture.js) and,
+    //     when they are done, shows that spot in the always-on-top mini window (light-pip.js).
+    //   - The helper window (share-helper.html) lays the drawing over the very spot on the screen:
+    //     by itself when there is no mini window, otherwise on "Zur Stelle" / a click on the
+    //     notification – a browser window in the background cannot come to the front by itself.
+    // The helper reaches this page through window.opener.pvLight.
     import { LightHost, TURN_SERVICE } from './light-host.js'
+    import { takeCapture } from './light-capture.js'
+    import { MiniWindow, documentPip, videoPip } from './light-pip.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -183,6 +205,13 @@
     // a window is shared: the whole screen as well, only here, to find the window on it (never sent)
     let locator = null
     let locateSkipped = false
+    // the mini window; for a video: the presenter turned it on (Firefox does not tell)
+    let mini = null
+    let miniDone = false
+    let miniSkipped = false
+    // strokes in progress (from -> {points, capture, name}) and the last spot shown
+    const strokes = new Map()
+    let lastReveal = null
     const listeners = new Set()
 
     // ---------------------------------------------------------------- name, modes
@@ -251,11 +280,15 @@
       } catch (err) {
         picking = Promise.reject(err)
       }
-      openHelper()
+      // Chrome, Edge: the mini window floats above everything; the helper comes on "Zur Stelle"
+      if (documentPip) openMini()
+      else openHelper()
       $('start').disabled = true
       picking.then((stream) => begin(stream, name)).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
+        mini?.close()
+        mini = null
         $('start-error').textContent = err?.name === 'NotAllowedError'
           ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf „Bildschirm teilen“.'
           : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
@@ -274,11 +307,17 @@
           renderAll()
           emit({ kind: 'status', ...status() })
         },
-        onAnnotation: (m) => emit({ kind: 'ann', m }),
+        onAnnotation: (m) => {
+          emit({ kind: 'ann', m })
+          watch(m)
+        },
         onEnded: (why) => ended(why),
       })
       await host.start()
       window.pvLight.host = host
+      $('src-video').srcObject = stream
+      // Safari, Firefox: the mini window is a video (turned on in the step below)
+      if (!documentPip) mini = MiniWindow.video($('mini-video'), miniActions)
       // where the browser lets a page bring a window forward
       try { helper?.focus() } catch {}
       $('setup').hidden = true
@@ -297,6 +336,12 @@
       for (const t of locator?.getTracks() ?? []) t.stop()
       locator = null
       locateSkipped = false
+      mini?.close()
+      mini = null
+      miniDone = miniSkipped = false
+      strokes.clear()
+      lastReveal = null
+      $('src-video').srcObject = $('src-screen').srcObject = null
       window.pvLight.host = null
       emit({ kind: 'status', ...status() })
       closeHelper()
@@ -313,10 +358,11 @@
     })
 
     // ---------------------------------------------------------------- link
-    async function copyLink(quiet) {
+    // (from the mini window: with its clipboard – the page itself is in the background)
+    async function copyLink(quiet, from = window) {
       if (!host) return
       try {
-        await navigator.clipboard.writeText(host.link)
+        await from.navigator.clipboard.writeText(host.link)
         toast(quiet ? 'Der Link ist schon in deiner Zwischenablage – füge ihn z. B. in eine E-Mail oder einen Chat ein.' : 'Link kopiert.')
       } catch {
         $('link').select()
@@ -377,6 +423,8 @@
         li.append(who(v), v.name)
         return li
       }) : [Object.assign(document.createElement('li'), { className: 'none', textContent: 'Noch niemand – schicke den Link oben.' })]))
+      mini?.set({ viewers, requests, busy: busyNames() })
+      renderMini()
       renderHelper()
     }
 
@@ -406,18 +454,179 @@
     function renderHelper() {
       const open = !!helper && !helper.closed
       const windowShared = !!host && host.surface !== 'monitor'
+      const middle = windowShared && !locator
       $('locate-step').hidden = !windowShared || !!locator || locateSkipped
-      $('helper-open').hidden = open || !host
-      $('helper-locate').hidden = !open || !windowShared || !!locator || !locateSkipped
+      // with the mini window the helper comes only on "Zur Stelle"
+      $('helper-open').hidden = open || !host || miniActive()
+      $('helper-locate').hidden = !windowShared || !!locator || !locateSkipped
       $('helper-text').textContent = !host
         ? ''
-        : !open
-          ? helperBlocked
-            ? 'Dein Browser hat das Hilfsfenster blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
-            : 'Ohne Hilfsfenster siehst du nicht, wo die Zuschauer zeigen und malen.'
-          : windowShared && !locator
-            ? 'Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es in der Mitte deines Bildschirms.'
-            : 'Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es genau an der Stelle – mit der Zeichnung. Du kannst dort auch selbst malen.'
+        : miniActive()
+          ? mini.kind === 'document'
+            ? `Das Mini-Fenster schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt. „Zur Stelle“ legt die Zeichnung ${middle ? 'in die Mitte deines Bildschirms' : 'genau über die Stelle'}.`
+            : `Das Mini-Fenster schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt. Ein Klick auf die Benachrichtigung legt die Zeichnung ${middle ? 'in die Mitte deines Bildschirms' : 'genau über die Stelle'}.`
+          : !open
+            ? helperBlocked
+              ? 'Dein Browser hat das Hilfsfenster blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
+              : 'Ohne Hilfsfenster siehst du nicht, wo die Zuschauer zeigen und malen.'
+            : `Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es ${middle ? 'in der Mitte deines Bildschirms' : 'genau über der Stelle'} – mit der Zeichnung. Liegt es hinter anderen Programmen, bleibt es dort: Browser dürfen Fenster nicht nach vorne holen.`
+    }
+
+    // ---------------------------------------------------------------- the mini window (always on top)
+    const miniActions = {
+      onJump: (win) => jumpHelper(win),
+      onAdmit: (peer, allow) => host?.admit(peer, allow),
+      onCopy: (win) => copyLink(false, win),
+      onStop: () => host?.stop(),
+      onClose: () => {
+        if (mini?.kind === 'document') mini = null
+        renderAll()
+        emit({ kind: 'status', ...status() })
+      },
+      onEnter: () => {
+        miniDone = true
+        renderAll()
+        emit({ kind: 'status', ...status() })
+      },
+      onLeave: () => {
+        miniDone = false
+        renderAll()
+        emit({ kind: 'status', ...status() })
+      },
+    }
+
+    function miniActive() {
+      return !!mini && (mini.kind === 'document' ? !mini.closed : mini.inPip || miniDone)
+    }
+
+    // Chrome, Edge: right in a click
+    function openMini() {
+      if (mini && !mini.closed) return
+      MiniWindow.openDocument(miniActions)
+        .then((m) => {
+          mini = m
+          // the helper opened from there finds this page
+          m.win.pvLight = window.pvLight
+          renderAll()
+          emit({ kind: 'status', ...status() })
+        })
+        .catch(() => {
+          $('mini-error').textContent = 'Das Mini-Fenster ließ sich nicht öffnen. Bitte noch einmal klicken.'
+          $('mini-error').hidden = !host
+          renderAll()
+        })
+    }
+
+    function requestNotifications() {
+      if (typeof Notification === 'function' && Notification.permission === 'default') Notification.requestPermission().then(() => renderMini()).catch(() => {})
+    }
+
+    function renderMini() {
+      const firefox = !documentPip && !videoPip
+      const askNotify = !documentPip && typeof Notification === 'function' && Notification.permission === 'default'
+      const open = !!host && !miniActive() && !miniSkipped
+      $('mini-step').hidden = !host || (documentPip && !open)
+      $('mini-step').classList.toggle('away', !open)
+      $('mini-video').hidden = documentPip
+      $('mini-text').textContent = documentPip
+        ? 'Es schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
+        : firefox
+          ? 'Klicke mit der rechten Maustaste auf das Bild unten und wähle „Bild-im-Bild“. Es schwebt dann über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
+          : 'Es schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
+      $('mini-on').hidden = firefox && !askNotify
+      $('mini-on').textContent = documentPip ? 'Mini-Fenster öffnen' : firefox ? 'Benachrichtigungen erlauben' : 'Mini-Fenster einschalten'
+      $('mini-done').textContent = firefox ? 'Erledigt' : 'Später'
+    }
+    $('mini-on').addEventListener('click', () => {
+      $('mini-error').hidden = true
+      if (documentPip) return openMini()
+      // (a click on a notification brings the drawing to the spot)
+      requestNotifications()
+      if (videoPip) mini?.enter()?.catch(() => {
+        $('mini-error').textContent = 'Das Mini-Fenster ließ sich nicht einschalten.'
+        $('mini-error').hidden = false
+      })
+    })
+    $('mini-done').addEventListener('click', () => {
+      if (!documentPip && !videoPip) miniDone = true
+      else miniSkipped = true
+      renderAll()
+      emit({ kind: 'status', ...status() })
+    })
+
+    // ---------------------------------------------------------------- what viewers point at and draw
+
+    const nameOf = (id) => host?.peers().list.find((p) => p.id === id)?.name ?? 'Jemand'
+    const busyNames = () => [...strokes.values()].map((s) => s.name)
+    const sourceVideos = () => {
+      let inHelper = []
+      try {
+        if (helper && !helper.closed) inHelper = [...helper.document.querySelectorAll('video')]
+      } catch {}
+      return [$('src-video'), $('src-screen'), ...inHelper]
+    }
+    const capture = () => takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
+
+    // a point right away; a stroke when it is finished – with the picture from its start
+    function watch(m) {
+      if (!host) return
+      if (m.t === 'left') {
+        if (strokes.delete(m.id)) busyChanged()
+        return
+      }
+      if (m.t === 'ping') return reveal({ from: m.from, points: [[m.x, m.y]], ping: true, capture: capture() })
+      if (m.t !== 'draw') return
+      let stroke = strokes.get(m.from)
+      if (m.s === 'start' || !stroke) {
+        stroke = { points: [], capture: capture(), name: nameOf(m.from) }
+        strokes.set(m.from, stroke)
+        busyChanged()
+      }
+      if (stroke.points.length < 4000) stroke.points.push([m.x, m.y])
+      if (m.s !== 'end') return
+      strokes.delete(m.from)
+      busyChanged()
+      reveal({ from: m.from, points: stroke.points, capture: stroke.capture })
+    }
+
+    function busyChanged() {
+      mini?.set({ busy: busyNames() })
+      emit({ kind: 'status', ...status() })
+    }
+
+    async function reveal(r) {
+      const capture = await r.capture
+      if (!host || !capture?.image) return
+      const peer = host.peers().list.find((p) => p.id === r.from)
+      lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now() }
+      mini?.reveal(lastReveal)
+      emit({ kind: 'reveal', reveal: lastReveal })
+      notify(lastReveal)
+    }
+
+    // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
+    function notify(r) {
+      if (mini?.kind === 'document' || typeof Notification !== 'function' || Notification.permission !== 'granted') return
+      try {
+        const n = new Notification(r.ping ? `${r.name} zeigt dir etwas` : `${r.name} hat etwas gemalt`, { body: 'Klicke hier, dann erscheint es genau an der Stelle.', tag: 'pv-light' })
+        n.onclick = () => {
+          n.close()
+          window.focus()
+          jumpHelper()
+        }
+      } catch {}
+    }
+
+    /** The helper over the spot of the last drawing – from a click (mini window, notification). */
+    function jumpHelper(from = window) {
+      if (!lastReveal || !host) return
+      if (helper && !helper.closed) {
+        try { helper.focus() } catch {}
+        return emit({ kind: 'jump' })
+      }
+      helper = from.open('share-helper.html?jump=1', 'pv-light-helper', 'popup=yes,width=560,height=400')
+      helperBlocked = !helper
+      renderHelper()
     }
 
     // ---------------------------------------------------------------- finding a shared window
@@ -450,6 +659,7 @@
       if (!host) return track.stop()
       for (const t of locator?.getTracks() ?? []) t.stop()
       locator = stream
+      $('src-screen').srcObject = stream
       // stopped in the browser's bar: back to "in the middle"
       track.addEventListener('ended', () => {
         if (locator !== stream) return
@@ -473,6 +683,10 @@
         requests: host?.requestList ?? [],
         peers: host?.peers().list ?? [],
         locator: !!locator,
+        // somebody draws right now (their names)
+        busy: busyNames(),
+        // the mini window floats on top: the helper comes only when asked
+        mini: miniActive(),
       }
     }
     function emit(event) {
@@ -484,6 +698,9 @@
       host: null,
       get stream() { return host?.stream ?? null },
       get locatorStream() { return locator },
+      get lastReveal() { return lastReveal },
+      capture: () => (host ? capture() : null),
+      get mini() { return mini },
       status,
       subscribe(fn) {
         listeners.add(fn)

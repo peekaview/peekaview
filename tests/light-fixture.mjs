@@ -4,6 +4,7 @@
 //     "from" = signing key)
 //   - getDisplayMedia returns animated canvases: a fake "whole screen" or a fake window on it
 //   - no TURN request leaves the page
+//   - share.html?browser=firefox: as in Firefox, no Picture-in-Picture window a page can open
 //
 //   node tests/light-fixture.mjs [port]   – a server for the browser preview
 import { readFile } from 'node:fs/promises'
@@ -38,6 +39,11 @@ Signaling.open = async ({ hostKey = null, secretKey, strictFrom = false, onMessa
 // none is left). A "monitor" is the size of this screen with a "window" at window.qaWindowAt; a
 // "window" is exactly that window's picture – so the window can be found on the screen.
 const fakeScreen = `<script>
+// ?browser=firefox: no Picture-in-Picture windows for pages (only the user's own on videos)
+if (new URLSearchParams(location.search).get('browser') === 'firefox') {
+  delete window.documentPictureInPicture
+  Object.defineProperty(Document.prototype, 'pictureInPictureEnabled', { get: () => false })
+}
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
 const paintWindow = (ctx, t) => {

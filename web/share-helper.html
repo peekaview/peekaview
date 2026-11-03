@@ -62,32 +62,30 @@
     <div id="focus-bar"><span class="chip" id="focus-who"></span><span class="spacer"></span><button class="icon" id="focus-close" title="Zurück in die Ecke" aria-label="Zurück in die Ecke"></button></div>
     <span class="chip" id="focus-hint">Standbild – du kannst hier auch selbst zeigen und malen.</span>
   </div>
-  <!-- the whole screen, only to find the shared window on it (never sent) -->
+  <!-- the whole screen, only to find the shared window on it (never sent); still pictures -->
   <video class="offscreen" id="screen-video" muted autoplay playsinline></video>
 
   <script type="module">
-    // The helper window of "Bildschirmfreigabe light" (opened by share.html).
-    // Waits small in a corner of the screen. When a viewer points – or has finished a stroke – it
-    // jumps to that spot, grows, and shows a still picture of the shared screen there with the
-    // stroke drawn again on top – like a pane of glass over the spot – and slips back into the
-    // corner afterwards. While somebody draws it says so in the corner; the picture is taken when
-    // the stroke starts, so it shows what they drew on. The presenter can point and draw into it
-    // too; that goes to the viewers.
+    // The helper window of "Bildschirmfreigabe light" (opened by share.html or its mini window).
+    // Lays a drawing over the very spot on the presenter's screen: it jumps there, grows, and shows
+    // the still picture taken when the stroke started – like a pane of glass over the spot – with
+    // the stroke drawn again on top. The presenter can point and draw into it, too; that goes to
+    // the viewers. Afterwards it slips back into its corner (or closes, when it was only called
+    // for this spot).
     //
-    // Where the spot is (light-geometry.js): a shared screen maps directly; a shared window is
-    // found on the screen by its picture (light-locate.js) when the presenter also picked the
-    // whole screen. Otherwise the helper shows the whole picture in the middle of the screen.
+    // When it comes: the share page sends each finished stroke or point ("reveal").
+    //   - Without a mini window it comes right away – but only shows on top where the browser is
+    //     the active app: a browser window in the background never comes to the front by itself.
+    //   - With the always-on-top mini window it comes when asked: "Zur Stelle" there, or a click on
+    //     the notification ("jump") – a click makes the browser the active app.
     //
-    // Browser limits:
-    //   - Only windows a page opened itself can be moved and resized (window.open with "popup"),
-    //     and only within the screen. Firefox may forbid it (dom.disable_window_move_resize).
-    //   - A page cannot keep a window on top of other apps; focus() brings it forward where the
-    //     browser allows it (Chrome mostly, Firefox and Safari rarely).
+    // Browser limits: only windows a page opened itself can be moved and resized (window.open
+    // with "popup"), and only within the screen; Firefox may forbid it
+    // (dom.disable_window_move_resize).
     import { Annotations } from './annotate.js'
     import { icon, owl } from './icons.js'
     import { HOST_ID } from './light-host.js'
-    import { bounds, fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, visiblePart, windowRect } from './light-geometry.js'
-    import { locate, scaledGray } from './light-locate.js'
+    import { bounds, fit, inside, spotRect, stageInContent, visiblePart } from './light-geometry.js'
 
     const $ = (id) => document.getElementById(id)
     $('owl').innerHTML = owl(20)
@@ -97,12 +95,13 @@
     $('copy').prepend(document.createRange().createContextualFragment(icon('copy', 13)))
     $('show').prepend(document.createRange().createContextualFragment(icon('draw', 13)))
 
-    const mac = /Mac/.test(navigator.platform)
     const PARKED_WIDTH = 300
     const SPOT = { width: 560, height: 400 }
     // back into the corner after this long without anybody pointing or drawing
     const AFTER_PING = 3500
     const AFTER_DRAW = 6000
+    // called for one spot (from the mini window or a notification): closes afterwards
+    const onDemand = new URLSearchParams(location.search).has('jump')
 
     const api = window.opener?.pvLight
     if (!api) {
@@ -113,17 +112,15 @@
     let status = { sharing: false }
     let started = false
     let state = 'waiting' // waiting | parked | focus
-    let shown = null // what the focus shows: {image, picture, monitor} (picture: where it lies on the screen, null: unknown)
+    let shown = null // the capture shown: {image, picture, monitor, screenImage} (picture: where it lies on the screen, null: unknown)
     let part = null // the part of the picture (0..1) the focus shows
     let stageBox = null // where the whole picture lies in the window (CSS px)
     let spotLayout = false
     let idleTimer
-    // strokes of viewers in progress: from -> {live} (drawn right away, inside the focus) or
-    // {points, capture, name} (shown when they let go)
-    const strokes = new Map()
     // one jump after the other
     let queue = Promise.resolve()
     const ann = new Annotations($('stage'), { voice: false })
+    if (onDemand) $('waiting').hidden = true
 
     // ---------------------------------------------------------------- from the share page
     function onStatus(s) {
@@ -132,11 +129,14 @@
       if (s.sharing && !started) {
         started = true
         play($('video'), api.stream)
-        park()
+        if (onDemand && api.lastReveal) onJump()
+        else park()
       } else if (!s.sharing && started) {
         window.close()
       }
+      // (the page takes still pictures from these where the browser has no ImageCapture)
       if ((api.locatorStream ?? null) !== $('screen-video').srcObject) play($('screen-video'), api.locatorStream)
+      renderBusy()
       if (state === 'parked') renderParked()
     }
 
@@ -147,75 +147,38 @@
       } catch {}
     }
 
-    const nameOf = (id) => (id === HOST_ID ? 'Du' : (status.peers ?? []).find((p) => p.id === id)?.name ?? 'Jemand')
-
     function onAnnotation(m) {
       if (m.t === 'peers' || m.t === 'state') return ann.handle(m)
+      // cursors, hiding, clearing while something is shown (points and strokes come as "reveal")
+      if (state === 'focus' && ['ptr', 'hide', 'clear', 'left'].includes(m.t)) ann.handle(m)
+    }
+
+    function onReveal(r) {
       if (!started) return
-      if (m.t === 'draw') return onDraw(m)
-      if (m.t === 'ping') return onPing(m)
-      // cursors, hiding, clearing: only while something is shown
-      if (state === 'focus') ann.handle(m)
+      if (state === 'focus' || !status.mini) enqueue(() => showReveal(r))
     }
 
-    const insideShown = (p) => state === 'focus' && part && inside(p, part, spotLayout ? 0.08 : 0)
-
-    function onPing(m) {
-      if (insideShown(m)) return pinged(m)
-      const capture = takeCapture()
-      enqueue(async () => {
-        await show(await capture, m)
-        pinged(m)
-      })
-    }
-
-    function pinged(m) {
-      ann.handle(m)
-      // (the ring is short: once more when the helper has arrived)
-      setTimeout(() => state === 'focus' && ann.ping(m.from, m.x, m.y), 450)
-      showWho(m.from)
-      idle(AFTER_PING)
-    }
-
-    function onDraw(m) {
-      let stroke = strokes.get(m.from)
-      if (m.s === 'start' || !stroke) {
-        // inside what is shown already: drawn right away
-        if (insideShown(m)) {
-          strokes.set(m.from, { live: true })
-          clearTimeout(idleTimer)
-          showWho(m.from)
-          return ann.handle({ ...m, s: 'start' })
-        }
-        // otherwise the picture now (that is what they draw on), shown when they let go
-        stroke = { points: [[m.x, m.y]], capture: takeCapture(), name: nameOf(m.from) }
-        strokes.set(m.from, stroke)
-        renderBusy()
-        return
-      }
-      if (stroke.live) {
-        ann.handle(m)
-        if (m.s === 'end') {
-          strokes.delete(m.from)
-          idle(AFTER_DRAW)
-        }
-        return
-      }
-      if (stroke.points.length < 4000) stroke.points.push([m.x, m.y])
-      if (m.s !== 'end') return
-      strokes.delete(m.from)
-      renderBusy()
-      enqueue(async () => {
-        const b = bounds(stroke.points)
-        await show(await stroke.capture, { x: b.x + b.w / 2, y: b.y + b.h / 2 }, b)
-        showWho(m.from)
-        await replay(m.from, stroke.points)
-        idle(AFTER_DRAW)
-      })
+    function onJump() {
+      const r = api.lastReveal
+      if (r) enqueue(() => showReveal(r))
     }
 
     function enqueue(task) {
       queue = queue.then(task).catch((err) => console.warn('peekaview light helper', err))
+    }
+
+    async function showReveal(r) {
+      const b = bounds(r.points)
+      await show(r.capture, { x: b.x + b.w / 2, y: b.y + b.h / 2 }, b)
+      showWho(r.from)
+      if (r.ping) {
+        ann.handle({ t: 'ping', from: r.from, x: r.points[0][0], y: r.points[0][1] })
+        // (the ring is short: once more)
+        setTimeout(() => state === 'focus' && ann.ping(r.from, r.points[0][0], r.points[0][1]), 450)
+      } else {
+        await replay(r.from, r.points)
+      }
+      idle(r.ping ? AFTER_PING : AFTER_DRAW)
     }
 
     /** A stroke drawn again, quickly (it shows up as it was drawn). */
@@ -254,19 +217,22 @@
         row.querySelector('[data-deny]').addEventListener('click', () => api.admit(r.peer, false))
         return row
       }))
-      if (state === 'parked') placeParked()
+      placeParked()
     }
 
+    // somebody draws: it shows up as soon as they let go
     function renderBusy() {
-      const names = [...strokes.values()].filter((s) => !s.live).map((s) => s.name)
+      const names = status.busy ?? []
       const busy = $('busy')
+      const was = busy.hidden
       busy.hidden = !names.length
       busy.querySelector('span').textContent = names.length === 1 ? `${names[0]} malt gerade …` : `${names.join(' und ')} malen gerade …`
-      if (state === 'parked') placeParked()
+      if (state === 'parked' && was !== busy.hidden) placeParked()
     }
 
     function park() {
       clearTimeout(idleTimer)
+      if (onDemand) return window.close()
       state = 'parked'
       part = null
       shown = null
@@ -283,6 +249,7 @@
 
     // bottom right of the usable area of the screen
     function placeParked() {
+      if (state !== 'parked') return
       const c = chrome()
       const height = Math.ceil($('parked').scrollHeight)
       const w = PARKED_WIDTH + c.x
@@ -299,11 +266,12 @@
 
     $('stop').addEventListener('click', () => api.stop())
     $('copy').addEventListener('click', () => api.copyLink())
+    // the presenter wants to show something: the whole picture, now
     $('show').addEventListener('click', () => {
-      const capture = takeCapture()
       enqueue(async () => {
-        // the presenter wants to show something: the whole picture
-        await show({ ...(await capture), picture: null }, null)
+        const capture = await api.capture()
+        if (!capture?.image) return
+        await show({ ...capture, picture: null }, null)
         showWho(HOST_ID)
         idle(AFTER_DRAW * 2)
       })
@@ -311,64 +279,18 @@
     $('focus-close').addEventListener('click', park)
     window.addEventListener('keydown', (e) => e.key === 'Escape' && state === 'focus' && park())
 
-    // ---------------------------------------------------------------- the picture and where it lies
-
-    /**
-     * A still picture of the shared screen or window, and where it lies on the screen – taken
-     * while the helper still sits in its corner.
-     */
-    async function takeCapture() {
-      const monitor = monitorRect(screen, { mac, details: await screenDetails() })
-      const image = await frameCanvas(api.stream, $('video'))
-      let picture = null
-      let screenImage = null
-      if (image && status.surface === 'monitor' && matchesScreen(status.video, monitor)) picture = monitor
-      else if (image && api.locatorStream) ({ picture, screenImage } = await findWindow(image, monitor))
-      return { image, picture, monitor, screenImage }
-    }
-
-    // the shared window on the screen (the presenter also picked the whole screen)
-    async function findWindow(image, monitor) {
-      const track = api.locatorStream?.getVideoTracks()[0]
-      const size = track?.getSettings?.() ?? {}
-      if (!track || track.readyState !== 'live' || !matchesScreen(size, monitor)) return {}
-      const screenFrame = await frameCanvas(api.locatorStream, $('screen-video'))
-      if (!screenFrame) return {}
-      const scratch = document.createElement('canvas')
-      const found = locate((w, h) => scaledGray(screenFrame, w, h, scratch), (w, h) => scaledGray(image, w, h, scratch), screenFrame, image)
-      window.pvHelper.found = found
-      // the desktop around the window, too: the helper is a pane of glass over that spot
-      return found ? { picture: windowRect(found, monitor), screenImage: screenFrame } : {}
-    }
-
-    /** The current frame of a stream as a canvas (ImageCapture where there is one, else the video). */
-    async function frameCanvas(stream, video) {
-      const track = stream?.getVideoTracks()[0]
-      let source = null
-      try {
-        if (track && typeof ImageCapture === 'function') source = await new ImageCapture(track).grabFrame()
-      } catch {}
-      if (!source && video.videoWidth) source = video
-      if (!source) return null
-      const canvas = document.createElement('canvas')
-      canvas.width = source.width || video.videoWidth
-      canvas.height = source.height || video.videoHeight
-      canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
-      source.close?.()
-      return canvas
-    }
-
     // ---------------------------------------------------------------- jumping to a spot
+
+    const insideShown = (p) => state === 'focus' && part && inside(p, part, spotLayout ? 0.08 : 0)
 
     /** Shows a capture: 1:1 over `center` (0..1 of the picture), large enough for `extent`. */
     async function show(capture, center, extent = { w: 0, h: 0 }) {
+      const stay = shown?.picture && capture.picture && center && insideShown(center) && Math.abs(shown.picture.left - capture.picture.left) < 2 && Math.abs(shown.picture.top - capture.picture.top) < 2
       shown = capture
       const shot = $('shot')
-      if (capture.image) {
-        shot.width = capture.image.width
-        shot.height = capture.image.height
-        shot.getContext('2d').drawImage(capture.image, 0, 0)
-      }
+      shot.width = capture.image.width
+      shot.height = capture.image.height
+      shot.getContext('2d').drawImage(capture.image, 0, 0)
       const backdrop = $('backdrop')
       backdrop.hidden = !capture.screenImage || !center
       if (!backdrop.hidden) {
@@ -381,6 +303,9 @@
       $('waiting').hidden = true
       $('parked').hidden = true
       $('focus').hidden = false
+      try { window.focus() } catch {}
+      // the next stroke in the part shown already: no need to move
+      if (stay) return layoutSpot()
       const c = chrome()
       const { picture, monitor } = capture
       if (picture && center) {
@@ -398,13 +323,12 @@
         if (shown === capture) layoutSpot()
       } else {
         const box = { width: screen.availWidth * 0.6, height: screen.availHeight * 0.6 }
-        const f = fit(capture.image ?? { width: 16, height: 9 }, box)
+        const f = fit(capture.image, box)
         moveWindow((screen.availLeft ?? 0) + (screen.availWidth - f.width) / 2, (screen.availTop ?? 0) + (screen.availHeight - f.height) / 2, f.width + c.x, f.height + c.y)
         layoutWhole()
         await new Promise((done) => setTimeout(done, 150))
         if (shown === capture) layoutWhole()
       }
-      try { window.focus() } catch {}
     }
 
     function layoutSpot() {
@@ -419,30 +343,16 @@
 
     function layoutWhole() {
       spotLayout = false
-      place(fit(shown?.image ?? { width: 16, height: 9 }, { width: window.innerWidth, height: window.innerHeight }))
+      place(fit(shown.image, { width: window.innerWidth, height: window.innerHeight }))
       part = { x: 0, y: 0, w: 1, h: 1 }
     }
 
-    window.addEventListener('resize', () => state === 'focus' && !spotLayout && layoutWhole())
+    window.addEventListener('resize', () => state === 'focus' && !spotLayout && shown && layoutWhole())
 
     function place(box) {
       stageBox = box
       Object.assign($('stage').style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
       ann.resize()
-    }
-
-    // a screen of several: where it is exactly – only when the presenter allowed it already
-    // (Chrome's "window management"; we never ask for it here)
-    let detailsAllowed
-    async function screenDetails() {
-      try {
-        if (!('getScreenDetails' in window)) return null
-        detailsAllowed ??= (await navigator.permissions.query({ name: 'window-management' })).state === 'granted'
-        if (!detailsAllowed) return null
-        return (await window.getScreenDetails()).currentScreen
-      } catch {
-        return null
-      }
     }
 
     function showWho(id) {
@@ -460,7 +370,7 @@
       clearTimeout(idleTimer)
       idleTimer = setTimeout(function check() {
         // nobody lets go of a stroke halfway: wait for it
-        if (strokes.size > 0 || down) return (idleTimer = setTimeout(check, 1000))
+        if ((status.busy ?? []).length || down) return (idleTimer = setTimeout(check, 1000))
         park()
       }, ms)
     }
@@ -524,8 +434,9 @@
       get part() { return part },
       get stage() { return stageBox },
       get picture() { return shown?.picture ?? null },
+      get found() { return shown?.found ?? null },
       get busy() { return $('busy').hidden ? '' : $('busy').textContent },
-      found: null,
+      onDemand,
       park,
     }
 
@@ -533,6 +444,8 @@
     const unsubscribe = api.subscribe((e) => {
       if (e.kind === 'status') onStatus(e)
       else if (e.kind === 'ann') onAnnotation(e.m)
+      else if (e.kind === 'reveal') onReveal(e.reveal)
+      else if (e.kind === 'jump') onJump()
     })
     window.addEventListener('pagehide', () => unsubscribe())
     // the share page is gone (closed, reloaded): so is the share
