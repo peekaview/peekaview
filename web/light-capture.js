@@ -66,7 +66,8 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
     return capture
   }
   const scratch = document.createElement('canvas')
-  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(image, w, h, scratch), screenImage, image)
+  const info = (debug.search_result = {})
+  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(image, w, h, scratch), screenImage, image, info)
   debug.ms = Math.round(performance.now() - t0)
   if (!found) {
     debug.problem = 'not-found'

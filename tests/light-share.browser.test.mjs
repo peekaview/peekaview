@@ -203,22 +203,33 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await browser('click', '#locate')
     await waitFor("!document.querySelector('#locate-error').hidden")
     assert.match(await evaluate("document.querySelector('#locate-error').textContent"), /Bitte „Gesamter Bildschirm“ wählen/)
-    // the window minimized: said plainly, with what to do
+    // not to be seen while this page lies in front (it may cover the window): no error, just
+    // "switch to your window" – searched for again once the page is in the background
     await evaluate('window.qaHideWindow = true')
     await browser('click', '#locate')
     await waitFor("document.querySelector('#locate-step').hidden && !document.querySelector('#place-problem').hidden")
-    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert, ganz verdeckt/)
-    // back on the screen: found
-    await evaluate('window.qaHideWindow = false')
-    await browser('click', '#problem-check')
+    assert.equal(await evaluate("document.querySelector('#place-problem').classList.contains('problem')"), false)
+    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Wechsle jetzt zu deinem geteilten Fenster/)
+    // the presenter switches to the window (headless Chrome keeps every tab "in front": as if)
+    await evaluate('window.qaHideWindow = false; document.hasFocus = () => false')
     await waitFor("document.querySelector('#place-problem').hidden")
-    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /„Zur Stelle“ legt die Zeichnung genau über die Stelle/)
+    // still not to be seen while the presenter is over there: now that is a problem, said plainly
+    await evaluate('window.qaHideWindow = true; new Promise((done) => setTimeout(() => done(pvLight.check().then(() => true)), 400))')
+    await waitFor("document.querySelector('#place-problem').classList.contains('problem') && !document.querySelector('#place-problem').hidden")
+    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert, ganz verdeckt/)
+    assert.equal(await evaluate('pvLight.mini.view.state.problem'), 'Dein Fenster ist nicht zu finden', 'the mini window says so, too')
+    // back on the screen: found again by itself
+    await evaluate('window.qaHideWindow = false')
+    await waitFor("document.querySelector('#place-problem').hidden")
+    await evaluate('delete document.hasFocus; true')
     // the whole screen stays here: viewers get only the window
     assert.equal(await evaluate('pvLight.locatorStream.getVideoTracks()[0].getSettings().displaySurface + "|" + pvLight.status().locator'), 'monitor|true')
 
     // let in from the mini window
     const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
+    await tab('t1')
+    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /„Zur Stelle“ legt die Zeichnung genau über die Stelle/)
     await tab('t2')
     await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
     // larger and smaller again with a click (the window may only resize in one)

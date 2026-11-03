@@ -320,7 +320,10 @@ The viewer site opens with a small start page:
     - The window's edge (shadow, rounded corners) and its title bar are left out. A window that is not the active one looks different there.
     - That takes about 0.1–0.2 s and finds the window to a pixel, also after it was moved or when something covers part of it.
   - The helper then shows the window's still picture over its place, with the desktop around it; the mini window's map marks the spot on the whole screen.
-  - Not to be seen on the screen (minimized, covered, another screen): the share page says so right after the screen was picked and whenever a still picture cannot be placed, with "Noch einmal prüfen" and "Anderen Bildschirm wählen"; the mini window marks such a spot "Dein Fenster ist nicht zu finden". `share.html?debug` (and the console) show how each search went.
+  - Not to be seen on the screen (minimized, covered, another screen): the share page says so, with "Anderen Bildschirm wählen", and the mini window shows "Dein Fenster ist nicht zu finden".
+    - Only while the presenter is elsewhere. While the share page lies in front (right after picking the screen, say), the browser may well cover the window, so the page only asks to switch to it.
+    - It keeps looking every 2.5 s while the page is in the background, and the message goes away by itself once the window is found.
+    - `share.html?debug` (and the console) show how each search went, including the best score when nothing was found.
 - Without that click ("Später"), when the window is not found (minimized, covered) and for another monitor, the helper shows the whole picture in the middle of the screen.
 - When the whole screen is shared, the mini window and the helper are part of the picture: viewers see them, too.
 - Popup blockers let windows through only right in a click. Phones and tablets cannot share from the browser at all, so the start page does not offer it there.

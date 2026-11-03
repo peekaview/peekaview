@@ -219,6 +219,8 @@
     let locateSkipped = false
     // the last still picture could not be placed on the screen: 'other-screen' | 'not-found' | null
     let placeProblem = null
+    // not seen yet, but this page lay in front (and maybe over the window): wait for the switch
+    let placeWaiting = false
     // the mini window; for a video: the presenter turned it on (Firefox does not tell)
     let mini = null
     let miniDone = false
@@ -353,6 +355,7 @@
       locator = null
       locateSkipped = false
       placeProblem = null
+      placeWaiting = false
       mini?.close()
       mini = null
       miniDone = miniSkipped = false
@@ -615,19 +618,11 @@
 
     async function reveal(r) {
       const capture = await r.capture
-      // how the still picture and the search went (share.html?debug shows it here)
-      console.info('peekaview light: Standbild', capture?.debug)
-      if (new URLSearchParams(location.search).has('debug')) {
-        $('debug').hidden = false
-        $('debug').textContent = JSON.stringify({ ...capture?.debug, mini: mini?.kind ?? null, locator: !!locator }, null, 1)
-      }
+      showDebug('Standbild', capture)
       if (!host || !capture?.image) return
       // could it be placed? (a window needs the whole screen picked first – that is the step above)
       const problem = host.surface !== 'monitor' && !locator ? null : capture.debug?.problem ?? null
-      if (problem !== placeProblem) {
-        placeProblem = problem
-        renderAll()
-      }
+      placed(problem)
       const peer = host.peers().list.find((p) => p.id === r.from)
       lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
       mini?.reveal(lastReveal)
@@ -660,27 +655,73 @@
       renderHelper()
     }
 
+    // how the still picture and the search went: the console, and here with share.html?debug
+    function showDebug(what, capture) {
+      console.info(`peekaview light: ${what}`, capture?.debug)
+      if (!new URLSearchParams(location.search).has('debug')) return
+      $('debug').hidden = false
+      $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
+    }
+
+    // this page in front – then the browser may well lie over the shared window
+    const inFront = () => !document.hidden && document.hasFocus()
+
+    /** The result of a search: found (null) or a problem – said only when the window could be seen. */
+    function placed(problem) {
+      if (!problem) {
+        placeProblem = null
+        placeWaiting = false
+      } else if (problem === 'not-found' && inFront()) {
+        // the browser in front covers it: look again once the presenter switched to it
+        placeProblem = null
+        placeWaiting = true
+      } else {
+        placeProblem = problem
+        placeWaiting = false
+      }
+      mini?.set({ problem: placeProblem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : placeProblem ? 'Anderer Bildschirm geteilt' : '' })
+      renderAll()
+    }
+
     function renderProblem(windowShared) {
-      $('place-problem').hidden = !host || !placeProblem
-      if (!placeProblem) return
+      const box = $('place-problem')
+      box.hidden = !host || (!placeProblem && !placeWaiting)
+      box.classList.toggle('problem', !!placeProblem)
+      $('problem-check').hidden = $('problem-screen').hidden = !placeProblem
+      if (!placeProblem) {
+        $('problem-title').textContent = 'Wechsle jetzt zu deinem geteilten Fenster'
+        $('problem-text').textContent = 'PeekaView sucht es auf dem Bildschirm, sobald es zu sehen ist – gerade liegt dieser Browser darüber.'
+        return
+      }
       $('problem-title').textContent = windowShared ? 'Dein Fenster ist auf dem Bildschirm nicht zu finden' : 'Du teilst einen anderen Bildschirm'
       $('problem-text').textContent = placeProblem === 'other-screen'
         ? windowShared
           ? 'Der gewählte Bildschirm ist nicht der, auf dem dieser Browser ist. Wähle den Bildschirm, auf dem dein Fenster liegt.'
           : 'Der geteilte Bildschirm ist nicht der, auf dem dieser Browser ist. Zeichnungen erscheinen deshalb in der Mitte.'
-        : 'Ist es minimiert, ganz verdeckt oder auf einem anderen Bildschirm? Hol es nach vorne und klicke auf „Noch einmal prüfen“. Bis dahin erscheinen Zeichnungen in der Mitte.'
+        : 'Ist es minimiert, ganz verdeckt oder auf einem anderen Bildschirm? Hol es nach vorne – PeekaView sucht weiter. Bis dahin erscheinen Zeichnungen in der Mitte.'
       $('problem-screen').hidden = !windowShared
     }
 
     /** Can the shared picture be placed on the screen right now? Says so when not. */
+    let checking = false
     async function checkPlace() {
-      if (!host) return
-      const c = await capture()
-      console.info('peekaview light: Prüfung', c?.debug)
-      placeProblem = c?.image ? (c.debug?.problem ?? null) : placeProblem
-      renderAll()
-      return !placeProblem
+      if (!host || checking) return
+      checking = true
+      try {
+        const c = await capture()
+        showDebug('Prüfung', c)
+        if (!host || !c?.image) return
+        placed(c.debug?.problem ?? null)
+        return !c.debug?.problem
+      } finally {
+        checking = false
+      }
     }
+    // not found yet: looked for again while the presenter is elsewhere (their window in front)
+    const lookAgain = () => host && locator && host.surface !== 'monitor' && (placeProblem || placeWaiting) && !inFront() && checkPlace()
+    setInterval(lookAgain, 2500)
+    window.addEventListener('blur', () => setTimeout(lookAgain, 800))
+    document.addEventListener('visibilitychange', () => setTimeout(lookAgain, 800))
     $('problem-check').addEventListener('click', async () => {
       $('problem-check').disabled = true
       const ok = await checkPlace()
@@ -761,6 +802,8 @@
       get locatorStream() { return locator },
       get lastReveal() { return lastReveal },
       capture: () => (host ? capture() : null),
+      // is the shared window to be seen on the screen? (says so on the page)
+      check: () => checkPlace(),
       get mini() { return mini },
       status,
       subscribe(fn) {

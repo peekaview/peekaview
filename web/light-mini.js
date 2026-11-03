@@ -25,13 +25,13 @@ export class MiniView {
     canvas.height = H
     this.ctx = canvas.getContext('2d')
     this.requestsOnCanvas = requestsOnCanvas
-    this.state = { viewers: [], requests: [], busy: [] }
+    this.state = { viewers: [], requests: [], busy: [], problem: '' }
     this.spot = null
     this.ticker = null
     this.render()
   }
 
-  /** {viewers, requests, busy: names of people drawing right now} */
+  /** {viewers, requests, busy: names of people drawing right now, problem: a line to warn with} */
   set(state) {
     this.state = { ...this.state, ...state }
     if (!this.spot) this.render()
@@ -109,6 +109,12 @@ export class MiniView {
       text(ctx, requests.length === 1 ? `${requests[0].name} möchte zusehen` : `${requests.length} möchten zusehen`, 48, y, 24, '#fafafa', 650)
       text(ctx, 'Im PeekaView-Tab zulassen', 48, y + 32, 20, '#fca5a5')
       y += 104
+    }
+    // the shared window is not to be found on the screen
+    if (this.state.problem) {
+      box(ctx, 28, y - 36, W - 56, 56, '#ef4444')
+      text(ctx, this.state.problem, 48, y, 22, '#ffffff', 650)
+      y += 74
     }
     if (y < H - 60) text(ctx, 'Hier erscheint, was jemand zeigt oder malt.', 40, H - 40, 22, '#71717a')
   }

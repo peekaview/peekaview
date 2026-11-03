@@ -111,10 +111,11 @@ function inner(g) {
  * @param {(w: number, h: number) => {width, height, px}} screenAt the screen's picture scaled to w × h
  * @param {(w: number, h: number) => {width, height, px}} windowAt the window's picture scaled to w × h
  * @param {{width, height}} screenSize, windowSize the pictures' own sizes (pixels)
+ * @param {object} [info] filled with how the search went (best score and size, also when nothing is found)
  * @returns {{x, y, w, h, score, k} | null} the window's place, 0..1 of the screen; k: its size
  *   on the screen's picture relative to its own picture
  */
-export function locate(screenAt, windowAt, screenSize, windowSize) {
+export function locate(screenAt, windowAt, screenSize, windowSize, info = {}) {
   const level = (factor) => {
     const s = (COARSE_WIDTH * factor) / screenSize.width
     const img = screenAt(Math.round(screenSize.width * s), Math.round(screenSize.height * s))
@@ -134,8 +135,9 @@ export function locate(screenAt, windowAt, screenSize, windowSize) {
     const hit = best(coarse.img, tpl, {}, coarse.ints)
     if (hit.score > 0.25) hits.push({ ...hit, k })
   }
-  if (!hits.length) return null
   hits.sort((a, b) => b.score - a.score)
+  info.coarse = +(hits[0]?.score ?? 0).toFixed(3)
+  if (!hits.length) return null
   const candidates = []
   for (const h of hits) {
     if (candidates.some((c) => Math.abs(c.x - h.x) <= 2 && Math.abs(c.y - h.y) <= 2 && Math.abs(c.k / h.k - 1) < 0.1)) continue
@@ -156,12 +158,15 @@ export function locate(screenAt, windowAt, screenSize, windowSize) {
     }
   }
   if (!sized) return null
+  info.mid = +sized.score.toFixed(3)
+  info.k = +sized.k.toFixed(3)
   // the place, to a pixel
   const fine = level(FINE_FACTOR)
   const { full, tpl } = at(fine, sized.k)
   const f = FINE_FACTOR / MID_FACTOR
   const r = 3
   const hit = best(fine.img, tpl, { x0: sized.x * f - r, y0: sized.y * f - r, x1: sized.x * f + r, y1: sized.y * f + r }, fine.ints)
+  info.score = +hit.score.toFixed(3)
   if (hit.score < MIN_SCORE) return null
   return { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height, score: hit.score, k: sized.k }
 }
