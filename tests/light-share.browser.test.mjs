@@ -219,7 +219,7 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     // still not to be seen while the presenter is over there: now that is a problem, said plainly
     await evaluate('window.qaHideWindow = true; new Promise((done) => setTimeout(() => done(pvLight.check().then(() => true)), 400))')
     await waitFor("document.querySelector('#place-problem').classList.contains('problem') && !document.querySelector('#place-problem').hidden")
-    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert, ganz verdeckt/)
+    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert oder ganz verdeckt[\s\S]*mehrere Bildschirme/)
     assert.equal(await evaluate('pvLight.mini.view.state.problem'), 'Dein Fenster ist nicht zu finden', 'the mini window says so, too')
     // back on the screen: found again by itself
     await evaluate('window.qaHideWindow = false')
