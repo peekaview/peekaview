@@ -97,6 +97,8 @@ navigator.mediaDevices.getDisplayMedia = async () => {
 export function startServer(port = 0, { real = false } = {}) {
   const server = createServer(async (request, response) => {
     const path = new URL(request.url, 'http://localhost').pathname
+    // (trying it out: which files the browser really fetched)
+    if (real) console.log(new Date().toLocaleTimeString('de-DE'), request.method, path)
     const file = resolve(web, path === '/' ? 'index.html' : '.' + path)
     if (!file.startsWith(web + sep)) return response.writeHead(403).end()
     try {
