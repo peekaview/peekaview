@@ -55,6 +55,15 @@ const STYLE = `
 /* behind another window on the presenter's screen, even if still partly visible */
 .pv-win.covered .pv-view video { filter: grayscale(1) brightness(.5); transition: filter .3s; }
 .pv-win.covered .pv-win-bar { color: #71717a; }
+/* with remote control: where another window lies over it at the presenter's – clicks do not arrive
+   there. The fill's opacity applies once to all parts, so overlapping ones do not get darker. */
+.pv-cover { position: absolute; inset: 0; pointer-events: none; }
+.pv-cover[hidden] { display: none; }
+.pv-cover-fill { position: absolute; inset: 0; opacity: .72; }
+.pv-cover-fill div { position: absolute; background: repeating-linear-gradient(135deg, #09090b 0 7px, #3f3f46 7px 14px); }
+.pv-cover-label { position: absolute; display: grid; place-items: center; overflow: hidden; }
+.pv-cover-label span { max-width: calc(100% - 12px); padding: 4px 10px; border-radius: 8px; background: rgba(9, 9, 11, .88); color: #fde68a; font: 600 12px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: center; }
+.pv-cover-label small { display: block; color: #d4d4d8; font-weight: 500; font-size: 11px; }
 .pv-viewer[data-tool="point"] .pv-win.covered .pv-view,
 .pv-viewer[data-tool="draw"] .pv-win.covered .pv-view { cursor: not-allowed; }
 /* mirror of the presenter's screen ("Resize/Anordnen erlauben") */
@@ -169,6 +178,7 @@ export class WindowManager {
       win.el.querySelector('.pv-win-flag').textContent = covered ? 'Im Hintergrund' : ''
       win.el.querySelector('.pv-win-bar').title = covered && this.options.canActivate?.() ? 'Bei der teilenden Person in den Vordergrund holen' : ''
       if (!this.canAnnotate(win)) win.ann.reset()
+      this.showCover(win, control && !info.paused ? info.cover : [])
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
       paused.textContent = 'Das Fenster ist bei der teilenden Person gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
@@ -196,6 +206,30 @@ export class WindowManager {
     this.options.onChange?.()
   }
 
+  /**
+   * Marks where other windows lie over this one at the presenter's (`cover`: [x, y, w, h], 0..1 of
+   * the window) – remote control clicks do not arrive there.
+   */
+  showCover(win, cover) {
+    const rects = (Array.isArray(cover) ? cover : []).filter((r) => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite))
+    const layer = win.el.querySelector('.pv-cover')
+    const key = JSON.stringify(rects)
+    if (layer.dataset.key === key) return
+    layer.dataset.key = key
+    layer.hidden = !rects.length
+    const place = (el, [x, y, w, h]) => {
+      el.style.left = `${x * 100}%`
+      el.style.top = `${y * 100}%`
+      el.style.width = `${w * 100}%`
+      el.style.height = `${h * 100}%`
+      return el
+    }
+    layer.querySelector('.pv-cover-fill').replaceChildren(...rects.map((r) => place(document.createElement('div'), r)))
+    // the hint in the largest part
+    const largest = rects.reduce((a, r) => (!a || r[2] * r[3] > a[2] * a[3] ? r : a), null)
+    if (largest) place(layer.querySelector('.pv-cover-label'), largest)
+  }
+
   create(slot) {
     const el = document.createElement('div')
     el.className = 'pv-win'
@@ -203,7 +237,7 @@ export class WindowManager {
     el.innerHTML = `
       <div class="pv-win-bar"><span class="pv-win-app"></span><span class="pv-win-title"></span><span class="pv-win-flag"></span>
         <button data-min title="Minimieren">${icon('minimize', 15)}</button><button data-max title="Maximieren">${icon('maximize', 13)}</button></div>
-      <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
+      <div class="pv-view"><video class="pv-screen" autoplay playsinline muted></video><div class="pv-cover" hidden><div class="pv-cover-fill"></div><div class="pv-cover-label"><span>Verdeckt<small>Klicks kommen hier nicht an</small></span></div></div><div class="pv-ann"></div><div class="pv-win-paused" hidden></div></div>
       <div class="pv-nav" hidden>
         <button data-nav="back" title="Zurück"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 4.5v15L5.5 12z"/></svg></button>
         <button data-nav="home" title="Startbildschirm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="7.5"/></svg></button>

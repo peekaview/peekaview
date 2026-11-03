@@ -127,6 +127,18 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   // Remote control keeps its existing host-side input guard and can still activate a window.
   await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'control'})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
   assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="mouse").map(m=>m.a)'),['down','up'])
+  // Remote control: where another window lies over the presenter's, the picture is marked – the
+  // hint sits in the largest part, and the marking never takes the pointer
+  const covering={...foreground,mode:'control',windows:foreground.windows.map((w,i)=>i===1?{...w,cover:[[.5,0,.5,.25],[.6,.1,.2,.7]]}:w)}
+  await evaluate(`qa.receive(${JSON.stringify(covering)});true`);await settle()
+  assert.deepEqual(await evaluate(`(()=>{const c=qa.wm.wins.get(1).el.querySelector('.pv-cover'),r=c.getBoundingClientRect(),v=qa.wm.wins.get(1).view.getBoundingClientRect(),parts=[...c.querySelectorAll('.pv-cover-fill div')].map(d=>d.getBoundingClientRect()),l=c.querySelector('.pv-cover-label').getBoundingClientRect();
+   return {shown:r.width>0,parts:parts.map(p=>[Math.round((p.left-v.left)/v.width*100),Math.round((p.top-v.top)/v.height*100),Math.round(p.width/v.width*100),Math.round(p.height/v.height*100)]),label:[Math.round((l.left-v.left)/v.width*100),Math.round((l.top-v.top)/v.height*100)],events:getComputedStyle(c).pointerEvents,others:[0,2,3].every(s=>qa.wm.wins.get(s).el.querySelector('.pv-cover').hidden)}})()`),
+   {shown:true,parts:[[50,0,50,25],[60,10,20,70]],label:[60,10],events:'none',others:true})
+  await evaluate(`qa.receive(${JSON.stringify({...covering,mode:'view'})});true`)
+  assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'only remote control is affected')
+  await evaluate(`qa.receive(${JSON.stringify(covering)});qa.receive(${JSON.stringify({...covering,windows:covering.windows.map(w=>({...w,cover:[]}))})});true`)
+  assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'uncovered again')
+  await evaluate(`qa.receive(${JSON.stringify(foreground)});true`)
   // An explicit title-bar click can raise a background window with arrangement permission,
   // including while watching or annotating. Only a new host state unlocks annotations.
   await evaluate(`qa.titlePointer=(type,selector='.pv-win-bar',dx=0,id=11)=>{const bar=qa.wm.wins.get(1).el.querySelector(selector),r=bar.getBoundingClientRect();bar.setPointerCapture=()=>{};bar.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:r.left+15+dx,clientY:r.top+10,pointerId:id,button:0}))};true`)
