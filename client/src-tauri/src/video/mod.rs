@@ -117,6 +117,53 @@ pub fn fit_width((w, h): (u32, u32), want_w: u32) -> (u32, u32) {
     (even(w as f64 * s), even(h as f64 * s))
 }
 
+/// BGRA (`pitch` bytes per row) → NV12 at size `out`, BT.709 studio range, box-filtered when
+/// smaller. The CPU fallback for GPUs whose own conversion gets the colors wrong (Windows).
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub fn bgra_to_nv12(src: &[u8], (iw, ih): (usize, usize), pitch: usize, (ow, oh): (usize, usize), out: &mut Vec<u8>) {
+    out.resize(ow * oh * 3 / 2, 0);
+    let (luma, chroma) = out.split_at_mut(ow * oh);
+    // source pixels [a, b) that make up output pixel i
+    let span = |i: usize, n_out: usize, n_in: usize| {
+        let a = (i * n_in / n_out).min(n_in - 1);
+        (a, ((i + 1) * n_in / n_out).clamp(a + 1, n_in))
+    };
+    // R, G, B of two output rows: the chroma of a 2×2 block is their average
+    let mut rows = vec![[0i32; 3]; ow * 2];
+    for y2 in 0..oh / 2 {
+        for r in 0..2 {
+            let y = y2 * 2 + r;
+            let (sy0, sy1) = span(y, oh, ih);
+            for x in 0..ow {
+                let (sx0, sx1) = span(x, ow, iw);
+                let mut acc = [0u32; 3];
+                for sy in sy0..sy1 {
+                    for p in src[sy * pitch + sx0 * 4..sy * pitch + sx1 * 4].chunks_exact(4) {
+                        acc[0] += p[2] as u32;
+                        acc[1] += p[1] as u32;
+                        acc[2] += p[0] as u32;
+                    }
+                }
+                let n = ((sy1 - sy0) * (sx1 - sx0)) as u32;
+                let [red, green, blue] = acc.map(|c| ((c + n / 2) / n) as i32);
+                rows[r * ow + x] = [red, green, blue];
+                luma[y * ow + x] = (16 + ((47 * red + 157 * green + 16 * blue + 128) >> 8)) as u8;
+            }
+        }
+        for x2 in 0..ow / 2 {
+            let [mut red, mut green, mut blue] = [0i32; 3];
+            for i in [x2 * 2, x2 * 2 + 1, ow + x2 * 2, ow + x2 * 2 + 1] {
+                red += rows[i][0];
+                green += rows[i][1];
+                blue += rows[i][2];
+            }
+            // sums of four pixels: /1024 instead of /256
+            chroma[y2 * ow + x2 * 2] = (128 + ((-26 * red - 86 * green + 112 * blue + 512) >> 10)).clamp(0, 255) as u8;
+            chroma[y2 * ow + x2 * 2 + 1] = (128 + ((112 * red - 102 * green - 10 * blue + 512) >> 10)).clamp(0, 255) as u8;
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum Source {
     Screen(xcap::Monitor),
@@ -144,4 +191,34 @@ pub fn packet(slot: u8, annex_b: &[u8], key: bool, w: usize, h: usize) -> Vec<u8
     out.extend_from_slice(&(h as u16).to_le_bytes());
     out.extend_from_slice(annex_b);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    /// White, black, blue, yellow bars (BGRA) come out as BT.709 studio-range YCbCr – also when
+    /// halved in size.
+    #[test]
+    fn bgra_to_nv12_colors() {
+        let bars: [[u8; 4]; 4] = [[255, 255, 255, 255], [0, 0, 0, 255], [255, 0, 0, 255], [0, 255, 255, 255]];
+        let want = [(235, 128, 128), (16, 128, 128), (32, 240, 118), (219, 16, 138)];
+        for scale in [1, 2] {
+            let (w, h) = (64 * scale, 8 * scale);
+            let pitch = w * 4 + 16; // rows with padding, as a mapped texture has
+            let mut src = vec![0u8; pitch * h];
+            for y in 0..h {
+                for x in 0..w {
+                    src[y * pitch + x * 4..y * pitch + x * 4 + 4].copy_from_slice(&bars[x / (16 * scale)]);
+                }
+            }
+            let mut nv12 = Vec::new();
+            super::bgra_to_nv12(&src, (w, h), pitch, (64, 8), &mut nv12);
+            assert_eq!(nv12.len(), 64 * 8 * 3 / 2);
+            for (i, (wy, wcb, wcr)) in want.into_iter().enumerate() {
+                let x = i * 16 + 8;
+                let got = (nv12[4 * 64 + x], nv12[64 * 8 + 2 * 64 + x], nv12[64 * 8 + 2 * 64 + x + 1]);
+                let near = |a: u8, b: i32| (a as i32 - b).abs() <= 1;
+                assert!(near(got.0, wy) && near(got.1, wcb) && near(got.2, wcr), "bar {i} at scale {scale}: {got:?}");
+            }
+        }
+    }
 }
