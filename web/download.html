@@ -6,20 +6,74 @@
   <title>PeekaView Desktop herunterladen</title>
   <link rel="stylesheet" href="fixed-rooms.css">
   <link rel="stylesheet" href="legal.css">
-  <style>body{margin:0;background:#09090b;color:#fafafa;font:500 14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:440px;margin:9vh auto;padding:24px}h1{font-size:24px;margin:0}p{color:#a1a1aa}.download{display:block;margin:24px 0;padding:15px;background:#ef4444;color:white;text-align:center;text-decoration:none;font-weight:700;font-size:16px;border-radius:14px;box-shadow:0 10px 30px rgba(239,68,68,.35)}.steps{padding-left:20px;color:#d4d4d8}.steps li{margin:12px 0}</style>
+  <style>
+    body{margin:0;background:#09090b;color:#fafafa;font:500 14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{max-width:460px;margin:9vh auto;padding:24px}
+    h1{font-size:24px;margin:0}
+    p{color:#a1a1aa}
+    .download{display:block;margin:24px 0 8px;padding:15px;background:#ef4444;color:white;text-align:center;text-decoration:none;font-weight:700;font-size:16px;border-radius:14px;box-shadow:0 10px 30px rgba(239,68,68,.35)}
+    .download:hover{background:#dc2626}
+    .meta{margin:0 0 20px;text-align:center;font-size:12.5px;color:#71717a}
+    .steps{padding-left:20px;color:#d4d4d8}
+    .steps li{margin:12px 0}
+    .note{padding:12px 14px;border-radius:12px;background:#18181b;border:1px solid rgba(255,255,255,.08);color:#d4d4d8}
+    .others{margin-top:28px;padding-top:18px;border-top:1px solid #27272a}
+    .others h2{margin:0 0 8px;font-size:14px;color:#a1a1aa}
+    .others a{display:block;padding:8px 0;color:#fafafa;text-underline-offset:3px}
+    [hidden]{display:none!important}
+  </style>
 </head>
 <body><main>
   <h1>PeekaView Desktop</h1>
-  <p>Bildschirme und Anwendungen mit deinen Kontakten teilen.</p>
-  <a class="download" href="https://peekaview.devxpert.de/downloads/PeekaView-macOS-Apple-Silicon.zip">Für macOS mit Apple Silicon herunterladen</a>
-  <ol class="steps">
-    <li>ZIP öffnen und PeekaView nach „Programme“ ziehen.</li>
-    <li>PeekaView einmal starten.</li>
-    <li>Zur Bestätigungsseite zurückkehren und „PeekaView Desktop öffnen“ wählen.</li>
-  </ol>
-  <p>Für Windows und Linux steht derzeit noch kein aktueller Download bereit.</p>
+  <p>Bildschirme und Anwendungen teilen – kostenlos.</p>
+
+  <!-- the download for this computer comes first; the others stay below -->
+  <section data-system="windows" hidden>
+    <a class="download" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe">Für Windows herunterladen</a>
+    <p class="meta">Windows 10 und 11 (64 Bit)</p>
+    <ol class="steps">
+      <li>Die heruntergeladene Datei <b>PeekaView-Windows-x64-Setup.exe</b> öffnen und installieren.</li>
+      <li>Am Ende „PeekaView starten“ wählen. Später findest du es im Startmenü.</li>
+    </ol>
+    <p class="note">Zeigt Windows „Der Computer wurde durch Windows geschützt“? Auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“ klicken.</p>
+  </section>
+
+  <section data-system="mac" hidden>
+    <a class="download" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip">Für Mac herunterladen</a>
+    <p class="meta">Mac mit Apple-Chip (M1 und neuer)</p>
+    <ol class="steps">
+      <li>Die ZIP-Datei öffnen und PeekaView in den Ordner „Programme“ ziehen.</li>
+      <li>PeekaView einmal starten.</li>
+    </ol>
+  </section>
+
+  <section data-system="phone" hidden>
+    <p class="note">Zum Zuschauen brauchst du auf dem Handy nichts zu installieren – öffne einfach den Link, den du bekommen hast. PeekaView Desktop gibt es für Windows und Mac.</p>
+  </section>
+
+  <p data-from-invitation class="note">Kommst du von einer Bestätigungsseite? Nach der Installation dorthin zurückkehren und „PeekaView Desktop öffnen“ wählen.</p>
+
+  <section class="others">
+    <h2 data-others-title>Andere Systeme</h2>
+    <a data-other="windows" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe">Windows 10 und 11 (64 Bit)</a>
+    <a data-other="mac" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip">Mac mit Apple-Chip (M1 und neuer)</a>
+    <p>Für Linux gibt es noch keinen Download.</p>
+  </section>
 </main>
 <footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
+<script>
+  // which download fits this computer (phones and tablets get no desktop app)
+  const ua = navigator.userAgent
+  const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''
+  const system = /Android|iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1)
+    ? 'phone'
+    : /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows' : /Mac/i.test(platform) || /Mac OS X/i.test(ua) ? 'mac' : 'other'
+  const own = document.querySelector(`[data-system="${system}"]`)
+  if (own) own.hidden = false
+  for (const link of document.querySelectorAll('[data-other]')) link.hidden = link.dataset.other === system
+  document.querySelector('[data-others-title]').textContent = system === 'other' || system === 'phone' ? 'PeekaView Desktop herunterladen' : 'Andere Systeme'
+  document.querySelector('[data-from-invitation]').hidden = system === 'phone'
+</script>
 <script type="module" src="legal.js"></script>
 </body>
 </html>
