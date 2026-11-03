@@ -12,6 +12,8 @@ const files = [
   'fixed-rooms.html', 'fixed-rooms.js', 'fixed-rooms.css', 'room-sw.js', 'download.html',
   'impressum.html', 'datenschutz.html', 'sicherheit.html', 'legal.css', 'legal.js',
   'room-pcm-worklet.js',
+  // "Bildschirmfreigabe light": sharing from the browser
+  'share.html', 'share-helper.html', 'light-host.js', 'light-geometry.js',
   'rooms.webmanifest', 'room-icon.png',
   'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'vendor/pdfjs/LICENSE',
 ]

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Im Browser teilen – PeekaView light</title>
+  <link rel="stylesheet" href="fixed-rooms.css">
+  <link rel="stylesheet" href="legal.css">
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #09090b; color: #fafafa; }
+    [hidden] { display: none !important; }
+    body { display: flow-root; font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    main { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(500px, calc(100% - 32px)); margin: 7vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 8px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: #fafafa; text-decoration: none; }
+    .brand i { display: flex; }
+    .light-tag { padding: 3px 9px; border-radius: 999px; background: rgba(234,179,8,.14); color: #fde68a; font-size: 11.5px; font-weight: 650; }
+    h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.015em; }
+    .lead { margin: -10px 0 0; color: #a1a1aa; font-size: 15px; }
+    /* the limitation: impossible to overlook, wherever light mode is offered or runs */
+    .limits { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(234,179,8,.35); background: rgba(234,179,8,.08); }
+    .limits strong { color: #fde68a; font-size: 15px; }
+    .limits p { margin: 0; color: #e4e4e7; }
+    .limits ul { margin: 0; padding-left: 18px; color: #d4d4d8; }
+    .limits li { margin: 2px 0; }
+    .limits .yes { color: #86efac; }
+    .limits .no { color: #fca5a5; }
+    .limits a.desktop { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; background: #fafafa; color: #18181b; font-weight: 700; text-decoration: none; }
+    .limits a.desktop:hover { background: #e4e4e7; }
+    .limits a.desktop:focus-visible, .connect:focus-visible, button:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
+    .limits.compact { padding: 11px 14px; }
+    .limits.compact a { color: #fafafa; font-weight: 650; text-underline-offset: 3px; }
+    label.field { display: block; color: #fafafa; font-size: 14px; font-weight: 600; }
+    input[type=text] { display: block; box-sizing: border-box; width: 100%; margin-top: 7px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; font-size: 16px; outline: none; }
+    input[type=text]:focus { border-color: #ef4444; }
+    input.invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.2); }
+    .error { margin: 6px 0 0; color: #fca5a5; font-size: 13px; font-weight: 600; }
+    .modes-title { margin: 0 0 7px; font-size: 14px; font-weight: 600; }
+    .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 12px; background: #09090b; }
+    .modes button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 10px 6px; border: 0; border-radius: 9px; background: transparent; color: #a1a1aa; font: 600 13px/1.2 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+    .modes button small { color: #71717a; font-size: 11px; font-weight: 500; text-align: center; }
+    .modes button[aria-pressed="true"] { background: #3f3f46; color: #fafafa; }
+    .modes button[aria-pressed="true"] small { color: #d4d4d8; }
+    .modes button.unavailable { color: #52525b; cursor: help; }
+    .modes button.unavailable small { color: #fca5a5; }
+    .mode-note { margin: 7px 0 0; color: #a1a1aa; font-size: 13px; }
+    .mode-note:empty { display: none; }
+    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; height: 52px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
+    .connect:hover:not(:disabled) { background: #dc2626; }
+    .connect:disabled { opacity: .45; cursor: default; box-shadow: none; }
+    .hint { margin: -8px 0 0; color: #a1a1aa; font-size: 13px; text-align: center; }
+    .live { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+    .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.25); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(239,68,68,.1); } }
+    .linkbox { display: flex; gap: 8px; margin-top: 7px; }
+    .linkbox input { margin: 0; flex: 1; min-width: 0; font-size: 14px; color: #d4d4d8; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #3f3f46; color: #fafafa; font: 650 13.5px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+    .pill:hover:not(:disabled) { background: #52525b; }
+    .pill.primary { background: #ef4444; }
+    .pill.primary:hover:not(:disabled) { background: #dc2626; }
+    .pill:disabled { opacity: .5; cursor: default; }
+    .section-title { margin: 0 0 7px; color: #a1a1aa; font-size: 12px; font-weight: 600; }
+    .requests { display: flex; flex-direction: column; gap: 6px; }
+    .request { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.08); animation: in .2s ease-out; }
+    @keyframes in { from { opacity: 0; transform: translateY(-4px); } }
+    .request div { flex: 1; min-width: 0; }
+    .request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .request span { color: #a1a1aa; font-size: 12.5px; }
+    .who { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; }
+    .viewers { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .viewers li { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 999px; background: #27272a; }
+    .viewers li .who { width: 24px; height: 24px; font-size: 10px; }
+    .viewers .none { padding: 0; background: none; color: #71717a; }
+    .helper { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.07); color: #d4d4d8; font-size: 13px; }
+    .helper span { flex: 1; }
+    .stop { align-self: center; }
+    .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="brand" href="./"><i id="logo"></i>PeekaView<span class="light-tag">Bildschirmfreigabe light</span></a>
+
+    <!-- before the share -->
+    <section id="setup" style="display:flex;flex-direction:column;gap:18px">
+      <div>
+        <h1>Bildschirm im Browser teilen</h1>
+      </div>
+      <p class="lead">Die schnelle Variante ohne Installation – mit wenigen Funktionen.</p>
+      <div class="limits" id="limits">
+        <strong>Im Browser geht nur ein kleiner Teil von PeekaView</strong>
+        <p>Browser erlauben einer Webseite nur wenig. Deshalb gilt hier:</p>
+        <ul>
+          <li class="yes">Zusehen, zeigen und malen geht.</li>
+          <li class="no">Steuern geht nicht – niemand kann bei dir klicken oder tippen.</li>
+          <li class="no">Keine Sprache, keine gemeinsame Zwischenablage, keine Aufzeichnung, nur ein Fenster oder Bildschirm.</li>
+          <li class="no">Zeichnungen siehst du nur in einem kleinen Hilfsfenster, nicht direkt auf dem Bildschirm.</li>
+        </ul>
+        <p>Für alles andere empfehlen wir <b>PeekaView Desktop</b> – kostenlos für Windows und Mac.</p>
+        <a class="desktop" href="download.html" target="_blank" rel="noopener" id="desktop-link"></a>
+      </div>
+      <div>
+        <label class="field" for="name">Wie heißt du?</label>
+        <input id="name" type="text" maxlength="32" autocomplete="name" placeholder="z. B. Anna" aria-describedby="name-error">
+        <p id="name-error" class="error" role="alert" hidden>Bitte gib zuerst deinen Namen ein.</p>
+      </div>
+      <div>
+        <p class="modes-title">Was dürfen die Zuschauer?</p>
+        <div class="modes" id="setup-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
+        <p class="mode-note" id="setup-mode-note" role="status"></p>
+      </div>
+      <button class="connect" id="start" type="button"></button>
+      <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
+      <p class="error" id="start-error" role="alert" hidden></p>
+    </section>
+
+    <!-- while sharing -->
+    <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
+      <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span></div>
+      <div>
+        <label class="field" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
+        <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
+      </div>
+      <div id="requests-box" hidden>
+        <p class="section-title">Möchte zusehen</p>
+        <div class="requests" id="requests"></div>
+      </div>
+      <div>
+        <p class="section-title" id="viewers-title">Schauen zu</p>
+        <ul class="viewers" id="viewers"></ul>
+      </div>
+      <div>
+        <p class="modes-title">Was dürfen die Zuschauer?</p>
+        <div class="modes" id="running-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
+        <p class="mode-note" id="running-mode-note" role="status"></p>
+      </div>
+      <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button></div>
+      <div class="limits compact"><p><b>Bildschirmfreigabe light:</b> nur Zusehen, Zeigen und Malen. Steuern, Sprache, Zwischenablage und mehr gibt es mit <a href="download.html" target="_blank" rel="noopener">PeekaView Desktop</a> – empfohlen.</p></div>
+      <button class="pill stop" id="stop" type="button"></button>
+      <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+    </section>
+
+    <!-- afterwards -->
+    <section id="ended" style="display:flex;flex-direction:column;gap:18px" hidden>
+      <h1>Freigabe beendet</h1>
+      <p class="lead" id="ended-why" style="margin:0">Niemand sieht deinen Bildschirm mehr.</p>
+      <button class="connect" id="again" type="button">Noch einmal teilen</button>
+      <div class="limits compact"><p>Öfter teilen? Mit <a href="download.html" target="_blank" rel="noopener">PeekaView Desktop</a> geht viel mehr: steuern lassen, mehrere Fenster, Sprache, Zwischenablage.</p></div>
+    </section>
+  </main>
+  <footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module">
+    // "Bildschirmfreigabe light": the presenter's page. Shares with getDisplayMedia (light-host.js)
+    // and opens a small helper window that waits in a corner of the screen and jumps to the spot
+    // where a viewer points or draws (share-helper.html). The helper reaches this page through
+    // window.opener.pvLight.
+    import { LightHost, TURN_SERVICE } from './light-host.js'
+    import { icon, owl } from './icons.js'
+    import './legal.js'
+
+    const $ = (id) => document.getElementById(id)
+    $('logo').innerHTML = owl(28)
+    $('desktop-link').innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen (empfohlen)'
+    $('start').innerHTML = icon('share', 20) + 'Bildschirm teilen'
+    $('copy').innerHTML = icon('copy', 15) + 'Link kopieren'
+    $('stop').innerHTML = icon('stop', 15) + 'Freigabe beenden'
+
+    const MODES = [
+      { id: 'view', name: 'Zusehen', note: 'nur ansehen' },
+      { id: 'draw', name: 'Zeigen & Malen', note: 'zeigen, malen' },
+      { id: 'control', name: 'Steuern', note: 'nur mit Desktop' },
+    ]
+    const HELPER_SIZE = { width: 300, height: 132 }
+    let mode = 'draw'
+    let host = null
+    let helper = null
+    let helperBlocked = false
+    const listeners = new Set()
+
+    // ---------------------------------------------------------------- name, modes
+    try { $('name').value = localStorage.getItem('pv-name') ?? '' } catch {}
+    $('name').addEventListener('input', () => {
+      try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
+      $('name-error').hidden = true
+      $('name').classList.remove('invalid')
+    })
+
+    function renderModes(box, note) {
+      box.replaceChildren(...MODES.map((m) => {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.dataset.mode = m.id
+        b.innerHTML = icon(m.id, 18) + '<span></span><small></small>'
+        b.querySelector('span').textContent = m.name
+        b.querySelector('small').textContent = m.note
+        b.setAttribute('aria-pressed', String(mode === m.id))
+        if (m.id === 'control') {
+          b.classList.add('unavailable')
+          b.title = 'Steuern geht nur mit PeekaView Desktop'
+        }
+        b.addEventListener('click', () => {
+          if (m.id === 'control') {
+            note.innerHTML = 'Steuern lassen geht im Browser nicht – Browser dürfen keine Klicks und Tasten von anderen ausführen. Dafür gibt es <a href="download.html" target="_blank" rel="noopener" style="color:#fafafa">PeekaView Desktop</a>.'
+            return
+          }
+          note.textContent = ''
+          mode = m.id
+          host?.setMode(mode)
+          renderAll()
+        })
+        return b
+      }))
+    }
+
+    // ---------------------------------------------------------------- start
+    const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
+    if (!supported) {
+      $('start').disabled = true
+      $('start-hint').textContent = 'Dieser Browser kann den Bildschirm nicht teilen (auf Handys und Tablets geht das nicht). Bitte am Computer Chrome, Edge, Firefox oder Safari verwenden – oder PeekaView Desktop.'
+    }
+
+    $('start').addEventListener('click', start)
+    $('again').addEventListener('click', () => {
+      $('ended').hidden = true
+      $('setup').hidden = false
+      start()
+    })
+
+    function start() {
+      const name = $('name').value.trim()
+      if (!name) {
+        $('name-error').hidden = false
+        $('name').classList.add('invalid')
+        return $('name').focus()
+      }
+      $('start-error').hidden = true
+      // Both need the click: the screen picker, and the helper window (popup blockers let
+      // windows through only right in a click). The picker first – Safari spends the click on it,
+      // then the helper waits for a click of its own.
+      let picking
+      try {
+        picking = navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, displaySurface: 'monitor' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
+      } catch (err) {
+        picking = Promise.reject(err)
+      }
+      openHelper()
+      $('start').disabled = true
+      picking.then((stream) => begin(stream, name)).catch((err) => {
+        $('start').disabled = !supported
+        closeHelper()
+        $('start-error').textContent = err?.name === 'NotAllowedError'
+          ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf „Bildschirm teilen“.'
+          : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
+        $('start-error').hidden = false
+      })
+    }
+
+    async function begin(stream, name) {
+      host = new LightHost({
+        stream,
+        name,
+        mode,
+        // TURN credentials are only handed to peekaview.de
+        turnService: location.hostname === 'peekaview.de' ? TURN_SERVICE : null,
+        onChange: () => {
+          renderAll()
+          emit({ kind: 'status', ...status() })
+        },
+        onAnnotation: (m) => emit({ kind: 'ann', m }),
+        onEnded: (why) => ended(why),
+      })
+      await host.start()
+      window.pvLight.host = host
+      // where the browser lets a page bring a window forward
+      try { helper?.focus() } catch {}
+      $('setup').hidden = true
+      $('running').hidden = false
+      $('link').value = host.link
+      $('start').disabled = false
+      document.title = '● Freigabe läuft – PeekaView light'
+      renderAll()
+      emit({ kind: 'status', ...status() })
+      copyLink(true)
+    }
+
+    function ended(why) {
+      host = null
+      window.pvLight.host = null
+      emit({ kind: 'status', ...status() })
+      closeHelper()
+      $('running').hidden = true
+      $('ended').hidden = false
+      $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
+      document.title = 'Im Browser teilen – PeekaView light'
+    }
+
+    $('stop').addEventListener('click', () => host?.stop())
+    window.addEventListener('pagehide', () => host?.stop())
+    window.addEventListener('beforeunload', (e) => {
+      if (host) e.preventDefault()
+    })
+
+    // ---------------------------------------------------------------- link
+    async function copyLink(quiet) {
+      if (!host) return
+      try {
+        await navigator.clipboard.writeText(host.link)
+        toast(quiet ? 'Der Link ist schon in deiner Zwischenablage – füge ihn z. B. in eine E-Mail oder einen Chat ein.' : 'Link kopiert.')
+      } catch {
+        $('link').select()
+        if (!quiet) toast('Bitte den Link markieren und kopieren.')
+      }
+    }
+    $('copy').addEventListener('click', () => copyLink(false))
+    $('link').addEventListener('focus', () => $('link').select())
+
+    let toastTimer
+    function toast(text) {
+      $('toast').textContent = text
+      $('toast').hidden = false
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => ($('toast').hidden = true), 4000)
+    }
+
+    // ---------------------------------------------------------------- requests, viewers
+    const initials = (n) => n.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+    const who = (p) => {
+      const el = document.createElement('span')
+      el.className = 'who'
+      el.textContent = initials(p.name || 'Gast')
+      el.style.background = p.color || '#52525b'
+      return el
+    }
+    let knownRequests = new Set()
+
+    function renderAll() {
+      renderModes($('setup-modes'), $('setup-mode-note'))
+      renderModes($('running-modes'), $('running-mode-note'))
+      if (!host) return
+      const requests = host.requestList
+      const fresh = requests.some((r) => !knownRequests.has(r.peer))
+      knownRequests = new Set(requests.map((r) => r.peer))
+      if (fresh) dingDong()
+      $('requests-box').hidden = !requests.length
+      $('requests').replaceChildren(...requests.map((r) => {
+        const row = document.createElement('div')
+        row.className = 'request'
+        row.innerHTML = '<div><strong></strong><span>möchte deinen Bildschirm sehen</span></div><button class="pill" type="button" data-deny>Ablehnen</button><button class="pill primary" type="button" data-allow>Zulassen</button>'
+        row.prepend(who(r))
+        row.querySelector('strong').textContent = r.name
+        row.querySelector('[data-allow]').addEventListener('click', () => host?.admit(r.peer, true))
+        row.querySelector('[data-deny]').addEventListener('click', () => host?.admit(r.peer, false))
+        return row
+      }))
+      if (requests.length > 1) {
+        const all = Object.assign(document.createElement('button'), { type: 'button', className: 'pill primary' })
+        all.innerHTML = icon('check', 14) + `Alle ${requests.length} zulassen`
+        all.addEventListener('click', () => host?.admitAll())
+        $('requests').append(all)
+      }
+      const viewers = host.viewerList
+      $('viewers-title').textContent = viewers.length ? `Schauen zu (${viewers.length})` : 'Schauen zu'
+      $('viewers').replaceChildren(...(viewers.length ? viewers.map((v) => {
+        const li = document.createElement('li')
+        li.append(who(v), v.name)
+        return li
+      }) : [Object.assign(document.createElement('li'), { className: 'none', textContent: 'Noch niemand – schicke den Link oben.' })]))
+      renderHelper()
+    }
+
+    // ---------------------------------------------------------------- the helper window
+    // A popup (no tab): browsers only let a page move and resize windows it opened itself.
+    function openHelper() {
+      if (helper && !helper.closed) return helper.focus()
+      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - HELPER_SIZE.width - 16)
+      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - HELPER_SIZE.height - 16)
+      helper = window.open('share-helper.html', 'pv-light-helper', `popup=yes,width=${HELPER_SIZE.width},height=${HELPER_SIZE.height},left=${left},top=${top}`)
+      helperBlocked = !helper
+      renderHelper()
+    }
+    function closeHelper() {
+      try { helper?.close() } catch {}
+      helper = null
+    }
+    // closed by the presenter (or never opened): offer it again
+    setInterval(() => {
+      if (helper?.closed) {
+        helper = null
+        renderHelper()
+      }
+    }, 1000)
+    $('helper-open').addEventListener('click', openHelper)
+
+    function renderHelper() {
+      const open = !!helper && !helper.closed
+      $('helper-open').hidden = open || !host
+      $('helper-text').textContent = !host
+        ? ''
+        : open
+          ? 'Das kleine Hilfsfenster wartet unten rechts in der Ecke. Zeigt oder malt jemand, springt es kurz an die Stelle und zeigt die Zeichnung. Du kannst dort auch selbst malen.'
+          : helperBlocked
+            ? 'Dein Browser hat das Hilfsfenster blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
+            : 'Ohne Hilfsfenster siehst du nicht, wo die Zuschauer zeigen und malen.'
+    }
+
+    // ---------------------------------------------------------------- for the helper (window.opener.pvLight)
+    function status() {
+      return {
+        sharing: !!host,
+        mode,
+        surface: host?.surface ?? null,
+        video: host ? (({ width, height }) => ({ width, height }))(host.track.getSettings?.() ?? {}) : null,
+        viewers: host?.viewerList ?? [],
+        requests: host?.requestList ?? [],
+        peers: host?.peers().list ?? [],
+      }
+    }
+    function emit(event) {
+      for (const fn of listeners) {
+        try { fn(event) } catch { listeners.delete(fn) }
+      }
+    }
+    window.pvLight = {
+      host: null,
+      get stream() { return host?.stream ?? null },
+      status,
+      subscribe(fn) {
+        listeners.add(fn)
+        fn({ kind: 'status', ...status() })
+        return () => listeners.delete(fn)
+      },
+      admit: (peer, allow) => host?.admit(peer, allow),
+      admitAll: () => host?.admitAll(),
+      annotate: (m) => host?.annotate(m),
+      copyLink: () => copyLink(false),
+      stop: () => host?.stop(),
+    }
+
+    let audio
+    // a new join request: two soft bell tones (as in PeekaView Desktop)
+    function dingDong() {
+      try {
+        audio ??= new AudioContext()
+        const now = audio.currentTime
+        for (const [i, f] of [[0, 880], [1, 660]]) {
+          const o = audio.createOscillator()
+          const g = audio.createGain()
+          o.frequency.value = f
+          g.gain.setValueAtTime(0, now + i * 0.28)
+          g.gain.linearRampToValueAtTime(0.15, now + i * 0.28 + 0.02)
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.28 + 0.6)
+          o.connect(g).connect(audio.destination)
+          o.start(now + i * 0.28)
+          o.stop(now + i * 0.28 + 0.65)
+        }
+      } catch {}
+    }
+
+    renderAll()
+  </script>
+</body>
+</html>

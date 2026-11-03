@@ -81,12 +81,14 @@ export class Signaling {
    * @param {{secret: string, hostKey?: string | null, relays?: string[], secretKey?: Uint8Array, onMessage: (msg: object) => void}} options
    *   hostKey: the presenter's public key (hex); when given, presenter messages must be signed by it
    *   secretKey: our own signing key (see viewerKey); a throw-away one without
+   *   strictFrom: as presenter – only take messages whose "from" is the key that signed them
    */
-  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, secretKey, onMessage }) {
+  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, secretKey, strictFrom = false, onMessage }) {
     const topic = hex(await sha256(`peekaview/topic/v1:${secret}`))
     const key = await crypto.subtle.importKey('raw', await sha256(`peekaview/key/v1:${secret}`), 'AES-GCM', false, ['encrypt', 'decrypt'])
     const signaling = new Signaling(topic, key, relays, onMessage, secretKey)
     signaling.hostKey = hostKey
+    signaling.strictFrom = strictFrom
     signaling.connectAll()
     return signaling
   }
@@ -148,6 +150,8 @@ export class Signaling {
       const msg = JSON.parse(dec.decode(plain))
       // presenter messages only from the pinned presenter key
       if (this.hostKey && msg.from === 'host' && !(event.pubkey === this.hostKey && (await verifyEvent(event)))) return
+      // (the presenter) only from whom it says it is from
+      if (this.strictFrom && !(msg.from === event.pubkey && (await verifyEvent(event)))) return
       this.onMessage(msg)
     } catch {
       // not for this room (or tampered with) – AES-GCM authenticates every message
