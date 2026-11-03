@@ -12,6 +12,10 @@ import { icon } from './icons.js'
 import { MiniView } from './light-mini.js'
 
 export const documentPip = typeof window !== 'undefined' && 'documentPictureInPicture' in window
+// the mini window small and large ("Größer" / "Kleiner" – resizing needs a click there)
+const SMALL = { width: 420, height: 320 }
+const LARGE = { width: 840, height: 600 }
+
 export const videoPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true && 'requestPictureInPicture' in HTMLVideoElement.prototype
 
 const CSS = `
@@ -37,7 +41,7 @@ export class MiniWindow {
    * @param {{onJump, onAdmit, onCopy, onStop, onClose}} actions
    */
   static async openDocument(actions) {
-    const win = await window.documentPictureInPicture.requestWindow({ width: 340, height: 280 })
+    const win = await window.documentPictureInPicture.requestWindow(SMALL)
     return new MiniWindow('document', { win, actions })
   }
 
@@ -58,9 +62,10 @@ export class MiniWindow {
       const style = doc.createElement('style')
       style.textContent = CSS
       doc.head.append(style)
-      doc.body.innerHTML = `<canvas></canvas><div class="bar"><button class="primary" data-jump hidden>${icon('point', 15)}Zur Stelle</button><span class="spacer"></span><button class="icon" data-copy title="Link kopieren" aria-label="Link kopieren">${icon('copy', 15)}</button><button class="icon" data-stop title="Freigabe beenden" aria-label="Freigabe beenden">${icon('stop', 15)}</button></div><div class="requests"></div>`
+      doc.body.innerHTML = `<canvas></canvas><div class="bar"><button class="primary" data-jump hidden>${icon('point', 15)}Zur Stelle</button><span class="spacer"></span><button class="icon" data-size title="Größer" aria-label="Größer">${icon('maximize', 15)}</button><button class="icon" data-copy title="Link kopieren" aria-label="Link kopieren">${icon('copy', 15)}</button><button class="icon" data-stop title="Freigabe beenden" aria-label="Freigabe beenden">${icon('stop', 15)}</button></div><div class="requests"></div>`
       this.view = new MiniView(doc.querySelector('canvas'))
       doc.querySelector('[data-jump]').addEventListener('click', () => actions.onJump?.(win))
+      doc.querySelector('[data-size]').addEventListener('click', () => this.toggleSize())
       doc.querySelector('[data-copy]').addEventListener('click', () => actions.onCopy?.(win))
       doc.querySelector('[data-stop]').addEventListener('click', () => actions.onStop?.())
       win.addEventListener('pagehide', () => this.gone())
@@ -74,6 +79,22 @@ export class MiniWindow {
       video.addEventListener('enterpictureinpicture', () => actions.onEnter?.())
       video.addEventListener('leavepictureinpicture', () => actions.onLeave?.())
     }
+  }
+
+  /** Larger or smaller again (in a click in the window; on its screen at most 90 %). */
+  toggleSize() {
+    const win = this.win
+    this.large = !this.large
+    const size = this.large ? LARGE : SMALL
+    const width = Math.min(size.width, Math.round(win.screen.availWidth * 0.9))
+    const height = Math.min(size.height, Math.round(win.screen.availHeight * 0.9))
+    try {
+      win.resizeTo(width + win.outerWidth - win.innerWidth, height + win.outerHeight - win.innerHeight)
+    } catch {}
+    const button = win.document.querySelector('[data-size]')
+    button.innerHTML = icon(this.large ? 'restore' : 'maximize', 15)
+    button.title = this.large ? 'Kleiner' : 'Größer'
+    button.setAttribute('aria-label', button.title)
   }
 
   get inPip() {
