@@ -140,6 +140,10 @@ fn create_device() -> Result<(ID3D11Device, ID3D11DeviceContext)> {
         .map_err(err("D3D11-Gerät"))?;
     }
     let device = device.ok_or("kein D3D11-Gerät")?;
+    if let Ok(adapter) = device.cast::<IDXGIDevice>().and_then(|d| unsafe { d.GetAdapter() }).and_then(|a| unsafe { a.GetDesc() }) {
+        let name = String::from_utf16_lossy(&adapter.Description);
+        crate::log(&format!("video: GPU {}", name.trim_end_matches('\0')));
+    }
     // Media Foundation uses the device from its own threads
     if let Ok(mt) = device.cast::<ID3D11Multithread>() {
         unsafe {
@@ -338,6 +342,20 @@ impl Converter {
         };
         let enumerator = unsafe { video_device.CreateVideoProcessorEnumerator(&desc) }.map_err(err("Videoprozessor"))?;
         let processor = unsafe { video_device.CreateVideoProcessor(&enumerator, 0) }.map_err(err("Videoprozessor"))?;
+        // Color spaces spelled out: left at their defaults, some drivers take the RGB input for
+        // YCbCr and pass the bytes through unconverted – a pink picture. sRGB in, BT.709 studio
+        // range out (what the encoder signals in the stream); no driver "enhancements".
+        unsafe {
+            if let Ok(context1) = video_context.cast::<ID3D11VideoContext1>() {
+                context1.VideoProcessorSetStreamColorSpace1(&processor, 0, DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
+                context1.VideoProcessorSetOutputColorSpace1(&processor, DXGI_COLOR_SPACE_YCBCR_STUDIO_G22_LEFT_P709);
+            } else {
+                // RGB_Range 0 (0–255) in; YCbCr_Matrix 1 (BT.709) | Nominal_Range 1 (16–235) out
+                video_context.VideoProcessorSetStreamColorSpace(&processor, 0, &D3D11_VIDEO_PROCESSOR_COLOR_SPACE { _bitfield: 0 });
+                video_context.VideoProcessorSetOutputColorSpace(&processor, &D3D11_VIDEO_PROCESSOR_COLOR_SPACE { _bitfield: (1 << 2) | (1 << 4) });
+            }
+            video_context.VideoProcessorSetStreamAutoProcessingMode(&processor, 0, false);
+        }
 
         let texture = |width: u32, height: u32, format: DXGI_FORMAT, bind: D3D11_BIND_FLAG| -> Result<ID3D11Texture2D> {
             let desc = D3D11_TEXTURE2D_DESC {
@@ -467,7 +485,17 @@ fn find_encoder(flags: MFT_ENUM_FLAG) -> Option<IMFTransform> {
             return None;
         }
         let list = std::slice::from_raw_parts_mut(activates, count as usize);
-        let transform = list.iter().flatten().find_map(|a| a.ActivateObject::<IMFTransform>().ok());
+        let transform = list.iter().flatten().find_map(|a| {
+            let transform = a.ActivateObject::<IMFTransform>().ok()?;
+            // which one it is, for reports about the picture
+            let mut name = windows::core::PWSTR::null();
+            let mut len = 0u32;
+            if a.GetAllocatedString(&MFT_FRIENDLY_NAME_Attribute, &mut name, &mut len).is_ok() {
+                crate::log(&format!("video: encoder {}", name.to_string().unwrap_or_default()));
+                CoTaskMemFree(Some(name.0 as *const _));
+            }
+            Some(transform)
+        });
         for a in list.iter_mut() {
             drop(a.take());
         }
@@ -531,7 +559,7 @@ impl Encoder {
             }
         }
 
-        let media_type = |subtype: &GUID| -> Result<IMFMediaType> {
+        let media_type = |subtype: &GUID, color: bool| -> Result<IMFMediaType> {
             let t = unsafe { MFCreateMediaType() }.map_err(err("Medientyp"))?;
             unsafe {
                 t.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video).map_err(err("Medientyp"))?;
@@ -540,18 +568,32 @@ impl Encoder {
                 t.SetUINT64(&MF_MT_FRAME_RATE, ((FPS as u64) << 32) | 1).map_err(err("Medientyp"))?;
                 t.SetUINT64(&MF_MT_PIXEL_ASPECT_RATIO, (1u64 << 32) | 1).map_err(err("Medientyp"))?;
                 t.SetUINT32(&MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive.0 as u32).map_err(err("Medientyp"))?;
+                if color {
+                    // the converter's output: BT.709, studio range – signalled in the stream for the viewers' decoder
+                    t.SetUINT32(&MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709.0 as u32).map_err(err("Medientyp"))?;
+                    t.SetUINT32(&MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709.0 as u32).map_err(err("Medientyp"))?;
+                    t.SetUINT32(&MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709.0 as u32).map_err(err("Medientyp"))?;
+                    t.SetUINT32(&MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235.0 as u32).map_err(err("Medientyp"))?;
+                }
             }
             Ok(t)
         };
         // output before input: H.264, Constrained Baseline – what every browser negotiates for WebRTC
-        let output = media_type(&MFVideoFormat_H264)?;
-        unsafe {
-            output.SetUINT32(&MF_MT_AVG_BITRATE, bitrate).map_err(err("Medientyp"))?;
-            output.SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_ConstrainedBase.0 as u32).map_err(err("Medientyp"))?;
-            transform.SetOutputType(0, &output, 0).map_err(err("Ausgabeformat"))?;
+        let formats = |color: bool| -> Result<()> {
+            let output = media_type(&MFVideoFormat_H264, color)?;
+            unsafe {
+                output.SetUINT32(&MF_MT_AVG_BITRATE, bitrate).map_err(err("Medientyp"))?;
+                output.SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_ConstrainedBase.0 as u32).map_err(err("Medientyp"))?;
+                transform.SetOutputType(0, &output, 0).map_err(err("Ausgabeformat"))?;
+            }
+            let input = media_type(&MFVideoFormat_NV12, color)?;
+            unsafe { transform.SetInputType(0, &input, 0) }.map_err(err("Eingabeformat"))
+        };
+        // an encoder that does not take the color tags still encodes – the viewers then guess them
+        if let Err(e) = formats(true) {
+            crate::log(&format!("video: without color tags ({e})"));
+            formats(false)?;
         }
-        let input = media_type(&MFVideoFormat_NV12)?;
-        unsafe { transform.SetInputType(0, &input, 0) }.map_err(err("Eingabeformat"))?;
 
         let info = unsafe { transform.GetOutputStreamInfo(0) }.map_err(err("Ausgabestrom"))?;
         let provides_samples = info.dwFlags & (MFT_OUTPUT_STREAM_PROVIDES_SAMPLES.0 as u32 | MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES.0 as u32) != 0;
@@ -795,4 +837,73 @@ fn parameter_sets(data: &[u8]) -> Vec<u8> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The GPU's BGRA → NV12 conversion on this machine: four color bars come out as BT.709
+    /// studio-range YCbCr (not the RGB bytes passed through – a pink picture at the viewers).
+    #[test]
+    fn converts_colors_to_bt709() {
+        let Ok((device, context)) = create_device() else {
+            eprintln!("no D3D11 device – skipped");
+            return;
+        };
+        let (w, h) = (64u32, 16u32);
+        // B, G, R, A: white, black, blue, yellow
+        let bars: [[u8; 4]; 4] = [[255, 255, 255, 255], [0, 0, 0, 255], [255, 0, 0, 255], [0, 255, 255, 255]];
+        let pixels: Vec<u8> = (0..h).flat_map(|_| (0..w).flat_map(|x| bars[(x / 16) as usize])).collect();
+        let texture = |format: DXGI_FORMAT, usage: D3D11_USAGE, bind: u32, cpu: u32, data: Option<&[u8]>| -> ID3D11Texture2D {
+            let desc = D3D11_TEXTURE2D_DESC {
+                Width: w,
+                Height: h,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: format,
+                SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+                Usage: usage,
+                BindFlags: bind,
+                CPUAccessFlags: cpu,
+                MiscFlags: 0,
+            };
+            let init = data.map(|d| D3D11_SUBRESOURCE_DATA { pSysMem: d.as_ptr().cast(), SysMemPitch: w * 4, SysMemSlicePitch: 0 });
+            let mut tex = None;
+            unsafe { device.CreateTexture2D(&desc, init.as_ref().map(|i| i as *const _), Some(&mut tex)) }.unwrap();
+            tex.unwrap()
+        };
+        let frame = texture(DXGI_FORMAT_B8G8R8A8_UNORM, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE.0 as u32, 0, Some(&pixels));
+        let mut converter = match Converter::new(&device, &context, (w, h), (w, h)) {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("no video processor ({e}) – skipped");
+                return;
+            }
+        };
+        converter.blt(&frame).unwrap();
+        let readback = texture(DXGI_FORMAT_NV12, D3D11_USAGE_STAGING, 0, D3D11_CPU_ACCESS_READ.0 as u32, None);
+        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+        unsafe {
+            context.CopyResource(&readback, converter.current());
+            context.Map(&readback, 0, D3D11_MAP_READ, 0, Some(&mut mapped)).unwrap();
+        }
+        let pitch = mapped.RowPitch as usize;
+        let at = |offset: usize| unsafe { *(mapped.pData as *const u8).add(offset) };
+        // the middle of each bar: Y, then Cb / Cr from the interleaved plane below the Y plane
+        let got: Vec<(u8, u8, u8)> = (0..4)
+            .map(|i| {
+                let x = i * 16 + 8;
+                let uv = (h as usize + 4) * pitch + (x & !1);
+                (at(8 * pitch + x), at(uv), at(uv + 1))
+            })
+            .collect();
+        unsafe { context.Unmap(&readback, 0) };
+        let want = [(235, 128, 128), (16, 128, 128), (32, 240, 118), (219, 16, 138)];
+        eprintln!("YCbCr per bar: {got:?}");
+        for ((y, cb, cr), (wy, wcb, wcr)) in got.iter().zip(want) {
+            let near = |a: u8, b: i32| (a as i32 - b).abs() <= 8;
+            assert!(near(*y, wy) && near(*cb, wcb) && near(*cr, wcr), "got {got:?}, want {want:?}");
+        }
+    }
 }
