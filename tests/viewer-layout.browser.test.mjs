@@ -127,6 +127,26 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   // Remote control keeps its existing host-side input guard and can still activate a window.
   await evaluate(`qa.receive(${JSON.stringify({...foreground,mode:'control'})});qa.sent=[];qa.pointer(1,'pointerdown');qa.pointer(1,'pointerup');true`)
   assert.deepEqual(await evaluate('qa.sent.filter(m=>m.t==="mouse").map(m=>m.a)'),['down','up'])
+  // Remote control: where another window lies over the presenter's, the picture is marked – the
+  // hint sits in the largest part, PeekaView's own windows (toolbar) are named, and the marking
+  // never takes the pointer
+  const covering={...foreground,mode:'control',windows:foreground.windows.map((w,i)=>i===1?{...w,cover:[[.5,0,.5,.25,0],[.6,.1,.2,.7,0],[.3,.9,.3,.06,1]]}:w)}
+  await evaluate(`qa.receive(${JSON.stringify(covering)});true`);await settle()
+  const coverGeometry=`(()=>{const c=qa.wm.wins.get(1).el.querySelector('.pv-cover'),r=c.getBoundingClientRect(),v=qa.wm.wins.get(1).view.getBoundingClientRect(),rel=e=>{const p=e.getBoundingClientRect();return [Math.round((p.left-v.left)/v.width*100),Math.round((p.top-v.top)/v.height*100),Math.round(p.width/v.width*100),Math.round(p.height/v.height*100)]};
+   return {shown:r.width>0,parts:[...c.querySelectorAll('.pv-cover-fill div')].map(d=>[...rel(d),d.classList.contains('own')]),labels:[...c.querySelectorAll('.pv-cover-label')].map(l=>[...rel(l).slice(0,2),l.textContent]),events:getComputedStyle(c).pointerEvents,others:[0,2,3].every(s=>qa.wm.wins.get(s).el.querySelector('.pv-cover').hidden)}})()`
+  assert.deepEqual(await evaluate(coverGeometry),
+   {shown:true,parts:[[50,0,50,25,false],[60,10,20,70,false],[30,90,30,6,true]],labels:[[60,10,'VerdecktKlicks kommen hier nicht an'],[30,90,'PeekaViewnicht steuerbar']],events:'none',others:true})
+  // an older host sends no own flag
+  await evaluate(`qa.receive(${JSON.stringify({...covering,windows:covering.windows.map((w,i)=>i===1?{...w,cover:[[.5,0,.5,.25]]}:w)})});true`)
+  assert.deepEqual((await evaluate(coverGeometry)).labels,[[50,0,'VerdecktKlicks kommen hier nicht an']])
+  await evaluate(`qa.receive(${JSON.stringify({...covering,mode:'view'})});true`)
+  assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'only remote control is affected')
+  await evaluate(`qa.receive(${JSON.stringify(covering)});qa.receive(${JSON.stringify({...covering,windows:covering.windows.map(w=>({...w,cover:[]}))})});true`)
+  assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'uncovered again')
+  // a shared screen: the toolbar on it is marked as well
+  await evaluate(`qa.receive(${JSON.stringify(state(1,{windows:[{w:0,kind:'screen',title:'Bildschirm',pw:3200,ph:2000,cover:[[.35,0,.3,.03,1]]}]}))});true`);await settle()
+  assert.deepEqual(await evaluate("[...qa.wm.wins.get(0).el.querySelectorAll('.pv-cover-label')].map(l=>l.textContent)"),['PeekaViewnicht steuerbar'])
+  await evaluate(`qa.receive(${JSON.stringify(foreground)});true`)
   // An explicit title-bar click can raise a background window with arrangement permission,
   // including while watching or annotating. Only a new host state unlocks annotations.
   await evaluate(`qa.titlePointer=(type,selector='.pv-win-bar',dx=0,id=11)=>{const bar=qa.wm.wins.get(1).el.querySelector(selector),r=bar.getBoundingClientRect();bar.setPointerCapture=()=>{};bar.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:r.left+15+dx,clientY:r.top+10,pointerId:id,button:0}))};true`)

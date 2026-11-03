@@ -173,14 +173,19 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
                     }
                 }
             }
-            for s in streams.iter().filter(|s| s.window_id.is_some()) {
+            // (a shared screen: always reachable and in front, but PeekaView's own windows on it
+            // take no input)
+            for s in streams.iter() {
                 let reachable = guard::reachable(s.target(), s.rect);
                 let front = guard::in_front(s.target());
-                if reachable != s.reachable || front != s.front {
+                // where windows lie over it: viewers see those spots marked
+                let covers = guard::covers(s.target(), s.rect);
+                if reachable != s.reachable || front != s.front || covers != s.covers {
                     changed = true;
                     if let Some(stream) = shared.streams.lock().unwrap().iter_mut().find(|x| x.slot == s.slot) {
                         stream.reachable = reachable;
                         stream.front = front;
+                        stream.covers = covers;
                     }
                 }
             }

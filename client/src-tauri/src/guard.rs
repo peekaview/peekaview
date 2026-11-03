@@ -31,6 +31,20 @@ impl Rect {
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && y >= self.y && x < self.x + self.w && y < self.y + self.h
     }
+
+    /// The part of this rect that lies within `other`, if any.
+    pub fn intersect(&self, other: &Rect) -> Option<Rect> {
+        let (x, y) = (self.x.max(other.x), self.y.max(other.y));
+        let (r, b) = ((self.x + self.w).min(other.x + other.w), (self.y + self.h).min(other.y + other.h));
+        (r > x && b > y).then_some(Rect { x, y, w: r - x, h: b - y })
+    }
+
+    /// [x, y, w, h] relative to `outer` (0..1 inside it), to 4 decimals.
+    pub fn within(&self, outer: &Rect) -> [f64; 4] {
+        let round = |v: f64| (v * 10_000.0).round() / 10_000.0;
+        let (w, h) = (outer.w.max(1) as f64, outer.h.max(1) as f64);
+        [round((self.x - outer.x) as f64 / w), round((self.y - outer.y) as f64 / h), round(self.w as f64 / w), round(self.h as f64 / h)]
+    }
 }
 
 /// Current geometry of a window: `None` if it no longer exists, `Some((rect, visible))` otherwise.
@@ -87,6 +101,31 @@ pub fn reachable(target: Target, rect: Rect) -> bool {
 }
 
 const GRID: usize = 5;
+
+/// A part of the shared picture where viewer input is refused.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Cover {
+    pub rect: Rect,
+    /// one of PeekaView's own windows (toolbar, main window) – never in the picture itself
+    pub own: bool,
+}
+
+/// The parts of a shared window or screen (`rect`) that windows lie over (screen coordinates,
+/// clipped to it): viewer input is refused there. For a window: other windows above it; for a
+/// screen: PeekaView's own windows on it. Empty where the platform does not tell.
+pub fn covers(target: Target, rect: Rect) -> Vec<Cover> {
+    let mut out: Vec<Cover> = imp::covers(target)
+        .into_iter()
+        .filter_map(|c| Some(Cover { rect: c.rect.intersect(&rect)?, own: c.own }))
+        .filter(|c| c.rect.w >= MIN_COVER && c.rect.h >= MIN_COVER)
+        .collect();
+    out.truncate(MAX_COVERS);
+    out
+}
+
+/// Slivers (window shadows, 1 px borders) are not worth showing.
+const MIN_COVER: i32 = 4;
+const MAX_COVERS: usize = 32;
 
 /// Windows of the shared window's app that are *not* part of it (other document windows, the
 /// Finder's desktop) – they are left out of the picture. Part of it: menus and panels above the
@@ -264,6 +303,30 @@ mod imp {
             .any(|w| overlaps(&w.rect, &own) && !(w.pid == pid && part_of(w, &own)))
     }
 
+    /// Windows lying over the shared one, as `any_allowed` judges them: PeekaView's own windows
+    /// count (input is never allowed there), its click-through overlays and the window's own
+    /// dialogs / menus do not. A shared screen: only PeekaView's own windows.
+    pub fn covers(target: super::Target) -> Vec<super::Cover> {
+        let me = std::process::id() as i32;
+        let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();
+        let windows = list(false);
+        let visible = |w: &&Info| w.alpha > 0.0 && !overlays.contains(&w.id);
+        let cover = |w: &Info| super::Cover { rect: w.rect, own: w.pid == me };
+        let Some((id, pid)) = target else {
+            return windows.iter().filter(visible).filter(|w| w.pid == me).map(cover).collect();
+        };
+        let displays = displays();
+        let Some(own) = windows.iter().find(|w| w.id == id).map(|w| w.rect) else { return vec![] };
+        windows
+            .iter()
+            .take_while(|w| w.id != id)
+            .filter(visible)
+            .filter(|w| !is_screen_overlay(w, &displays))
+            .filter(|w| !(w.pid == pid && part_of(w, &own)))
+            .map(cover)
+            .collect()
+    }
+
     pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
         let me = std::process::id() as i32;
         let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();
@@ -324,19 +387,101 @@ mod imp {
 
 #[cfg(target_os = "windows")]
 mod imp {
+    use std::ffi::c_void;
+
+    use super::Cover;
+
+    use windows_sys::core::BOOL;
     use windows_sys::Win32::{
-        Foundation::POINT,
-        UI::WindowsAndMessaging::{GetAncestor, GetForegroundWindow, GetWindowThreadProcessId, WindowFromPoint, GA_ROOT},
+        Foundation::{HWND, LPARAM, POINT, RECT},
+        Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
+        UI::WindowsAndMessaging::{
+            EnumWindows, GetAncestor, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
+            WindowFromPoint, GA_ROOT, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
+        },
     };
 
     use super::Rect;
+
+    struct Walk {
+        /// the shared window: stop there; `None` (a shared screen): all windows, only our own count
+        target: super::Target,
+        me: u32,
+        out: Vec<Cover>,
+    }
+
+    /// Is it one of our overlays (red frame)? Click-through, apart from the moment the presenter's
+    /// pointer is on its badge – then it has no WS_EX_TRANSPARENT, but must not count either.
+    fn is_overlay(hwnd: HWND) -> bool {
+        let mut title = [0u16; 64];
+        let n = unsafe { GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32) };
+        n > 0 && String::from_utf16_lossy(&title[..n as usize]) == crate::OVERLAY_TITLE
+    }
+
+    /// One top-level window, front to back.
+    unsafe extern "system" fn each(hwnd: HWND, data: LPARAM) -> BOOL {
+        let walk = unsafe { &mut *(data as *mut Walk) };
+        if walk.target.is_some_and(|(id, _)| hwnd as usize as u32 == id) {
+            return 0;
+        }
+        if unsafe { IsWindowVisible(hwnd) } == 0 || unsafe { IsIconic(hwnd) } != 0 {
+            return 1;
+        }
+        // click-through windows never take input – WindowFromPoint skips them too
+        let ex = unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) } as u32;
+        if ex & WS_EX_LAYERED != 0 && ex & WS_EX_TRANSPARENT != 0 {
+            return 1;
+        }
+        // windows of other virtual desktops and suspended store apps are "cloaked"
+        let mut cloaked = 0u32;
+        if unsafe { DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED as _, &mut cloaked as *mut u32 as *mut c_void, 4) } == 0 && cloaked != 0 {
+            return 1;
+        }
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+        let own = pid == walk.me;
+        match walk.target {
+            // a shared screen: only PeekaView's own windows (toolbar, main window) are in the way
+            None if !own => return 1,
+            // the shared window's own dialogs and menus count as part of it
+            Some((_, owner)) if !own && pid as i32 == owner => return 1,
+            _ => {}
+        }
+        if own && is_overlay(hwnd) {
+            return 1;
+        }
+        // the visible frame, without the invisible resize borders
+        let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let frame = unsafe { DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS as _, &mut r as *mut RECT as *mut c_void, std::mem::size_of::<RECT>() as u32) };
+        if frame != 0 && unsafe { GetWindowRect(hwnd, &mut r) } == 0 {
+            return 1;
+        }
+        walk.out.push(Cover { rect: Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top }, own });
+        1
+    }
+
+    pub fn covers(target: super::Target) -> Vec<Cover> {
+        let mut walk = Walk { target, me: std::process::id(), out: Vec::new() };
+        unsafe { EnumWindows(Some(each), &mut walk as *mut Walk as LPARAM) };
+        walk.out
+    }
+
+    /// PeekaView's own visible windows (overlays aside).
+    fn own_windows() -> Vec<Rect> {
+        covers(None).into_iter().map(|c| c.rect).collect()
+    }
 
     pub fn window_geometry(win: &xcap::Window) -> Option<(Rect, bool)> {
         let rect = Rect { x: win.x().ok()?, y: win.y().ok()?, w: win.width().ok()? as i32, h: win.height().ok()? as i32 };
         Some((rect, !win.is_minimized().unwrap_or(true)))
     }
 
-    fn input_allowed(target: super::Target, x: i32, y: i32) -> bool {
+    fn input_allowed(target: super::Target, own: &[Rect], x: i32, y: i32) -> bool {
+        // never on one of our own windows: WindowFromPoint looks through a transparent window
+        // where it has no pixels (the toolbar's WebView), so they are checked by their frames
+        if own.iter().any(|r| r.contains(x, y)) {
+            return false;
+        }
         // WindowFromPoint skips click-through (layered + transparent) windows like our overlay.
         let root = unsafe { GetAncestor(WindowFromPoint(POINT { x, y }), GA_ROOT) };
         if root.is_null() {
@@ -349,7 +494,8 @@ mod imp {
     }
 
     pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
-        points.iter().any(|&(x, y)| input_allowed(target, x, y))
+        let own = own_windows();
+        points.iter().any(|&(x, y)| input_allowed(target, &own, x, y))
     }
 
     pub fn focused((window_id, owner): (u32, i32)) -> bool {
@@ -366,6 +512,10 @@ mod imp {
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod imp {
     use super::Rect;
+
+    pub fn covers(_target: super::Target) -> Vec<super::Cover> {
+        vec![]
+    }
 
     pub fn window_geometry(win: &xcap::Window) -> Option<(Rect, bool)> {
         let rect = Rect { x: win.x().ok()?, y: win.y().ok()?, w: win.width().ok()? as i32, h: win.height().ok()? as i32 };
@@ -408,6 +558,28 @@ mod imp {
     }
 }
 
+#[cfg(test)]
+mod rect_tests {
+    use super::Rect;
+
+    #[test]
+    fn intersect_clips_to_the_window() {
+        let win = Rect { x: 100, y: 100, w: 400, h: 300 };
+        let over = Rect { x: 350, y: 50, w: 400, h: 150 };
+        assert_eq!(over.intersect(&win), Some(Rect { x: 350, y: 100, w: 150, h: 100 }));
+        // only touching or apart: nothing covered
+        assert_eq!(Rect { x: 500, y: 100, w: 50, h: 50 }.intersect(&win), None);
+        assert_eq!(Rect { x: 0, y: 0, w: 50, h: 50 }.intersect(&win), None);
+    }
+
+    #[test]
+    fn within_normalizes_to_the_window() {
+        let win = Rect { x: 100, y: 100, w: 400, h: 300 };
+        assert_eq!(Rect { x: 350, y: 100, w: 150, h: 100 }.within(&win), [0.625, 0.0, 0.375, 0.3333]);
+        assert_eq!(win.within(&win), [0.0, 0.0, 1.0, 1.0]);
+    }
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     /// Diagnostic against the live desktop: `PV_WINDOW=<title> cargo test guard -- --ignored --nocapture`
@@ -431,6 +603,14 @@ mod tests {
         let target = (id, win.pid().unwrap_or(0) as i32);
         println!("window {id} {rect:?} visible={visible} focused={}", super::focused(target));
         println!("input_allowed(center)={} reachable={}", super::input_allowed(Some(target), cx, cy), super::reachable(Some(target), rect));
+        for c in super::covers(Some(target), rect) {
+            println!("  covered: {c:?} = {:?}", c.rect.within(&rect));
+        }
+        let screen = xcap::Monitor::from_point(cx, cy).unwrap();
+        let screen = super::Rect { x: screen.x().unwrap(), y: screen.y().unwrap(), w: screen.width().unwrap() as i32, h: screen.height().unwrap() as i32 };
+        for c in super::covers(None, screen) {
+            println!("  own on the screen: {c:?}");
+        }
         for w in super::imp::list(false).iter().filter(|w| w.rect.contains(cx, cy)) {
             println!("  at center: id={} pid={} layer={} alpha={} {:?}", w.id, w.pid, w.layer, w.alpha, w.rect);
         }

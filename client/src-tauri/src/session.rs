@@ -77,6 +77,8 @@ pub struct Stream {
     pub z: u32,
     /// no other app's window over it (the frame is fully red only then)
     pub front: bool,
+    /// the parts other windows (or PeekaView's own) lie over – input does not arrive there
+    pub covers: Vec<crate::guard::Cover>,
 }
 
 impl Stream {
@@ -92,6 +94,18 @@ impl Stream {
     /// Normalized (0..1) coordinates of a screen point inside it.
     pub fn normalize(&self, x: i32, y: i32) -> (f64, f64) {
         ((x - self.rect.x) as f64 / self.rect.w.max(1) as f64, (y - self.rect.y) as f64 / self.rect.h.max(1) as f64)
+    }
+
+    /// The covered parts for the viewers: [x, y, w, h, own] – normalized to the window (0..1),
+    /// own = 1 for one of PeekaView's own windows.
+    pub fn cover(&self) -> Vec<[f64; 5]> {
+        self.covers
+            .iter()
+            .map(|c| {
+                let [x, y, w, h] = c.rect.within(&self.rect);
+                [x, y, w, h, if c.own { 1.0 } else { 0.0 }]
+            })
+            .collect()
     }
 }
 
@@ -165,7 +179,7 @@ impl Shared {
                 json!({
                     "w": s.slot, "kind": s.kind, "title": s.title, "app": s.app,
                     "pw": (s.rect.w as f64 * scale).round(), "ph": (s.rect.h as f64 * scale).round(),
-                    "paused": !s.visible(), "reachable": s.reachable, "z": s.z, "front": s.front,
+                    "paused": !s.visible(), "reachable": s.reachable, "z": s.z, "front": s.front, "cover": s.cover(),
                     // where it is on the presenter's screen (viewers mirror the layout when
                     // they may arrange the windows)
                     "rect": { "x": s.rect.x, "y": s.rect.y, "w": s.rect.w, "h": s.rect.h },
@@ -269,7 +283,7 @@ fn open_stream(id: &str, slot: u8) -> Result<Stream, String> {
         _ => return Err("Ungültige Quelle".into()),
     };
     let (rect, visible) = capture::geometry(&source).ok_or("Quelle nicht mehr vorhanden")?;
-    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true, z: 0, front: true })
+    Ok(Stream { slot, ctl: StreamCtl::new(slot, visible), source, id: id.to_string(), window_id, pid, kind, title, app, rect, reachable: true, z: 0, front: true, covers: Vec::new() })
 }
 
 /// Picker ids → streams; ids already shared keep their slot (and running pipeline).
