@@ -157,3 +157,42 @@ test('a bright text window among other bright windows, partly covered (desktop a
   assert.equal(info.stage, 'likely')
   assert.ok(found.tiles >= 0.7, `most tiles match although a good part is covered: ${found.tiles} (whole: ${found.score})`)
 })
+
+// an editor with thin text: rows of 1–2 px glyph strokes on white, as on a 2560 px screen
+function editorWindow(width, height, seed) {
+  let s = seed
+  const rand = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  const img = { width, height, px: new Float32Array(width * height).fill(252) }
+  const dot = (x, y, v) => x >= 0 && y >= 0 && x < width && y < height && (img.px[y * width + x] = v)
+  for (let y = 0; y < 28; y++) for (let x = 0; x < width; x++) dot(x, y, 236)
+  for (let line = 0; line < 60; line++) {
+    const y0 = 40 + line * 17
+    if (y0 + 10 > height) break
+    const end = 30 + rand() * (width - 60) * (rand() < 0.3 ? 0.2 : 0.9)
+    for (let x = 30; x < end; x += 7) {
+      if (rand() < 0.15) continue // a space
+      // a glyph: a few thin strokes
+      for (let k = 0; k < 3; k++) {
+        const gx = x + Math.floor(rand() * 5)
+        const top = y0 + Math.floor(rand() * 4)
+        const len = 4 + Math.floor(rand() * 6)
+        for (let yy = top; yy < top + len; yy++) dot(gx, yy, 30 + rand() * 80)
+      }
+    }
+  }
+  return img
+}
+
+test('an editor window with thin text on a large screen is found (DELL 2560 x 1440)', () => {
+  let screen = noise(2560, 1440, 41, 90)
+  screen = paste(screen, editorWindow(900, 700, 42), { x: 1500, y: 300 })
+  const win = editorWindow(1330, 1098, 43)
+  const at = { x: 465, y: 160 }
+  screen = paste(screen, win, at)
+  // the mini window over a corner of it
+  screen = paste(screen, noise(340, 280, 44, 20), { x: 1520, y: 980 })
+  const info = {}
+  const found = locate((w, h) => scaled(screen, w, h), (w, h) => scaled(win, w, h), screen, win, info, { hints: [1] })
+  assert.ok(found, JSON.stringify(info))
+  assert.ok(Math.abs(found.x * 2560 - at.x) <= 8 && Math.abs(found.y * 1440 - at.y) <= 8, JSON.stringify(found))
+})

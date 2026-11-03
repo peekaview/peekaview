@@ -13,7 +13,7 @@
 
 const COARSE_WIDTH = 128 // the screen at this width for the search over all positions and sizes
 const MID_FACTOR = 2 // the size refined on copies this much larger
-const FINE_FACTOR = 4 // the position refined on copies this much larger
+const FINE_FACTOR = 8 // the position refined on copies this much larger (thin text needs it)
 const EDGE = 0.05 // share of the window's width / height left out at each side
 const TITLE = 0.12 // … and at the top (title bar, toolbar)
 const SCALES = (() => {
@@ -127,6 +127,69 @@ export function tileScore(img, tpl, x, y, ints = integrals(img)) {
   return top.reduce((a, b) => a + b, 0) / top.length
 }
 
+/**
+ * The best position of `tpl` in `img`, compared tile by tile (see tileScore) – a small, busy
+ * window over a bright one (the mini window!) does not spoil the match. About as costly as best().
+ */
+export function bestTiled(img, tpl, { x0 = 0, y0 = 0, x1 = img.width - tpl.width, y1 = img.height - tpl.height } = {}, ints = integrals(img)) {
+  const tw = Math.floor(tpl.width / TILES.x)
+  const th = Math.floor(tpl.height / TILES.y)
+  let top = { x: -1, y: -1, score: -Infinity }
+  if (tw < 3 || th < 3) return best(img, tpl, { x0, y0, x1, y1 }, ints)
+  const n = tw * th
+  // each tile without its mean; flat ones (nothing to compare) are left out
+  const tiles = []
+  for (let ty = 0; ty < TILES.y; ty++) {
+    for (let tx = 0; tx < TILES.x; tx++) {
+      const tc = new Float32Array(n)
+      let mean = 0
+      for (let row = 0; row < th; row++) for (let col = 0; col < tw; col++) mean += tpl.px[(ty * th + row) * tpl.width + tx * tw + col]
+      mean /= n
+      let vt = 0
+      for (let row = 0; row < th; row++) {
+        for (let col = 0; col < tw; col++) {
+          const v = tpl.px[(ty * th + row) * tpl.width + tx * tw + col] - mean
+          tc[row * tw + col] = v
+          vt += v * v
+        }
+      }
+      if (vt / n >= 4) tiles.push({ ox: tx * tw, oy: ty * th, tc, vt })
+    }
+  }
+  if (tiles.length < 4) return best(img, tpl, { x0, y0, x1, y1 }, ints)
+  const keep = Math.max(4, Math.ceil(tiles.length * 0.6))
+  const scores = new Float64Array(tiles.length)
+  for (let y = Math.max(0, y0); y <= Math.min(y1, img.height - tpl.height); y++) {
+    for (let x = Math.max(0, x0); x <= Math.min(x1, img.width - tpl.width); x++) {
+      for (let t = 0; t < tiles.length; t++) {
+        const { ox, oy, tc, vt } = tiles[t]
+        const X = x + ox
+        const Y = y + oy
+        const si = ints.sum[(Y + th) * ints.w + X + tw] - ints.sum[Y * ints.w + X + tw] - ints.sum[(Y + th) * ints.w + X] + ints.sum[Y * ints.w + X]
+        const sii = ints.sq[(Y + th) * ints.w + X + tw] - ints.sq[Y * ints.w + X + tw] - ints.sq[(Y + th) * ints.w + X] + ints.sq[Y * ints.w + X]
+        const vi = sii - (si * si) / n
+        if (vi < 1e-3 * n) {
+          scores[t] = 0
+          continue
+        }
+        let cov = 0
+        for (let row = 0; row < th; row++) {
+          let i = (Y + row) * img.width + X
+          let k = row * tw
+          for (let col = 0; col < tw; col++) cov += img.px[i++] * tc[k++]
+        }
+        scores[t] = cov / Math.sqrt(vi * vt)
+      }
+      scores.sort()
+      let sum = 0
+      for (let t = scores.length - keep; t < scores.length; t++) sum += scores[t]
+      const score = sum / keep
+      if (score > top.score) top = { x, y, score }
+    }
+  }
+  return top
+}
+
 // the window's picture without its edge and title bar
 function inner(g) {
   const ex = Math.round(g.width * EDGE)
@@ -174,7 +237,7 @@ export function locate(screenAt, windowAt, screenSize, windowSize, info = {}, { 
     for (const k of scales) {
       const { tpl } = at(coarse, k)
       if (tpl.width < 16 || tpl.height < 12 || tpl.width > coarse.img.width || tpl.height > coarse.img.height) continue
-      const hit = best(coarse.img, tpl, {}, coarse.ints)
+      const hit = bestTiled(coarse.img, tpl, {}, coarse.ints)
       if (hit.score > 0.25) hits.push({ ...hit, k, rank: hit.score * Math.min(1, tpl.width / 40) })
     }
     hits.sort((a, b) => b.rank - a.rank)
@@ -196,7 +259,7 @@ export function locate(screenAt, windowAt, screenSize, windowSize, info = {}, { 
         const { tpl } = at(mid, k)
         if (tpl.width > mid.img.width || tpl.height > mid.img.height) continue
         const r = 4
-        const hit = best(mid.img, tpl, { x0: c.x * MID_FACTOR - r, y0: c.y * MID_FACTOR - r, x1: c.x * MID_FACTOR + r, y1: c.y * MID_FACTOR + r }, mid.ints)
+        const hit = bestTiled(mid.img, tpl, { x0: c.x * MID_FACTOR - r, y0: c.y * MID_FACTOR - r, x1: c.x * MID_FACTOR + r, y1: c.y * MID_FACTOR + r }, mid.ints)
         if (hit.score > (top?.score ?? -1)) top = { ...hit, k }
       }
       if (top) sized.push(top)
@@ -210,9 +273,10 @@ export function locate(screenAt, windowAt, screenSize, windowSize, info = {}, { 
     let winner = null
     for (const c of sized.slice(0, 3)) {
       const { full, tpl } = at(fine, c.k)
-      const r = 3
-      const hit = best(fine.img, tpl, { x0: c.x * f - r, y0: c.y * f - r, x1: c.x * f + r, y1: c.y * f + r }, fine.ints)
-      const tiles = tileScore(fine.img, tpl, hit.x, hit.y, fine.ints)
+      const r = f + 2
+      const hit = bestTiled(fine.img, tpl, { x0: c.x * f - r, y0: c.y * f - r, x1: c.x * f + r, y1: c.y * f + r }, fine.ints)
+      const tiles = hit.score
+      hit.score = best(fine.img, tpl, { x0: hit.x, y0: hit.y, x1: hit.x, y1: hit.y }, fine.ints).score
       const strength = Math.max(hit.score / MIN_SCORE, tiles / MIN_TILES)
       if (!winner || strength > winner.strength) winner = { hit, tiles, strength, full, tpl, k: c.k }
     }
