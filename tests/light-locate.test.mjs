@@ -74,3 +74,43 @@ test('partly covered (the helper over it) it is still found; not on the screen i
   const elsewhere = noise(500, 320, 6, 10)
   assert.equal(locate((w, h) => scaled(screen, w, h), (w, h) => scaled(elsewhere, w, h), screen, elsewhere), null)
 })
+
+// a frame of `width` pixels in `value` around a picture (a window's shadow)
+function framed(img, width, value) {
+  const out = { width: img.width + 2 * width, height: img.height + 2 * width, px: new Float32Array((img.width + 2 * width) * (img.height + 2 * width)).fill(value) }
+  return paste(out, img, { x: width, y: width })
+}
+
+function fill(img, rect, value) {
+  const out = { ...img, px: Float32Array.from(img.px) }
+  for (let y = rect.y; y < rect.y + rect.h; y++) for (let x = rect.x; x < rect.x + rect.w; x++) out.px[y * img.width + x] = value
+  return out
+}
+
+test('the window picture in another resolution than the screen, with a shadow around it', () => {
+  const screen = noise(1600, 1000, 11, 24)
+  const win = noise(500, 320, 12, 10)
+  const at = { x: 610, y: 330 }
+  const shot = paste(screen, win, at)
+  // captured with 1.57 times the pixels, plus 12 px of dark shadow on each side
+  const own = framed(scaled(win, 785, 502), 12, 20)
+  const found = locate((w, h) => scaled(shot, w, h), (w, h) => scaled(own, w, h), shot, own)
+  assert.ok(found, 'found')
+  // the window's picture (with its shadow) lies around the window
+  const x = found.x * 1600
+  const y = found.y * 1000
+  const w = found.w * 1600
+  assert.ok(Math.abs(x + (12 / own.width) * w - at.x) <= 8 && Math.abs(y + (12 / own.height) * found.h * 1000 - at.y) <= 8, JSON.stringify(found))
+  assert.ok(Math.abs(found.k - 500 / 785) < 0.04, `size ${found.k}`)
+})
+
+test('the window not active on the screen (other title bar, grey selection) is still found', () => {
+  const screen = noise(1600, 1000, 21, 24)
+  const win = noise(500, 320, 22, 10)
+  const at = { x: 250, y: 520 }
+  // on the screen: title bar and a selected row look different
+  const inactive = fill(fill(win, { x: 0, y: 0, w: 500, h: 28 }, 205), { x: 0, y: 150, w: 500, h: 22 }, 180)
+  const shot = paste(screen, inactive, at)
+  const found = locate((w, h) => scaled(shot, w, h), (w, h) => scaled(win, w, h), shot, win)
+  assert.ok(found && Math.abs(found.x * 1600 - at.x) <= 6 && Math.abs(found.y * 1000 - at.y) <= 6, JSON.stringify(found))
+})

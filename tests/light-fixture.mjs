@@ -61,6 +61,8 @@ const paintScreen = (ctx, w, h, t) => {
   for (let y = 0; y < h; y += 60) for (let x = (y / 60) % 2 * 60; x < w; x += 120) ctx.fillRect(x, y, 60, 60)
   ctx.fillStyle = '#e2e8f0'; ctx.font = '600 28px system-ui'
   ctx.fillText('Schreibtisch', 40, h - 40)
+  // window.qaHideWindow: the window is minimized – not to be seen on the screen
+  if (window.qaHideWindow) return
   const at = window.qaWindowAt
   ctx.save(); ctx.translate(at.x, at.y); paintWindow(ctx, t); ctx.restore()
 }

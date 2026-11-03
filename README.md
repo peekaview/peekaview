@@ -315,8 +315,12 @@ The viewer site opens with a small start page:
 - A shared **whole screen** maps to positions directly, but only the screen the helper is on (same aspect ratio as the picture).
 - A shared **window or tab** can be anywhere: browsers never tell where. The share page therefore asks for one more click, on "Gesamter Bildschirm".
   - That second picture stays in the presenter's browser; viewers still get only the window.
-  - For each still picture the page looks for the window's picture in the screen's picture (`light-locate.js`): normalized cross-correlation on small grayscale copies, refined on larger ones. That takes about 0.1 s and finds the window to a pixel, also after it was moved or when something covers part of it.
+  - For each still picture the page looks for the window's picture in the screen's picture (`light-locate.js`): normalized cross-correlation on small grayscale copies, refined on larger ones.
+    - The two pictures need not have the same resolution (Retina, Chrome's own limits): sizes from a quarter to three times are tried.
+    - The window's edge (shadow, rounded corners) and its title bar are left out. A window that is not the active one looks different there.
+    - That takes about 0.1–0.2 s and finds the window to a pixel, also after it was moved or when something covers part of it.
   - The helper then shows the window's still picture over its place, with the desktop around it; the mini window's map marks the spot on the whole screen.
+  - Not to be seen on the screen (minimized, covered, another screen): the share page says so right after the screen was picked and whenever a still picture cannot be placed, with "Noch einmal prüfen" and "Anderen Bildschirm wählen"; the mini window marks such a spot "Dein Fenster ist nicht zu finden". `share.html?debug` (and the console) show how each search went.
 - Without that click ("Später"), when the window is not found (minimized, covered) and for another monitor, the helper shows the whole picture in the middle of the screen.
 - When the whole screen is shared, the mini window and the helper are part of the picture: viewers see them, too.
 - Popup blockers let windows through only right in a click. Phones and tablets cannot share from the browser at all, so the start page does not offer it there.

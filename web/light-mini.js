@@ -156,6 +156,12 @@ export class MiniView {
     box(ctx, 14, 14, lw + 54, 40, 'rgba(24,24,27,.88)')
     dot(ctx, 36, 34, 7, color)
     text(ctx, label, 52, 42, 22, '#fafafa', 600)
+    // could not be placed on the screen: "Zur Stelle" shows it in the middle
+    if (spot.note) {
+      ctx.font = `600 20px ${FONT}`
+      box(ctx, 14, H - 54, ctx.measureText(spot.note).width + 28, 40, '#ef4444')
+      text(ctx, spot.note, 28, H - 27, 20, '#ffffff', 600)
+    }
     this.renderMap()
   }
 

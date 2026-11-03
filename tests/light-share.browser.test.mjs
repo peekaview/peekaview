@@ -203,8 +203,15 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await browser('click', '#locate')
     await waitFor("!document.querySelector('#locate-error').hidden")
     assert.match(await evaluate("document.querySelector('#locate-error').textContent"), /Bitte „Gesamter Bildschirm“ wählen/)
+    // the window minimized: said plainly, with what to do
+    await evaluate('window.qaHideWindow = true')
     await browser('click', '#locate')
-    await waitFor("document.querySelector('#locate-step').hidden")
+    await waitFor("document.querySelector('#locate-step').hidden && !document.querySelector('#place-problem').hidden")
+    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert, ganz verdeckt/)
+    // back on the screen: found
+    await evaluate('window.qaHideWindow = false')
+    await browser('click', '#problem-check')
+    await waitFor("document.querySelector('#place-problem').hidden")
     assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /„Zur Stelle“ legt die Zeichnung genau über die Stelle/)
     // the whole screen stays here: viewers get only the window
     assert.equal(await evaluate('pvLight.locatorStream.getVideoTracks()[0].getSettings().displaySurface + "|" + pvLight.status().locator'), 'monitor|true')

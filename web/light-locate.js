@@ -4,13 +4,24 @@
 // window's picture in the screen's picture: normalized cross-correlation, coarse on small
 // grayscale copies, then refined on larger ones around the best match.
 //
-// Both pictures come in device pixels at the same density (a window and the screen it is on), so
-// the window is searched at its own size; half and double size are tried when that finds nothing.
+// The two pictures need not have the same density: Chrome may capture a window and the screen at
+// different resolutions (Retina, its own limits). So the window is searched at sizes from a
+// quarter to three times its own, then the size is refined with the position. Its edge (shadow,
+// rounded corners) is left out of the comparison, and so is its title bar: a window that is not
+// the active one looks different there (grey title, grey buttons) – the shared picture and the
+// screen may show it in different states.
 
-const COARSE_WIDTH = 192 // the screen at this width for the search over all positions
-const FINE_FACTOR = 4 // refined on copies this much larger
-const FINE_RADIUS = 5 // ± fine pixels around the coarse match
-export const MIN_SCORE = 0.6
+const COARSE_WIDTH = 128 // the screen at this width for the search over all positions and sizes
+const MID_FACTOR = 2 // the size refined on copies this much larger
+const FINE_FACTOR = 4 // the position refined on copies this much larger
+const EDGE = 0.05 // share of the window's width / height left out at each side
+const TITLE = 0.12 // … and at the top (title bar, toolbar)
+const SCALES = (() => {
+  const list = []
+  for (let k = 0.25; k <= 3.01; k *= 1.08) list.push(k)
+  return list
+})()
+export const MIN_SCORE = 0.55
 
 /** A grayscale picture: {width, height, px: Float32Array} (0..255). */
 export function grayFrom({ width, height, data }) {
@@ -23,75 +34,136 @@ export function grayFrom({ width, height, data }) {
  * Normalized cross-correlation of `tpl` placed at (x, y) in `img`; -1..1, 0 for flat areas.
  */
 export function ncc(img, tpl, x, y) {
-  const n = tpl.width * tpl.height
-  let si = 0
-  let sii = 0
-  let st = 0
-  let stt = 0
-  let sit = 0
-  for (let ty = 0; ty < tpl.height; ty++) {
-    let i = (y + ty) * img.width + x
-    let t = ty * tpl.width
-    for (let tx = 0; tx < tpl.width; tx++, i++, t++) {
-      const a = img.px[i]
-      const b = tpl.px[t]
-      si += a
-      sii += a * a
-      st += b
-      stt += b * b
-      sit += a * b
+  return best(img, tpl, { x0: x, y0: y, x1: x, y1: y }).score
+}
+
+// sums and sums of squares of a picture, for the mean and variance of any rectangle
+function integrals(img) {
+  const w = img.width + 1
+  const sum = new Float64Array(w * (img.height + 1))
+  const sq = new Float64Array(w * (img.height + 1))
+  for (let y = 0; y < img.height; y++) {
+    let row = 0
+    let rowSq = 0
+    for (let x = 0; x < img.width; x++) {
+      const v = img.px[y * img.width + x]
+      row += v
+      rowSq += v * v
+      sum[(y + 1) * w + x + 1] = sum[y * w + x + 1] + row
+      sq[(y + 1) * w + x + 1] = sq[y * w + x + 1] + rowSq
     }
   }
-  const vi = sii - (si * si) / n
-  const vt = stt - (st * st) / n
-  if (vi < 1e-3 * n || vt < 1e-3 * n) return 0
-  return (sit - (si * st) / n) / Math.sqrt(vi * vt)
+  return { w, sum, sq }
 }
 
 /** The best position of `tpl` in `img` within a range of positions. */
-export function best(img, tpl, { x0 = 0, y0 = 0, x1 = img.width - tpl.width, y1 = img.height - tpl.height } = {}) {
+export function best(img, tpl, { x0 = 0, y0 = 0, x1 = img.width - tpl.width, y1 = img.height - tpl.height } = {}, ints = integrals(img)) {
+  const n = tpl.width * tpl.height
+  // the template without its mean: its correlation with the picture is the covariance
+  let mean = 0
+  for (let i = 0; i < n; i++) mean += tpl.px[i]
+  mean /= n
+  const tc = new Float32Array(n)
+  let vt = 0
+  for (let i = 0; i < n; i++) {
+    tc[i] = tpl.px[i] - mean
+    vt += tc[i] * tc[i]
+  }
   let top = { x: -1, y: -1, score: -Infinity }
+  if (vt < 1e-3 * n) return { ...top, score: 0 }
   for (let y = Math.max(0, y0); y <= Math.min(y1, img.height - tpl.height); y++) {
     for (let x = Math.max(0, x0); x <= Math.min(x1, img.width - tpl.width); x++) {
-      const score = ncc(img, tpl, x, y)
+      const X = x + tpl.width
+      const Y = y + tpl.height
+      const si = ints.sum[Y * ints.w + X] - ints.sum[y * ints.w + X] - ints.sum[Y * ints.w + x] + ints.sum[y * ints.w + x]
+      const sii = ints.sq[Y * ints.w + X] - ints.sq[y * ints.w + X] - ints.sq[Y * ints.w + x] + ints.sq[y * ints.w + x]
+      const vi = sii - (si * si) / n
+      if (vi < 1e-3 * n) {
+        if (top.score < 0) top = { x, y, score: 0 }
+        continue
+      }
+      let cov = 0
+      for (let ty = 0; ty < tpl.height; ty++) {
+        let i = (y + ty) * img.width + x
+        let t = ty * tpl.width
+        for (let tx = 0; tx < tpl.width; tx++) cov += img.px[i++] * tc[t++]
+      }
+      const score = cov / Math.sqrt(vi * vt)
       if (score > top.score) top = { x, y, score }
     }
   }
   return top
 }
 
+// the window's picture without its edge and title bar
+function inner(g) {
+  const ex = Math.round(g.width * EDGE)
+  const ey = Math.round(g.height * TITLE)
+  const width = g.width - 2 * ex
+  const height = g.height - ey - Math.round(g.height * EDGE)
+  const px = new Float32Array(width * height)
+  for (let y = 0; y < height; y++) px.set(g.px.subarray((y + ey) * g.width + ex, (y + ey) * g.width + ex + width), y * width)
+  return { width, height, px, ex, ey }
+}
+
 /**
  * Finds the window in the screen.
  * @param {(w: number, h: number) => {width, height, px}} screenAt the screen's picture scaled to w × h
  * @param {(w: number, h: number) => {width, height, px}} windowAt the window's picture scaled to w × h
- * @param {{width, height}} screenSize, windowSize the pictures' own sizes (device pixels)
- * @returns {{x, y, w, h, score} | null} the window's place, 0..1 of the screen
+ * @param {{width, height}} screenSize, windowSize the pictures' own sizes (pixels)
+ * @returns {{x, y, w, h, score, k} | null} the window's place, 0..1 of the screen; k: its size
+ *   on the screen's picture relative to its own picture
  */
 export function locate(screenAt, windowAt, screenSize, windowSize) {
-  const coarse = COARSE_WIDTH / screenSize.width
-  const sw = COARSE_WIDTH
-  const sh = Math.round(screenSize.height * coarse)
-  const screenSmall = screenAt(sw, sh)
-  let found = null
-  for (const k of [1, 0.5, 2]) {
-    const tw = Math.round(windowSize.width * k * coarse)
-    const th = Math.round(windowSize.height * k * coarse)
-    if (tw < 6 || th < 6 || tw > sw || th > sh) continue
-    const hit = best(screenSmall, windowAt(tw, th))
-    if (hit.score > (found?.score ?? 0.4)) found = { ...hit, k, tw, th }
-    if (found?.score > 0.8) break
+  const level = (factor) => {
+    const s = (COARSE_WIDTH * factor) / screenSize.width
+    const img = screenAt(Math.round(screenSize.width * s), Math.round(screenSize.height * s))
+    return { s, img, ints: integrals(img) }
   }
-  if (!found) return null
-  // refined: larger copies, a few pixels around the coarse match
-  const f = coarse * FINE_FACTOR
-  const big = screenAt(Math.round(screenSize.width * f), Math.round(screenSize.height * f))
-  const tpl = windowAt(Math.round(windowSize.width * found.k * f), Math.round(windowSize.height * found.k * f))
-  const cx = found.x * FINE_FACTOR
-  const cy = found.y * FINE_FACTOR
-  const r = FINE_RADIUS + FINE_FACTOR
-  const hit = best(big, tpl, { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r })
+  const at = (lv, k) => {
+    const full = windowAt(Math.max(1, Math.round(windowSize.width * k * lv.s)), Math.max(1, Math.round(windowSize.height * k * lv.s)))
+    return { full, tpl: inner(full) }
+  }
+  // all sizes, everywhere, on small copies – the best few go on (a plain text window looks much
+  // the same at a slightly wrong size there)
+  const coarse = level(1)
+  const hits = []
+  for (const k of SCALES) {
+    const { tpl } = at(coarse, k)
+    if (tpl.width < 8 || tpl.height < 8 || tpl.width > coarse.img.width || tpl.height > coarse.img.height) continue
+    const hit = best(coarse.img, tpl, {}, coarse.ints)
+    if (hit.score > 0.25) hits.push({ ...hit, k })
+  }
+  if (!hits.length) return null
+  hits.sort((a, b) => b.score - a.score)
+  const candidates = []
+  for (const h of hits) {
+    if (candidates.some((c) => Math.abs(c.x - h.x) <= 2 && Math.abs(c.y - h.y) <= 2 && Math.abs(c.k / h.k - 1) < 0.1)) continue
+    candidates.push(h)
+    if (candidates.length === 6) break
+  }
+  // size and place, on copies twice as large
+  const mid = level(MID_FACTOR)
+  let sized = null
+  for (const c of candidates) {
+    for (const dk of [0.94, 0.97, 1, 1.03, 1.06]) {
+      const k = c.k * dk
+      const { tpl } = at(mid, k)
+      if (tpl.width > mid.img.width || tpl.height > mid.img.height) continue
+      const r = 4
+      const hit = best(mid.img, tpl, { x0: c.x * MID_FACTOR - r, y0: c.y * MID_FACTOR - r, x1: c.x * MID_FACTOR + r, y1: c.y * MID_FACTOR + r }, mid.ints)
+      if (hit.score > (sized?.score ?? -1)) sized = { ...hit, k }
+    }
+  }
+  if (!sized) return null
+  // the place, to a pixel
+  const fine = level(FINE_FACTOR)
+  const { full, tpl } = at(fine, sized.k)
+  const f = FINE_FACTOR / MID_FACTOR
+  const r = 3
+  const hit = best(fine.img, tpl, { x0: sized.x * f - r, y0: sized.y * f - r, x1: sized.x * f + r, y1: sized.y * f + r }, fine.ints)
   if (hit.score < MIN_SCORE) return null
-  return { x: hit.x / big.width, y: hit.y / big.height, w: tpl.width / big.width, h: tpl.height / big.height, score: hit.score }
+  return { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height, score: hit.score, k: sized.k }
 }
 
 /** A frame of a picture source scaled into w × h grayscale (in the browser). */

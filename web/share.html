@@ -75,6 +75,9 @@
     .step-body p { margin: 0; color: #a1a1aa; }
     .step-body p b { color: #fafafa; font-weight: 650; }
     .step-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
+    /* the shared window is not to be found: said plainly, with what to do */
+    .step.problem { border-color: rgba(239,68,68,.55); background: rgba(239,68,68,.07); }
+    .step.problem .step-icon { background: #ef4444; color: #fff; }
     .text-button { padding: 2px 4px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .text-button:hover { color: #fafafa; }
     /* the mini window's picture: shown while setting it up, afterwards it keeps playing out of
@@ -115,6 +118,14 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span></div>
+      <div class="step problem" id="place-problem" role="alert" hidden>
+        <span class="step-icon" data-icon="window"></span>
+        <div class="step-body">
+          <strong id="problem-title"></strong>
+          <p id="problem-text"></p>
+          <div class="step-actions"><button class="pill primary" id="problem-check" type="button">Noch einmal prüfen</button><button class="pill" id="problem-screen" type="button">Anderen Bildschirm wählen</button></div>
+        </div>
+      </div>
       <div class="step" id="mini-step" hidden>
         <span class="step-icon" data-icon="windows"></span>
         <div class="step-body">
@@ -153,6 +164,7 @@
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <pre id="debug" hidden style="margin:0;padding:10px;border-radius:10px;background:#09090b;color:#a1a1aa;font-size:11px;white-space:pre-wrap"></pre>
       <button class="pill stop" id="stop" type="button"></button>
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
     </section>
@@ -205,6 +217,8 @@
     // a window is shared: the whole screen as well, only here, to find the window on it (never sent)
     let locator = null
     let locateSkipped = false
+    // the last still picture could not be placed on the screen: 'other-screen' | 'not-found' | null
+    let placeProblem = null
     // the mini window; for a video: the presenter turned it on (Firefox does not tell)
     let mini = null
     let miniDone = false
@@ -329,6 +343,8 @@
       renderAll()
       emit({ kind: 'status', ...status() })
       copyLink(true)
+      // a whole screen: is it the one this browser is on?
+      if (host.surface === 'monitor') setTimeout(checkPlace, 500)
     }
 
     function ended(why) {
@@ -336,6 +352,7 @@
       for (const t of locator?.getTracks() ?? []) t.stop()
       locator = null
       locateSkipped = false
+      placeProblem = null
       mini?.close()
       mini = null
       miniDone = miniSkipped = false
@@ -454,8 +471,10 @@
     function renderHelper() {
       const open = !!helper && !helper.closed
       const windowShared = !!host && host.surface !== 'monitor'
-      const middle = windowShared && !locator
+      // not placed on the screen: the helper shows the drawing in the middle
+      const middle = (windowShared && !locator) || !!placeProblem
       $('locate-step').hidden = !windowShared || !!locator || locateSkipped
+      renderProblem(windowShared)
       // with the mini window the helper comes only on "Zur Stelle"
       $('helper-open').hidden = open || !host || miniActive()
       $('helper-locate').hidden = !windowShared || !!locator || !locateSkipped
@@ -596,9 +615,21 @@
 
     async function reveal(r) {
       const capture = await r.capture
+      // how the still picture and the search went (share.html?debug shows it here)
+      console.info('peekaview light: Standbild', capture?.debug)
+      if (new URLSearchParams(location.search).has('debug')) {
+        $('debug').hidden = false
+        $('debug').textContent = JSON.stringify({ ...capture?.debug, mini: mini?.kind ?? null, locator: !!locator }, null, 1)
+      }
       if (!host || !capture?.image) return
+      // could it be placed? (a window needs the whole screen picked first – that is the step above)
+      const problem = host.surface !== 'monitor' && !locator ? null : capture.debug?.problem ?? null
+      if (problem !== placeProblem) {
+        placeProblem = problem
+        renderAll()
+      }
       const peer = host.peers().list.find((p) => p.id === r.from)
-      lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now() }
+      lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
       mini?.reveal(lastReveal)
       emit({ kind: 'reveal', reveal: lastReveal })
       notify(lastReveal)
@@ -628,6 +659,35 @@
       helperBlocked = !helper
       renderHelper()
     }
+
+    function renderProblem(windowShared) {
+      $('place-problem').hidden = !host || !placeProblem
+      if (!placeProblem) return
+      $('problem-title').textContent = windowShared ? 'Dein Fenster ist auf dem Bildschirm nicht zu finden' : 'Du teilst einen anderen Bildschirm'
+      $('problem-text').textContent = placeProblem === 'other-screen'
+        ? windowShared
+          ? 'Der gewählte Bildschirm ist nicht der, auf dem dieser Browser ist. Wähle den Bildschirm, auf dem dein Fenster liegt.'
+          : 'Der geteilte Bildschirm ist nicht der, auf dem dieser Browser ist. Zeichnungen erscheinen deshalb in der Mitte.'
+        : 'Ist es minimiert, ganz verdeckt oder auf einem anderen Bildschirm? Hol es nach vorne und klicke auf „Noch einmal prüfen“. Bis dahin erscheinen Zeichnungen in der Mitte.'
+      $('problem-screen').hidden = !windowShared
+    }
+
+    /** Can the shared picture be placed on the screen right now? Says so when not. */
+    async function checkPlace() {
+      if (!host) return
+      const c = await capture()
+      console.info('peekaview light: Prüfung', c?.debug)
+      placeProblem = c?.image ? (c.debug?.problem ?? null) : placeProblem
+      renderAll()
+      return !placeProblem
+    }
+    $('problem-check').addEventListener('click', async () => {
+      $('problem-check').disabled = true
+      const ok = await checkPlace()
+      $('problem-check').disabled = false
+      if (ok) toast('Gefunden – Zeichnungen erscheinen jetzt genau an der Stelle.')
+    })
+    $('problem-screen').addEventListener('click', chooseScreen)
 
     // ---------------------------------------------------------------- finding a shared window
     $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'
@@ -669,7 +729,8 @@
       })
       renderAll()
       emit({ kind: 'status', ...status() })
-      toast('Fertig – das Hilfsfenster findet dein Fenster jetzt auf dem Bildschirm.')
+      // right away: is the window to be seen there?
+      if (await checkPlace()) toast('Fertig – dein Fenster ist gefunden. Zeichnungen erscheinen genau an der Stelle.')
     }
 
     // ---------------------------------------------------------------- for the helper (window.opener.pvLight)
