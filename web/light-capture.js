@@ -66,16 +66,63 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
     return capture
   }
   const scratch = document.createElement('canvas')
+  // black bars around the window (Chrome letterboxes a window whose shape changed) are not on
+  // the screen: searched for without them
+  const bars = blackBars(image, scratch)
+  const content = bars ? crop(image, bars) : image
+  if (bars) debug.bars = bars
   const info = (debug.search_result = {})
-  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(image, w, h, scratch), screenImage, image, info)
+  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(content, w, h, scratch), screenImage, content, info)
   debug.ms = Math.round(performance.now() - t0)
+  // (the pictures, for the diagnosis)
+  capture.searched = { screen: screenImage, window: content, best: info.best ?? null }
   if (!found) {
     debug.problem = 'not-found'
     debug.why = 'Fenster auf dem Bildschirm nicht gefunden'
     return capture
   }
   debug.found = { x: +found.x.toFixed(4), y: +found.y.toFixed(4), w: +found.w.toFixed(4), h: +found.h.toFixed(4), score: +found.score.toFixed(3), k: +found.k.toFixed(3) }
-  return { ...capture, picture: windowRect(found, monitor), screenImage, found }
+  // the whole picture (bars included) around the found window
+  const inner = windowRect(found, monitor)
+  const sx = inner.width / content.width
+  const sy = inner.height / content.height
+  const picture = bars ? { left: inner.left - bars.left * sx, top: inner.top - bars.top * sy, width: image.width * sx, height: image.height * sy } : inner
+  return { ...capture, picture, screenImage, found }
+}
+
+/**
+ * Black (or transparent) bars at the edges of a picture: {left, top, right, bottom} in its pixels,
+ * null when there are none.
+ */
+export function blackBars(image, scratch = document.createElement('canvas')) {
+  const w = Math.min(320, image.width)
+  const h = Math.max(1, Math.round((image.height * w) / image.width))
+  const g = scaledGray(image, w, h, scratch)
+  const dark = (x, y) => g.px[y * w + x] < 10
+  const row = (y) => Array.from({ length: w }, (_, x) => x).every((x) => dark(x, y))
+  const col = (x) => Array.from({ length: h }, (_, y) => y).every((y) => dark(x, y))
+  let top = 0
+  while (top < h * 0.45 && row(top)) top++
+  let bottom = 0
+  while (bottom < h * 0.45 && row(h - 1 - bottom)) bottom++
+  let left = 0
+  while (left < w * 0.45 && col(left)) left++
+  let right = 0
+  while (right < w * 0.45 && col(w - 1 - right)) right++
+  // a dark line or two is a window's edge, not a bar
+  const bar = (n) => (n >= 2 ? n : 0)
+  ;[top, bottom, left, right] = [top, bottom, left, right].map(bar)
+  if (!top && !bottom && !left && !right) return null
+  const f = image.width / w
+  return { left: Math.round(left * f), top: Math.round(top * f), right: Math.round(right * f), bottom: Math.round(bottom * f) }
+}
+
+function crop(image, bars) {
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, image.width - bars.left - bars.right)
+  canvas.height = Math.max(1, image.height - bars.top - bars.bottom)
+  canvas.getContext('2d').drawImage(image, bars.left, bars.top, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height)
+  return canvas
 }
 
 // a screen of several: where it is exactly – only when the presenter allowed it already

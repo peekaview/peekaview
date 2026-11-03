@@ -46,6 +46,8 @@ if (new URLSearchParams(location.search).get('browser') === 'firefox') {
 }
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
+// black bars above and below the window's picture (px), as Chrome adds when a window's shape changed
+window.qaLetterbox = 0
 const paintWindow = (ctx, t) => {
   const { width, height } = window.qaWindowAt
   ctx.fillStyle = '#f4f4f5'; ctx.fillRect(0, 0, width, height)
@@ -70,13 +72,15 @@ navigator.mediaDevices.getDisplayMedia = async () => {
   const surface = window.qaSurfaces.shift() ?? 'monitor'
   const canvas = document.createElement('canvas')
   canvas.width = surface === 'monitor' ? screen.width : window.qaWindowAt.width
-  canvas.height = surface === 'monitor' ? screen.height : window.qaWindowAt.height
+  const bar = surface === 'monitor' ? 0 : window.qaLetterbox
+  canvas.height = surface === 'monitor' ? screen.height : window.qaWindowAt.height + 2 * bar
   const ctx = canvas.getContext('2d')
   let t = 0
   const paint = () => {
     t++
-    if (surface === 'monitor') paintScreen(ctx, canvas.width, canvas.height, t)
-    else paintWindow(ctx, t)
+    if (surface === 'monitor') return paintScreen(ctx, canvas.width, canvas.height, t)
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.save(); ctx.translate(0, bar); paintWindow(ctx, t); ctx.restore()
   }
   paint()
   setInterval(paint, 100)

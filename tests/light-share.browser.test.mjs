@@ -187,8 +187,11 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '900')
     // the presenter picks a window – the fake one lies at qaWindowAt on the fake screen
-    await evaluate("qaSurfaces.push('window', 'window', 'monitor');document.querySelector('#name').value='Patrick';true")
-    const at = await evaluate('qaWindowAt')
+    // (Chrome letterboxes the window's picture: black bars above and below)
+    await evaluate("qaSurfaces.push('window', 'window', 'monitor');qaLetterbox=30;document.querySelector('#name').value='Patrick';true")
+    const win = await evaluate('qaWindowAt')
+    // the shared picture: the window and its bars
+    const at = { x: win.x, y: win.y - 30, width: win.width, height: win.height + 60 }
     // the same click opens the mini window (Picture-in-Picture document), no helper popup yet
     await browser('click', '#start')
     await tab('t1')
@@ -259,6 +262,7 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     const capture = await evaluate('({picture: pvLight.lastReveal.capture.picture, score: pvLight.lastReveal.capture.found.score, points: pvLight.lastReveal.points.length})')
     for (const [k, v] of [['left', at.x], ['top', at.y], ['width', at.width], ['height', at.height]]) assert.ok(Math.abs(capture.picture[k] - v) <= 3, `${k}: ${capture.picture[k]} ≈ ${v}`)
     assert.ok(capture.score > 0.8)
+    assert.deepEqual(await evaluate('pvLight.lastReveal.capture.debug.bars'), { left: 0, top: 30, right: 0, bottom: 30 }, 'the black bars are left out of the search')
     assert.ok(capture.points >= 3, 'the whole stroke')
     assert.doesNotMatch(await tabs(), /share-helper/, 'nothing pops up by itself')
 

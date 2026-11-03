@@ -164,7 +164,10 @@
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
-      <pre id="debug" hidden style="margin:0;padding:10px;border-radius:10px;background:#09090b;color:#a1a1aa;font-size:11px;white-space:pre-wrap"></pre>
+      <div id="debug-box" hidden style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;background:#09090b">
+        <canvas id="debug-view" style="width:100%;border-radius:6px"></canvas>
+        <pre id="debug" style="margin:0;color:#a1a1aa;font-size:11px;white-space:pre-wrap"></pre>
+      </div>
       <button class="pill stop" id="stop" type="button"></button>
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
     </section>
@@ -659,8 +662,32 @@
     function showDebug(what, capture) {
       console.info(`peekaview light: ${what}`, capture?.debug)
       if (!new URLSearchParams(location.search).has('debug')) return
-      $('debug').hidden = false
+      $('debug-box').hidden = false
       $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
+      // left: the screen with the best match (red) and the found place (green); right: the window
+      const view = $('debug-view')
+      const ctx = view.getContext('2d')
+      const searched = capture?.searched
+      if (!searched) {
+        view.hidden = true
+        return
+      }
+      view.hidden = false
+      const H = 220
+      const sw = Math.round((searched.screen.width * H) / searched.screen.height)
+      const ww = Math.round((searched.window.width * H) / searched.window.height)
+      view.width = sw + 12 + ww
+      view.height = H
+      ctx.drawImage(searched.screen, 0, 0, sw, H)
+      ctx.drawImage(searched.window, sw + 12, 0, ww, H)
+      const mark = (r, color) => {
+        if (!r) return
+        ctx.strokeStyle = color
+        ctx.lineWidth = 3
+        ctx.strokeRect(r.x * sw, r.y * H, r.w * sw, r.h * H)
+      }
+      mark(searched.best, '#ef4444')
+      mark(capture.found, '#22c55e')
     }
 
     // this page in front – then the browser may well lie over the shared window

@@ -167,6 +167,8 @@ export function locate(screenAt, windowAt, screenSize, windowSize, info = {}) {
   const r = 3
   const hit = best(fine.img, tpl, { x0: sized.x * f - r, y0: sized.y * f - r, x1: sized.x * f + r, y1: sized.y * f + r }, fine.ints)
   info.score = +hit.score.toFixed(3)
+  // where the best match was (also below the threshold) – for the diagnosis
+  info.best = { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height }
   if (hit.score < MIN_SCORE) return null
   return { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height, score: hit.score, k: sized.k }
 }
