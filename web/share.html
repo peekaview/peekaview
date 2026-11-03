@@ -664,6 +664,8 @@
       console.info(`peekaview light: ${what}`, capture?.debug)
       if (!new URLSearchParams(location.search).has('debug')) return
       $('debug-box').hidden = false
+      // at the top: to be seen without scrolling
+      if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
       $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
       // left: the screen with the best match (red) and the found place (green); right: the window
       const view = $('debug-view')

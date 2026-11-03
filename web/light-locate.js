@@ -22,6 +22,9 @@ const SCALES = (() => {
   return list
 })()
 export const MIN_SCORE = 0.55
+// … or most of its tiles match: a window partly covered by others
+const MIN_TILES = 0.7
+const TILES = { x: 6, y: 5 }
 
 /** A grayscale picture: {width, height, px: Float32Array} (0..255). */
 export function grayFrom({ width, height, data }) {
@@ -95,6 +98,35 @@ export function best(img, tpl, { x0 = 0, y0 = 0, x1 = img.width - tpl.width, y1 
   return top
 }
 
+/**
+ * How well a picture matches at (x, y), tile by tile: the mean of the best 60 % of its tiles –
+ * tiles covered by other windows drop out. Flat tiles (nothing to compare) are left out.
+ */
+export function tileScore(img, tpl, x, y, ints = integrals(img)) {
+  const scores = []
+  const tw = Math.floor(tpl.width / TILES.x)
+  const th = Math.floor(tpl.height / TILES.y)
+  if (tw < 4 || th < 4) return 0
+  for (let ty = 0; ty < TILES.y; ty++) {
+    for (let tx = 0; tx < TILES.x; tx++) {
+      const px = new Float32Array(tw * th)
+      for (let row = 0; row < th; row++) px.set(tpl.px.subarray((ty * th + row) * tpl.width + tx * tw, (ty * th + row) * tpl.width + tx * tw + tw), row * tw)
+      let mean = 0
+      for (const v of px) mean += v
+      mean /= px.length
+      let variance = 0
+      for (const v of px) variance += (v - mean) ** 2
+      if (variance / px.length < 4) continue
+      const at = { x0: x + tx * tw, y0: y + ty * th, x1: x + tx * tw, y1: y + ty * th }
+      scores.push(best(img, { width: tw, height: th, px }, at, ints).score)
+    }
+  }
+  if (scores.length < 4) return 0
+  scores.sort((a, b) => b - a)
+  const top = scores.slice(0, Math.max(4, Math.ceil(scores.length * 0.6)))
+  return top.reduce((a, b) => a + b, 0) / top.length
+}
+
 // the window's picture without its edge and title bar
 function inner(g) {
   const ex = Math.round(g.width * EDGE)
@@ -112,65 +144,102 @@ function inner(g) {
  * @param {(w: number, h: number) => {width, height, px}} windowAt the window's picture scaled to w × h
  * @param {{width, height}} screenSize, windowSize the pictures' own sizes (pixels)
  * @param {object} [info] filled with how the search went (best score and size, also when nothing is found)
+ * @param {{hints?: number[]}} [options] hints: likely sizes of the window on the screen's picture
+ *   relative to its own picture (1 when both have the same density) – searched first
  * @returns {{x, y, w, h, score, k} | null} the window's place, 0..1 of the screen; k: its size
  *   on the screen's picture relative to its own picture
  */
-export function locate(screenAt, windowAt, screenSize, windowSize, info = {}) {
+export function locate(screenAt, windowAt, screenSize, windowSize, info = {}, { hints = [] } = {}) {
+  const levels = new Map()
   const level = (factor) => {
+    if (levels.has(factor)) return levels.get(factor)
     const s = (COARSE_WIDTH * factor) / screenSize.width
     const img = screenAt(Math.round(screenSize.width * s), Math.round(screenSize.height * s))
-    return { s, img, ints: integrals(img) }
+    const lv = { s, img, ints: integrals(img) }
+    levels.set(factor, lv)
+    return lv
   }
   const at = (lv, k) => {
     const full = windowAt(Math.max(1, Math.round(windowSize.width * k * lv.s)), Math.max(1, Math.round(windowSize.height * k * lv.s)))
     return { full, tpl: inner(full) }
   }
-  // all sizes, everywhere, on small copies – the best few go on (a plain text window looks much
-  // the same at a slightly wrong size there)
-  const coarse = level(1)
-  const hits = []
-  for (const k of SCALES) {
-    const { tpl } = at(coarse, k)
-    if (tpl.width < 8 || tpl.height < 8 || tpl.width > coarse.img.width || tpl.height > coarse.img.height) continue
-    const hit = best(coarse.img, tpl, {}, coarse.ints)
-    if (hit.score > 0.25) hits.push({ ...hit, k })
+
+  // coarse → size → place, for some sizes
+  const search = (scales, stage) => {
+    // all positions, on small copies – the best few go on (a plain text window looks much the
+    // same at a slightly wrong size there). A tiny picture of a mostly white window matches any
+    // bright area: small ones count less.
+    const coarse = level(1)
+    const hits = []
+    for (const k of scales) {
+      const { tpl } = at(coarse, k)
+      if (tpl.width < 16 || tpl.height < 12 || tpl.width > coarse.img.width || tpl.height > coarse.img.height) continue
+      const hit = best(coarse.img, tpl, {}, coarse.ints)
+      if (hit.score > 0.25) hits.push({ ...hit, k, rank: hit.score * Math.min(1, tpl.width / 40) })
+    }
+    hits.sort((a, b) => b.rank - a.rank)
+    const result = { stage, coarse: +(hits[0]?.score ?? 0).toFixed(3) }
+    if (!hits.length) return { result }
+    const candidates = []
+    for (const h of hits) {
+      if (candidates.some((c) => Math.abs(c.x - h.x) <= 2 && Math.abs(c.y - h.y) <= 2 && Math.abs(c.k / h.k - 1) < 0.1)) continue
+      candidates.push(h)
+      if (candidates.length === 6) break
+    }
+    // size and place, on copies twice as large
+    const mid = level(MID_FACTOR)
+    const sized = []
+    for (const c of candidates) {
+      let top = null
+      for (const dk of [0.94, 0.97, 1, 1.03, 1.06]) {
+        const k = c.k * dk
+        const { tpl } = at(mid, k)
+        if (tpl.width > mid.img.width || tpl.height > mid.img.height) continue
+        const r = 4
+        const hit = best(mid.img, tpl, { x0: c.x * MID_FACTOR - r, y0: c.y * MID_FACTOR - r, x1: c.x * MID_FACTOR + r, y1: c.y * MID_FACTOR + r }, mid.ints)
+        if (hit.score > (top?.score ?? -1)) top = { ...hit, k }
+      }
+      if (top) sized.push(top)
+    }
+    if (!sized.length) return { result }
+    sized.sort((a, b) => b.score - a.score)
+    result.mid = +sized[0].score.toFixed(3)
+    // the place, to a pixel – for the best three; a match counts as a whole or tile by tile
+    const fine = level(FINE_FACTOR)
+    const f = FINE_FACTOR / MID_FACTOR
+    let winner = null
+    for (const c of sized.slice(0, 3)) {
+      const { full, tpl } = at(fine, c.k)
+      const r = 3
+      const hit = best(fine.img, tpl, { x0: c.x * f - r, y0: c.y * f - r, x1: c.x * f + r, y1: c.y * f + r }, fine.ints)
+      const tiles = tileScore(fine.img, tpl, hit.x, hit.y, fine.ints)
+      const strength = Math.max(hit.score / MIN_SCORE, tiles / MIN_TILES)
+      if (!winner || strength > winner.strength) winner = { hit, tiles, strength, full, tpl, k: c.k }
+    }
+    const { hit, tiles, full, tpl, k } = winner
+    result.k = +k.toFixed(3)
+    result.score = +hit.score.toFixed(3)
+    result.tiles = +tiles.toFixed(3)
+    // where the best match was (also below the threshold) – for the diagnosis
+    result.best = { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height }
+    const found = winner.strength >= 1 ? { ...result.best, score: hit.score, tiles, k } : null
+    return { result, found }
   }
-  hits.sort((a, b) => b.score - a.score)
-  info.coarse = +(hits[0]?.score ?? 0).toFixed(3)
-  if (!hits.length) return null
-  const candidates = []
-  for (const h of hits) {
-    if (candidates.some((c) => Math.abs(c.x - h.x) <= 2 && Math.abs(c.y - h.y) <= 2 && Math.abs(c.k / h.k - 1) < 0.1)) continue
-    candidates.push(h)
-    if (candidates.length === 6) break
-  }
-  // size and place, on copies twice as large
-  const mid = level(MID_FACTOR)
-  let sized = null
-  for (const c of candidates) {
-    for (const dk of [0.94, 0.97, 1, 1.03, 1.06]) {
-      const k = c.k * dk
-      const { tpl } = at(mid, k)
-      if (tpl.width > mid.img.width || tpl.height > mid.img.height) continue
-      const r = 4
-      const hit = best(mid.img, tpl, { x0: c.x * MID_FACTOR - r, y0: c.y * MID_FACTOR - r, x1: c.x * MID_FACTOR + r, y1: c.y * MID_FACTOR + r }, mid.ints)
-      if (hit.score > (sized?.score ?? -1)) sized = { ...hit, k }
+
+  // the likely sizes first (same density: 1), then all from a quarter to three times
+  const likely = [...new Set(hints.filter((k) => k > 0.1 && k < 10).map((k) => +k.toFixed(3)))].flatMap((k) => [0.9, 0.95, 1, 1.05, 1.1].map((d) => k * d))
+  let last = null
+  for (const [scales, stage] of [[likely, 'likely'], [SCALES, 'all']]) {
+    if (!scales.length) continue
+    const { result, found } = search(scales, stage)
+    if (!last || (result.score ?? -1) > (last.score ?? -1)) last = result
+    if (found) {
+      Object.assign(info, result)
+      return found
     }
   }
-  if (!sized) return null
-  info.mid = +sized.score.toFixed(3)
-  info.k = +sized.k.toFixed(3)
-  // the place, to a pixel
-  const fine = level(FINE_FACTOR)
-  const { full, tpl } = at(fine, sized.k)
-  const f = FINE_FACTOR / MID_FACTOR
-  const r = 3
-  const hit = best(fine.img, tpl, { x0: sized.x * f - r, y0: sized.y * f - r, x1: sized.x * f + r, y1: sized.y * f + r }, fine.ints)
-  info.score = +hit.score.toFixed(3)
-  // where the best match was (also below the threshold) – for the diagnosis
-  info.best = { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height }
-  if (hit.score < MIN_SCORE) return null
-  return { x: (hit.x - tpl.ex) / fine.img.width, y: (hit.y - tpl.ey) / fine.img.height, w: full.width / fine.img.width, h: full.height / fine.img.height, score: hit.score, k: sized.k }
+  Object.assign(info, last)
+  return null
 }
 
 /** A frame of a picture source scaled into w × h grayscale (in the browser). */

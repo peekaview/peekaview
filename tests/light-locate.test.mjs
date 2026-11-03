@@ -114,3 +114,46 @@ test('the window not active on the screen (other title bar, grey selection) is s
   const found = locate((w, h) => scaled(shot, w, h), (w, h) => scaled(win, w, h), shot, win)
   assert.ok(found && Math.abs(found.x * 1600 - at.x) <= 6 && Math.abs(found.y * 1000 - at.y) <= 6, JSON.stringify(found))
 })
+
+// a bright window with a little text: white, a title bar, a few short dark lines
+function textWindow(width, height, seed) {
+  let s = seed
+  const rand = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  let img = { width, height, px: new Float32Array(width * height).fill(248) }
+  img = fill(img, { x: 0, y: 0, w: width, h: 26 }, 225)
+  for (let line = 0; line < 14; line++) {
+    const y = 50 + line * 22
+    if (y + 6 > height) break
+    let x = 20
+    while (x < width * (0.3 + rand() * 0.5)) {
+      const w = Math.round(12 + rand() * 50)
+      img = fill(img, { x, y, w: Math.min(w, width - x - 1), h: 6 }, 40 + rand() * 60)
+      x += w + 8
+    }
+  }
+  return img
+}
+
+test('a bright text window among other bright windows, partly covered (desktop as on a real screen)', () => {
+  let screen = noise(1280, 720, 31, 40)
+  // other bright windows with text
+  screen = paste(screen, textWindow(420, 300, 32), { x: 40, y: 60 })
+  screen = paste(screen, textWindow(300, 380, 33), { x: 900, y: 200 })
+  const win = textWindow(665, 549, 34)
+  const at = { x: 330, y: 80 }
+  screen = paste(screen, win, at)
+  // panels over a good part of it
+  screen = paste(screen, textWindow(260, 200, 35), { x: 560, y: 440 })
+  screen = paste(screen, noise(300, 260, 36, 12), { x: 760, y: 120 })
+  // and a small copy of it elsewhere (a preview, a thumbnail): looks alike, but is not it
+  screen = paste(screen, scaled(win, 166, 137), { x: 1060, y: 40 })
+  // the page knows the likely size: both pictures with the same density (as on the DELL screen
+  // where this failed: the tiny copy of a white window matched an empty bright area)
+  const info = {}
+  const found = locate((w, h) => scaled(screen, w, h), (w, h) => scaled(win, w, h), screen, win, info, { hints: [1] })
+  assert.ok(found, JSON.stringify(info))
+  assert.ok(Math.abs(found.x * 1280 - at.x) <= 6 && Math.abs(found.y * 720 - at.y) <= 6, JSON.stringify(found))
+  assert.ok(Math.abs(found.k - 1) < 0.04)
+  assert.equal(info.stage, 'likely')
+  assert.ok(found.tiles >= 0.7, `most tiles match although a good part is covered: ${found.tiles} (whole: ${found.score})`)
+})

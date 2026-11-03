@@ -72,7 +72,11 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
   const content = bars ? crop(image, bars) : image
   if (bars) debug.bars = bars
   const info = (debug.search_result = {})
-  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(content, w, h, scratch), screenImage, content, info)
+  // likely sizes: both pictures with the same density (1) – or the screen's picture reduced by
+  // the browser while the window's has the full device pixels
+  const screenScale = screenImage.width / monitor.width
+  const hints = [1, screenScale / (window.devicePixelRatio || 1)]
+  const found = locate((w, h) => scaledGray(screenImage, w, h, scratch), (w, h) => scaledGray(content, w, h, scratch), screenImage, content, info, { hints })
   debug.ms = Math.round(performance.now() - t0)
   // (the pictures, for the diagnosis)
   capture.searched = { screen: screenImage, window: content, best: info.best ?? null }
