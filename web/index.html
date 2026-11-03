@@ -94,6 +94,10 @@
     .opened button { padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app:hover { color: #fafafa; }
+    /* "Bildschirmfreigabe light": secondary to the desktop app, its limits said right away */
+    #host-note { display: flex; flex-direction: column; gap: 10px; }
+    .light-offer { margin: 0; padding: 0 4px; color: #a1a1aa; font-size: 13px; text-align: center; }
+    .light-offer a { color: #fafafa; font-weight: 650; text-underline-offset: 3px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -155,6 +159,12 @@
 
     const $ = (id) => document.getElementById(id)
     $('host-note').append(downloadCard())
+    // sharing from the browser: only where browsers can (not on phones), and only as the small extra
+    if (navigator.mediaDevices?.getDisplayMedia) {
+      const light = Object.assign(document.createElement('p'), { className: 'light-offer', id: 'light-offer' })
+      light.innerHTML = 'Nichts installieren? <a href="share.html">Im Browser teilen (light)</a> – nur Zusehen und Zeigen, kein Steuern. Für alles andere PeekaView Desktop.'
+      $('host-note').append(light)
+    }
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
       const notice = document.createElement('button')
       notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`

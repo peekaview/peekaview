@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viewer",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "-d", "web", "8090"],
+      "port": 8090
+    },
+    {
+      "name": "light-fixture",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tests/light-fixture.mjs", "8091"],
+      "port": 8091
+    }
+  ]
+}

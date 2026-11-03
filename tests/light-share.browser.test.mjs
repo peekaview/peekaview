@@ -1,0 +1,137 @@
+// "Bildschirmfreigabe light" end to end in one browser: the presenter's page (fake whole screen),
+// its helper window and real viewers – connected over WebRTC, signaling between the tabs instead
+// of public relays (see light-fixture.mjs).
+import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import test from 'node:test'
+import { startServer } from './light-fixture.mjs'
+
+test('sharing from the browser: limits said, viewers let in, the helper jumps to pointers and draws back', { timeout: 180000 }, async () => {
+  const server = await startServer()
+  const base = `http://127.0.0.1:${server.address().port}`
+  const session = 'pv-light-' + process.pid
+  const browser = async (...args) => (await promisify(execFile)('agent-browser', ['--session', session, ...args], { encoding: 'utf8', timeout: 30000 })).stdout
+  const evaluate = async (code) => JSON.parse(await browser('eval', code))
+  const waitFor = (fn) => browser('wait', '--fn', fn)
+  const tab = (id) => browser('tab', id)
+  const tabs = async () => browser('tab', 'list')
+  try {
+    // offered on the start page – with its limits, secondary to the desktop app
+    await browser('open', base + '/')
+    await browser('set', 'viewport', '1280', '900')
+    await browser('wait', '#light-offer')
+    assert.match(await evaluate("document.querySelector('#light-offer').textContent"), /kein Steuern/)
+    assert.equal(await evaluate("document.querySelector('#light-offer').previousElementSibling.classList.contains('pv-download')"), true, 'below the desktop download')
+    await browser('click', '#light-offer a')
+    await browser('wait', '#start')
+
+    // the presenter's page says plainly what the browser cannot do and recommends the desktop app
+    const limits = await evaluate("document.querySelector('#limits').innerText")
+    assert.match(limits, /nur ein kleiner Teil von PeekaView/)
+    assert.match(limits, /Steuern geht nicht/)
+    assert.match(limits, /empfehlen wir PeekaView Desktop/)
+    assert.equal(await evaluate("new URL(document.querySelector('#desktop-link').href).pathname"), '/download.html')
+    await browser('click', '#setup-modes [data-mode=control]')
+    assert.match(await evaluate("document.querySelector('#setup-mode-note').textContent"), /Steuern lassen geht im Browser nicht/)
+    assert.equal(await evaluate("document.querySelector('#setup-modes [aria-pressed=true]').dataset.mode"), 'draw')
+    // no name, no share
+    await evaluate("localStorage.removeItem('pv-name');document.querySelector('#name').value='';true")
+    await browser('click', '#start')
+    assert.equal(await evaluate("!document.querySelector('#name-error').hidden && document.querySelector('#running').hidden"), true)
+    await browser('fill', '#name', 'Patrick')
+
+    // start: the picker (faked) and the helper window in the same click
+    await browser('click', '#start')
+    await waitFor("location.pathname.endsWith('share-helper.html') && window.pvHelper?.state === 'parked'")
+    assert.match(await tabs(), /t1\].*share\.html[\s\S]*t2\].*share-helper\.html/)
+    assert.match(await evaluate('document.body.innerText'), /Freigabe läuft[\s\S]*Noch niemand schaut zu/)
+    await tab('t1')
+    await waitFor("!document.querySelector('#running').hidden")
+    const link = await evaluate("document.querySelector('#link').value")
+    assert.match(link, /^http:\/\/127\.0\.0\.1:\d+\/#[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/, 'the normal viewer link: room secret and presenter key')
+    const room = link.split('#')[1]
+    assert.match(await evaluate("document.querySelector('#running').innerText"), /Bildschirmfreigabe light:.*nur Zusehen, Zeigen und Malen/)
+
+    // a viewer asks to come in – nobody watches without "Zulassen"
+    await browser('tab', 'new', `${base}/?name=Anna#${room}`)
+    await waitFor("document.querySelector('.pv-notice-text')?.textContent.includes('hereinlässt')")
+    await tab('t2')
+    await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
+    await tab('t1')
+    await browser('wait', '#requests [data-allow]')
+    assert.match(await evaluate("document.querySelector('#requests').innerText"), /Anna\s+möchte deinen Bildschirm sehen/)
+    await browser('click', '#requests [data-allow]')
+    await waitFor("document.querySelector('#viewers').innerText.includes('Anna')")
+
+    // the viewer sees the picture; remote control is shown as not possible, no clipboard
+    await tab('t3')
+    await waitFor("document.querySelector('video')?.videoWidth > 0")
+    assert.equal(await evaluate("document.querySelector('.pv-notice').hidden"), true)
+    assert.equal(await evaluate("[...document.querySelectorAll('.pv-dock [data-tool]')].filter(b=>!b.hidden).map(b=>b.dataset.tool+(b.classList.contains('unavailable')?'!':'')).join()"), 'point,draw,control!')
+    assert.equal(await evaluate("document.querySelector('[data-clip]').hidden"), true)
+    assert.match(await evaluate("document.querySelector('.pv-toast span').textContent"), /im Browser.*Steuern nicht/)
+    await browser('click', '.pv-dock [data-tool=control]')
+    assert.match(await evaluate("document.querySelector('.pv-toast span').textContent"), /PeekaView Desktop/)
+    assert.equal(await evaluate("document.querySelector('.pv-viewer').dataset.tool"), 'point', 'the control tool is never chosen')
+
+    // the viewer points: the helper jumps there and shows a still picture with the pointer
+    const target = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {x:Math.round(r.left+r.width*.6),y:Math.round(r.top+r.height*.4),nx:.6,ny:.4}})()")
+    await browser('mouse', 'move', String(target.x), String(target.y))
+    await browser('mouse', 'down')
+    await browser('mouse', 'up')
+    await tab('t2')
+    await waitFor("pvHelper.state === 'focus'")
+    const focus = await evaluate("({part:pvHelper.part,who:document.querySelector('#focus-who').textContent,shot:document.querySelector('#shot').width,cursor:[...document.querySelectorAll('.pv-cursor .pv-name')].map(n=>n.textContent)})")
+    assert.equal(focus.who, 'Anna zeigt hier')
+    assert.ok(focus.shot > 0, 'a still picture of the shared screen')
+    assert.deepEqual(focus.cursor, ['Anna'])
+    const { part } = focus
+    assert.ok(part.x < target.nx && target.nx < part.x + part.w && part.y < target.ny && target.ny < part.y + part.h, `the spot ${JSON.stringify(part)} contains the pointer`)
+
+    // the presenter draws into the helper: the viewer sees the stroke with the presenter's name
+    const box = await evaluate("(()=>{const r=document.querySelector('#stage').getBoundingClientRect();return {l:Math.max(0,r.left),t:Math.max(0,r.top),w:Math.min(innerWidth,r.right)-Math.max(0,r.left),h:Math.min(innerHeight,r.bottom)-Math.max(0,r.top)}})()")
+    await browser('mouse', 'move', String(Math.round(box.l + box.w * 0.3)), String(Math.round(box.t + box.h * 0.5)))
+    await browser('mouse', 'down')
+    for (const f of [0.35, 0.4, 0.45, 0.5, 0.55]) {
+      await browser('mouse', 'move', String(Math.round(box.l + box.w * f)), String(Math.round(box.t + box.h * 0.55)))
+    }
+    await browser('mouse', 'up')
+    await tab('t3')
+    await waitFor("[...document.querySelectorAll('.pv-cursor .pv-name')].some(n=>n.textContent==='Patrick')")
+
+    // and back into the corner once nobody points any more
+    await tab('t2')
+    await waitFor("pvHelper.state === 'parked'")
+    assert.match(await evaluate('document.body.innerText'), /Anna schaut zu/)
+
+    // "Zusehen": the viewer only watches – still told why there is no remote control
+    await tab('t1')
+    await browser('click', '#running-modes [data-mode=view]')
+    await tab('t3')
+    await waitFor("document.querySelector('.pv-mode').dataset.mode === 'view'")
+    assert.equal(await evaluate("[...document.querySelectorAll('.pv-dock [data-tool]')].filter(b=>!b.hidden).map(b=>b.dataset.tool).join()"), 'control')
+
+    // somebody else is turned away
+    await browser('tab', 'new', `${base}/?name=Bob#${room}`)
+    await tab('t1')
+    await waitFor("document.querySelector('#requests')?.innerText.includes('Bob')")
+    await browser('click', '#requests [data-deny]')
+    await tab('t4')
+    await waitFor("document.querySelector('.pv-notice-text').textContent.includes('abgelehnt')")
+
+    // stopping ends it everywhere: the helper closes, the viewer waits for the next share
+    await tab('t1')
+    await browser('click', '#stop')
+    await waitFor("!document.querySelector('#ended').hidden")
+    await tab('t3')
+    await waitFor("document.querySelector('.pv-notice-text').textContent === 'Noch keine Bildschirmfreigabe aktiv.'")
+    assert.doesNotMatch(await tabs(), /share-helper/)
+  } finally {
+    try {
+      await browser('close')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+})

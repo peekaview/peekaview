@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PeekaView light</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #18181b; color: #fafafa; }
+    [hidden] { display: none !important; }
+    body { font: 500 13px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; user-select: none; }
+    /* in the corner: who watches, who wants in */
+    #parked { box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+    .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row > .owl { flex: none; display: flex; color: #fafafa; }
+    .title { font-weight: 700; }
+    .light { padding: 1px 7px; border-radius: 999px; background: rgba(234,179,8,.14); color: #fde68a; font-size: 11px; font-weight: 650; }
+    .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
+    .muted { color: #a1a1aa; }
+    .thumb { flex: none; width: 64px; height: 40px; border-radius: 6px; background: #000; object-fit: contain; }
+    button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 28px; padding: 0 10px; border: 0; border-radius: 8px; background: #3f3f46; color: #fafafa; font: 650 12px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+    button:hover { background: #52525b; }
+    button.primary { background: #ef4444; }
+    button.primary:hover { background: #dc2626; }
+    button.icon { width: 28px; padding: 0; }
+    .request { padding: 7px 8px; border-radius: 9px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.1); }
+    /* jumped to a spot: the frozen picture under the helper 1:1, with the drawing on top */
+    #focus { position: fixed; inset: 0; overflow: hidden; background: #09090b; cursor: crosshair; touch-action: none; }
+    #stage { position: absolute; }
+    #shot { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #focus-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+    #focus-bar > * { pointer-events: auto; }
+    .chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; height: 28px; padding: 0 11px; border-radius: 999px; background: rgba(24,24,27,.85); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #focus-bar .chip { flex: 0 1 auto; }
+    #focus-bar .spacer { flex: 1; }
+    #focus-close { box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+    #focus-hint { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: calc(100% - 16px); color: #d4d4d8; font-size: 11.5px; pointer-events: none; }
+    /* the edge says: this is not your screen, it is a picture of it */
+    #focus::after { content: ""; position: absolute; inset: 0; border: 3px solid #ef4444; border-radius: 2px; pointer-events: none; }
+    #waiting { box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 100%; padding: 12px 14px; }
+  </style>
+</head>
+<body>
+  <div id="waiting"><span class="owl" id="owl-waiting"></span><span>Wähle im Browser aus, was du teilen möchtest …</span></div>
+
+  <div id="parked" hidden>
+    <div class="row"><span class="owl" id="owl"></span><span><span class="title">Freigabe läuft</span> <span class="light">light</span></span><button class="icon" id="stop" title="Freigabe beenden" aria-label="Freigabe beenden"></button></div>
+    <div class="row"><video class="thumb" id="video" muted autoplay playsinline></video><span class="muted" id="viewers">Noch niemand schaut zu</span></div>
+    <div class="row"><button id="copy">Link kopieren</button><button id="show" title="Den geteilten Bildschirm hier zeigen und selbst darauf zeigen oder malen">Selbst zeigen</button></div>
+    <div id="requests"></div>
+  </div>
+
+  <div id="focus" hidden>
+    <div id="stage"><canvas id="shot"></canvas></div>
+    <div id="focus-bar"><span class="chip" id="focus-who"></span><span class="spacer"></span><button class="icon" id="focus-close" title="Zurück in die Ecke" aria-label="Zurück in die Ecke"></button></div>
+    <span class="chip" id="focus-hint">Standbild – du kannst hier auch selbst zeigen und malen.</span>
+  </div>
+
+  <script type="module">
+    // The helper window of "Bildschirmfreigabe light" (opened by share.html).
+    // Waits small in a corner of the screen. When a viewer points or draws, it jumps to that spot,
+    // grows, and shows a still picture of the shared screen there with the drawing animated on
+    // top – like a pane of glass over the spot – and slips back into the corner afterwards. The
+    // presenter can point and draw into it too; that goes to the viewers. While somebody draws
+    // (the presenter included) it stays.
+    //
+    // Browser limits (see light-geometry.js for the coordinates):
+    //   - Only windows a page opened itself can be moved and resized (window.open with "popup"),
+    //     and only within the screen. Firefox may forbid it (dom.disable_window_move_resize).
+    //   - A page cannot keep a window on top of other apps; focus() brings it forward where the
+    //     browser allows it (Chrome mostly, Firefox and Safari rarely).
+    //   - Only a shared *screen* maps to screen positions. For a window or a tab the helper shows
+    //     the whole picture in the middle of the screen instead.
+    import { Annotations } from './annotate.js'
+    import { icon, owl } from './icons.js'
+    import { HOST_ID } from './light-host.js'
+    import { fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, visiblePart } from './light-geometry.js'
+
+    const $ = (id) => document.getElementById(id)
+    $('owl').innerHTML = owl(20)
+    $('owl-waiting').innerHTML = owl(24)
+    $('stop').innerHTML = icon('stop', 14)
+    $('focus-close').innerHTML = icon('close', 15)
+    $('copy').prepend(document.createRange().createContextualFragment(icon('copy', 13)))
+    $('show').prepend(document.createRange().createContextualFragment(icon('draw', 13)))
+
+    const mac = /Mac/.test(navigator.platform)
+    const PARKED_WIDTH = 300
+    const SPOT = { width: 560, height: 400 }
+    // back into the corner after this long without anybody pointing or drawing
+    const AFTER_PING = 3500
+    const AFTER_DRAW = 6000
+
+    const api = window.opener?.pvLight
+    if (!api) {
+      document.body.textContent = 'Dieses Fenster gehört zu einer Bildschirmfreigabe im Browser. Starte sie auf peekaview.de.'
+      throw new Error('no share')
+    }
+
+    let status = { sharing: false }
+    let started = false
+    let state = 'waiting' // waiting | parked | focus
+    let part = null // the part of the picture (0..1) the focus shows
+    let stageBox = null // where the whole picture lies in the window (CSS px)
+    let idleTimer
+    let drawing = 0 // strokes in progress (viewers and presenter)
+    const ann = new Annotations($('stage'), { voice: false })
+
+    // ---------------------------------------------------------------- from the share page
+    function onStatus(s) {
+      status = s
+      if (s.peers) ann.handle({ t: 'peers', list: s.peers })
+      if (s.sharing && !started) {
+        started = true
+        const video = $('video')
+        try {
+          video.srcObject = api.stream
+          video.play().catch(() => {})
+        } catch {}
+        park()
+      } else if (!s.sharing && started) {
+        window.close()
+      }
+      if (state === 'parked') renderParked()
+    }
+
+    function onAnnotation(m) {
+      if (m.t === 'peers') return ann.handle(m)
+      if (m.t === 'state') return ann.handle(m)
+      if (!started) return
+      if (m.t === 'draw') {
+        if (m.s === 'start') drawing++
+        if (m.s === 'end') drawing = Math.max(0, drawing - 1)
+      }
+      // pointing or (starting to) draw brings the helper to the spot – while it shows one
+      // already, only a new ping or stroke outside of it moves it on
+      const trigger = m.t === 'ping' || (m.t === 'draw' && m.s !== 'end')
+      const fresh = m.t === 'ping' || m.s === 'start'
+      if (trigger && !jumping && (state !== 'focus' || (fresh && part && !inside(m, part, spotLayout ? 0.08 : 0)))) jump(m)
+      if (state === 'focus' || trigger) {
+        ann.handle(m)
+        // (the ring is short: once more when the helper has arrived)
+        if (m.t === 'ping') setTimeout(() => state === 'focus' && ann.ping(m.from, m.x, m.y), 450)
+        if (['ping', 'draw'].includes(m.t)) {
+          showWho(m.from)
+          idle(m.t === 'ping' ? AFTER_PING : AFTER_DRAW)
+        }
+      }
+    }
+
+    // ---------------------------------------------------------------- in the corner
+    function renderParked() {
+      const viewers = status.viewers ?? []
+      $('viewers').textContent = viewers.length === 0 ? 'Noch niemand schaut zu' : viewers.length === 1 ? `${viewers[0].name} schaut zu` : `${viewers.length} schauen zu`
+      $('show').hidden = !viewers.length
+      $('requests').replaceChildren(...(status.requests ?? []).map((r) => {
+        const row = document.createElement('div')
+        row.className = 'row request'
+        row.innerHTML = '<span></span><button data-deny>Ablehnen</button><button class="primary" data-allow>Zulassen</button>'
+        row.querySelector('span').textContent = `${r.name} möchte zusehen`
+        row.querySelector('[data-allow]').addEventListener('click', () => api.admit(r.peer, true))
+        row.querySelector('[data-deny]').addEventListener('click', () => api.admit(r.peer, false))
+        return row
+      }))
+      if (state === 'parked') placeParked()
+    }
+
+    function park() {
+      clearTimeout(idleTimer)
+      state = 'parked'
+      part = null
+      ann.reset()
+      $('waiting').hidden = true
+      $('focus').hidden = true
+      $('parked').hidden = false
+      renderParked()
+    }
+
+    function chrome() {
+      return { x: Math.max(0, window.outerWidth - window.innerWidth), y: Math.max(0, window.outerHeight - window.innerHeight) }
+    }
+
+    // bottom right of the usable area of the screen
+    function placeParked() {
+      const c = chrome()
+      const height = Math.ceil($('parked').scrollHeight)
+      const w = PARKED_WIDTH + c.x
+      const h = height + c.y
+      moveWindow((screen.availLeft ?? 0) + screen.availWidth - w - 16, (screen.availTop ?? 0) + screen.availHeight - h - 16, w, h)
+    }
+
+    function moveWindow(left, top, width, height) {
+      try {
+        window.resizeTo(Math.round(width), Math.round(height))
+        window.moveTo(Math.round(left), Math.round(top))
+      } catch {}
+    }
+
+    $('stop').addEventListener('click', () => api.stop())
+    $('copy').addEventListener('click', () => api.copyLink())
+    $('show').addEventListener('click', () => jump(null))
+    $('focus-close').addEventListener('click', park)
+    window.addEventListener('keydown', (e) => e.key === 'Escape' && state === 'focus' && park())
+
+    // ---------------------------------------------------------------- jumping to a spot
+    /** To the spot of `point` (0..1 of the picture) – or, with null, the whole picture. */
+    let jumping = false
+    async function jump(point) {
+      jumping = true
+      try {
+        await jumpTo(point)
+      } finally {
+        jumping = false
+      }
+    }
+
+    async function jumpTo(point) {
+      const video = status.video ?? {}
+      const monitor = monitorRect(screen, { mac, details: await screenDetails() })
+      // a shared screen (this one): 1:1 over the spot; otherwise the whole picture in the middle
+      const spot = point && status.surface === 'monitor' && matchesScreen(video, monitor)
+      await snapshot()
+      state = 'focus'
+      $('waiting').hidden = true
+      $('parked').hidden = true
+      $('focus').hidden = false
+      const c = chrome()
+      if (spot) {
+        const r = spotRect(point, monitor, SPOT)
+        // the content area (not the title bar) over the spot
+        moveWindow(r.left - c.x / 2, r.top - (c.y - c.x / 2), r.width + c.x, r.height + c.y)
+        layoutSpot(monitor)
+        // where the browser actually put it (it keeps windows on the screen)
+        setTimeout(() => state === 'focus' && layoutSpot(monitor), 150)
+      } else {
+        const box = { width: screen.availWidth * 0.6, height: screen.availHeight * 0.6 }
+        const f = fit({ width: video.width || 16, height: video.height || 9 }, box)
+        moveWindow((screen.availLeft ?? 0) + (screen.availWidth - f.width) / 2, (screen.availTop ?? 0) + (screen.availHeight - f.height) / 2, f.width + c.x, f.height + c.y)
+        layoutWhole()
+        setTimeout(() => state === 'focus' && !spotLayout && layoutWhole(), 150)
+      }
+      try { window.focus() } catch {}
+      if (!point) {
+        showWho(HOST_ID)
+        idle(AFTER_DRAW * 2)
+      }
+    }
+
+    let spotLayout = false
+    function layoutSpot(monitor) {
+      spotLayout = true
+      const c = chrome()
+      const content = { left: window.screenX + c.x / 2, top: window.screenY + c.y - c.x / 2, width: window.innerWidth, height: window.innerHeight }
+      place(stageInContent(content, monitor))
+      part = visiblePart(content, monitor)
+    }
+
+    function layoutWhole() {
+      spotLayout = false
+      const video = status.video ?? {}
+      place(fit({ width: video.width || 16, height: video.height || 9 }, { width: window.innerWidth, height: window.innerHeight }))
+      part = { x: 0, y: 0, w: 1, h: 1 }
+    }
+
+    window.addEventListener('resize', () => {
+      if (state === 'parked') return
+      if (state === 'focus' && !spotLayout) layoutWhole()
+    })
+
+    function place(box) {
+      stageBox = box
+      Object.assign($('stage').style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
+      ann.resize()
+    }
+
+    // a still picture of the shared screen (taken while the helper still sits in its corner)
+    async function snapshot() {
+      const canvas = $('shot')
+      const track = api.stream?.getVideoTracks()[0]
+      let frame = null
+      try {
+        if (track && typeof ImageCapture === 'function') frame = await new ImageCapture(track).grabFrame()
+      } catch {}
+      const video = $('video')
+      const source = frame ?? (video.videoWidth ? video : null)
+      if (!source) return
+      canvas.width = source.width || video.videoWidth
+      canvas.height = source.height || video.videoHeight
+      canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height)
+      frame?.close?.()
+    }
+
+    // a screen of several: where it is exactly – only when the presenter allowed it already
+    // (Chrome's "window management"; we never ask for it here)
+    let detailsAllowed
+    async function screenDetails() {
+      try {
+        if (!('getScreenDetails' in window)) return null
+        detailsAllowed ??= (await navigator.permissions.query({ name: 'window-management' })).state === 'granted'
+        if (!detailsAllowed) return null
+        return (await window.getScreenDetails()).currentScreen
+      } catch {
+        return null
+      }
+    }
+
+    function showWho(id) {
+      const p = (status.peers ?? []).find((x) => x.id === id)
+      const chip = $('focus-who')
+      chip.textContent = ''
+      const dot = document.createElement('i')
+      dot.className = 'dot'
+      dot.style.background = p?.color ?? '#a1a1aa'
+      dot.style.boxShadow = 'none'
+      chip.append(dot, id === HOST_ID ? 'Du zeigst' : `${p?.name ?? 'Jemand'} zeigt hier`)
+    }
+
+    function idle(ms) {
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(function check() {
+        // nobody lets go of a stroke halfway: wait for it
+        if (drawing > 0 || down) return (idleTimer = setTimeout(check, 1000))
+        park()
+      }, ms)
+    }
+
+    // ---------------------------------------------------------------- the presenter draws here
+    let down = null
+    let lastMove = 0
+    const pos = (e) => {
+      const r = $('stage').getBoundingClientRect()
+      return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }
+    }
+    const focusEl = $('focus')
+    focusEl.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || state !== 'focus') return
+      e.preventDefault()
+      focusEl.setPointerCapture?.(e.pointerId)
+      const p = pos(e)
+      down = { x: e.clientX, y: e.clientY, p, drawing: false }
+      clearTimeout(idleTimer)
+      showWho(HOST_ID)
+    })
+    focusEl.addEventListener('pointermove', (e) => {
+      if (state !== 'focus') return
+      const now = performance.now()
+      if (now - lastMove < (down ? 16 : 33)) return
+      lastMove = now
+      const p = pos(e)
+      if (down && !down.drawing && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) {
+        down.drawing = true
+        ann.draw(HOST_ID, 'start', down.p.x, down.p.y)
+        api.annotate({ t: 'draw', s: 'start', ...down.p })
+      }
+      if (down?.drawing) {
+        ann.draw(HOST_ID, 'move', p.x, p.y)
+        api.annotate({ t: 'draw', s: 'move', ...p })
+      } else {
+        api.annotate({ t: 'ptr', ...p })
+      }
+    })
+    const release = (e) => {
+      if (!down) return
+      const p = pos(e)
+      if (down.drawing) {
+        ann.draw(HOST_ID, 'end', p.x, p.y)
+        api.annotate({ t: 'draw', s: 'end', ...p })
+      } else {
+        // a click: a ping
+        ann.ping(HOST_ID, p.x, p.y)
+        api.annotate({ t: 'ping', ...p })
+      }
+      down = null
+      idle(AFTER_DRAW)
+    }
+    focusEl.addEventListener('pointerup', release)
+    focusEl.addEventListener('pointercancel', release)
+    focusEl.addEventListener('pointerleave', () => !down && state === 'focus' && api.annotate({ t: 'hide' }))
+
+    // ---------------------------------------------------------------- connected to the share page
+    const unsubscribe = api.subscribe((e) => {
+      if (e.kind === 'status') onStatus(e)
+      else if (e.kind === 'ann') onAnnotation(e.m)
+    })
+    window.addEventListener('pagehide', () => unsubscribe())
+    // the share page is gone (closed, reloaded): so is the share
+    setInterval(() => {
+      if (!window.opener || window.opener.closed) window.close()
+    }, 1000)
+
+    // (tests and debugging)
+    window.pvHelper = { get state() { return state }, get part() { return part }, get stage() { return stageBox }, jump, park }
+  </script>
+</body>
+</html>

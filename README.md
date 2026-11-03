@@ -2,7 +2,8 @@
 
 Screen sharing with **pointing, drawing, remote control, voice and session recording**, peer-to-peer and without a server of its own.
 
-- Sharing always goes through the **native desktop client** (Rust/Tauri), a small toolbar at the top of the screen.
+- Sharing goes through the **native desktop client** (Rust/Tauri), a small toolbar at the top of the screen.
+  - **Bildschirmfreigabe light** (`share.html`) shares straight from a browser as a low-barrier extra. It covers only a small part: watching, pointing and drawing (see below).
 - Watching only needs a **browser**: either a **static website** or the embeddable module / React component.
 
 ```
@@ -31,6 +32,7 @@ and screen, audio and clipboard data travel over WebRTC.
 | `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
 | `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
 | `web/desktop/` | UI of the desktop client in the same design |
+| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`) and its helper window (`light-geometry.js`) |
 | `android/` | Android app: watching (bundled viewer) and sharing the phone's screen – see `android/README.md` |
 | `build.sh` | Builds the macOS app and installs it to `/Applications` |
 | `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
@@ -280,6 +282,35 @@ The viewer site opens with a small start page:
 - **Tags:** whether the link is **permanent** or **temporary** (one share only), whether it has a **PIN**, and whether it offers **remote access**.
 - **Online check:** a "ping" over the room's encrypted signaling. The presenter's signed answer creates no join request.
 - **Connecting:** a big **Verbinden** button joins the selected room; an online room can be joined directly.
+
+## Bildschirmfreigabe light (sharing from the browser)
+
+`share.html` on peekaview.de shares a screen, window or tab straight from the browser, without PeekaView Desktop. The start page offers it below the desktop download, never instead of it.
+- **Same protocol as the desktop host** (`light-host.js`): Nostr signaling with a fresh room key, the normal link, "Zulassen"/"Ablehnen" for every viewer, one WebRTC connection per viewer (picture as slot 0, the `pv` data channel). Viewers need nothing new.
+- **What works:** the modes **Zusehen** and **Zeigen & Malen**, the participant list, TURN credentials from the service (only for the origin peekaview.de).
+- **What does not:** remote control (browsers cannot inject input), voice, the shared clipboard, recording, several windows. The state says `light: true`. The viewer then shows "Steuern" greyed out, explains it on click and once when joining, and hides the clipboard.
+- **Saying so:** the start page, the share page before and during the share, and its end screen say that the browser covers only a small part, and link to `download.html` (PeekaView Desktop, recommended).
+
+**The helper window** (`share-helper.html`) opens with the share as a small popup in the bottom right corner of the screen: who watches, join requests, copy link, stop.
+- A viewer points or starts to draw → the helper jumps to that spot and grows. It shows a still picture of the shared screen there, 1:1 under the window like a pane of glass, with the pointer and the stroke animated on top. After 3.5 s (point) or 6 s (stroke) without anybody pointing or drawing, it goes back into the corner.
+- The presenter can draw and point into it, too ("Selbst zeigen" from the corner); viewers see it with the presenter's name. While anybody draws, it stays.
+- **Position:** normalized picture coordinates × screen size + the screen's corner (`light-geometry.js`). After moving, the helper reads where the browser actually put it and lays the picture under it accordingly, so the picture under the pointer is right even when the position is off.
+
+**What browsers allow** (tested in Chromium with a fake screen; Firefox and Safari not yet on real machines):
+
+| | Chrome, Edge | Firefox | Safari |
+|---|---|---|---|
+| Opening the helper | in the same click as the screen picker | same | Safari spends the click on the picker: the page offers "Hilfsfenster öffnen" |
+| Moving and resizing it | yes (popups only, inside the screen) | yes, unless `dom.disable_window_move_resize` | yes (popups only) |
+| Bringing it to the front | `focus()` mostly works | not over other windows (`dom.disable_window_flip`) | rarely |
+| Screen corner | estimated from `availLeft`/`availTop` (on a Mac minus about 25 px menu bar); exact with the "window management" permission if already granted (`getScreenDetails`, never requested) | exact (`screen.left`/`top`) | estimated |
+| Still picture | `ImageCapture.grabFrame()` | the live `<video>` | the live `<video>` |
+
+- **Always:** a page cannot keep a window on top of other apps; the helper can end up behind them.
+- Only a shared **whole screen** maps to positions, and only the screen the helper is on (same aspect ratio as the picture). For a window, a tab or another monitor the helper shows the whole picture in the middle of the screen instead.
+- When the whole screen is shared, the helper is part of the picture: viewers see it jump, too.
+- Popup blockers let the helper through only right in a click. Phones and tablets cannot share from the browser at all, so the start page does not offer it there.
+- Closing or reloading the share page ends the share.
 
 ## Embedding the viewer
 

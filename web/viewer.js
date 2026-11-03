@@ -24,6 +24,8 @@ const MODE_ICONS = { view: 'view', draw: 'draw', control: 'control' }
 const TOOLS = { view: [], draw: ['point', 'draw'], control: ['point', 'draw', 'control'] }
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'Fn', 'OS']
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+// a share from a browser ("Bildschirmfreigabe light") cannot be controlled
+const LIGHT_CONTROL = 'Steuern geht hier nicht: Die Freigabe läuft im Browser. Dafür braucht die teilende Person PeekaView Desktop.'
 
 const CSS = `
 .pv-viewer:fullscreen { width: 100%; height: 100%; background: var(--pv-bg); }
@@ -87,6 +89,8 @@ const CSS = `
 .pv-dock button:hover:not(:disabled) { background: rgba(255, 255, 255, .09); }
 .pv-dock button.active { background: var(--pv-fg); color: var(--pv-bg); }
 .pv-dock button:disabled { opacity: .28; cursor: default; }
+/* shared from a browser ("light"): remote control is not possible – the button says why */
+.pv-dock button.unavailable { opacity: .38; cursor: help; }
 .pv-dock button::after { content: attr(data-tip); position: absolute; top: calc(100% + 10px); left: 50%; transform: translate(-50%, -4px); padding: 5px 9px; border-radius: 8px; background: #18181b; border: 1px solid var(--pv-line); white-space: nowrap; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .12s, transform .12s; }
 .pv-dock button:hover::after { opacity: 1; transform: translate(-50%, 0); }
 .pv-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--pv-line); }
@@ -209,6 +213,7 @@ export function mountViewer(el, options) {
   let hostPresent = false
   let tool = 'point'
   let hasFrame = false
+  let lightNoticed = false
   let error = ''
   let signaling
   let pc
@@ -483,6 +488,7 @@ export function mountViewer(el, options) {
     me = undefined
     hostPresent = false
     offered = false
+    lightNoticed = false
     state = { mode: 'view' }
     voice.setEnabled(false)
     resetVideo()
@@ -506,6 +512,10 @@ export function mountViewer(el, options) {
         // when remote control is granted, switch straight to the control tool
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
+        if (m.light && !lightNoticed) {
+          lightNoticed = true
+          toast('Diese Freigabe läuft im Browser („light“): Zusehen und Zeigen geht, Steuern nicht.', 6000)
+        }
         voice.setEnabled(voiceEnabled && state.voice_enabled === true)
         // "Resize/Anordnen erlauben": the windows where they are on the presenter's screen
         wm.setWindows(m.windows ?? [], { control: m.mode === 'control', mirror: m.mode !== 'view' && m.resize === true, screens: m.screens ?? [] })
@@ -766,12 +776,20 @@ export function mountViewer(el, options) {
     q('.pv-rec').hidden = !hostPresent || !state.recording
     q('.pv-paused').hidden = !hostPresent || state.mode !== 'control' || state.reachable !== false || !(state.windows ?? []).length
     q('.pv-dock').hidden = !toolbar || (!allowed.length && !me)
-    for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.hidden = !allowed.includes(b.dataset.tool)
+    const lightShare = hostPresent && state.light === true
+    for (const b of el.querySelectorAll('.pv-dock [data-tool]')) {
+      const unavailable = lightShare && b.dataset.tool === 'control'
+      b.hidden = !allowed.includes(b.dataset.tool) && !unavailable
+      b.classList.toggle('unavailable', unavailable)
+      b.dataset.tip = unavailable ? 'Steuern geht nur mit PeekaView Desktop' : b.dataset.tool === 'control' ? 'Steuern' : b.dataset.tip
+      b.setAttribute('aria-label', unavailable ? LIGHT_CONTROL : b.dataset.tip)
+    }
     q('[data-clear]').hidden = !allowed.length
     q('.pv-tools-sep').hidden = !allowed.length || !me
     q('[data-voice]').hidden = !voiceEnabled || state.voice_enabled !== true || !me
     const clipButton = q('[data-clip]')
-    clipButton.hidden = !me || !hostPresent
+    // (a browser share has no shared clipboard)
+    clipButton.hidden = !me || !hostPresent || lightShare
     if (clipItems.length) clipButton.dataset.count = String(clipItems.length)
     else delete clipButton.dataset.count
     clipButton.classList.toggle('open', !!clipPanel)
@@ -786,12 +804,12 @@ export function mountViewer(el, options) {
   }
 
   let toastTimer
-  function toast(text) {
+  function toast(text, ms = 3500) {
     const t = q('.pv-toast')
     t.querySelector('span').textContent = text
     t.hidden = false
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => (t.hidden = true), 3500)
+    toastTimer = setTimeout(() => (t.hidden = true), ms)
   }
 
   function setTool(t) {
@@ -832,7 +850,7 @@ export function mountViewer(el, options) {
     )
   }
 
-  for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => setTool(b.dataset.tool))
+  for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => (b.classList.contains('unavailable') ? toast(LIGHT_CONTROL, 6000) : setTool(b.dataset.tool)))
   q('[data-clear]').addEventListener('click', clear)
   q('[data-fixed-rooms]').addEventListener('click', () => options.onRooms?.())
   // full screen: on a phone the whole display for the shared windows (controlling with a finger)
