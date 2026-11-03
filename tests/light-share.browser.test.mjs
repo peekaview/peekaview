@@ -21,19 +21,16 @@ test('sharing from the browser: limits said, viewers let in, the helper jumps to
     await browser('open', base + '/')
     await browser('set', 'viewport', '1280', '900')
     await browser('wait', '#light-offer')
-    assert.match(await evaluate("document.querySelector('#light-offer').textContent"), /kein Steuern/)
+    assert.match(await evaluate("document.querySelector('#light-offer').textContent"), /einfache Variante, ohne Steuern/)
     assert.equal(await evaluate("document.querySelector('#light-offer').previousElementSibling.classList.contains('pv-download')"), true, 'below the desktop download')
     await browser('click', '#light-offer a')
     await browser('wait', '#start')
 
-    // the presenter's page says plainly what the browser cannot do and recommends the desktop app
-    const limits = await evaluate("document.querySelector('#limits').innerText")
-    assert.match(limits, /nur ein kleiner Teil von PeekaView/)
-    assert.match(limits, /Steuern geht nicht/)
-    assert.match(limits, /empfehlen wir PeekaView Desktop/)
+    // the presenter's page says briefly what the browser cannot do and points to the desktop app
+    assert.equal(await evaluate("document.querySelector('#limits').innerText.replace(/\\s+/g, ' ').trim()"), 'Steuern, Sprache und mehr gehen nur mit PeekaView Desktop. Desktop-App holen')
     assert.equal(await evaluate("new URL(document.querySelector('#desktop-link').href).pathname"), '/download.html')
     await browser('click', '#setup-modes [data-mode=control]')
-    assert.match(await evaluate("document.querySelector('#setup-mode-note').textContent"), /Steuern lassen geht im Browser nicht/)
+    assert.match(await evaluate("document.querySelector('#setup-mode-note').textContent"), /Steuern lassen geht nur mit PeekaView Desktop/)
     assert.equal(await evaluate("document.querySelector('#setup-modes [aria-pressed=true]').dataset.mode"), 'draw')
     // no name, no share
     await evaluate("localStorage.removeItem('pv-name');document.querySelector('#name').value='';true")
@@ -51,7 +48,8 @@ test('sharing from the browser: limits said, viewers let in, the helper jumps to
     const link = await evaluate("document.querySelector('#link').value")
     assert.match(link, /^http:\/\/127\.0\.0\.1:\d+\/#[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/, 'the normal viewer link: room secret and presenter key')
     const room = link.split('#')[1]
-    assert.match(await evaluate("document.querySelector('#running').innerText"), /Bildschirmfreigabe light:.*nur Zusehen, Zeigen und Malen/)
+    assert.match(await evaluate("document.querySelector('#running').innerText"), /Steuern, Sprache und mehr gehen nur mit PeekaView Desktop/)
+    assert.equal(await evaluate("document.querySelector('#locate-step').hidden"), true, 'a whole screen needs no second step')
 
     // a viewer asks to come in – nobody watches without "Zulassen"
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
@@ -105,6 +103,22 @@ test('sharing from the browser: limits said, viewers let in, the helper jumps to
     await waitFor("pvHelper.state === 'parked'")
     assert.match(await evaluate('document.body.innerText'), /Anna schaut zu/)
 
+    // a viewer draws: the helper waits in its corner and says so, and comes only when they let go
+    await tab('t3')
+    await browser('click', '.pv-dock [data-tool=draw]')
+    await browser('mouse', 'move', String(target.x - 80), String(target.y))
+    await browser('mouse', 'down')
+    for (const dx of [-60, -40, -20, 0, 20]) await browser('mouse', 'move', String(target.x + dx), String(target.y + dx / 2))
+    await tab('t2')
+    await waitFor("pvHelper.busy.includes('Anna malt gerade')")
+    assert.equal(await evaluate('pvHelper.state'), 'parked')
+    await tab('t3')
+    await browser('mouse', 'up')
+    await tab('t2')
+    await waitFor("pvHelper.state === 'focus'")
+    assert.equal(await evaluate("pvHelper.busy + '|' + document.querySelector('#focus-who').textContent"), '|Anna zeigt hier')
+    await evaluate('pvHelper.park();true')
+
     // "Zusehen": the viewer only watches – still told why there is no remote control
     await tab('t1')
     await browser('click', '#running-modes [data-mode=view]')
@@ -127,6 +141,78 @@ test('sharing from the browser: limits said, viewers let in, the helper jumps to
     await tab('t3')
     await waitFor("document.querySelector('.pv-notice-text').textContent === 'Noch keine Bildschirmfreigabe aktiv.'")
     assert.doesNotMatch(await tabs(), /share-helper/)
+  } finally {
+    try {
+      await browser('close')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+})
+
+test('a shared window: one more click on the whole screen, then the helper finds the window on it', { timeout: 180000 }, async () => {
+  const server = await startServer()
+  const base = `http://127.0.0.1:${server.address().port}`
+  const session = 'pv-light-window-' + process.pid
+  const browser = async (...args) => (await promisify(execFile)('agent-browser', ['--session', session, ...args], { encoding: 'utf8', timeout: 30000 })).stdout
+  const evaluate = async (code) => JSON.parse(await browser('eval', code))
+  const waitFor = (fn) => browser('wait', '--fn', fn)
+  const tab = (id) => browser('tab', id)
+  try {
+    await browser('open', base + '/share.html')
+    await browser('set', 'viewport', '1280', '900')
+    // the presenter picks a window – the fake one lies at qaWindowAt on the fake screen
+    await evaluate("qaSurfaces.push('window', 'window', 'monitor');document.querySelector('#name').value='Patrick';true")
+    const at = await evaluate('qaWindowAt')
+    await browser('click', '#start')
+    await waitFor("window.pvHelper?.state === 'parked'")
+    await tab('t1')
+    await waitFor("!document.querySelector('#running').hidden")
+    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
+    assert.equal(await evaluate("document.querySelector('#locate-step').hidden"), false)
+    assert.match(await evaluate("document.querySelector('#locate-step').innerText"), /„Gesamter Bildschirm“[\s\S]*sehen weiterhin nur das Fenster/)
+    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /in der Mitte deines Bildschirms/)
+    // a window instead of the whole screen: said what to pick
+    await browser('click', '#locate')
+    await waitFor("!document.querySelector('#locate-error').hidden")
+    assert.match(await evaluate("document.querySelector('#locate-error').textContent"), /Bitte „Gesamter Bildschirm“ wählen/)
+    await browser('click', '#locate')
+    await waitFor("document.querySelector('#locate-step').hidden")
+    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /genau an der Stelle/)
+    // the whole screen stays here: viewers get only the window
+    assert.equal(await evaluate('pvLight.locatorStream.getVideoTracks()[0].getSettings().displaySurface + "|" + pvLight.status().locator'), 'monitor|true')
+
+    const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
+    await browser('tab', 'new', `${base}/?name=Anna#${room}`)
+    await tab('t1')
+    await browser('wait', '#requests [data-allow]')
+    await browser('click', '#requests [data-allow]')
+    await tab('t3')
+    await waitFor("document.querySelector('video')?.videoWidth > 0")
+    assert.equal(await evaluate("document.querySelector('video').videoWidth + 'x' + document.querySelector('video').videoHeight"), `${at.width}x${at.height}`, 'only the window goes out')
+
+    // a stroke on the window: the helper comes when it is finished, over the window's place on the screen
+    await browser('click', '.pv-dock [data-tool=draw]')
+    const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
+    const point = (fx, fy) => [String(Math.round(r.l + r.w * fx)), String(Math.round(r.t + r.h * fy))]
+    await browser('mouse', 'move', ...point(0.3, 0.4))
+    await browser('mouse', 'down')
+    for (const f of [0.35, 0.4, 0.45, 0.5, 0.55, 0.6]) await browser('mouse', 'move', ...point(f, 0.4 + (f - 0.3) / 2))
+    await browser('mouse', 'up')
+    await tab('t2')
+    await waitFor("pvHelper.state === 'focus' && !!pvHelper.picture")
+    const shown = await evaluate('({picture: pvHelper.picture, found: pvHelper.found, part: pvHelper.part, backdrop: !document.querySelector("#backdrop").hidden})')
+    for (const [k, v] of [['left', at.x], ['top', at.y], ['width', at.width], ['height', at.height]]) assert.ok(Math.abs(shown.picture[k] - v) <= 3, `${k}: ${shown.picture[k]} ≈ ${v}`)
+    assert.ok(shown.found.score > 0.8)
+    assert.equal(shown.backdrop, true, 'the desktop around the window shows, too')
+    const mid = { x: 0.45, y: 0.475 }
+    assert.ok(shown.part.x < mid.x && mid.x < shown.part.x + shown.part.w && shown.part.y < mid.y && mid.y < shown.part.y + shown.part.h, 'the stroke is in view')
+
+    // stopping ends the screen picture, too
+    await tab('t1')
+    await browser('click', '#stop')
+    await waitFor("!document.querySelector('#ended').hidden")
+    assert.equal(await evaluate('pvLight.locatorStream'), null)
   } finally {
     try {
       await browser('close')

@@ -1,7 +1,7 @@
 // Where the helper window of "Bildschirmfreigabe light" goes on the presenter's screen.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, visiblePart } from '../web/light-geometry.js'
+import { bounds, fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, visiblePart, windowRect } from '../web/light-geometry.js'
 
 test('the shared screen: exact where the browser says, below the menu bar estimated on a Mac', () => {
   // Firefox: the screen's own corner
@@ -44,4 +44,19 @@ test('the picture lies 1:1 under the helper, wherever the browser put it', () =>
 
 test('a window or tab is shown whole, fitted and centered', () => {
   assert.deepEqual(fit({ width: 1600, height: 900 }, { width: 800, height: 600 }), { left: 0, top: 75, width: 800, height: 450 })
+})
+
+test('a shared window found on the screen: points map onto it, the helper stays on the screen', () => {
+  const monitor = { left: 0, top: 0, width: 1000, height: 800 }
+  const win = windowRect({ x: 0.5, y: 0.25, w: 0.4, h: 0.5 }, monitor)
+  assert.deepEqual(win, { left: 500, top: 200, width: 400, height: 400 })
+  // the middle of the window
+  assert.deepEqual(spotRect({ x: 0.5, y: 0.5 }, win, { width: 300, height: 200 }, monitor), { left: 550, top: 300, width: 300, height: 200 })
+  // its right edge: the helper may stick out of the window, not out of the screen
+  assert.deepEqual(spotRect({ x: 1, y: 0.5 }, win, { width: 300, height: 200 }, monitor), { left: 700, top: 300, width: 300, height: 200 })
+  assert.deepEqual(stageInContent({ left: 550, top: 300, width: 300, height: 200 }, win), { left: -50, top: -100, width: 400, height: 400 })
+})
+
+test('the helper grows to a whole stroke', () => {
+  assert.deepEqual(bounds([[0.2, 0.5], [0.4, 0.3], [0.3, 0.6]]), { x: 0.2, y: 0.3, w: 0.2, h: 0.3 })
 })

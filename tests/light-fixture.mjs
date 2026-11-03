@@ -2,7 +2,7 @@
 //   - Nostr relays are replaced by a BroadcastChannel between the tabs of one browser – with the
 //     same identity rules (presenter messages only from the room key, the presenter only takes
 //     "from" = signing key)
-//   - getDisplayMedia returns an animated canvas the size of the screen (a fake "whole screen")
+//   - getDisplayMedia returns animated canvases: a fake "whole screen" or a fake window on it
 //   - no TURN request leaves the page
 //
 //   node tests/light-fixture.mjs [port]   – a server for the browser preview
@@ -34,26 +34,49 @@ Signaling.open = async ({ hostKey = null, secretKey, strictFrom = false, onMessa
 }
 `
 
-// a "whole screen": the size of this screen, something moving on it
+// What is shared: one call after the other takes the next of window.qaSurfaces ("monitor" when
+// none is left). A "monitor" is the size of this screen with a "window" at window.qaWindowAt; a
+// "window" is exactly that window's picture – so the window can be found on the screen.
 const fakeScreen = `<script>
+window.qaSurfaces = []
+window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
+const paintWindow = (ctx, t) => {
+  const { width, height } = window.qaWindowAt
+  ctx.fillStyle = '#f4f4f5'; ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, width, 34)
+  ctx.fillStyle = '#18181b'; ctx.font = '600 20px system-ui'
+  for (let i = 0; i < 7; i++) ctx.fillText('Testzeile ' + (i + 1) + ' – im Fenster', 24, 70 + i * 36)
+  ctx.fillStyle = '#16a34a'; ctx.fillRect(width - 120, 60, 90, 90)
+  ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(width / 2 + Math.sin(t / 20) * 120, height - 40, 22, 0, 7); ctx.fill()
+}
+const paintScreen = (ctx, w, h, t) => {
+  ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = '#475569'
+  for (let y = 0; y < h; y += 60) for (let x = (y / 60) % 2 * 60; x < w; x += 120) ctx.fillRect(x, y, 60, 60)
+  ctx.fillStyle = '#e2e8f0'; ctx.font = '600 28px system-ui'
+  ctx.fillText('Schreibtisch', 40, h - 40)
+  const at = window.qaWindowAt
+  ctx.save(); ctx.translate(at.x, at.y); paintWindow(ctx, t); ctx.restore()
+}
 navigator.mediaDevices.getDisplayMedia = async () => {
+  const surface = window.qaSurfaces.shift() ?? 'monitor'
   const canvas = document.createElement('canvas')
-  canvas.width = screen.width
-  canvas.height = screen.height
+  canvas.width = surface === 'monitor' ? screen.width : window.qaWindowAt.width
+  canvas.height = surface === 'monitor' ? screen.height : window.qaWindowAt.height
   const ctx = canvas.getContext('2d')
   let t = 0
   const paint = () => {
     t++
-    ctx.fillStyle = '#f4f4f5'; ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, canvas.width, 48)
-    ctx.fillStyle = '#18181b'; ctx.font = '600 28px system-ui'
-    for (let i = 0; i < 12; i++) ctx.fillText('Testzeile ' + (i + 1) + ' – Bildschirmfreigabe light', 80, 120 + i * 60)
-    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(canvas.width / 2 + Math.sin(t / 20) * 200, canvas.height * 0.75, 40, 0, 7); ctx.fill()
+    if (surface === 'monitor') paintScreen(ctx, canvas.width, canvas.height, t)
+    else paintWindow(ctx, t)
   }
   paint()
   setInterval(paint, 100)
-  window.qaScreen = canvas.captureStream(30)
-  return window.qaScreen
+  const stream = canvas.captureStream(30)
+  const track = stream.getVideoTracks()[0]
+  const settings = track.getSettings.bind(track)
+  track.getSettings = () => ({ ...settings(), width: canvas.width, height: canvas.height, displaySurface: surface })
+  return stream
 }
 </script>`
 

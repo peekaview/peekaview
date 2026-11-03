@@ -13,22 +13,17 @@
     main { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(500px, calc(100% - 32px)); margin: 7vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 8px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: #fafafa; text-decoration: none; }
     .brand i { display: flex; }
-    .light-tag { padding: 3px 9px; border-radius: 999px; background: rgba(234,179,8,.14); color: #fde68a; font-size: 11.5px; font-weight: 650; }
+    .light-tag { padding: 3px 9px; border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 11.5px; font-weight: 650; }
     h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.015em; }
     .lead { margin: -10px 0 0; color: #a1a1aa; font-size: 15px; }
-    /* the limitation: impossible to overlook, wherever light mode is offered or runs */
-    .limits { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(234,179,8,.35); background: rgba(234,179,8,.08); }
-    .limits strong { color: #fde68a; font-size: 15px; }
-    .limits p { margin: 0; color: #e4e4e7; }
-    .limits ul { margin: 0; padding-left: 18px; color: #d4d4d8; }
-    .limits li { margin: 2px 0; }
-    .limits .yes { color: #86efac; }
-    .limits .no { color: #fca5a5; }
-    .limits a.desktop { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 12px; background: #fafafa; color: #18181b; font-weight: 700; text-decoration: none; }
-    .limits a.desktop:hover { background: #e4e4e7; }
-    .limits a.desktop:focus-visible, .connect:focus-visible, button:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
-    .limits.compact { padding: 11px 14px; }
-    .limits.compact a { color: #fafafa; font-weight: 650; text-underline-offset: 3px; }
+    /* what the browser cannot do: calm, short, with the way to the desktop app */
+    .note { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #09090b; border: 1px solid rgba(255,255,255,.08); color: #d4d4d8; font-size: 13.5px; }
+    .note-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #27272a; color: #a1a1aa; }
+    .note p { flex: 1; min-width: 0; margin: 0; }
+    .note a { flex: none; color: #fafafa; font-weight: 650; text-decoration: none; white-space: nowrap; }
+    .note a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .note a:focus-visible, .connect:focus-visible, button:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
+    @media (max-width: 420px) { .note { flex-wrap: wrap; } .note a { margin-left: 46px; } }
     label.field { display: block; color: #fafafa; font-size: 14px; font-weight: 600; }
     input[type=text] { display: block; box-sizing: border-box; width: 100%; margin-top: 7px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; font-size: 16px; outline: none; }
     input[type=text]:focus { border-color: #ef4444; }
@@ -41,7 +36,7 @@
     .modes button[aria-pressed="true"] { background: #3f3f46; color: #fafafa; }
     .modes button[aria-pressed="true"] small { color: #d4d4d8; }
     .modes button.unavailable { color: #52525b; cursor: help; }
-    .modes button.unavailable small { color: #fca5a5; }
+    .modes button.unavailable small { color: #71717a; }
     .mode-note { margin: 7px 0 0; color: #a1a1aa; font-size: 13px; }
     .mode-note:empty { display: none; }
     .connect { display: flex; align-items: center; justify-content: center; gap: 10px; height: 52px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
@@ -72,6 +67,16 @@
     .viewers .none { padding: 0; background: none; color: #71717a; }
     .helper { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.07); color: #d4d4d8; font-size: 13px; }
     .helper span { flex: 1; }
+    /* a window is shared: one more click lets the helper find it on the screen */
+    .step { display: flex; gap: 14px; padding: 16px; border-radius: 14px; background: #09090b; border: 1px solid #3f3f46; animation: in .2s ease-out; }
+    .step-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #fafafa; color: #18181b; }
+    .step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .step-body strong { font-size: 15px; line-height: 1.3; }
+    .step-body p { margin: 0; color: #a1a1aa; }
+    .step-body p b { color: #fafafa; font-weight: 650; }
+    .step-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
+    .text-button { padding: 2px 4px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .text-button:hover { color: #fafafa; }
     .stop { align-self: center; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
@@ -86,19 +91,8 @@
       <div>
         <h1>Bildschirm im Browser teilen</h1>
       </div>
-      <p class="lead">Die schnelle Variante ohne Installation – mit wenigen Funktionen.</p>
-      <div class="limits" id="limits">
-        <strong>Im Browser geht nur ein kleiner Teil von PeekaView</strong>
-        <p>Browser erlauben einer Webseite nur wenig. Deshalb gilt hier:</p>
-        <ul>
-          <li class="yes">Zusehen, zeigen und malen geht.</li>
-          <li class="no">Steuern geht nicht – niemand kann bei dir klicken oder tippen.</li>
-          <li class="no">Keine Sprache, keine gemeinsame Zwischenablage, keine Aufzeichnung, nur ein Fenster oder Bildschirm.</li>
-          <li class="no">Zeichnungen siehst du nur in einem kleinen Hilfsfenster, nicht direkt auf dem Bildschirm.</li>
-        </ul>
-        <p>Für alles andere empfehlen wir <b>PeekaView Desktop</b> – kostenlos für Windows und Mac.</p>
-        <a class="desktop" href="download.html" target="_blank" rel="noopener" id="desktop-link"></a>
-      </div>
+      <p class="lead">Ohne Installation. Deine Zuschauer können zusehen und dir etwas zeigen.</p>
+      <div class="note" id="limits"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener" id="desktop-link">Desktop-App holen</a></div>
       <div>
         <label class="field" for="name">Wie heißt du?</label>
         <input id="name" type="text" maxlength="32" autocomplete="name" placeholder="z. B. Anna" aria-describedby="name-error">
@@ -117,6 +111,15 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span></div>
+      <div class="step" id="locate-step" hidden>
+        <span class="step-icon" data-icon="screen"></span>
+        <div class="step-body">
+          <strong>Noch ein Klick, dann siehst du Zeichnungen genau an deinem Fenster</strong>
+          <p>Wähle im nächsten Fenster <b>„Gesamter Bildschirm“</b>. Deine Zuschauer sehen weiterhin nur das Fenster, das du teilst.</p>
+          <p class="error" id="locate-error" role="alert" hidden></p>
+          <div class="step-actions"><button class="pill primary" id="locate" type="button"></button><button class="text-button" id="locate-skip" type="button">Später</button></div>
+        </div>
+      </div>
       <div>
         <label class="field" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
         <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
@@ -134,8 +137,8 @@
         <div class="modes" id="running-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
         <p class="mode-note" id="running-mode-note" role="status"></p>
       </div>
-      <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button></div>
-      <div class="limits compact"><p><b>Bildschirmfreigabe light:</b> nur Zusehen, Zeigen und Malen. Steuern, Sprache, Zwischenablage und mehr gibt es mit <a href="download.html" target="_blank" rel="noopener">PeekaView Desktop</a> – empfohlen.</p></div>
+      <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
+      <div class="note"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
       <button class="pill stop" id="stop" type="button"></button>
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
     </section>
@@ -145,7 +148,7 @@
       <h1>Freigabe beendet</h1>
       <p class="lead" id="ended-why" style="margin:0">Niemand sieht deinen Bildschirm mehr.</p>
       <button class="connect" id="again" type="button">Noch einmal teilen</button>
-      <div class="limits compact"><p>Öfter teilen? Mit <a href="download.html" target="_blank" rel="noopener">PeekaView Desktop</a> geht viel mehr: steuern lassen, mehrere Fenster, Sprache, Zwischenablage.</p></div>
+      <div class="note"><span class="note-icon" data-icon="screen"></span><p>Öfter teilen? Mit PeekaView Desktop geht viel mehr.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
     </section>
   </main>
   <footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
@@ -162,7 +165,7 @@
 
     const $ = (id) => document.getElementById(id)
     $('logo').innerHTML = owl(28)
-    $('desktop-link').innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen (empfohlen)'
+    for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 18)
     $('start').innerHTML = icon('share', 20) + 'Bildschirm teilen'
     $('copy').innerHTML = icon('copy', 15) + 'Link kopieren'
     $('stop').innerHTML = icon('stop', 15) + 'Freigabe beenden'
@@ -177,6 +180,9 @@
     let host = null
     let helper = null
     let helperBlocked = false
+    // a window is shared: the whole screen as well, only here, to find the window on it (never sent)
+    let locator = null
+    let locateSkipped = false
     const listeners = new Set()
 
     // ---------------------------------------------------------------- name, modes
@@ -202,7 +208,7 @@
         }
         b.addEventListener('click', () => {
           if (m.id === 'control') {
-            note.innerHTML = 'Steuern lassen geht im Browser nicht – Browser dürfen keine Klicks und Tasten von anderen ausführen. Dafür gibt es <a href="download.html" target="_blank" rel="noopener" style="color:#fafafa">PeekaView Desktop</a>.'
+            note.innerHTML = 'Steuern lassen geht nur mit <a href="download.html" target="_blank" rel="noopener" style="color:#fafafa">PeekaView Desktop</a>.'
             return
           }
           note.textContent = ''
@@ -278,6 +284,7 @@
       $('setup').hidden = true
       $('running').hidden = false
       $('link').value = host.link
+      $('live-title').textContent = host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
       $('start').disabled = false
       document.title = '● Freigabe läuft – PeekaView light'
       renderAll()
@@ -287,6 +294,9 @@
 
     function ended(why) {
       host = null
+      for (const t of locator?.getTracks() ?? []) t.stop()
+      locator = null
+      locateSkipped = false
       window.pvLight.host = null
       emit({ kind: 'status', ...status() })
       closeHelper()
@@ -395,14 +405,61 @@
 
     function renderHelper() {
       const open = !!helper && !helper.closed
+      const windowShared = !!host && host.surface !== 'monitor'
+      $('locate-step').hidden = !windowShared || !!locator || locateSkipped
       $('helper-open').hidden = open || !host
+      $('helper-locate').hidden = !open || !windowShared || !!locator || !locateSkipped
       $('helper-text').textContent = !host
         ? ''
-        : open
-          ? 'Das kleine Hilfsfenster wartet unten rechts in der Ecke. Zeigt oder malt jemand, springt es kurz an die Stelle und zeigt die Zeichnung. Du kannst dort auch selbst malen.'
-          : helperBlocked
+        : !open
+          ? helperBlocked
             ? 'Dein Browser hat das Hilfsfenster blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
             : 'Ohne Hilfsfenster siehst du nicht, wo die Zuschauer zeigen und malen.'
+          : windowShared && !locator
+            ? 'Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es in der Mitte deines Bildschirms.'
+            : 'Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es genau an der Stelle – mit der Zeichnung. Du kannst dort auch selbst malen.'
+    }
+
+    // ---------------------------------------------------------------- finding a shared window
+    $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'
+    $('locate').addEventListener('click', chooseScreen)
+    $('helper-locate').addEventListener('click', chooseScreen)
+    $('locate-skip').addEventListener('click', () => {
+      locateSkipped = true
+      renderAll()
+    })
+
+    async function chooseScreen() {
+      const error = $('locate-error')
+      error.hidden = true
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor', frameRate: { ideal: 5 } }, audio: false, selfBrowserSurface: 'exclude', monitorTypeSurfaces: 'include' })
+      } catch (err) {
+        error.textContent = err?.name === 'NotAllowedError' ? 'Kein Bildschirm ausgewählt. Versuche es noch einmal oder klicke auf „Später“.' : 'Das hat nicht geklappt: ' + (err?.message || err)
+        error.hidden = false
+        return
+      }
+      const track = stream.getVideoTracks()[0]
+      if ((track.getSettings?.().displaySurface ?? 'monitor') !== 'monitor') {
+        for (const t of stream.getTracks()) t.stop()
+        error.textContent = 'Bitte „Gesamter Bildschirm“ wählen – nicht ein Fenster oder einen Tab.'
+        error.hidden = false
+        return
+      }
+      if (!host) return track.stop()
+      for (const t of locator?.getTracks() ?? []) t.stop()
+      locator = stream
+      // stopped in the browser's bar: back to "in the middle"
+      track.addEventListener('ended', () => {
+        if (locator !== stream) return
+        locator = null
+        renderAll()
+        emit({ kind: 'status', ...status() })
+      })
+      renderAll()
+      emit({ kind: 'status', ...status() })
+      toast('Fertig – das Hilfsfenster findet dein Fenster jetzt auf dem Bildschirm.')
     }
 
     // ---------------------------------------------------------------- for the helper (window.opener.pvLight)
@@ -415,6 +472,7 @@
         viewers: host?.viewerList ?? [],
         requests: host?.requestList ?? [],
         peers: host?.peers().list ?? [],
+        locator: !!locator,
       }
     }
     function emit(event) {
@@ -425,6 +483,7 @@
     window.pvLight = {
       host: null,
       get stream() { return host?.stream ?? null },
+      get locatorStream() { return locator },
       status,
       subscribe(fn) {
         listeners.add(fn)

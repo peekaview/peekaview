@@ -2,8 +2,10 @@
 // "Bildschirmfreigabe light", which jumps there when somebody points or draws.
 //
 // Browsers say little about screens, so this is an estimate:
-//   - Only a shared *screen* (displaySurface "monitor") maps to screen coordinates. A window or
-//     a tab can be anywhere – the helper then shows the whole picture in the middle instead.
+//   - A shared *screen* (displaySurface "monitor") maps to screen coordinates directly. A shared
+//     window is found on the screen by its picture (light-locate.js) when the presenter also
+//     picked the whole screen; otherwise – and for a tab – the helper shows the whole picture in
+//     the middle instead.
 //   - The shared screen is assumed to be the one the helper window is on; when the picture's
 //     aspect ratio does not match that screen, it is another one (several monitors).
 //   - The screen's own corner: Firefox has screen.left/top; Chrome only has it with the
@@ -35,44 +37,58 @@ export function matchesScreen(video, monitor) {
   return Math.abs(video.width / video.height - monitor.width / monitor.height) < 0.02 * (monitor.width / monitor.height)
 }
 
-/** A point of the picture (0..1) in screen coordinates. */
-export function toScreen(point, monitor) {
-  return { x: monitor.left + clamp01(point.x) * monitor.width, y: monitor.top + clamp01(point.y) * monitor.height }
+/** A point of the picture (0..1) in screen coordinates; `picture`: where the picture lies. */
+export function toScreen(point, picture) {
+  return { x: picture.left + clamp01(point.x) * picture.width, y: picture.top + clamp01(point.y) * picture.height }
+}
+
+/** Where a found window (0..1 of the screen's picture, see light-locate.js) lies on the screen. */
+export function windowRect(found, monitor) {
+  return { left: monitor.left + found.x * monitor.width, top: monitor.top + found.y * monitor.height, width: found.w * monitor.width, height: found.h * monitor.height }
 }
 
 /**
- * The area (screen coordinates) a helper of `size` should cover so that the point lies in its
- * middle – moved inside the screen where it would stick out.
+ * The area (screen coordinates) a helper of `size` should cover so that the point of the
+ * picture lies in its middle – moved inside `bounds` (the screen) where it would stick out.
  */
-export function spotRect(point, monitor, size) {
-  const w = Math.min(size.width, monitor.width)
-  const h = Math.min(size.height, monitor.height)
-  const p = toScreen(point, monitor)
+export function spotRect(point, picture, size, bounds = picture) {
+  const w = Math.min(size.width, bounds.width)
+  const h = Math.min(size.height, bounds.height)
+  const p = toScreen(point, picture)
   return {
-    left: Math.round(clampTo(p.x - w / 2, monitor.left, monitor.left + monitor.width - w)),
-    top: Math.round(clampTo(p.y - h / 2, monitor.top, monitor.top + monitor.height - h)),
+    left: Math.round(clampTo(p.x - w / 2, bounds.left, bounds.left + bounds.width - w)),
+    top: Math.round(clampTo(p.y - h / 2, bounds.top, bounds.top + bounds.height - h)),
     width: Math.round(w),
     height: Math.round(h),
   }
 }
 
 /**
- * Where the whole shared screen lies inside the helper's content area that actually sits at
- * `content` (screen coordinates) – the picture is laid under it 1:1, so the helper looks like a
+ * Where the whole shared picture (lying at `picture`, screen coordinates) is inside the helper's
+ * content area that actually sits at `content` – laid under it 1:1, so the helper looks like a
  * pane of glass over that spot.
  */
-export function stageInContent(content, monitor) {
-  return { left: monitor.left - content.left, top: monitor.top - content.top, width: monitor.width, height: monitor.height }
+export function stageInContent(content, picture) {
+  return { left: picture.left - content.left, top: picture.top - content.top, width: picture.width, height: picture.height }
 }
 
 /** The part of the picture (0..1) the helper's content shows. */
-export function visiblePart(content, monitor) {
+export function visiblePart(content, picture) {
   return {
-    x: (content.left - monitor.left) / monitor.width,
-    y: (content.top - monitor.top) / monitor.height,
-    w: content.width / monitor.width,
-    h: content.height / monitor.height,
+    x: (content.left - picture.left) / picture.width,
+    y: (content.top - picture.top) / picture.height,
+    w: content.width / picture.width,
+    h: content.height / picture.height,
   }
+}
+
+/** The bounding box (0..1) of a stroke's points [[x, y], …]. */
+export function bounds(points) {
+  const xs = points.map((p) => p[0])
+  const ys = points.map((p) => p[1])
+  const x = Math.min(...xs)
+  const y = Math.min(...ys)
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }
 }
 
 /** Whether a point (0..1) lies inside a part, at least `margin` (share of the part) from its edges. */

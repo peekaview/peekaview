@@ -32,7 +32,7 @@ and screen, audio and clipboard data travel over WebRTC.
 | `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
 | `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
 | `web/desktop/` | UI of the desktop client in the same design |
-| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`) and its helper window (`light-geometry.js`) |
+| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`) and its helper window (`light-geometry.js`, `light-locate.js`) |
 | `android/` | Android app: watching (bundled viewer) and sharing the phone's screen – see `android/README.md` |
 | `build.sh` | Builds the macOS app and installs it to `/Applications` |
 | `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
@@ -289,10 +289,12 @@ The viewer site opens with a small start page:
 - **Same protocol as the desktop host** (`light-host.js`): Nostr signaling with a fresh room key, the normal link, "Zulassen"/"Ablehnen" for every viewer, one WebRTC connection per viewer (picture as slot 0, the `pv` data channel). Viewers need nothing new.
 - **What works:** the modes **Zusehen** and **Zeigen & Malen**, the participant list, TURN credentials from the service (only for the origin peekaview.de).
 - **What does not:** remote control (browsers cannot inject input), voice, the shared clipboard, recording, several windows. The state says `light: true`. The viewer then shows "Steuern" greyed out, explains it on click and once when joining, and hides the clipboard.
-- **Saying so:** the start page, the share page before and during the share, and its end screen say that the browser covers only a small part, and link to `download.html` (PeekaView Desktop, recommended).
+- **Saying so:** the start page, the share page before and during the share, and its end screen say in one short, calm line that steering, voice and more need PeekaView Desktop, and link to `download.html`.
 
 **The helper window** (`share-helper.html`) opens with the share as a small popup in the bottom right corner of the screen: who watches, join requests, copy link, stop.
-- A viewer points or starts to draw → the helper jumps to that spot and grows. It shows a still picture of the shared screen there, 1:1 under the window like a pane of glass, with the pointer and the stroke animated on top. After 3.5 s (point) or 6 s (stroke) without anybody pointing or drawing, it goes back into the corner.
+- A viewer points → the helper jumps to that spot and grows. It shows a still picture of the shared screen there, 1:1 under the window like a pane of glass, with the pointer on top.
+- A viewer draws → the helper stays in its corner and says "Anna malt gerade …". When they let go, it jumps to the stroke, grows to fit it and draws it again on the still picture, taken when the stroke started (what they drew on).
+- After 3.5 s (point) or 6 s (stroke) without anybody pointing or drawing, it goes back into the corner.
 - The presenter can draw and point into it, too ("Selbst zeigen" from the corner); viewers see it with the presenter's name. While anybody draws, it stays.
 - **Position:** normalized picture coordinates × screen size + the screen's corner (`light-geometry.js`). After moving, the helper reads where the browser actually put it and lays the picture under it accordingly, so the picture under the pointer is right even when the position is off.
 
@@ -307,7 +309,12 @@ The viewer site opens with a small start page:
 | Still picture | `ImageCapture.grabFrame()` | the live `<video>` | the live `<video>` |
 
 - **Always:** a page cannot keep a window on top of other apps; the helper can end up behind them.
-- Only a shared **whole screen** maps to positions, and only the screen the helper is on (same aspect ratio as the picture). For a window, a tab or another monitor the helper shows the whole picture in the middle of the screen instead.
+- A shared **whole screen** maps to positions directly, but only the screen the helper is on (same aspect ratio as the picture).
+- A shared **window or tab** can be anywhere: browsers never tell where. The share page therefore asks for one more click, on "Gesamter Bildschirm".
+  - That second picture stays in the presenter's browser; viewers still get only the window.
+  - Each time the helper jumps, it looks for the window's picture in the screen's picture (`light-locate.js`): normalized cross-correlation on small grayscale copies, refined on larger ones. That takes about 0.1 s and finds the window to a pixel, also after it was moved or when the helper covers part of it.
+  - The helper then shows the window's still picture over its place, with the desktop around it.
+- Without that click ("Später"), when the window is not found (minimized, covered) and for another monitor, the helper shows the whole picture in the middle of the screen.
 - When the whole screen is shared, the helper is part of the picture: viewers see it jump, too.
 - Popup blockers let the helper through only right in a click. Phones and tablets cannot share from the browser at all, so the start page does not offer it there.
 - Closing or reloading the share page ends the share.

@@ -162,7 +162,7 @@
     // sharing from the browser: only where browsers can (not on phones), and only as the small extra
     if (navigator.mediaDevices?.getDisplayMedia) {
       const light = Object.assign(document.createElement('p'), { className: 'light-offer', id: 'light-offer' })
-      light.innerHTML = 'Nichts installieren? <a href="share.html">Im Browser teilen (light)</a> – nur Zusehen und Zeigen, kein Steuern. Für alles andere PeekaView Desktop.'
+      light.innerHTML = 'Ohne Installation? <a href="share.html">Im Browser teilen</a> – die einfache Variante, ohne Steuern.'
       $('host-note').append(light)
     }
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
