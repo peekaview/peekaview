@@ -22,6 +22,8 @@ const SCALES = (() => {
   return list
 })()
 export const MIN_SCORE = 0.55
+// which search this is (shown in share.html?debug)
+export const VERSION = 'kacheln-3'
 // … or most of its tiles match: a window partly covered by others
 const MIN_TILES = 0.7
 const TILES = { x: 6, y: 5 }

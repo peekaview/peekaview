@@ -3,7 +3,7 @@
 // Used by the share page (for the always-on-top mini window) and the helper window.
 
 import { matchesScreen, monitorRect, windowRect } from './light-geometry.js'
-import { locate, scaledGray } from './light-locate.js'
+import { VERSION, locate, scaledGray } from './light-locate.js'
 
 const mac = /Mac/.test(navigator.platform)
 
@@ -44,7 +44,7 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
   const image = await frameCanvas(stream, videos)
   const capture = { image, picture: null, monitor, screenImage: null, found: null }
   // what happened – for share.html?debug and the console
-  const debug = (capture.debug = { surface, picture: image ? `${image.width}x${image.height}` : 'kein Bild', screen: `${monitor.width}x${monitor.height}@${monitor.left},${monitor.top}` })
+  const debug = (capture.debug = { version: VERSION, surface, picture: image ? `${image.width}x${image.height}` : 'kein Bild', screen: `${monitor.width}x${monitor.height}@${monitor.left},${monitor.top}` })
   if (!image) return capture
   if (surface === 'monitor') {
     if (matchesScreen(image, monitor)) return { ...capture, picture: monitor }
