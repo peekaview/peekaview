@@ -45,7 +45,7 @@ use windows::{
     },
 };
 
-use super::{fit_width, output_size, packet, Source, FPS, KEY_GAP};
+use super::{bgra_to_nv12, fit_width, output_size, packet, Source, FPS, KEY_GAP};
 use super::StreamCtl;
 use crate::guard::Rect;
 
@@ -113,6 +113,9 @@ struct Pipeline {
     session: GraphicsCaptureSession,
     pool_size: SizeInt32,
     converter: Option<Converter>,
+    /// the GPU gets the colors wrong (startup check): frames are converted on the CPU instead
+    cpu: Option<CpuConverter>,
+    cpu_colors: bool,
     encoder: Option<Encoder>,
     shared: Arc<StreamCtl>,
     frames: mpsc::Sender<Vec<u8>>,
@@ -186,6 +189,7 @@ impl Pipeline {
         let _ = session.SetIsCursorCaptureEnabled(false);
         let _ = session.SetIsBorderRequired(false);
         session.StartCapture().map_err(err("Aufnahme starten"))?;
+        let cpu_colors = !gpu_colors_right(&device, &context);
         Ok(Pipeline {
             device,
             context,
@@ -194,6 +198,8 @@ impl Pipeline {
             session,
             pool_size,
             converter: None,
+            cpu: None,
+            cpu_colors,
             encoder: None,
             shared,
             frames,
@@ -258,24 +264,44 @@ impl Pipeline {
         let (w, h) = (size.Width as u32, size.Height as u32);
         // never more pixels than the viewers display
         let out = fit_width(output_size(w as f64, h as f64), self.shared.want_w.load(Ordering::Relaxed));
-        if self.converter.as_ref().is_none_or(|c| c.input != (w, h) || c.output != out) {
-            self.converter = Some(Converter::new(&self.device, &self.context, (w, h), out)?);
-        }
         if self.encoder.as_ref().is_none_or(|e| (e.width, e.height) != out) {
-            self.encoder = Some(Encoder::new(&self.device, out.0, out.1, self.shared.target_bitrate(out.0 as usize, out.1 as usize))?);
+            let bitrate = self.shared.target_bitrate(out.0 as usize, out.1 as usize);
+            self.encoder = Some(Encoder::new(&self.device, out.0, out.1, bitrate, !self.cpu_colors)?);
             self.shared.need_key.store(true, Ordering::Relaxed);
             self.last_key = Instant::now() - KEY_GAP;
+        }
+        if self.cpu_colors {
+            if self.cpu.as_ref().is_none_or(|c| c.input != (w, h) || c.output != out) {
+                self.cpu = Some(CpuConverter::new(&self.device, (w, h), out)?);
+            }
+            // only a copy on the GPU – the CPU converts the frames that get encoded
+            self.cpu.as_mut().unwrap().copy(&self.context, texture);
+            return Ok(());
+        }
+        if self.converter.as_ref().is_none_or(|c| c.input != (w, h) || c.output != out) {
+            self.converter = Some(Converter::new(&self.device, &self.context, (w, h), out)?);
         }
         self.converter.as_mut().unwrap().blt(texture)
     }
 
     /// Feeds the current NV12 frame to the encoder. Returns whether it was taken.
     fn encode(&mut self, key: bool) -> Result<bool> {
-        let (Some(converter), Some(encoder)) = (self.converter.as_mut(), self.encoder.as_mut()) else { return Ok(false) };
         // nobody watches this window right now (minimized in every viewer)
         if self.shared.idle.load(Ordering::Relaxed) && !key {
             return Ok(false);
         }
+        let Some(encoder) = self.encoder.as_mut() else { return Ok(false) };
+        // (the CPU path has Windows' synchronous software encoder: it always takes the frame)
+        if self.cpu_colors && encoder.need_input > 0 {
+            if let Some(cpu) = self.cpu.as_mut() {
+                cpu.convert(&self.context)?;
+            }
+        }
+        let input = match (&self.cpu, &self.converter) {
+            (Some(cpu), _) if self.cpu_colors => Input::Memory(&cpu.nv12),
+            (_, Some(converter)) if !self.cpu_colors => Input::Texture(converter.current()),
+            _ => return Ok(false),
+        };
         let (frames, shared) = (&self.frames, &self.shared);
         let (w, h) = (encoder.width as usize, encoder.height as usize);
         // what the viewers' network takes
@@ -289,9 +315,11 @@ impl Pipeline {
                 shared.need_key.store(true, Ordering::Relaxed);
             }
         };
-        let taken = encoder.feed(&self.context, converter.current(), key, &mut sink)?;
-        if taken {
-            converter.rotate();
+        let taken = encoder.feed(&self.context, input, key, &mut sink)?;
+        if taken && !self.cpu_colors {
+            if let Some(converter) = self.converter.as_mut() {
+                converter.rotate();
+            }
         }
         Ok(taken)
     }
@@ -446,7 +474,145 @@ impl Converter {
     }
 }
 
+/// BGRA → NV12 on the CPU, for GPUs whose video processor gets the colors wrong.
+struct CpuConverter {
+    input: (u32, u32),
+    output: (u32, u32),
+    staging: ID3D11Texture2D,
+    nv12: Vec<u8>,
+}
+
+impl CpuConverter {
+    fn new(device: &ID3D11Device, input: (u32, u32), output: (u32, u32)) -> Result<Self> {
+        let desc = D3D11_TEXTURE2D_DESC {
+            Width: input.0,
+            Height: input.1,
+            MipLevels: 1,
+            ArraySize: 1,
+            Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Usage: D3D11_USAGE_STAGING,
+            BindFlags: 0,
+            CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+            MiscFlags: 0,
+        };
+        let mut staging = None;
+        unsafe { device.CreateTexture2D(&desc, None, Some(&mut staging)) }.map_err(err("Readback-Textur"))?;
+        Ok(CpuConverter { input, output, staging: staging.ok_or("Readback-Textur")?, nv12: Vec::new() })
+    }
+
+    /// The newest captured frame into CPU-readable memory (on the GPU).
+    fn copy(&mut self, context: &ID3D11DeviceContext, frame: &ID3D11Texture2D) {
+        let region = D3D11_BOX { left: 0, top: 0, front: 0, right: self.input.0, bottom: self.input.1, back: 1 };
+        unsafe { context.CopySubresourceRegion(&self.staging, 0, 0, 0, 0, frame, 0, Some(&region)) };
+    }
+
+    /// The last copied frame → `nv12`.
+    fn convert(&mut self, context: &ID3D11DeviceContext) -> Result<()> {
+        let (w, h) = (self.input.0 as usize, self.input.1 as usize);
+        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+        unsafe {
+            context.Map(&self.staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped)).map_err(err("Readback"))?;
+            let pitch = mapped.RowPitch as usize;
+            let src = std::slice::from_raw_parts(mapped.pData as *const u8, pitch * h);
+            bgra_to_nv12(src, (w, h), pitch, (self.output.0 as usize, self.output.1 as usize), &mut self.nv12);
+            context.Unmap(&self.staging, 0);
+        }
+        Ok(())
+    }
+}
+
+/// Four color bars (B, G, R, A: white, black, blue, yellow) and their BT.709 studio-range YCbCr.
+const BARS: [[u8; 4]; 4] = [[255, 255, 255, 255], [0, 0, 0, 255], [255, 0, 0, 255], [0, 255, 255, 255]];
+const BARS_YCBCR: [(i32, i32, i32); 4] = [(235, 128, 128), (16, 128, 128), (32, 240, 118), (219, 16, 138)];
+
+/// Startup check: does this GPU's video processor convert the colors right? Some drivers pass the
+/// RGB bytes through as YCbCr whatever they are told (a pink picture at the viewers) – then the
+/// CPU converts.
+fn gpu_colors_right(device: &ID3D11Device, context: &ID3D11DeviceContext) -> bool {
+    match gpu_colors(device, context) {
+        Ok(got) => {
+            let ok = colors_right(&got);
+            crate::log(&format!("video: GPU color check {got:?} – {}", if ok { "ok" } else { "wrong, converting on the CPU" }));
+            ok
+        }
+        // the real conversion will tell
+        Err(e) => {
+            crate::log(&format!("video: GPU color check not possible ({e})"));
+            true
+        }
+    }
+}
+
+fn colors_right(got: &[(u8, u8, u8)]) -> bool {
+    let near = |a: u8, b: i32| (a as i32 - b).abs() <= 8;
+    got.len() == BARS_YCBCR.len() && got.iter().zip(BARS_YCBCR).all(|((y, cb, cr), (wy, wcb, wcr))| near(*y, wy) && near(*cb, wcb) && near(*cr, wcr))
+}
+
+/// The bars through the real GPU conversion: Y, Cb, Cr in the middle of each bar.
+fn gpu_colors(device: &ID3D11Device, context: &ID3D11DeviceContext) -> Result<Vec<(u8, u8, u8)>> {
+    let (w, h) = (64u32, 16u32);
+    let pixels: Vec<u8> = (0..h).flat_map(|_| (0..w).flat_map(|x| BARS[(x / 16) as usize])).collect();
+    let texture = |format: DXGI_FORMAT, usage: D3D11_USAGE, bind: u32, cpu: u32, data: Option<&[u8]>| -> Result<ID3D11Texture2D> {
+        let desc = D3D11_TEXTURE2D_DESC {
+            Width: w,
+            Height: h,
+            MipLevels: 1,
+            ArraySize: 1,
+            Format: format,
+            SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            Usage: usage,
+            BindFlags: bind,
+            CPUAccessFlags: cpu,
+            MiscFlags: 0,
+        };
+        let init = data.map(|d| D3D11_SUBRESOURCE_DATA { pSysMem: d.as_ptr().cast(), SysMemPitch: w * 4, SysMemSlicePitch: 0 });
+        let mut tex = None;
+        unsafe { device.CreateTexture2D(&desc, init.as_ref().map(|i| i as *const _), Some(&mut tex)) }.map_err(err("Textur"))?;
+        tex.ok_or_else(|| "Textur".to_string())
+    };
+    let frame = texture(DXGI_FORMAT_B8G8R8A8_UNORM, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE.0 as u32, 0, Some(&pixels))?;
+    let mut converter = Converter::new(device, context, (w, h), (w, h))?;
+    converter.blt(&frame)?;
+    let readback = texture(DXGI_FORMAT_NV12, D3D11_USAGE_STAGING, 0, D3D11_CPU_ACCESS_READ.0 as u32, None)?;
+    let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+    unsafe {
+        context.CopyResource(&readback, converter.current());
+        context.Map(&readback, 0, D3D11_MAP_READ, 0, Some(&mut mapped)).map_err(err("Readback"))?;
+    }
+    let pitch = mapped.RowPitch as usize;
+    let at = |offset: usize| unsafe { *(mapped.pData as *const u8).add(offset) };
+    // Y in row 8; Cb / Cr from the interleaved plane below the Y plane
+    let got = (0..4)
+        .map(|i| {
+            let x = i * 16 + 8;
+            let uv = (h as usize + 4) * pitch + (x & !1);
+            (at(8 * pitch + x), at(uv), at(uv + 1))
+        })
+        .collect();
+    unsafe { context.Unmap(&readback, 0) };
+    Ok(got)
+}
+
 // --------------------------------------------------------------------------------------------- Media Foundation
+
+/// A frame for the encoder: an NV12 texture (GPU conversion) or NV12 bytes (CPU conversion).
+enum Input<'a> {
+    Texture(&'a ID3D11Texture2D),
+    Memory(&'a [u8]),
+}
+
+fn memory_buffer(data: &[u8]) -> Result<IMFMediaBuffer> {
+    let buffer = unsafe { MFCreateMemoryBuffer(data.len() as u32) }.map_err(err("Speicherpuffer"))?;
+    unsafe {
+        let mut dst: *mut u8 = std::ptr::null_mut();
+        buffer.Lock(&mut dst, None, None).map_err(err("Speicherpuffer"))?;
+        std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+        let _ = buffer.Unlock();
+        buffer.SetCurrentLength(data.len() as u32).map_err(err("Speicherpuffer"))?;
+    }
+    Ok(buffer)
+}
 
 struct Encoder {
     width: u32,
@@ -518,9 +684,12 @@ impl Encoder {
         self.bitrate = bitrate;
     }
 
-    fn new(device: &ID3D11Device, width: u32, height: u32, bitrate: u32) -> Result<Self> {
+    /// `gpu_input`: frames come as GPU textures; otherwise from memory (CPU conversion), which
+    /// Windows' software encoder takes for sure.
+    fn new(device: &ID3D11Device, width: u32, height: u32, bitrate: u32, gpu_input: bool) -> Result<Self> {
         // the GPU's hardware encoder; Windows' software encoder as fallback
-        let (transform, hardware) = match find_encoder(MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER) {
+        let hardware_encoder = if gpu_input { find_encoder(MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER) } else { None };
+        let (transform, hardware) = match hardware_encoder {
             Some(t) => (t, true),
             None => (find_encoder(MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_SORTANDFILTER).ok_or("kein H.264-Encoder gefunden")?, false),
         };
@@ -539,7 +708,7 @@ impl Encoder {
                     // hardware encoders are asynchronous and must be unlocked explicitly
                     let _ = attributes.SetUINT32(&MF_TRANSFORM_ASYNC_UNLOCK, 1);
                 }
-                d3d_aware = attributes.GetUINT32(&MF_SA_D3D11_AWARE).unwrap_or(0) == 1;
+                d3d_aware = gpu_input && attributes.GetUINT32(&MF_SA_D3D11_AWARE).unwrap_or(0) == 1;
                 let _ = attributes.SetUINT32(&MF_LOW_LATENCY, 1);
             }
         }
@@ -665,7 +834,7 @@ impl Encoder {
     }
 
     /// Submits a frame if the encoder wants one. Returns whether it was taken.
-    fn feed(&mut self, context: &ID3D11DeviceContext, frame: &ID3D11Texture2D, key: bool, sink: &mut dyn FnMut(Vec<u8>, bool)) -> Result<bool> {
+    fn feed(&mut self, context: &ID3D11DeviceContext, input: Input, key: bool, sink: &mut dyn FnMut(Vec<u8>, bool)) -> Result<bool> {
         self.poll(sink)?;
         if self.need_input == 0 {
             return Ok(false);
@@ -675,10 +844,10 @@ impl Encoder {
                 let _ = unsafe { codec.SetValue(&CODECAPI_AVEncVideoForceKeyFrame, &variant_u32(1)) };
             }
         }
-        let buffer = if self.d3d_aware {
-            unsafe { MFCreateDXGISurfaceBuffer(&ID3D11Texture2D::IID, frame, 0, false) }.map_err(err("Eingabepuffer"))?
-        } else {
-            self.read_back(context, frame)?
+        let buffer = match input {
+            Input::Texture(frame) if self.d3d_aware => unsafe { MFCreateDXGISurfaceBuffer(&ID3D11Texture2D::IID, frame, 0, false) }.map_err(err("Eingabepuffer"))?,
+            Input::Texture(frame) => self.read_back(context, frame)?,
+            Input::Memory(nv12) => memory_buffer(nv12)?,
         };
         let sample = unsafe { MFCreateSample() }.map_err(err("Sample"))?;
         unsafe {
@@ -843,67 +1012,17 @@ fn parameter_sets(data: &[u8]) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    /// The GPU's BGRA → NV12 conversion on this machine: four color bars come out as BT.709
-    /// studio-range YCbCr (not the RGB bytes passed through – a pink picture at the viewers).
+    /// The startup check on this machine's GPU: the bars come out as BT.709 studio-range YCbCr
+    /// (not the RGB bytes passed through).
     #[test]
     fn converts_colors_to_bt709() {
         let Ok((device, context)) = create_device() else {
             eprintln!("no D3D11 device – skipped");
             return;
         };
-        let (w, h) = (64u32, 16u32);
-        // B, G, R, A: white, black, blue, yellow
-        let bars: [[u8; 4]; 4] = [[255, 255, 255, 255], [0, 0, 0, 255], [255, 0, 0, 255], [0, 255, 255, 255]];
-        let pixels: Vec<u8> = (0..h).flat_map(|_| (0..w).flat_map(|x| bars[(x / 16) as usize])).collect();
-        let texture = |format: DXGI_FORMAT, usage: D3D11_USAGE, bind: u32, cpu: u32, data: Option<&[u8]>| -> ID3D11Texture2D {
-            let desc = D3D11_TEXTURE2D_DESC {
-                Width: w,
-                Height: h,
-                MipLevels: 1,
-                ArraySize: 1,
-                Format: format,
-                SampleDesc: DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
-                Usage: usage,
-                BindFlags: bind,
-                CPUAccessFlags: cpu,
-                MiscFlags: 0,
-            };
-            let init = data.map(|d| D3D11_SUBRESOURCE_DATA { pSysMem: d.as_ptr().cast(), SysMemPitch: w * 4, SysMemSlicePitch: 0 });
-            let mut tex = None;
-            unsafe { device.CreateTexture2D(&desc, init.as_ref().map(|i| i as *const _), Some(&mut tex)) }.unwrap();
-            tex.unwrap()
-        };
-        let frame = texture(DXGI_FORMAT_B8G8R8A8_UNORM, D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE.0 as u32, 0, Some(&pixels));
-        let mut converter = match Converter::new(&device, &context, (w, h), (w, h)) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("no video processor ({e}) – skipped");
-                return;
-            }
-        };
-        converter.blt(&frame).unwrap();
-        let readback = texture(DXGI_FORMAT_NV12, D3D11_USAGE_STAGING, 0, D3D11_CPU_ACCESS_READ.0 as u32, None);
-        let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
-        unsafe {
-            context.CopyResource(&readback, converter.current());
-            context.Map(&readback, 0, D3D11_MAP_READ, 0, Some(&mut mapped)).unwrap();
-        }
-        let pitch = mapped.RowPitch as usize;
-        let at = |offset: usize| unsafe { *(mapped.pData as *const u8).add(offset) };
-        // the middle of each bar: Y, then Cb / Cr from the interleaved plane below the Y plane
-        let got: Vec<(u8, u8, u8)> = (0..4)
-            .map(|i| {
-                let x = i * 16 + 8;
-                let uv = (h as usize + 4) * pitch + (x & !1);
-                (at(8 * pitch + x), at(uv), at(uv + 1))
-            })
-            .collect();
-        unsafe { context.Unmap(&readback, 0) };
-        let want = [(235, 128, 128), (16, 128, 128), (32, 240, 118), (219, 16, 138)];
-        eprintln!("YCbCr per bar: {got:?}");
-        for ((y, cb, cr), (wy, wcb, wcr)) in got.iter().zip(want) {
-            let near = |a: u8, b: i32| (a as i32 - b).abs() <= 8;
-            assert!(near(*y, wy) && near(*cb, wcb) && near(*cr, wcr), "got {got:?}, want {want:?}");
+        match gpu_colors(&device, &context) {
+            Ok(got) => assert!(colors_right(&got), "got {got:?}, want {BARS_YCBCR:?}"),
+            Err(e) => eprintln!("no video processor ({e}) – skipped"),
         }
     }
 }
