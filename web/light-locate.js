@@ -280,6 +280,17 @@ export function locate(screenAt, windowAt, screenSize, windowSize, info = {}, { 
       const strength = Math.max(hit.score / MIN_SCORE, tiles / MIN_TILES)
       if (!winner || strength > winner.strength) winner = { hit, tiles, strength, full, tpl, k: c.k }
     }
+    // the size, to half a percent
+    for (const dk of [0.985, 0.99, 0.995, 1.005, 1.01, 1.015]) {
+      const k = winner.k * dk
+      const { full, tpl } = at(fine, k)
+      if (tpl.width > fine.img.width || tpl.height > fine.img.height) continue
+      const r = 2
+      const hit = bestTiled(fine.img, tpl, { x0: winner.hit.x - r, y0: winner.hit.y - r, x1: winner.hit.x + r, y1: winner.hit.y + r }, fine.ints)
+      if (hit.score <= winner.tiles) continue
+      const whole = best(fine.img, tpl, { x0: hit.x, y0: hit.y, x1: hit.x, y1: hit.y }, fine.ints).score
+      winner = { hit: { ...hit, score: whole }, tiles: hit.score, strength: Math.max(whole / MIN_SCORE, hit.score / MIN_TILES), full, tpl, k }
+    }
     const { hit, tiles, full, tpl, k } = winner
     result.k = +k.toFixed(3)
     result.score = +hit.score.toFixed(3)
