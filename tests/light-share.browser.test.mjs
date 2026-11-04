@@ -359,6 +359,24 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     const picture = await evaluate('pvLight.lastReveal.capture.picture')
     for (const [k, v] of [['left', win.x], ['top', win.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(picture[k] - v) <= 3, `${k}: ${picture[k]} ≈ ${v}`)
 
+    // the window moved – and drawn on right away: the drawing appears where it is now
+    const moved = { ...win, x: win.x - 160, y: win.y + 120 }
+    await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; true`)
+    await tab('t3')
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.4)))
+    await browser('mouse', 'down')
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.7)), String(Math.round(r.t + r.h * 0.45)))
+    await browser('mouse', 'up')
+    await tab('t1')
+    await waitFor(`pvLight.lastReveal?.capture?.picture?.left < ${win.x - 100}`).catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
+    })
+    const there = await evaluate('pvLight.lastReveal.capture.picture')
+    for (const [k, v] of [['left', moved.x], ['top', moved.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(there[k] - v) <= 3, `moved, ${k}: ${there[k]} ≈ ${v}`)
+    // … and viewers still see the whole window, at the same size
+    const after = await evaluate('pvLight.host.size')
+    assert.ok(Math.abs(after.width - size.width) <= 2 && Math.abs(after.height - size.height) <= 2, JSON.stringify(after))
+
     // another choice while sharing: the whole screen – the same viewers, the whole picture
     await browser('click', '#repick')
     await waitFor("!document.querySelector('#pick').hidden")

@@ -214,9 +214,9 @@
     import { LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { Cropper, cropSupported } from './light-crop.js'
-    import { locate, scaledGray } from './light-locate.js'
+    import { scaledGray } from './light-locate.js'
     import { WindowPicker } from './light-pick.js'
-    import { detectWindows } from './light-windows.js'
+    import { follow } from './light-track.js'
     import { MiniWindow, documentPip, videoPip } from './light-pip.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
@@ -639,7 +639,7 @@
     }
     const capture = () =>
       cropper
-        ? takeCapture({ stream: screenStream, crop: cropper.rect, surface: host.surface, videos: sourceVideos() })
+        ? track().then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos() }))
         : takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
 
     // a point right away; a stroke when it is finished – with the picture from its start
@@ -715,7 +715,7 @@
       $('debug-box').hidden = false
       // at the top: to be seen without scrolling
       if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
-      $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
+      $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, folgen: cropper ? trackInfo : undefined, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
       // left: the screen with the best match (red) and the found place (green); right: the window
       const view = $('debug-view')
       const ctx = view.getContext('2d')
@@ -885,8 +885,10 @@
       $('pick').hidden = true
       document.querySelector('main').classList.remove('wide')
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
-      const rect = selection ? { x: selection.x * f.width, y: selection.y * f.height, width: selection.w * f.width, height: selection.h * f.height } : null
-      trackImage = null
+      const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
+      // (the picture to follow the window by: from when it could be seen)
+      trackImage = rect && image && image.width === f.width ? cropCanvas(image, rect) : null
+      trackMisses = 0
       windowLost = false
       if (host) {
         cropper.setRect(rect)
@@ -908,55 +910,47 @@
     }
     $('repick').addEventListener('click', repick)
 
-    // the picked window moved (or changed): followed – found by its picture, else by its frame
+    // the picked window moved (or changed): followed – every second, and right before each still
+    // picture (a drawing then appears where the window is now, not where it was)
     let trackImage = null
     let trackMisses = 0
-    let tracking = false
-    setInterval(async () => {
-      // (not while this page lies in front: it may well cover the window)
-      if (!host || !cropper?.rect || tracking || picker || inFront()) return
-      tracking = true
-      try {
-        const full = await frameCanvas(screenStream)
-        if (!full) return
-        const r = cropper.rect
-        const before = trackImage ?? cropCanvas(full, r)
-        const scratch = document.createElement('canvas')
-        const found = locate((w, h) => scaledGray(full, w, h, scratch), (w, h) => scaledGray(before, w, h, scratch), full, before, {}, { hints: [1] })
-        let next = found && Math.abs(found.k - 1) < 0.03 ? { x: found.x * full.width, y: found.y * full.height, width: r.width, height: r.height } : null
-        if (!next) {
-          const h = Math.round((full.height * 640) / full.width)
-          const frames = detectWindows(scaledGray(full, 640, h, scratch)).map((w) => ({ x: w.x * full.width, y: w.y * full.height, width: w.w * full.width, height: w.h * full.height }))
-          next = frames.map((w) => ({ w, o: overlap(w, r) })).filter((c) => c.o > 0.6).sort((a, b) => b.o - a.o)[0]?.w ?? null
-        }
-        if (!next) {
-          if (++trackMisses >= 3 && !windowLost) {
-            windowLost = true
-            renderAll()
-          }
-          return
-        }
-        trackMisses = 0
-        if (windowLost) {
-          windowLost = false
+    let trackInfo = null // how the last search went (share.html?debug)
+    let tracking = null
+    function track() {
+      if (!host || !cropper?.rect || picker) return Promise.resolve()
+      return (tracking ??= followWindow().finally(() => (tracking = null)))
+    }
+    async function followWindow() {
+      const full = await frameCanvas(screenStream)
+      const r = cropper?.rect
+      if (!full || !r || picker) return
+      const before = trackImage ?? cropCanvas(full, r)
+      const scratch = document.createElement('canvas')
+      const t0 = performance.now()
+      const found = follow((w, h) => scaledGray(full, w, h, scratch), (w, h) => scaledGray(before, w, h, scratch), full, r)
+      // (this page in front may well cover the window: only a sure find counts then)
+      const front = inFront()
+      trackInfo = { how: found?.how ?? 'nicht gefunden', score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front }
+      if (!found || (front && found.how === 'frame')) {
+        if (!front && ++trackMisses >= 3 && !windowLost) {
+          windowLost = true
           renderAll()
         }
-        if (Math.abs(next.x - r.x) > 2 || Math.abs(next.y - r.y) > 2 || Math.abs(next.width - r.width) > 4 || Math.abs(next.height - r.height) > 4) {
-          cropper.setRect(next)
-          host.update()
-        }
-        trackImage = cropCanvas(full, cropper.rect)
-      } finally {
-        tracking = false
+        return
       }
-    }, 2000)
-
-    function overlap(a, b) {
-      const ix = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x))
-      const iy = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
-      const inter = ix * iy
-      return inter / (a.width * a.height + b.width * b.height - inter)
+      trackMisses = 0
+      if (windowLost) {
+        windowLost = false
+        renderAll()
+      }
+      const next = found.rect
+      if (next.x !== r.x || next.y !== r.y || next.width !== r.width || next.height !== r.height) {
+        cropper.setRect(next)
+        host.update()
+      }
+      trackImage = cropCanvas(full, cropper.rect)
     }
+    setInterval(track, 1000)
 
     // ---------------------------------------------------------------- finding a shared window
     $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'
@@ -1029,6 +1023,9 @@
       get stream() { return host?.stream ?? null },
       get locatorStream() { return locator },
       get lastReveal() { return lastReveal },
+      // the picked part of the screen, and how following it went last
+      get crop() { return cropper?.rect ?? null },
+      get tracked() { return trackInfo },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),
