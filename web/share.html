@@ -78,6 +78,12 @@
     /* the shared window is not to be found: said plainly, with what to do */
     .step.problem { border-color: rgba(239,68,68,.55); background: rgba(239,68,68,.07); }
     .step.problem .step-icon { background: #ef4444; color: #fff; }
+    /* picking the window: a picture of the screen, the windows found outlined */
+    main.wide { width: min(980px, calc(100% - 32px)); }
+    .pick-view { display: block; width: 100%; border-radius: 10px; background: #000; cursor: crosshair; touch-action: none; }
+    .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
+    .live { flex-wrap: wrap; }
+    .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
     .text-button { padding: 2px 4px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .text-button:hover { color: #fafafa; }
     /* the mini window's picture: shown while setting it up, afterwards it keeps playing out of
@@ -115,9 +121,19 @@
       <p class="error" id="start-error" role="alert" hidden></p>
     </section>
 
+    <!-- the whole screen is shared: which window of it? -->
+    <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
+      <h1>Welches Fenster möchtest du zeigen?</h1>
+      <p class="lead" id="pick-lead" style="margin:0"></p>
+      <canvas id="pick-view" class="pick-view"></canvas>
+      <button class="connect" id="pick-ok" type="button" disabled>Dieses Fenster zeigen</button>
+      <div class="pick-more"><button class="text-button" id="pick-screen" type="button">Lieber den ganzen Bildschirm zeigen</button><button class="text-button" id="pick-again" type="button">Bild neu holen</button></div>
+      <p class="keep" style="margin:0">Nur der rot umrandete Teil geht an deine Zuschauer – auch was gerade darüber liegt.</p>
+    </section>
+
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
-      <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span></div>
+      <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
       <div class="step problem" id="place-problem" role="alert" hidden>
         <span class="step-icon" data-icon="window"></span>
         <div class="step-body">
@@ -196,7 +212,11 @@
     //     notification – a browser window in the background cannot come to the front by itself.
     // The helper reaches this page through window.opener.pvLight.
     import { LightHost, TURN_SERVICE } from './light-host.js'
-    import { takeCapture } from './light-capture.js'
+    import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
+    import { Cropper, cropSupported } from './light-crop.js'
+    import { locate, scaledGray } from './light-locate.js'
+    import { WindowPicker } from './light-pick.js'
+    import { detectWindows } from './light-windows.js'
     import { MiniWindow, documentPip, videoPip } from './light-pip.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
@@ -225,6 +245,10 @@
     let placeProblem = null
     // not seen yet, but this page lay in front (and maybe over the window): wait for the switch
     let placeWaiting = false
+    // Chrome, Edge: the whole screen is captured, one window of it shared (cut out here)
+    let cropper = null
+    let screenStream = null
+    let windowLost = false
     // the mini window; for a video: the presenter turned it on (Firefox does not tell)
     let mini = null
     let miniDone = false
@@ -271,6 +295,7 @@
 
     // ---------------------------------------------------------------- start
     const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
+    if (cropSupported) $('start-hint').textContent = 'Dein Browser fragt gleich, was du teilen möchtest: Wähle „Gesamter Bildschirm“. Danach suchst du hier aus, welches Fenster deine Zuschauer sehen.'
     if (!supported) {
       $('start').disabled = true
       $('start-hint').textContent = 'Dieser Browser kann den Bildschirm nicht teilen (auf Handys und Tablets geht das nicht). Bitte am Computer Chrome, Edge, Firefox oder Safari verwenden – oder PeekaView Desktop.'
@@ -304,7 +329,12 @@
       if (documentPip) openMini()
       else openHelper()
       $('start').disabled = true
-      picking.then((stream) => begin(stream, name)).catch((err) => {
+      picking.then((stream) => {
+        const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface ?? 'monitor'
+        // the whole screen: pick the window to show from it (where the browser can cut it out)
+        if (cropSupported && surface === 'monitor') return showPick(stream, name)
+        return begin(stream, name)
+      }).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
         mini?.close()
@@ -316,9 +346,18 @@
       })
     }
 
-    async function begin(stream, name) {
+    /** @param crop the part of the whole screen to share (pixels), null for all of it; undefined: no cutting */
+    async function begin(stream, name, crop) {
+      if (crop !== undefined && cropSupported) {
+        screenStream = stream
+        cropper = new Cropper(stream.getVideoTracks()[0])
+        cropper.setRect(crop)
+      }
       host = new LightHost({
-        stream,
+        stream: cropper ? cropper.stream : stream,
+        sources: cropper ? stream.getVideoTracks() : [],
+        surface: cropper ? () => (cropper.rect ? 'window' : 'monitor') : undefined,
+        size: cropper ? () => cropper.size : undefined,
         name,
         mode,
         // TURN credentials are only handed to peekaview.de
@@ -343,7 +382,6 @@
       $('setup').hidden = true
       $('running').hidden = false
       $('link').value = host.link
-      $('live-title').textContent = host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
       $('start').disabled = false
       document.title = '● Freigabe läuft – PeekaView light'
       renderAll()
@@ -355,6 +393,9 @@
 
     function ended(why) {
       host = null
+      cropper = null
+      screenStream = null
+      windowLost = false
       for (const t of locator?.getTracks() ?? []) t.stop()
       locator = null
       locateSkipped = false
@@ -476,8 +517,13 @@
     $('helper-open').addEventListener('click', openHelper)
 
     function renderHelper() {
+      if (host) {
+        $('live-title').textContent = host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
+        $('repick').hidden = !cropper
+      }
       const open = !!helper && !helper.closed
-      const windowShared = !!host && host.surface !== 'monitor'
+      // (a window cut out here: its place is known – nothing to look for)
+      const windowShared = !!host && host.surface !== 'monitor' && !cropper
       // not placed on the screen: the helper shows the drawing in the middle
       const middle = (windowShared && !locator) || !!placeProblem
       $('locate-step').hidden = !windowShared || !!locator || locateSkipped
@@ -591,7 +637,10 @@
       } catch {}
       return [$('src-video'), $('src-screen'), ...inHelper]
     }
-    const capture = () => takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
+    const capture = () =>
+      cropper
+        ? takeCapture({ stream: screenStream, crop: cropper.rect, surface: host.surface, videos: sourceVideos() })
+        : takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
 
     // a point right away; a stroke when it is finished – with the picture from its start
     function watch(m) {
@@ -715,6 +764,17 @@
 
     function renderProblem(windowShared) {
       const box = $('place-problem')
+      if (windowLost && host) {
+        box.hidden = false
+        box.classList.add('problem')
+        $('problem-title').textContent = 'Dein Fenster ist nicht mehr an seinem Platz'
+        $('problem-text').textContent = 'Ist es verdeckt, verschoben oder geschlossen? Deine Zuschauer sehen weiter diesen Ausschnitt. Wähle das Fenster neu aus.'
+        $('problem-check').hidden = true
+        $('problem-screen').hidden = false
+        $('problem-screen').textContent = 'Fenster neu wählen'
+        return
+      }
+      $('problem-screen').textContent = 'Anderen Bildschirm wählen'
       box.hidden = !host || (!placeProblem && !placeWaiting)
       box.classList.toggle('problem', !!placeProblem)
       $('problem-check').hidden = $('problem-screen').hidden = !placeProblem
@@ -758,7 +818,145 @@
       $('problem-check').disabled = false
       if (ok) toast('Gefunden – Zeichnungen erscheinen jetzt genau an der Stelle.')
     })
-    $('problem-screen').addEventListener('click', chooseScreen)
+    $('problem-screen').addEventListener('click', () => (windowLost ? repick() : chooseScreen()))
+
+    // ---------------------------------------------------------------- picking the window (whole screen shared)
+    let picker = null
+    let pickStream = null
+    let pickName = ''
+    let pickTimer = null
+    let away = null // the screen while this page was in the background: the windows not covered by it
+    let sawAway = false
+
+    function showPick(stream, name) {
+      pickStream = stream
+      pickName = name
+      sawAway = false
+      away = null
+      $('setup').hidden = $('running').hidden = true
+      $('pick').hidden = false
+      document.querySelector('main').classList.add('wide')
+      picker?.destroy()
+      picker = new WindowPicker($('pick-view'), { onChange: renderPick })
+      if (host && cropper?.rect) {
+        const f = cropper.full
+        picker.selection = { x: cropper.rect.x / f.width, y: cropper.rect.y / f.height, w: cropper.rect.width / f.width, h: cropper.rect.height / f.height }
+      }
+      freshPicture()
+      clearInterval(pickTimer)
+      // this page covers the windows while it is in front: the picture from when it was not
+      pickTimer = setInterval(async () => {
+        if (inFront()) return
+        const c = await frameCanvas(pickStream)
+        if (c) away = c
+      }, 700)
+      renderPick()
+    }
+
+    async function freshPicture() {
+      const c = await frameCanvas(pickStream)
+      if (c) picker?.setImage(c)
+    }
+
+    function backInFront() {
+      if ($('pick').hidden || !away) return
+      picker.setImage(away)
+      away = null
+      sawAway = true
+      renderPick()
+    }
+    window.addEventListener('focus', () => setTimeout(backInFront, 50))
+    document.addEventListener('visibilitychange', () => !document.hidden && setTimeout(backInFront, 50))
+
+    function renderPick() {
+      if (!picker) return
+      $('pick-lead').textContent = sawAway
+        ? 'Klicke auf das Fenster, das du zeigen willst. Wird es nicht erkannt, zieh mit der Maus einen Rahmen darum.'
+        : 'Wechsle kurz zu dem Fenster, das du zeigen willst, und komm dann hierher zurück – dann siehst du es hier und klickst es an. Oder zieh mit der Maus einen Rahmen auf.'
+      $('pick-ok').disabled = !picker.selection
+      $('pick-ok').textContent = picker.selection?.drawn ? 'Diesen Ausschnitt zeigen' : 'Dieses Fenster zeigen'
+    }
+
+    function finishPick(selection) {
+      clearInterval(pickTimer)
+      const image = picker.image
+      picker.destroy()
+      picker = null
+      $('pick').hidden = true
+      document.querySelector('main').classList.remove('wide')
+      const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
+      const rect = selection ? { x: selection.x * f.width, y: selection.y * f.height, width: selection.w * f.width, height: selection.h * f.height } : null
+      trackImage = null
+      windowLost = false
+      if (host) {
+        cropper.setRect(rect)
+        host.update()
+        $('running').hidden = false
+        renderAll()
+        emit({ kind: 'status', ...status() })
+        return
+      }
+      $('setup').hidden = false
+      begin(pickStream, pickName, rect)
+    }
+    $('pick-ok').addEventListener('click', () => picker?.selection && finishPick(picker.selection))
+    $('pick-screen').addEventListener('click', () => finishPick(null))
+    $('pick-again').addEventListener('click', freshPicture)
+
+    function repick() {
+      if (host && cropper) showPick(screenStream, host.name)
+    }
+    $('repick').addEventListener('click', repick)
+
+    // the picked window moved (or changed): followed – found by its picture, else by its frame
+    let trackImage = null
+    let trackMisses = 0
+    let tracking = false
+    setInterval(async () => {
+      // (not while this page lies in front: it may well cover the window)
+      if (!host || !cropper?.rect || tracking || picker || inFront()) return
+      tracking = true
+      try {
+        const full = await frameCanvas(screenStream)
+        if (!full) return
+        const r = cropper.rect
+        const before = trackImage ?? cropCanvas(full, r)
+        const scratch = document.createElement('canvas')
+        const found = locate((w, h) => scaledGray(full, w, h, scratch), (w, h) => scaledGray(before, w, h, scratch), full, before, {}, { hints: [1] })
+        let next = found && Math.abs(found.k - 1) < 0.03 ? { x: found.x * full.width, y: found.y * full.height, width: r.width, height: r.height } : null
+        if (!next) {
+          const h = Math.round((full.height * 640) / full.width)
+          const frames = detectWindows(scaledGray(full, 640, h, scratch)).map((w) => ({ x: w.x * full.width, y: w.y * full.height, width: w.w * full.width, height: w.h * full.height }))
+          next = frames.map((w) => ({ w, o: overlap(w, r) })).filter((c) => c.o > 0.6).sort((a, b) => b.o - a.o)[0]?.w ?? null
+        }
+        if (!next) {
+          if (++trackMisses >= 3 && !windowLost) {
+            windowLost = true
+            renderAll()
+          }
+          return
+        }
+        trackMisses = 0
+        if (windowLost) {
+          windowLost = false
+          renderAll()
+        }
+        if (Math.abs(next.x - r.x) > 2 || Math.abs(next.y - r.y) > 2 || Math.abs(next.width - r.width) > 4 || Math.abs(next.height - r.height) > 4) {
+          cropper.setRect(next)
+          host.update()
+        }
+        trackImage = cropCanvas(full, cropper.rect)
+      } finally {
+        tracking = false
+      }
+    }, 2000)
+
+    function overlap(a, b) {
+      const ix = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x))
+      const iy = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
+      const inter = ix * iy
+      return inter / (a.width * a.height + b.width * b.height - inter)
+    }
 
     // ---------------------------------------------------------------- finding a shared window
     $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'
@@ -810,7 +1008,7 @@
         sharing: !!host,
         mode,
         surface: host?.surface ?? null,
-        video: host ? (({ width, height }) => ({ width, height }))(host.track.getSettings?.() ?? {}) : null,
+        video: host ? host.size : null,
         viewers: host?.viewerList ?? [],
         requests: host?.requestList ?? [],
         peers: host?.peers().list ?? [],

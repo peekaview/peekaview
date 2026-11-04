@@ -5,6 +5,7 @@
 //   - getDisplayMedia returns animated canvases: a fake "whole screen" or a fake window on it
 //   - no TURN request leaves the page
 //   - share.html?browser=firefox: as in Firefox, no Picture-in-Picture window a page can open
+//     and no cutting a window out of the screen
 //
 //   node tests/light-fixture.mjs [port]          – a server for the browser preview
 //   node tests/light-fixture.mjs [port] --real   – web/ as it is (real relays and screen), never
@@ -45,6 +46,8 @@ const fakeScreen = `<script>
 if (new URLSearchParams(location.search).get('browser') === 'firefox') {
   delete window.documentPictureInPicture
   Object.defineProperty(Document.prototype, 'pictureInPictureEnabled', { get: () => false })
+  // … and no cutting a window out of the screen (MediaStreamTrackGenerator)
+  delete window.MediaStreamTrackGenerator
 }
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }

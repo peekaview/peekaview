@@ -32,7 +32,7 @@ and screen, audio and clipboard data travel over WebRTC.
 | `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
 | `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
 | `web/desktop/` | UI of the desktop client in the same design |
-| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), the mini window (`light-pip.js`, `light-mini.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
+| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), picking a window from the screen (`light-windows.js`, `light-pick.js`, `light-crop.js`), the mini window (`light-pip.js`, `light-mini.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
 | `android/` | Android app: watching (bundled viewer) and sharing the phone's screen – see `android/README.md` |
 | `build.sh` | Builds the macOS app and installs it to `/Applications` |
 | `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
@@ -290,6 +290,14 @@ The viewer site opens with a small start page:
 - **What works:** the modes **Zusehen** and **Zeigen & Malen**, the participant list, TURN credentials from the service (only for the origin peekaview.de).
 - **What does not:** remote control (browsers cannot inject input), voice, the shared clipboard, recording, several windows. The state says `light: true`. The viewer then shows "Steuern" greyed out, explains it on click and once when joining, and hides the clipboard.
 - **Saying so:** the start page, the share page before and during the share, and its end screen say in one short, calm line that steering, voice and more need PeekaView Desktop, and link to `download.html`.
+
+**Picking a window from the whole screen** (Chrome, Edge).
+- The presenter shares the whole screen. The share page then shows a picture of it with the windows found outlined (`light-windows.js`: long straight edges joined at corners, each rectangle scored by how much of its four sides are edges). A click picks a window; clicking again on the same spot picks the next smaller one, and a drag draws a part by hand.
+- The picture comes from a moment the share page was in the background: in front, it would cover the windows. The page asks to switch to the window and back once.
+- Viewers get only that part. It is cut out of each frame right here, before encoding (`light-crop.js`: MediaStreamTrackProcessor, a `VideoFrame` with a smaller visible rectangle, MediaStreamTrackGenerator). That needs no timers, so it keeps going in a background tab. Whatever lies over the window is part of the picture, and the page says so.
+- The part's place is known, so drawings land on it without any search. "Anderes Fenster wählen" changes it while sharing (or the whole screen).
+- A moved window is followed every 2 s while the page is in the background: found by its picture (`light-locate.js`), else by the frame closest to its old place. After three misses the page says the window is no longer there.
+- Firefox and Safari cannot cut frames: they share what was picked in the browser's dialog, as described below.
 
 **Showing where viewers point and draw.** A point is shown right away, a stroke once it is finished ("Anna malt gerade …" meanwhile). The share page takes a still picture when the point or stroke starts, so it shows what they drew on (`light-capture.js`).
 - **The mini window** (`light-pip.js`, `light-mini.js`) floats above every app – a normal browser window cannot: macOS never lets an app in the background bring its windows to the front, so `focus()` does nothing while the presenter works elsewhere.

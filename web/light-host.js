@@ -31,9 +31,12 @@ const cleanName = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, '').t
 export class LightHost {
   /**
    * @param {{stream: MediaStream, name: string, mode?: 'view'|'draw', relays?: string[], site?: string,
-   *          turnService?: string|null, onChange?: () => void, onAnnotation?: (m: object) => void, onEnded?: (why?: string) => void}} options
+   *          turnService?: string|null, onChange?: () => void, onAnnotation?: (m: object) => void, onEnded?: (why?: string) => void,
+   *          surface?: () => string|undefined, size?: () => {width, height}, sources?: MediaStreamTrack[]}} options
+   *   surface, size: what is shared and how large, when `stream` is made from another picture (a
+   *   window cut out of the whole screen); sources: tracks behind it, stopped with the share
    */
-  constructor({ stream, name, mode = 'draw', relays, site = new URL('./', location.href).href, turnService = TURN_SERVICE, onChange, onAnnotation, onEnded }) {
+  constructor({ stream, name, mode = 'draw', relays, site = new URL('./', location.href).href, turnService = TURN_SERVICE, onChange, onAnnotation, onEnded, surface, size, sources = [] }) {
     this.stream = stream
     this.track = stream.getVideoTracks()[0]
     this.name = cleanName(name)
@@ -44,6 +47,9 @@ export class LightHost {
     this.onChange = onChange ?? (() => {})
     this.onAnnotation = onAnnotation ?? (() => {})
     this.onEnded = onEnded ?? (() => {})
+    this.surfaceOf = surface
+    this.sizeOf = size
+    this.sources = sources
     this.secret = newRoomSecret()
     this.secretKey = schnorr.utils.randomSecretKey()
     this.room = `${this.secret}.${b64url(schnorr.getPublicKey(this.secretKey))}`
@@ -61,12 +67,24 @@ export class LightHost {
       this.track.contentHint = 'detail'
     } catch {}
     this.onTrackEnded = () => this.stop('Die Freigabe wurde im Browser beendet.')
-    this.track.addEventListener('ended', this.onTrackEnded)
+    for (const t of [this.track, ...sources]) t.addEventListener('ended', this.onTrackEnded)
   }
 
   /** What is shared: 'monitor' (a whole screen), 'window' or 'browser' (a tab). */
   get surface() {
-    return this.track.getSettings?.().displaySurface ?? 'monitor'
+    return this.surfaceOf?.() ?? this.track.getSettings?.().displaySurface ?? 'monitor'
+  }
+
+  /** The size of the shared picture (pixels). */
+  get size() {
+    const s = this.sizeOf?.() ?? this.track.getSettings?.() ?? {}
+    return { width: s.width, height: s.height }
+  }
+
+  /** What is shared changed (another window picked): viewers lay it out anew. */
+  update() {
+    this.broadcast(this.state())
+    this.changed()
   }
 
   async start() {
@@ -113,8 +131,8 @@ export class LightHost {
     this.requests.clear()
     this.signaling?.send({ type: 'bye', from: 'host' })
     setTimeout(() => this.signaling?.close(), 300)
-    this.track.removeEventListener('ended', this.onTrackEnded)
-    for (const t of this.stream.getTracks()) t.stop()
+    for (const t of [this.track, ...this.sources]) t.removeEventListener('ended', this.onTrackEnded)
+    for (const t of [...this.stream.getTracks(), ...this.sources]) t.stop()
     this.onChange()
     this.onEnded(why)
   }
@@ -317,16 +335,17 @@ export class LightHost {
   }
 
   sizeKey() {
-    const s = this.track.getSettings?.() ?? {}
-    return `${s.width}x${s.height}`
+    const s = this.size
+    return `${s.width}x${s.height}:${this.surface}`
   }
 
   state() {
-    const s = this.track.getSettings?.() ?? {}
+    const s = this.size
     const w = s.width || 1280
     const h = s.height || 720
     const screen = this.surface === 'monitor'
-    const title = screen ? 'Bildschirm' : this.track.label || (this.surface === 'browser' ? 'Browser-Tab' : 'Fenster')
+    // (a picture made here – a window cut out of the screen – has no name of its own)
+    const title = screen ? 'Bildschirm' : (!this.surfaceOf && this.track.label) || (this.surface === 'browser' ? 'Browser-Tab' : 'Fenster')
     const rect = { x: 0, y: 0, w, h }
     return {
       t: 'state',

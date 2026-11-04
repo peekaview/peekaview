@@ -295,3 +295,87 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     }
   }
 })
+
+test('the whole screen shared, one window of it picked (as in Chrome): viewers get only that window', { timeout: 180000 }, async () => {
+  const server = await startServer()
+  const base = `http://127.0.0.1:${server.address().port}`
+  const session = 'pv-light-pick-' + process.pid
+  const browser = async (...args) => (await promisify(execFile)('agent-browser', ['--session', session, ...args], { encoding: 'utf8', timeout: 30000 })).stdout
+  const evaluate = async (code) => JSON.parse(await browser('eval', code))
+  const waitFor = (fn) => browser('wait', '--fn', fn)
+  const tab = (id) => browser('tab', id)
+  try {
+    await browser('open', base + '/share.html')
+    await browser('set', 'viewport', '1280', '1000')
+    assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
+    await evaluate("document.querySelector('#name').value='Patrick';true")
+    const win = await evaluate('qaWindowAt')
+    await browser('click', '#start')
+    await tab('t1')
+    // which window? the screen with the windows found
+    await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
+    assert.equal(await evaluate("document.querySelector('#running').hidden && document.querySelector('#pick-ok').disabled"), true, 'nothing shared before the choice')
+    // (as if the presenter had been over at the window: the picture from the background)
+    await evaluate('document.hasFocus = () => false; true')
+    await new Promise((done) => setTimeout(done, 900))
+    await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
+    await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Klicke auf das Fenster')")
+    // a click into the window picks it
+    const box = await evaluate("(()=>{const r=document.querySelector('#pick-view').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
+    const sw = await evaluate('screen.width')
+    const sh = await evaluate('screen.height')
+    await browser('mouse', 'move', String(Math.round(box.l + ((win.x + 100) / sw) * box.w)), String(Math.round(box.t + ((win.y + 200) / sh) * box.h)))
+    await browser('mouse', 'down')
+    await browser('mouse', 'up')
+    await waitFor("!document.querySelector('#pick-ok').disabled")
+    await browser('click', '#pick-ok')
+    await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
+    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
+    assert.equal(await evaluate("document.querySelector('#locate-step').hidden && !document.querySelector('#repick').hidden"), true, 'no second screen to pick: the place is known')
+    const size = await evaluate('pvLight.host.size')
+    assert.ok(Math.abs(size.width - win.width) <= 4 && Math.abs(size.height - win.height) <= 4, JSON.stringify(size))
+
+    // a viewer gets only the window
+    const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
+    await browser('tab', 'new', `${base}/?name=Anna#${room}`)
+    await tab('t2')
+    await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
+    await browser('click', '[data-allow]')
+    await tab('t3')
+    await waitFor("document.querySelector('video')?.videoWidth > 0")
+    const video = await evaluate("[document.querySelector('video').videoWidth, document.querySelector('video').videoHeight]")
+    assert.ok(Math.abs(video[0] - win.width) <= 4 && Math.abs(video[1] - win.height) <= 4, `${video}`)
+    assert.equal(await evaluate("document.querySelector('.pv-title').textContent"), 'Fenster')
+
+    // a stroke: its place on the screen is the window's – no search
+    await browser('click', '.pv-dock [data-tool=draw]')
+    const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.3)), String(Math.round(r.t + r.h * 0.5)))
+    await browser('mouse', 'down')
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.5)), String(Math.round(r.t + r.h * 0.55)))
+    await browser('mouse', 'up')
+    await tab('t1')
+    await waitFor('!!pvLight.lastReveal')
+    const picture = await evaluate('pvLight.lastReveal.capture.picture')
+    for (const [k, v] of [['left', win.x], ['top', win.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(picture[k] - v) <= 3, `${k}: ${picture[k]} ≈ ${v}`)
+
+    // another choice while sharing: the whole screen – the same viewers, the whole picture
+    await browser('click', '#repick')
+    await waitFor("!document.querySelector('#pick').hidden")
+    await browser('click', '#pick-screen')
+    await waitFor("!document.querySelector('#running').hidden && pvLight.host.surface === 'monitor'")
+    await tab('t3')
+    await waitFor(`document.querySelector('video').videoWidth === ${sw}`)
+    await waitFor("document.querySelector('.pv-title').textContent === 'Bildschirm'")
+
+    await tab('t1')
+    await browser('click', '#stop')
+    await waitFor("!document.querySelector('#ended').hidden")
+  } finally {
+    try {
+      await browser('close')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+})

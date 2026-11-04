@@ -36,11 +36,14 @@ export async function frameCanvas(stream, videos = []) {
  *   is not to be seen on the screen) – the page says so
  *   picture: where the shared picture lies (screen coordinates, CSS px) – null when unknown
  *   screenImage: the whole screen at that moment (only for a found window, as backdrop)
- * @param {{stream: MediaStream, locator?: MediaStream|null, surface: string, videos?: HTMLVideoElement[], screen?: Screen}} source
+ * @param {{stream: MediaStream, locator?: MediaStream|null, surface: string, crop?: {x, y, width, height}|null,
+ *          videos?: HTMLVideoElement[], screen?: Screen}} source
+ *   crop: the whole screen is captured (`stream`) and this part of it shared – its place is known
  */
-export async function takeCapture({ stream, locator = null, surface, videos = [], screen: scr = screen }) {
+export async function takeCapture({ stream, locator = null, surface, crop, videos = [], screen: scr = screen }) {
   const t0 = performance.now()
   const monitor = monitorRect(scr, { mac, details: await screenDetails() })
+  if (crop !== undefined) return cropCapture(stream, crop, monitor, videos)
   const image = await frameCanvas(stream, videos)
   const capture = { image, picture: null, monitor, screenImage: null, found: null }
   // what happened – for share.html?debug and the console
@@ -69,7 +72,7 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
   // black bars around the window (Chrome letterboxes a window whose shape changed) are not on
   // the screen: searched for without them
   const bars = blackBars(image, scratch)
-  const content = bars ? crop(image, bars) : image
+  const content = bars ? cutOut(image, bars) : image
   if (bars) debug.bars = bars
   const info = (debug.search_result = {})
   // likely sizes: both pictures with the same density (1) – or the screen's picture reduced by
@@ -92,6 +95,30 @@ export async function takeCapture({ stream, locator = null, surface, videos = []
   const sy = inner.height / content.height
   const picture = bars ? { left: inner.left - bars.left * sx, top: inner.top - bars.top * sy, width: image.width * sx, height: image.height * sy } : inner
   return { ...capture, picture, screenImage, found }
+}
+
+// a part of the whole screen: picture and place straight from the crop
+async function cropCapture(stream, crop, monitor, videos) {
+  const full = await frameCanvas(stream, videos)
+  const debug = { version: VERSION, surface: crop ? 'Ausschnitt' : 'monitor', screen: `${monitor.width}x${monitor.height}@${monitor.left},${monitor.top}` }
+  const capture = { image: null, picture: null, monitor, screenImage: null, found: null, debug }
+  if (!full) return capture
+  debug.search = `${full.width}x${full.height}`
+  const same = matchesScreen(full, monitor)
+  if (!same) {
+    debug.problem = 'other-screen'
+    debug.why = 'anderer Bildschirm (Seitenverhältnis)'
+  }
+  if (!crop) return { ...capture, image: full, picture: same ? monitor : null }
+  const image = cropCanvas(full, crop)
+  debug.picture = `${image.width}x${image.height}`
+  const part = { x: crop.x / full.width, y: crop.y / full.height, w: crop.width / full.width, h: crop.height / full.height }
+  return { ...capture, image, picture: same ? windowRect(part, monitor) : null, screenImage: full }
+}
+
+/** A part (pixels) of a picture as a canvas of its own. */
+export function cropCanvas(image, r) {
+  return cutOut(image, { left: r.x, top: r.y, right: image.width - r.x - r.width, bottom: image.height - r.y - r.height })
 }
 
 /**
@@ -121,7 +148,7 @@ export function blackBars(image, scratch = document.createElement('canvas')) {
   return { left: Math.round(left * f), top: Math.round(top * f), right: Math.round(right * f), bottom: Math.round(bottom * f) }
 }
 
-function crop(image, bars) {
+function cutOut(image, bars) {
   const canvas = document.createElement('canvas')
   canvas.width = Math.max(1, image.width - bars.left - bars.right)
   canvas.height = Math.max(1, image.height - bars.top - bars.bottom)
