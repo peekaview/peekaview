@@ -281,6 +281,20 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await new Promise((done) => setTimeout(done, 8000))
     assert.doesNotMatch(await tabs(), /share-helper/, 'closed again')
 
+    // "Zur Stelle" stays and always shows the drawing again – also clicked twice in a row
+    for (let i = 0; i < 2; i++) {
+      await tab('t2')
+      assert.equal(await evaluate("document.querySelector('[data-jump]').hidden"), false)
+      await browser('click', '[data-jump]')
+    }
+    await waitFor('1')
+    const list = await tabs()
+    assert.equal(list.split('\n').filter((l) => l.includes('share-helper')).length, 1, list)
+    const id = list.split('\n').find((l) => l.includes('share-helper')).match(/t\d+/)[0]
+    await tab(id)
+    await waitFor("window.pvHelper?.state === 'focus'")
+    assert.equal(await evaluate('document.querySelector("#focus-who").textContent'), 'Anna zeigt hier')
+
     // stopping from the mini window ends the screen picture, too
     await tab('t2')
     await browser('click', '[data-stop]')

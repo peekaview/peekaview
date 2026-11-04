@@ -697,13 +697,22 @@
     }
 
     /** The helper over the spot of the last drawing – from a click (mini window, notification). */
+    let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
       if (helper && !helper.closed) {
-        try { helper.focus() } catch {}
-        return emit({ kind: 'jump' })
+        let onDemand = false
+        try { onDemand = !!helper.pvHelper?.onDemand } catch {}
+        // the helper in the corner (no mini window): it shows the spot itself
+        if (!onDemand) {
+          try { helper.focus() } catch {}
+          return emit({ kind: 'jump' })
+        }
+        // one for the spot already open – maybe behind other programs, and an open window cannot
+        // come to the front from a click elsewhere: a new one in this click always does
+        closeHelper()
       }
-      helper = from.open('share-helper.html?jump=1', 'pv-light-helper', 'popup=yes,width=560,height=400')
+      helper = from.open('share-helper.html?jump=1', `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
       helperBlocked = !helper
       renderHelper()
     }

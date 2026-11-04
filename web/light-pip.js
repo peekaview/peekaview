@@ -121,21 +121,17 @@ export class MiniWindow {
     }))
   }
 
-  /** A spot to show: see MiniView.reveal. "Zur Stelle" stays for a minute. */
+  /** A spot to show: see MiniView.reveal. "Zur Stelle" stays: it always shows the last one. */
   reveal(spot) {
     this.view.reveal(spot)
     if (this.kind !== 'document' || this.closed) return
-    const jump = this.win.document.querySelector('[data-jump]')
-    jump.hidden = false
-    clearTimeout(this.jumpTimer)
-    this.jumpTimer = setTimeout(() => (jump.hidden = true), 60000)
+    this.win.document.querySelector('[data-jump]').hidden = false
   }
 
   gone() {
     if (this.closed) return
     this.closed = true
     this.view.destroy()
-    clearTimeout(this.jumpTimer)
     this.actions.onClose?.()
   }
 
