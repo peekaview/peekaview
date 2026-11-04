@@ -8,6 +8,8 @@ test('the shared screen: exact where the browser says, below the menu bar estima
   assert.deepEqual(monitorRect({ left: 1440, top: -200, width: 1920, height: 1080, availLeft: 1440, availTop: -175, availHeight: 1055 }), { left: 1440, top: -200, width: 1920, height: 1080 })
   // Chrome on a Mac: only the usable area, which starts below the menu bar
   assert.deepEqual(monitorRect({ width: 1512, height: 982, availLeft: 0, availTop: 25, availHeight: 900 }, { mac: true }), { left: 0, top: 0, width: 1512, height: 982 })
+  // a second screen on a Mac, the Dock elsewhere: only the menu bar (30 px) is missing
+  assert.deepEqual(monitorRect({ width: 2560, height: 1440, availLeft: 2560, availTop: 30, availHeight: 1410 }, { mac: true }), { left: 2560, top: 0, width: 2560, height: 1440 })
   // Windows: the taskbar is at the bottom, the usable area starts at the top
   assert.deepEqual(monitorRect({ width: 1920, height: 1080, availLeft: 0, availTop: 0, availHeight: 1040 }), { left: 0, top: 0, width: 1920, height: 1080 })
   // Chrome with "window management" already allowed

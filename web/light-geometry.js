@@ -15,6 +15,7 @@
 //   - Coordinates are CSS pixels; the picture (track settings) is in device pixels.
 
 const MAC_MENU_BAR = 25
+const MAC_MENU_BAR_MAX = 44 // taller than any menu bar (notch: 37–38), shorter than menu bar and Dock
 
 /** The shared screen in screen coordinates (CSS px): {left, top, width, height}. */
 export function monitorRect(screen, { mac = false, details = null } = {}) {
@@ -25,8 +26,10 @@ export function monitorRect(screen, { mac = false, details = null } = {}) {
   let top = Number.isFinite(screen.top) ? screen.top : null
   if (top == null) {
     const availTop = Number.isFinite(screen.availTop) ? screen.availTop : 0
-    // macOS: the usable area starts below the menu bar
-    top = mac && screen.availHeight < screen.height ? availTop - Math.min(MAC_MENU_BAR, screen.height - screen.availHeight) : availTop
+    // macOS: the usable area starts below the menu bar – which is all that is missing when the
+    // Dock is on another screen (or hidden); otherwise it is about 25 px
+    const missing = screen.height - screen.availHeight
+    top = mac && missing > 0 ? availTop - (missing <= MAC_MENU_BAR_MAX ? missing : Math.min(MAC_MENU_BAR, missing)) : availTop
   }
   return { left, top, width: screen.width, height: screen.height }
 }
