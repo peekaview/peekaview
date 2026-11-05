@@ -328,6 +328,11 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     await tab(P)
     await browser('wait', '#requests [data-allow]')
     await browser('click', '#requests [data-allow]')
+    // asked once: notifications (a fake one here – the browser's own asks the user)
+    await waitFor("!document.querySelector('#notify-step').hidden")
+    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'default'; static requestPermission() { Notification.permission = 'granted'; return Promise.resolve('granted') } constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
+    await browser('click', '#notify-on')
+    await waitFor("document.querySelector('#notify-step').hidden")
     await tab(V)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
     const video = await evaluate("[document.querySelector('video').videoWidth, document.querySelector('video').videoHeight]")
@@ -358,9 +363,10 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     // (the helper back in its corner, the pictures going out again)
     await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
 
-    // the window moved – and drawn on right away: the drawing appears where it is now
+    // the window moved – and drawn on right away: the drawing appears where it is now (the
+    // presenter in another program meanwhile: a notification)
     const moved = { ...win, x: win.x - 160, y: win.y + 120 }
-    await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; true`)
+    await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; document.hasFocus = () => false; true`)
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.4)))
     await browser('mouse', 'down')
@@ -371,6 +377,10 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
     })
     const there = await evaluate('pvLight.lastReveal.capture.picture')
+    // a notification – its click brings the small window with the drawing to the front
+    assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
+    await evaluate('delete document.hasFocus; qaNotes[0].onclick(); true')
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
     // (the move was noticed in the video's way: pictures held back until it was found)
     assert.ok((await evaluate('pvLight.frames')).held > still.held, 'noticed on a picture')
     for (const [k, v] of [['left', moved.x], ['top', moved.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(there[k] - v) <= 3, `moved, ${k}: ${there[k]} ≈ ${v}`)

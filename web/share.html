@@ -161,6 +161,14 @@
           <div class="step-actions"><button class="pill primary" id="problem-check" type="button">Noch einmal prüfen</button><button class="pill" id="problem-screen" type="button">Anderen Bildschirm wählen</button></div>
         </div>
       </div>
+      <div class="step" id="notify-step" hidden>
+        <span class="step-icon" data-icon="bell"></span>
+        <div class="step-body">
+          <strong>Zeichnungen sofort sehen</strong>
+          <p id="notify-text"></p>
+          <div class="step-actions"><button class="pill primary" id="notify-on" type="button">Benachrichtigungen erlauben</button><button class="text-button" id="notify-later" type="button">Später</button></div>
+        </div>
+      </div>
       <div class="step" id="locate-step" hidden>
         <span class="step-icon" data-icon="screen"></span>
         <div class="step-body">
@@ -631,6 +639,7 @@
     $('helper-open').addEventListener('click', openHelper)
 
     function renderHelper() {
+      renderNotify()
       if (host) {
         $('live-title').textContent = panel ? 'Freigabe läuft' : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
         $('repick').hidden = !cropper
@@ -712,22 +721,48 @@
     }
 
     // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
+    // (not while the presenter is in this window anyway: then it shows by itself, in front)
     function notify(r) {
-      if (typeof Notification !== 'function' || Notification.permission !== 'granted') return
+      if (typeof Notification !== 'function' || Notification.permission !== 'granted' || inFront()) return
       try {
-        const n = new Notification(r.ping ? `${r.name} zeigt dir etwas` : `${r.name} hat etwas gemalt`, { body: 'Klicke hier, dann erscheint es genau an der Stelle.', tag: 'pv-light' })
+        const n = new Notification(r.ping ? `${r.name} zeigt dir etwas` : `${r.name} hat etwas gemalt`, { body: 'Klicke hier, dann siehst du es genau an der Stelle.', tag: 'pv-light' })
         n.onclick = () => {
           n.close()
-          window.focus()
+          try { window.focus() } catch {}
           jumpHelper()
         }
       } catch {}
     }
 
+    // asked once, with a click of its own (browsers want one), while the share runs
+    let notifySkipped = false
+    function renderNotify() {
+      const can = typeof Notification === 'function'
+      const permission = can ? Notification.permission : 'denied'
+      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped
+      $('notify-text').textContent = permission === 'denied'
+        ? 'Benachrichtigungen sind für diese Seite gesperrt. Erlauben kannst du sie über das Symbol links neben der Adresse.'
+        : 'Arbeitest du in einem anderen Programm, meldet sich PeekaView, sobald jemand etwas zeigt oder malt. Ein Klick auf die Meldung zeigt es dir genau an der Stelle.'
+      $('notify-on').hidden = permission === 'denied'
+    }
+    $('notify-on').addEventListener('click', () => {
+      Notification.requestPermission().then(renderNotify).catch(() => {})
+    })
+    $('notify-later').addEventListener('click', () => {
+      notifySkipped = true
+      renderNotify()
+    })
+
     /** The helper over the spot of the last drawing – from a click (notification). */
     let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
+      // the small window is the helper: in front now (the click made the browser the active
+      // program), it shows the drawing again
+      if (panel) {
+        try { window.focus() } catch {}
+        return emit({ kind: 'jump' })
+      }
       // a helper already open may lie behind other programs, and it cannot come to the front from a
       // click elsewhere: a new one, opened in this click, always does – it waits in the corner afterwards
       closeHelper()
