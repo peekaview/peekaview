@@ -533,7 +533,28 @@
         $('src-video').srcObject = stream
         $('src-video').play().catch(() => {})
       }
-      if (await markSeen(stream)) return
+      const log = (step) => params.has('debug') && fetch('qa-log', { method: 'POST', body: JSON.stringify({ suche: step, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: { left: screen.left, top: screen.top, availLeft: screen.availLeft, availTop: screen.availTop, width: screen.width, height: screen.height } }) }).catch(() => {})
+      if (await markSeen(stream)) return log('gefunden, hier')
+      log('nicht hier')
+      // Chrome, Edge: a window goes to another screen only with the permission to manage windows –
+      // asked for here; with it the screens are known: the one as large as the shared picture
+      const track = stream.getVideoTracks()[0]
+      const size = track?.getSettings?.() ?? {}
+      if (typeof window.getScreenDetails === 'function') {
+        try {
+          const details = await window.getScreenDetails()
+          const others = details.screens.filter((d) => d !== details.currentScreen)
+          const match = others.find((d) => Math.abs(d.width * d.devicePixelRatio - size.width) < 8 && Math.abs(d.height * d.devicePixelRatio - size.height) < 8) ?? (others.length === 1 ? others[0] : null)
+          log(`Bildschirme: ${details.screens.length}, passend: ${!!match}`)
+          if (match) {
+            window.moveTo(match.availLeft + match.availWidth - window.outerWidth - 16, match.availTop + match.availHeight - window.outerHeight - 16)
+            await new Promise((done) => setTimeout(done, 350))
+            if (await markSeen(stream)) return log('gefunden, nach Fensterverwaltung')
+          }
+        } catch (err) {
+          log(`keine Fensterverwaltung: ${err?.message ?? err}`)
+        }
+      }
       const home = [window.screenX, window.screenY]
       const w = window.outerWidth
       const h = window.outerHeight
@@ -549,10 +570,15 @@
         try { window.moveTo(x, y) } catch {}
         await new Promise((done) => setTimeout(done, 350))
         // (not moved: no screen there)
-        if (Math.abs(window.screenX - home[0]) + Math.abs(window.screenY - home[1]) < 40) continue
-        if (await markSeen(stream)) return
+        if (Math.abs(window.screenX - home[0]) + Math.abs(window.screenY - home[1]) < 40) {
+          log(`nicht verschoben nach ${x},${y}`)
+          continue
+        }
+        if (await markSeen(stream)) return log(`gefunden bei ${x},${y}`)
+        log(`verschoben nach ${x},${y}, nicht gefunden`)
       }
       try { window.moveTo(...home) } catch {}
+      log('aufgegeben')
     }
 
     // a magenta mark over this window – to be found in the shared picture?
