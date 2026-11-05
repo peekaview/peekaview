@@ -973,6 +973,7 @@
     // screen: viewers would see the drawing twice)
     function setLarge(large, { resize = true } = {}) {
       pipLarge = large
+      if (!large) overlayUntil = performance.now() + 1500
       if (cropper) cropper.paused = large
       if (miniView) {
         miniView.keep = large
@@ -1451,14 +1452,22 @@
     let trackInfo = null // how the last search went (share.html?debug)
     let tracking = null
     let fixedPart = false // a part drawn by hand: not followed
+    // a drawing shown over the screen (the helper at its spot, the window "Freigabe läuft" large): it
+    // may lie over the shared window – not looked for meanwhile, and a moment after
+    let overlayUntil = 0
+    const overlaid = () => spotting || cropper?.paused || pipLarge || performance.now() < overlayUntil
     function track() {
       if (!host || !cropper?.rect || picker || fixedPart) return Promise.resolve()
+      if (overlaid()) {
+        trackMisses = 0
+        return Promise.resolve()
+      }
       return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
       const full = await frameCanvas(screenStream, sourceVideos())
       const r = cropper?.rect
-      if (!full || !r || picker) return
+      if (!full || !r || picker || overlaid()) return
       const grab = grabberOf(full)
       const scale = full.width / screen.width
       const before = trackImage ?? cropCanvas(full, r)
@@ -1712,6 +1721,7 @@
       },
       spotDone: () => {
         spotting = false
+        overlayUntil = performance.now() + 1500
         // (once the helper is out of the way: moving a window takes a moment)
         setTimeout(() => {
           if (!spotting && cropper) cropper.paused = false
