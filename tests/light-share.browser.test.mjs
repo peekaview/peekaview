@@ -245,6 +245,9 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     // the window just worked in is recognized by its title bar's buttons, and picked right away
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
+    // … it lights up, and the small window needs no scrolling
+    assert.equal(await evaluate("document.querySelector('#pick-preview').classList.contains('glow')"), true, 'recognized: a glow')
+    assert.ok(await evaluate("parseFloat(getComputedStyle(document.querySelector('#pick-preview')).maxHeight)") <= 150)
     // a drag draws a part by hand – which would stay where it is; the window is shown here
     assert.equal(await evaluate("document.querySelector('#pick-ok').textContent"), 'Dieses Fenster zeigen')
     const sw = await evaluate('screen.width')

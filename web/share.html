@@ -98,6 +98,18 @@
     main.wide { width: min(980px, calc(100% - 32px)); }
     .pick-view { display: block; width: 100%; border-radius: 10px; background: #000; cursor: crosshair; touch-action: none; }
     .pick-preview { display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 10px; background: #000; }
+    /* (the small window: no scrolling – the picture small) */
+    body.panel .pick-preview { max-height: 150px; }
+    body.panel #pick h1 { font-size: 18px; }
+    /* a window just recognized: it lights up */
+    .pick-preview.glow { animation: glow 1.4s ease-out; }
+    @keyframes glow {
+      0% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(255,255,255,0); }
+      18% { box-shadow: 0 0 0 3px rgba(239,68,68,.95), 0 0 26px 8px rgba(239,68,68,.7); }
+      45% { box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 0 18px 6px rgba(255,255,255,.35); }
+      100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(255,255,255,0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .pick-preview.glow { animation: none; outline: 3px solid #ef4444; } }
     body.panel .pick-steps { font-size: 14px; }
     .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
@@ -189,7 +201,7 @@
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
       <h1>Welches Fenster möchtest du zeigen?</h1>
-      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – so wird es aktiv.</li><li>Komm dann hierher zurück.</li></ol>
+      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – es erscheint dann hier.</li></ol>
       <p class="lead" id="pick-lead" style="margin:0"></p>
       <canvas id="pick-preview" class="pick-preview" hidden></canvas>
       <canvas id="pick-view" class="pick-view"></canvas>
@@ -1224,6 +1236,7 @@
       sawAway = false
       pickThumb = null
       pickActive = null
+      glowKey = null
       $('setup').hidden = $('running').hidden = true
       $('pick').hidden = false
       document.querySelector('main').classList.add('wide')
@@ -1260,10 +1273,12 @@
         if (!c || !picker) return
         // (the windows looked for again only when a quarter of the picture changed – or right after
         // switching to another program: the window worked in then)
-        const thumb = scaledGray(c, 64, 36)
-        const changed = pickThumb ? thumb.px.filter((v, i) => Math.abs(v - pickThumb.px[i]) > 10).length / thumb.px.length : 1
+        // In the background (the presenter in another program, clicking from window to window): looked
+        // through whenever anything changed – another window activated changes only its title bar
+        const thumb = scaledGray(c, 128, 72)
+        const changed = pickThumb ? thumb.px.filter((v, i) => Math.abs(v - pickThumb.px[i]) > 8).length / thumb.px.length : 1
         pickChanged = Math.round(changed * 100)
-        if (changed < 0.25 && pickActive === !front) return renderPick()
+        if (changed < (front ? 0.25 : 0.0005) && pickActive === !front) return renderPick()
         pickThumb = thumb
         pickActive = !front
         picker.setImage(c, { active: !front, own })
@@ -1293,6 +1308,7 @@
     // In the small window: the window activated, as a small picture – the whole screen only to
     // draw a part by hand (the window grows for that). In a tab: the whole screen right away.
     let pickDrawing = false
+    let glowKey = null
     function renderPick() {
       if (!picker) return
       const drawing = pickDrawing || !panel
@@ -1303,8 +1319,8 @@
       $('pick-lead').textContent = pickDrawing
         ? sel?.drawn ? 'Dein Bereich (rot umrandet). Er bleibt fest an seiner Stelle.' : 'Zieh mit der Maus einen Rahmen um den Bereich, den du zeigen möchtest.'
         : windowSel
-          ? 'Erkannt: dein aktives Fenster. Ein anderes? Klicke einmal hinein und komm zurück.'
-          : 'Kein aktives Fenster erkannt. Klicke noch einmal hinein und komm zurück.'
+          ? 'Erkannt: dein aktives Fenster. Ein anderes? Klicke einfach hinein.'
+          : 'Kein aktives Fenster erkannt. Klicke einmal in das Fenster, das du zeigen möchtest.'
       $('pick-view').hidden = !drawing
       $('pick-draw').hidden = !drawing || !!sel?.drawn
       $('pick-note').hidden = !drawing
@@ -1313,6 +1329,14 @@
       // the window picked, small
       const preview = $('pick-preview')
       preview.hidden = drawing || !windowSel
+      // a window newly recognized: lights up (not again for the same one in a new picture)
+      const key = windowSel ? [windowSel.x, windowSel.y, windowSel.w, windowSel.h].map((v) => Math.round(v * 200)).join() : null
+      if (key && key !== glowKey && !preview.hidden) {
+        preview.classList.remove('glow')
+        void preview.offsetWidth
+        preview.classList.add('glow')
+      }
+      glowKey = key
       if (!preview.hidden) {
         const img = picker.image
         const sw = windowSel.w * img.width
