@@ -19,7 +19,8 @@ export class Cropper {
     this.blank = null // a note on black instead of the part (setBlank)
     this.check = null // (frame, rect) => Promise<boolean>: is the part still what it was?
     this.onMiss = null // called when it is not (or while it is black)
-    this.counts = { checked: 0, held: 0 } // (for share.html?debug and tests)
+    this.paused = false // no new pictures for now
+    this.counts = { checked: 0, held: 0, paused: 0 } // (for share.html?debug and tests)
     this.size = { width: source.getSettings?.().width ?? 0, height: source.getSettings?.().height ?? 0 }
     this.full = { ...this.size }
     this.generator = new window.MediaStreamTrackGenerator({ kind: 'video' })
@@ -29,6 +30,13 @@ export class Cropper {
         const base = frame.visibleRect ?? { x: 0, y: 0, width: frame.displayWidth, height: frame.displayHeight }
         this.full = { width: base.width, height: base.height }
         const r = this.rect
+        // paused (the helper shows a drawing over the window: viewers would see it twice): no new
+        // pictures – viewers keep the last one
+        if (this.paused) {
+          this.counts.paused++
+          frame.close()
+          return
+        }
         // the window is not to be seen: black, with a word why (nothing of what lies there now)
         if (r && this.blank) {
           this.onMiss?.()

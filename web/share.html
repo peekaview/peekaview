@@ -236,7 +236,7 @@
     import { detectWindows, trafficLights, windowOfLights } from './light-windows.js'
     import { readText, sameTitle, titleBar, words } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
-    import { follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
+    import { borderStrips, follow, grabberOf, hasLine, snapRect, titleOf, titleScore } from './light-track.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -426,7 +426,8 @@
         // every picture: is the window's title bar still where it was? Not: looked for at once
         cropper.check = stillThere
         cropper.onMiss = () => {
-          if (performance.now() - missAt < 250) return
+          // (not to be seen at all: looked for once a second – the search costs)
+          if (performance.now() - missAt < (cropper?.blank ? 1000 : 250)) return
           missAt = performance.now()
           track()
         }
@@ -623,6 +624,7 @@
     setInterval(() => {
       if (helper?.closed) {
         helper = null
+        if (!panel && spotting) window.pvLight.spotDone()
         renderHelper()
       }
     }, 1000)
@@ -1022,6 +1024,8 @@
       if (next.x !== r.x || next.y !== r.y || next.width !== r.width || next.height !== r.height) {
         cropper.setRect(next)
         host.update()
+        // (larger or smaller: its title bar is, too)
+        if (next.width !== r.width || next.height !== r.height) trackTitle = titleOf(grab, cropper.rect, scale)
       }
       trackImage = cropCanvas(full, cropper.rect)
       // found without its title bar (it changed: another document, another tab): take the new one
@@ -1041,15 +1045,29 @@
       const title = trackTitle
       // (a plain title bar: nothing to compare – the timer's search has to do)
       if (!title) return true
-      const base = frame.visibleRect ?? { x: 0, y: 0 }
       const bx = r.x + title.band.x
       const by = r.y + title.band.y
-      // (a little more around it, on even pixels: video formats keep colour for pairs of pixels)
-      const x = Math.max(0, Math.floor((bx - 2) / 2) * 2)
-      const y = Math.max(0, Math.floor((by - 2) / 2) * 2)
-      const width = Math.min(frame.displayWidth - x, Math.ceil((title.tpl.width + 6) / 2) * 2)
-      const height = Math.min(frame.displayHeight - y, Math.ceil((title.tpl.height + 6) / 2) * 2)
-      if (width < title.tpl.width || height < title.tpl.height) return false
+      const strip = await lumaOf(frame, { x: bx - 2, y: by - 2, width: title.tpl.width + 6, height: title.tpl.height + 6 })
+      if (!strip || strip.width < title.tpl.width || strip.height < title.tpl.height) return false
+      if (titleScore(strip, title, bx - strip.x, by - strip.y) < 0.7) return false
+      // … and its right and bottom borders where they were (made larger or smaller: not)
+      const [right, bottom] = borderStrips(r)
+      for (const [area, across] of [[right, true], [bottom, false]]) {
+        if (area.x < 1 || area.y < 1 || area.x + area.width > frame.displayWidth || area.y + area.height > frame.displayHeight) continue
+        const g = await lumaOf(frame, area)
+        if (g && !hasLine(g, across)) return false
+      }
+      return true
+    }
+
+    /** The brightness of a part of a video frame (on even pixels: video formats keep colour for pairs). */
+    async function lumaOf(frame, area) {
+      const base = frame.visibleRect ?? { x: 0, y: 0 }
+      const x = Math.max(0, Math.floor(area.x / 2) * 2)
+      const y = Math.max(0, Math.floor(area.y / 2) * 2)
+      const width = Math.min(frame.displayWidth - x, Math.ceil((area.width + area.x - x) / 2) * 2)
+      const height = Math.min(frame.displayHeight - y, Math.ceil((area.height + area.y - y) / 2) * 2)
+      if (width < 2 || height < 2) return null
       const rect = { x: base.x + x, y: base.y + y, width, height }
       const buffer = new Uint8Array(frame.allocationSize({ rect }))
       const [plane] = await frame.copyTo(buffer, { rect })
@@ -1057,13 +1075,13 @@
       const rgb = /^(RGB|BGR)/.test(frame.format)
       const red = frame.format?.startsWith('RGB') ? 0 : 2
       for (let row = 0; row < height; row++) {
+        const i = plane.offset + row * plane.stride
         for (let col = 0; col < width; col++) {
-          const i = plane.offset + row * plane.stride
-          // the brightness: the first plane of NV12 / I420, else from red, green, blue
+          // the first plane of NV12 / I420, else from red, green, blue
           px[row * width + col] = rgb ? 0.299 * buffer[i + col * 4 + red] + 0.587 * buffer[i + col * 4 + 1] + 0.114 * buffer[i + col * 4 + 2 - red] : buffer[i + col]
         }
       }
-      return titleScore({ width, height, px }, title, bx - x, by - y) >= 0.7
+      return { x, y, width, height, px }
     }
 
     // The window's titles, read from its title bar (light-title.js): now and then while it stays,
@@ -1205,7 +1223,7 @@
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
-      get frames() { return cropper ? { ...cropper.counts } : null },
+      get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),
@@ -1220,14 +1238,23 @@
       annotate: (m) => host?.annotate(m),
       copyLink: () => copyLink(false),
       stop: () => host?.stop(),
-      // the spot inside the small window (share-helper.html, embedded): shown, and back to the panel
+      // the helper shows a drawing over its spot, and is done: meanwhile no new pictures go out –
+      // the helper is part of the screen's picture, viewers would see the drawing twice. (Inside the
+      // small window, share-helper.html embedded: shown instead of the panel, then the panel again.)
       spotShown: () => {
         spotting = true
+        if (cropper) cropper.paused = true
+        if (!panel) return
         $('spot').hidden = false
         document.body.classList.add('spotting')
       },
       spotDone: () => {
         spotting = false
+        // (once the helper is out of the way: moving a window takes a moment)
+        setTimeout(() => {
+          if (!spotting && cropper) cropper.paused = false
+        }, 300)
+        if (!panel) return
         $('spot').hidden = true
         document.body.classList.remove('spotting')
         dock()

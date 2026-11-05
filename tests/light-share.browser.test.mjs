@@ -346,12 +346,17 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     // the small window itself shows the spot (and goes back to its panel afterwards)
     await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
     assert.equal(await evaluate("document.querySelector('#spot').contentDocument.querySelector('#focus-who').textContent"), 'Anna zeigt hier')
+    // … and meanwhile no new pictures go out (the drawing over the window would be seen twice)
+    assert.equal(await evaluate('pvLight.frames.paused'), true)
     const picture = await evaluate('pvLight.lastReveal.capture.picture')
     for (const [k, v] of [['left', win.x], ['top', win.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(picture[k] - v) <= 3, `${k}: ${picture[k]} ≈ ${v}`)
 
     // every picture is checked right in the video's way: while the window stays, none is held back
     const still = await evaluate('pvLight.frames')
     assert.ok(still.checked > 10 && still.held <= 2, JSON.stringify(still))
+
+    // (the helper back in its corner, the pictures going out again)
+    await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
 
     // the window moved – and drawn on right away: the drawing appears where it is now
     const moved = { ...win, x: win.x - 160, y: win.y + 120 }
@@ -400,10 +405,20 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     await tab(V)
     await waitFor(`Math.abs(document.querySelector('video').videoWidth - ${big.width}) <= 6 && ${dark} > 60`)
     await tab(P)
+    // made smaller where it is (its right and bottom borders move): the new size, too
+    const smaller = { ...big, width: big.width - 120, height: big.height - 60 }
+    await evaluate(`qaWindowAt = ${JSON.stringify(smaller)}; true`)
+    await waitFor(`pvLight.crop.x === ${big.x} && Math.abs(pvLight.crop.width - ${smaller.width}) <= 6 && Math.abs(pvLight.crop.height - ${smaller.height}) <= 6`).catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked})'))}`)
+    })
+    await tab(V)
+    await waitFor(`Math.abs(document.querySelector('video').videoWidth - ${smaller.width}) <= 6`)
+    await tab(P)
 
     // another choice while sharing: the whole screen – the same viewers, the whole picture
     // (once the small window shows its panel again)
     await waitFor("!document.body.classList.contains('spotting')")
+    await waitFor('!pvLight.frames.paused')
     await browser('click', '#repick')
     await waitFor("!document.querySelector('#pick').hidden")
     await browser('click', '#pick-screen')

@@ -185,24 +185,34 @@ export function follow(grab, full, rect, { title, windowAt, places = () => [] })
 }
 
 /** Are there borders where the right and bottom side of this window would be? (beyond the screen: yes) */
-function hasBorders(grab, full, r) {
+export function hasBorders(grab, full, r) {
   const strip = (area, across) => {
     if (area.x < 1 || area.y < 1 || area.x + area.width > full.width || area.y + area.height > full.height) return true
-    const g = grab(area, area.width, area.height)
-    let best = 0
-    // the strongest line in the strip (across: the jump is between columns, else between rows)
-    const n = across ? g.width : g.height
-    for (let i = 1; i < n; i++) {
-      let sum = 0
-      const m = across ? g.height : g.width
-      for (let j = 0; j < m; j++) sum += across ? Math.abs(g.px[j * g.width + i] - g.px[j * g.width + i - 1]) : Math.abs(g.px[i * g.width + j] - g.px[(i - 1) * g.width + j])
-      best = Math.max(best, sum / m)
-    }
-    return best >= 6
+    return hasLine(grab(area, area.width, area.height), across)
   }
-  const right = strip({ x: r.x + r.width - 4, y: Math.round(r.y + r.height * 0.2), width: 8, height: Math.round(r.height * 0.6) }, true)
-  const bottom = strip({ x: Math.round(r.x + r.width * 0.2), y: r.y + r.height - 4, width: Math.round(r.width * 0.6), height: 8 }, false)
-  return right && bottom
+  const [right, bottom] = borderStrips(r)
+  return strip(right, true) && strip(bottom, false)
+}
+
+/** Where a window's right and bottom borders would be: two narrow strips (pixels). */
+export function borderStrips(r) {
+  return [
+    { x: r.x + r.width - 4, y: Math.round(r.y + r.height * 0.2), width: 8, height: Math.round(r.height * 0.6) },
+    { x: Math.round(r.x + r.width * 0.2), y: r.y + r.height - 4, width: Math.round(r.width * 0.6), height: 8 },
+  ]
+}
+
+/** A border along a strip? (across: the jump is between columns, else between rows) */
+export function hasLine(g, across) {
+  let best = 0
+  const n = across ? g.width : g.height
+  const m = across ? g.height : g.width
+  for (let i = 1; i < n; i++) {
+    let sum = 0
+    for (let j = 0; j < m; j++) sum += across ? Math.abs(g.px[j * g.width + i] - g.px[j * g.width + i - 1]) : Math.abs(g.px[i * g.width + j] - g.px[(i - 1) * g.width + j])
+    best = Math.max(best, sum / m)
+  }
+  return best >= 6
 }
 
 /** The best place of the title bar for a window near (x, y), within `reach` pixels; 1:1. */

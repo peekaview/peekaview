@@ -239,6 +239,7 @@
 
     function park() {
       clearTimeout(idleTimer)
+      if (state === 'focus') api.spotDone?.()
       if (onDemand && closeAfter) return window.close()
       state = 'parked'
       part = null
@@ -246,7 +247,7 @@
       ann.reset()
       $('waiting').hidden = true
       $('focus').hidden = true
-      if (embedded) return api.spotDone?.()
+      if (embedded) return
       $('parked').hidden = false
       renderParked()
     }
@@ -308,8 +309,9 @@
       }
       ann.reset()
       state = 'focus'
-      // (the share's window shows this page instead of its panel)
-      if (embedded) api.spotShown?.()
+      // (no new pictures meanwhile – the drawing here would go out twice; the share's small window
+      // shows this page instead of its panel)
+      api.spotShown?.()
       $('waiting').hidden = true
       $('parked').hidden = true
       $('focus').hidden = false
@@ -457,7 +459,10 @@
       else if (e.kind === 'reveal') onReveal(e.reveal)
       else if (e.kind === 'jump') onJump()
     })
-    window.addEventListener('pagehide', () => unsubscribe())
+    window.addEventListener('pagehide', () => {
+      unsubscribe()
+      if (state === 'focus') api.spotDone?.()
+    })
     // the share page is gone (closed, reloaded): so is the share
     setInterval(() => {
       let gone = true
