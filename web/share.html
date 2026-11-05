@@ -96,6 +96,11 @@
     body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
     body.panel #running > .note, body.panel #helper, body.panel .linkbox input, body.panel #link-label { display: none !important; }
     body.panel .brand { font-size: 14px; }
+    body.panel #in-pip .lead { display: block !important; font-size: 13.5px; }
+    body.panel .stay { padding: 12px; gap: 12px; }
+    body.panel .stay strong { font-size: 15px; }
+    body.panel .stay p { font-size: 13px; }
+    body.panel .stay-icon { width: 36px; height: 36px; border-radius: 10px; }
     /* before the share the window is large (the browser's screen picker shows in it): centred */
     body.panel #setup { width: min(440px, 100%); margin: 6vh auto 0; }
     body.panel h1 { font-size: 17px; }
@@ -429,9 +434,9 @@
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
     function start() {
-      // Chrome, Edge: here, with the always-on-top window opened along the way (it closes with the
-      // tab). Else in a popup of its own, which asks for the screen itself – the tab may be closed.
-      if (panel || !supported || documentPip || !nameOrAsk()) return startHere()
+      // in a popup of its own, which asks for the screen itself – the tab may be closed (Chrome, Edge:
+      // the popup opens the always-on-top window, which belongs to it then)
+      if (panel || !supported || !nameOrAsk()) return startHere()
       // (large enough for the browser's screen picker, which shows inside it; small afterwards)
       const width = Math.min(PICKER_ROOM.width, screen.availWidth)
       const height = Math.min(PICKER_ROOM.height, screen.availHeight)
@@ -725,7 +730,7 @@
 
     function renderHelper() {
       renderNotify()
-      $('pip-step').hidden = !(documentPip && !panel && host && !pip)
+      $('pip-step').hidden = !(documentPip && host && !pip)
       $('helper').hidden = documentPip && !panel
       if (host) {
         const watching = host.viewerList.length
@@ -836,6 +841,13 @@
       win.document.body.classList.add('panel', 'pip')
       win.document.body.append(running, toastBox)
       $('in-pip').hidden = false
+      // (the small window itself: it stays, small – the always-on-top one belongs to it)
+      if (panel) {
+        $('in-pip').querySelector('strong').textContent = 'Lass dieses Fenster bitte offen.'
+        $('in-pip').querySelector('.stay p').textContent = 'Schließt du es, endet die Freigabe.'
+        $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.'
+      }
+      setTimeout(dock, 0)
       // closed (by the presenter, or here): the controls back into the tab
       pipGone = () => {
         if (pip !== win) return
@@ -851,6 +863,7 @@
         $('pip-spot').hidden = true
         setLarge(false, { resize: false })
         renderAll()
+        dock()
       }
       win.addEventListener('pagehide', () => pipGone?.())
       renderAll()
@@ -948,7 +961,7 @@
       const can = typeof Notification === 'function'
       const permission = can ? Notification.permission : 'denied'
       // (Chrome, Edge: the always-on-top window shows drawings instead)
-      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped || (documentPip && !panel)
+      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped || documentPip
       $('notify-text').textContent = permission === 'denied'
         ? 'Benachrichtigungen sind für diese Seite gesperrt. Erlauben kannst du sie über das Symbol links neben der Adresse.'
         : 'Arbeitest du in einem anderen Programm, meldet sich PeekaView, sobald jemand etwas zeigt oder malt. Ein Klick auf die Meldung zeigt es dir genau an der Stelle.'
@@ -967,8 +980,9 @@
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
       // the small window is the helper: in front now (the click made the browser the active
-      // program), it shows the drawing again
-      if (panel) {
+      // program), it shows the drawing again. (From the always-on-top window: a helper of its own,
+      // opened in that click – the small window would not come to the front from there.)
+      if (panel && from === window) {
         try { window.focus() } catch {}
         return emit({ kind: 'jump' })
       }
@@ -1254,7 +1268,7 @@
       document.querySelector('main').classList.remove('wide')
       setTimeout(dock, 0)
       // (Chrome, Edge: the always-on-top window, in this click)
-      if (documentPip && !panel) openPipWindow()
+      if (documentPip) openPipWindow()
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
       const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
       // a part drawn by hand stays where it is: not followed. A window: its real edges, its title bar

@@ -384,7 +384,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
   }
 })
 
-test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chrome): picked in the tab, a drawing shown large with a click', { timeout: 180000 }, async () => {
+test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chrome): opened by the small window, the tab may be closed, a drawing shown large with a click', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pip-' + process.pid
@@ -399,21 +399,27 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await browser('set', 'viewport', '1280', '1000')
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
-    // the window is picked here, in the tab (the always-on-top window would lie over the screen's picture)
+    // the small window takes over; the window is picked there
     await browser('click', '#start')
     await tab('t1')
+    await waitFor("!document.querySelector('#elsewhere').hidden")
+    const S = await idOf('panel')
+    await tab(S)
+    await browser('click', '#start')
+    await tab(S)
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
-    assert.doesNotMatch(await tabs(), /share-helper|panel/, 'no popup: the always-on-top window instead')
     await evaluate("document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); true")
     await new Promise((done) => setTimeout(done, 900))
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
-    // "Dieses Fenster zeigen": the controls move into the always-on-top window
+    // "Dieses Fenster zeigen": the small window opens the always-on-top one; the controls move there
     await evaluate("document.querySelector('#pick-ok').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#pick-ok')
-    await tab('t1')
+    await tab(S)
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
-    assert.match(await evaluate("document.querySelector('#in-pip').innerText"), /Lass diesen Tab bitte offen[\s\S]*immer vorne/)
+    assert.match(await evaluate("document.querySelector('#in-pip').textContent"), /Lass dieses Fenster bitte offen[\s\S]*immer vorne/, await evaluate("JSON.stringify({d: getComputedStyle(document.querySelector('#in-pip')).display, main: getComputedStyle(document.querySelector('main')).display, vis: getComputedStyle(document.querySelector('main')).visibility, body: document.body.className})"))
+    // the tab is no longer needed
+    await browser('tab', 'close', 't1')
     let P = await idOf('about:blank')
     await tab(P)
     assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)
@@ -459,14 +465,14 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await stroke(0.4, 0.6)
     await browser('click', '#pip-look')
     assert.equal(await evaluate("document.body.classList.contains('pip-large') && !document.querySelector('#pip-small').hidden && document.querySelector('#pip-jump').hidden"), true)
-    await tab('t1')
+    await tab(S)
     assert.equal(await evaluate('pvLight.frames.paused'), true)
     await tab(P)
     await new Promise((done) => setTimeout(done, 7500))
     assert.equal(await evaluate("!document.querySelector('#pip-spot').hidden"), true, 'kept while large')
     // "Wieder klein": opened anew, small, in the browser's corner; the controls back, the pictures going out again
     await browser('click', '#pip-small')
-    await tab('t1')
+    await tab(S)
     await waitFor("!pvLight.frames.paused && !document.querySelector('#in-pip').hidden")
     P = await idOf('about:blank')
     await tab(P)
@@ -475,7 +481,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     // stopping there ends it, and the always-on-top window closes
     await tab(P)
     await browser('click', '#stop')
-    await tab('t1')
+    await tab(S)
     await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#in-pip').hidden").catch(async (e) => {
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, inPip: document.querySelector('#in-pip').hidden, host: !!pvLight.host})"))}\n${await tabs()}`)
     })
