@@ -49,6 +49,9 @@ if (new URLSearchParams(location.search).get('browser') === 'firefox') {
   // … and no cutting a window out of the screen (MediaStreamTrackGenerator)
   delete window.MediaStreamTrackGenerator
 }
+// localStorage qaNoPip: no interactive Picture-in-Picture (as in Firefox, Safari) – for this page
+// and the small window it opens
+try { if (localStorage.getItem('qaNoPip')) delete window.documentPictureInPicture } catch {}
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
 // black bars above and below the window's picture (px), as Chrome adds when a window's shape changed

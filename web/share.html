@@ -108,6 +108,17 @@
     body.panel .linkbox { margin: 0; }
     body.panel .linkbox .pill { flex: 1; }
     body.panel .keep { margin: 0; }
+    /* the always-on-top window (Picture-in-Picture): the running controls, compact; a drawing as a
+       preview on top – and "Ansehen": as large as it gets, nothing else */
+    body.pip { margin: 0; padding: 14px; overflow-y: auto; background: #18181b; }
+    .pip-spot { display: flex; flex-direction: column; gap: 8px; }
+    .pip-spot canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: #18181b; }
+    .pip-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pip-bar .pill { flex: 1; }
+    body.pip-large { padding: 0; overflow: hidden; }
+    body.pip-large #running > :not(#pip-spot) { display: none !important; }
+    body.pip-large #pip-spot { position: fixed; inset: 0; padding: 10px; background: #09090b; }
+    body.pip-large #pip-spot canvas { flex: 1; min-height: 0; aspect-ratio: auto; object-fit: contain; }
     /* someone drew: the window shows the spot instead of its panel */
     #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
     body.spotting main { visibility: hidden; }
@@ -161,6 +172,18 @@
           <div class="step-actions"><button class="pill primary" id="problem-check" type="button">Noch einmal prüfen</button><button class="pill" id="problem-screen" type="button">Anderen Bildschirm wählen</button></div>
         </div>
       </div>
+      <div class="pip-spot" id="pip-spot" hidden>
+        <canvas id="pip-canvas"></canvas>
+        <div class="pip-bar"><button class="pill primary" id="pip-look" type="button">Ansehen</button><button class="pill" id="pip-jump" type="button">Zur Stelle</button><button class="pill" id="pip-small" type="button" hidden>Kleiner</button></div>
+      </div>
+      <div class="step" id="pip-step" hidden>
+        <span class="step-icon" data-icon="windows"></span>
+        <div class="step-body">
+          <strong>Immer im Vordergrund</strong>
+          <p>Ein kleines Fenster, das über allen Programmen liegt: wer zusieht, wer herein möchte – und was jemand malt.</p>
+          <div class="step-actions"><button class="pill primary" id="pip-open" type="button">Kleines Fenster öffnen</button></div>
+        </div>
+      </div>
       <div class="step" id="notify-step" hidden>
         <span class="step-icon" data-icon="bell"></span>
         <div class="step-body">
@@ -200,6 +223,12 @@
 
       <button class="pill stop" id="stop" type="button"></button>
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+    </section>
+
+    <!-- the tab, while the controls are in the always-on-top window (Chrome, Edge) -->
+    <section id="in-pip" style="display:flex;flex-direction:column;gap:18px" hidden>
+      <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
+      <p class="lead" style="margin:0">Alles Weitere im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne. Lass diesen Tab offen: Schließt du ihn, endet die Freigabe.</p>
     </section>
 
     <!-- the tab, once the share runs in its own small window -->
@@ -245,10 +274,15 @@
     import { readText, sameTitle, titleBar, words } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { borderStrips, follow, grabberOf, hasLine, snapRect, titleOf, titleScore } from './light-track.js'
+    import { documentPip, openPip, resizePip } from './light-pip.js'
+    import { MiniView } from './light-mini.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
-    const $ = (id) => document.getElementById(id)
+    // the window "Freigabe läuft" as Picture-in-Picture (Chrome, Edge): the running controls are
+    // moved into it, so elements are looked for there, too
+    let pip = null
+    const $ = (id) => document.getElementById(id) ?? pip?.document.getElementById(id)
     $('logo').innerHTML = owl(28)
     for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = icon(el.dataset.icon, 18)
     $('start').innerHTML = icon('share', 20) + 'Bildschirm teilen'
@@ -365,7 +399,8 @@
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
     function start() {
-      if (panel || !supported || !nameOrAsk()) return startHere()
+      // (Chrome, Edge: here, with the always-on-top window opened along the way)
+      if (panel || !supported || documentPip || !nameOrAsk()) return startHere()
       // (large enough for the browser's screen picker, which shows inside it; small afterwards)
       const width = Math.min(PICKER_ROOM.width, screen.availWidth)
       const height = Math.min(PICKER_ROOM.height, screen.availHeight)
@@ -408,7 +443,7 @@
       }
       // the helper: waits in the corner and comes to each drawing by itself – the small window is
       // that helper itself
-      if (!panel) openHelper()
+      if (!panel && !documentPip) openHelper()
       $('start').disabled = true
       picking.then((stream) => {
         const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface ?? 'monitor'
@@ -497,6 +532,7 @@
       $('ended').hidden = false
       $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
       document.title = 'Im Browser teilen – PeekaView light'
+      closePip()
       dock()
     }
 
@@ -640,6 +676,8 @@
 
     function renderHelper() {
       renderNotify()
+      $('pip-step').hidden = !(documentPip && !panel && host && !pip)
+      $('helper').hidden = documentPip && !panel
       if (host) {
         $('live-title').textContent = panel ? 'Freigabe läuft' : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
         $('repick').hidden = !cropper
@@ -717,8 +755,104 @@
       const peer = host.peers().list.find((p) => p.id === r.from)
       lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
       emit({ kind: 'reveal', reveal: lastReveal })
-      notify(lastReveal)
+      if (pip) showInPip(lastReveal)
+      else notify(lastReveal)
     }
+
+    // ---------------------------------------------------------------- the always-on-top window
+    // Chrome, Edge: "Freigabe läuft" as a Picture-in-Picture window (light-pip.js), opened in a
+    // click (the one that picks the window, or its own): the running controls move into it. A
+    // drawing shows there as a preview; "Ansehen" makes the window as large as it gets (only a
+    // click may), "Zur Stelle" lays it over the very spot, "Kleiner" shrinks it again.
+    const PIP_SMALL = { width: 380, height: 560 }
+    const PIP_LARGE = { width: 4000, height: 3000 }
+    let pipLarge = false
+    let miniView = null
+    async function openPipWindow() {
+      if (pip && !pip.closed) return
+      let win
+      try {
+        win = await openPip(PIP_SMALL)
+      } catch {
+        return renderAll()
+      }
+      pip = win
+      // (the helper opened from there – "Zur Stelle" – finds this page)
+      win.pvLight = window.pvLight
+      const running = $('running')
+      const toastBox = $('toast')
+      win.document.body.classList.add('panel', 'pip')
+      win.document.body.append(running, toastBox)
+      $('in-pip').hidden = false
+      // closed (by the presenter, or here): the controls back into the tab
+      pipGone = () => {
+        if (pip !== win) return
+        pip = null
+        pipGone = null
+        try {
+          $('in-pip').before(document.adoptNode(running))
+          document.body.append(document.adoptNode(toastBox))
+        } catch (err) {
+          console.warn('peekaview light: controls back', err)
+        }
+        $('in-pip').hidden = true
+        $('pip-spot').hidden = true
+        setLarge(false, { resize: false })
+        renderAll()
+      }
+      win.addEventListener('pagehide', () => pipGone?.())
+      renderAll()
+    }
+    let pipGone = null
+    function closePip() {
+      try { pip?.close() } catch {}
+      pipGone?.()
+    }
+    $('pip-open').addEventListener('click', openPipWindow)
+
+    function showInPip(r) {
+      if (!miniView) {
+        miniView = new MiniView($('pip-canvas'))
+        miniView.onDone = () => {
+          if (!pipLarge) $('pip-spot').hidden = true
+        }
+      }
+      $('pip-spot').hidden = false
+      // (the preview at the top, to be seen)
+      try { pip.document.scrollingElement.scrollTop = 0 } catch {}
+      miniView.reveal(r)
+      renderPipButtons()
+    }
+
+    // large: nothing but the drawing – and no new pictures meanwhile (the window lies over the
+    // screen: viewers would see the drawing twice)
+    function setLarge(large, { resize = true } = {}) {
+      pipLarge = large
+      if (cropper) cropper.paused = large
+      if (miniView) {
+        miniView.keep = large
+        // (as sharp as the screen the window may grow to)
+        const dpr = pip?.devicePixelRatio ?? 1
+        miniView.setScale(large ? Math.min(4, (screen.availWidth * dpr) / 640, (screen.availHeight * dpr) / 400) : 1)
+        if (miniView.showing) miniView.replay()
+      }
+      if (pip && !pip.closed) {
+        pip.document.body.classList.toggle('pip-large', large)
+        if (resize) resizePip(pip, large ? PIP_LARGE : PIP_SMALL)
+      }
+      if (!large && !miniView?.showing) $('pip-spot').hidden = true
+      renderPipButtons()
+    }
+    function renderPipButtons() {
+      $('pip-look').hidden = pipLarge
+      $('pip-small').hidden = !pipLarge
+    }
+    $('pip-look').addEventListener('click', () => setLarge(true))
+    $('pip-small').addEventListener('click', () => setLarge(false))
+    $('pip-jump').addEventListener('click', () => {
+      if (pipLarge) setLarge(false)
+      jumpHelper(pip)
+    })
 
     // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
     // (not while the presenter is in this window anyway: then it shows by itself, in front)
@@ -739,7 +873,8 @@
     function renderNotify() {
       const can = typeof Notification === 'function'
       const permission = can ? Notification.permission : 'denied'
-      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped
+      // (Chrome, Edge: the always-on-top window shows drawings instead)
+      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped || (documentPip && !panel)
       $('notify-text').textContent = permission === 'denied'
         ? 'Benachrichtigungen sind für diese Seite gesperrt. Erlauben kannst du sie über das Symbol links neben der Adresse.'
         : 'Arbeitest du in einem anderen Programm, meldet sich PeekaView, sobald jemand etwas zeigt oder malt. Ein Klick auf die Meldung zeigt es dir genau an der Stelle.'
@@ -766,7 +901,7 @@
       // a helper already open may lie behind other programs, and it cannot come to the front from a
       // click elsewhere: a new one, opened in this click, always does – it waits in the corner afterwards
       closeHelper()
-      helper = from.open(`share-helper.html?jump=1${panel ? '&close=1' : ''}`, `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
+      helper = from.open(`share-helper.html?jump=1${panel || pip ? '&close=1' : ''}`, `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
       helperBlocked = !helper
       renderHelper()
     }
@@ -959,6 +1094,8 @@
       $('pick').hidden = true
       document.querySelector('main').classList.remove('wide')
       setTimeout(dock, 0)
+      // (Chrome, Edge: the always-on-top window, in this click)
+      if (documentPip && !panel) openPipWindow()
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
       const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
       // the window's real edges, its title bar and picture to follow it by: from the picture in which
@@ -990,7 +1127,13 @@
     $('pick-again').addEventListener('click', freshPicture)
 
     function repick() {
-      if (host && cropper) showPick(screenStream, host.name)
+      if (!host || !cropper) return
+      // (picked here, in the tab: the always-on-top window would lie over the screen's picture)
+      if (pip) {
+        closePip()
+        try { window.focus() } catch {}
+      }
+      showPick(screenStream, host.name)
     }
     $('repick').addEventListener('click', repick)
 

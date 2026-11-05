@@ -171,6 +171,9 @@ test('a shared window (as in Safari): the whole screen once more to find it, the
   const idOf = async (part) => (await tabs()).split('\n').find((l) => l.includes(part))?.match(/t\d+/)?.[0]
   try {
     await browser('open', base + '/share.html')
+    // (Safari: no interactive Picture-in-Picture)
+    await evaluate("localStorage.setItem('qaNoPip', '1'); true")
+    await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '900')
     // the presenter picks a window – the fake one lies at qaWindowAt on the fake screen
     // (Chrome letterboxes the window's picture: black bars above and below)
@@ -273,7 +276,7 @@ test('a shared window (as in Safari): the whole screen once more to find it, the
   }
 })
 
-test('the share in its own small window (as in Chrome): the whole screen, one window of it picked – viewers get only that window, the tab may be closed', { timeout: 180000 }, async () => {
+test('the share in its own small window (no Picture-in-Picture): the whole screen, one window of it picked – viewers get only that window, the tab may be closed', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pick-' + process.pid
@@ -282,6 +285,9 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
   const waitFor = (fn) => browser('wait', '--fn', fn)
   const tab = (id) => browser('tab', id)
   try {
+    // (a browser without interactive Picture-in-Picture: the window "Freigabe läuft" is a popup)
+    await browser('open', base + '/share.html')
+    await evaluate("localStorage.setItem('qaNoPip', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '1000')
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
@@ -443,6 +449,99 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
     await browser('click', '#stop')
     await waitFor("!document.querySelector('#ended').hidden")
+  } finally {
+    try {
+      await browser('close')
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+    }
+  }
+})
+
+test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chrome): picked in the tab, a drawing shown large with a click', { timeout: 180000 }, async () => {
+  const server = await startServer()
+  const base = `http://127.0.0.1:${server.address().port}`
+  const session = 'pv-light-pip-' + process.pid
+  const browser = async (...args) => (await promisify(execFile)('agent-browser', ['--session', session, ...args], { encoding: 'utf8', timeout: 30000 })).stdout
+  const evaluate = async (code) => JSON.parse(await browser('eval', code))
+  const waitFor = (fn) => browser('wait', '--fn', fn)
+  const tab = (id) => browser('tab', id)
+  const tabs = async () => browser('tab', 'list')
+  const idOf = async (part) => (await tabs()).split('\n').find((l) => l.includes(part))?.match(/t\d+/)?.[0]
+  try {
+    await browser('open', base + '/share.html')
+    await browser('set', 'viewport', '1280', '1000')
+    await evaluate("document.querySelector('#name').value='Patrick';true")
+    const win = await evaluate('qaWindowAt')
+    // the window is picked here, in the tab (the always-on-top window would lie over the screen's picture)
+    await browser('click', '#start')
+    await tab('t1')
+    await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
+    assert.doesNotMatch(await tabs(), /share-helper|panel/, 'no popup: the always-on-top window instead')
+    await evaluate('document.hasFocus = () => false; true')
+    await new Promise((done) => setTimeout(done, 900))
+    await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
+    await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
+    // "Dieses Fenster zeigen": the controls move into the always-on-top window
+    await browser('click', '#pick-ok')
+    await tab('t1')
+    await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
+    assert.match(await evaluate("document.querySelector('#in-pip').innerText"), /immer vorne[\s\S]*Lass diesen Tab offen/)
+    const P = await idOf('about:blank')
+    await tab(P)
+    assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)
+
+    // let in from there
+    const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
+    await browser('tab', 'new', `${base}/?name=Anna#${room}`)
+    const V = await idOf('name=Anna')
+    await tab(P)
+    await browser('wait', '#requests [data-allow]')
+    await browser('click', '#requests [data-allow]')
+    await tab(V)
+    await waitFor("document.querySelector('video')?.videoWidth > 0")
+
+    // a stroke: a preview in the always-on-top window, with "Ansehen"
+    await browser('click', '.pv-dock [data-tool=draw]')
+    const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.3)), String(Math.round(r.t + r.h * 0.5)))
+    await browser('mouse', 'down')
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.5)), String(Math.round(r.t + r.h * 0.55)))
+    await browser('mouse', 'up')
+    await tab(P)
+    await waitFor("!document.querySelector('#pip-spot').hidden && !document.querySelector('#pip-look').hidden")
+    // "Ansehen": the window large, nothing but the drawing – and no new pictures meanwhile
+    await browser('click', '#pip-look')
+    assert.equal(await evaluate("document.body.classList.contains('pip-large') && !document.querySelector('#pip-small').hidden"), true)
+    await tab('t1')
+    assert.equal(await evaluate('pvLight.frames.paused'), true)
+    await tab(P)
+    await new Promise((done) => setTimeout(done, 7500))
+    assert.equal(await evaluate("!document.querySelector('#pip-spot').hidden"), true, 'kept while large')
+    // "Kleiner": small again, the pictures going out again
+    await browser('click', '#pip-small')
+    assert.equal(await evaluate("document.body.classList.contains('pip-large')"), false)
+    await tab('t1')
+    assert.equal(await evaluate('pvLight.frames.paused'), false)
+
+    // "Zur Stelle": the drawing over the very spot, in a window of its own that closes again
+    await tab(P)
+    await browser('click', '#pip-jump')
+    await waitFor('1')
+    const helper = await idOf('share-helper')
+    assert.ok(helper, await tabs())
+    await tab(helper)
+    await waitFor("window.pvHelper?.state === 'focus'")
+    const picture = await evaluate('pvHelper.picture')
+    assert.ok(Math.abs(picture.left - win.x) <= 3 && Math.abs(picture.top - win.y) <= 3, JSON.stringify(picture))
+
+    // stopping there ends it, and the always-on-top window closes
+    await tab(P)
+    await browser('click', '#stop')
+    await tab('t1')
+    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#in-pip').hidden").catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, inPip: document.querySelector('#in-pip').hidden, host: !!pvLight.host})"))}\n${await tabs()}`)
+    })
   } finally {
     try {
       await browser('close')

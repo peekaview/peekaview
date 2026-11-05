@@ -291,7 +291,13 @@ The viewer site opens with a small start page:
 - **What does not:** remote control (browsers cannot inject input), voice, the shared clipboard, recording, several windows. The state says `light: true`. The viewer then shows "Steuern" greyed out, explains it on click and once when joining, and hides the clipboard.
 - **Saying so:** the start page, the share page before and during the share, and its end screen say in one short, calm line that steering, voice and more need PeekaView Desktop, and link to `download.html`.
 
-**Its own small window.** "Bildschirm teilen" opens `share.html?panel`, a small popup "Freigabe läuft" in the bottom right corner, and the tab then only says that the share runs there and the tab may be closed.
+**Always on top (Chrome, Edge).** The window "Freigabe läuft" is a Picture-in-Picture document window (`light-pip.js`), floating above every program.
+- The window to share is picked in the tab (the always-on-top window would lie over the screen's picture); the click on "Dieses Fenster zeigen" opens it, and the running controls move into it. The tab says to stay open: the window closes with it.
+- A drawing shows in it as a preview (`light-mini.js`: the spot enlarged, the stroke drawn again, a map of the screen), with "Ansehen", "Zur Stelle".
+- "Ansehen" makes it as large as the browser allows and shows nothing but the drawing, sharp at that size; meanwhile no new pictures go out (it lies over the screen). "Kleiner" shrinks it again. Both only in a click: a Picture-in-Picture window never resizes, moves or reopens by itself (Chrome: "requires user activation").
+- "Zur Stelle" opens a helper window over the very spot, which closes again afterwards.
+
+**Its own small window (other browsers).** "Bildschirm teilen" opens `share.html?panel`, a small popup "Freigabe läuft" in the bottom right corner, and the tab then only says that the share runs there and the tab may be closed.
 - The popup asks for the screen itself, in a click of its own: whatever a page captured ends with that page, so the tab could not be closed otherwise.
 - Picking the window happens in it: it grows to the middle of the screen for that, and shrinks back to its corner afterwards, as tall as its content.
 - In the corner: who watches, "Zulassen"/"Ablehnen", what viewers may do (Zusehen, Zeigen & Malen, Steuern only with the desktop app), copy the link, another window, stop. Closing it ends the share.
