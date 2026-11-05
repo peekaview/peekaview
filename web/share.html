@@ -48,6 +48,7 @@
     .screen-help[data-kind=chrome], .screen-help[data-kind=edge] { top: 12px; left: calc(50% + 340px); }
     .screen-help-title { margin: 0 24px 10px 0; font-size: 14.5px; font-weight: 750; }
     .screen-help-arrow { color: #ef4444; }
+    .screen-help-warn { margin: 0 28px 10px 0; padding: 8px 10px; border-radius: 10px; background: #fee2e2; color: #991b1b; font-size: 12.5px; font-weight: 650; line-height: 1.35; }
     .screen-help-figure { display: block; width: 100%; height: auto; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
     .screen-help-steps { margin: 10px 0 0; padding-left: 20px; color: #27272a; line-height: 1.4; }
     .screen-help-steps li + li { margin-top: 4px; }
@@ -647,11 +648,27 @@
     }
 
     // ---------------------------------------------------------------- the small window's place
+    // With the window "Freigabe läuft" open (Picture-in-Picture: always in front): this one as small
+    // as it goes, hidden behind it – everything is done there
+    const TUCKED = { width: 160, height: 100 }
+    // (that one moved by the presenter: no event for it – looked at now and then)
+    if (panel) setInterval(() => pip && !pip.closed && dock(), 1500)
+    function tuck() {
+      if (!pip || pip.closed) return
+      try {
+        if (Math.abs(window.outerWidth - TUCKED.width) > 2 || Math.abs(window.outerHeight - TUCKED.height) > 2) window.resizeTo(TUCKED.width, TUCKED.height)
+        // (the browser may keep it larger: the middle of it behind the middle of that one)
+        const left = Math.round(pip.screenX + (pip.outerWidth - window.outerWidth) / 2)
+        const top = Math.round(pip.screenY + (pip.outerHeight - window.outerHeight) / 2)
+        if (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2) window.moveTo(left, top)
+      } catch {}
+    }
     // In the bottom right corner, as large as its content; larger, in the middle, to pick a window.
     let spotting = false
     function dock() {
       // (before the share: as large as the browser's screen picker needs)
       if (!panel || spotting || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
+      if (pip && !pip.closed) return tuck()
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
@@ -900,6 +917,9 @@
         $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.'
       }
       setTimeout(dock, 0)
+      // (where the browser put it is known a moment later; it may be moved or made larger)
+      setTimeout(dock, 400)
+      win.addEventListener('resize', () => setTimeout(dock, 100))
       // closed (by the presenter, or here): the controls back into the tab
       pipGone = () => {
         if (pip !== win) return

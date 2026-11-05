@@ -40,6 +40,7 @@ function firefoxCard(platform, host) {
   const mac = platform === 'mac'
   return `
     <button class="screen-help-close" type="button" aria-label="Schließen">×</button>
+    <p class="screen-help-warn" role="alert">Die Bedienung mit Firefox ist stark eingeschränkt. Verwende wenn möglich Chrome.</p>
     <p class="screen-help-title"><span class="screen-help-arrow" aria-hidden="true">←</span> So teilst du deinen Bildschirm</p>
     ${firefoxFigure(mac, host)}
     <ol class="screen-help-steps">

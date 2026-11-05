@@ -422,7 +422,11 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await evaluate("document.querySelector('#pick-ok').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#pick-ok')
     await tab(S)
+    // (asked to be as small as it goes, behind the always-on-top one: seen by its calls – the headless
+    // browser does not size its windows)
+    await evaluate("window.qaSizes = []; const r = window.resizeTo.bind(window); window.resizeTo = (w, h) => { qaSizes.push([w, h]); r(w, h) }; true")
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
+    await waitFor("qaSizes.some(([w, h]) => w === 160 && h === 100)")
     assert.match(await evaluate("document.querySelector('#in-pip').textContent"), /Lass dieses Fenster bitte offen[\s\S]*immer vorne/, await evaluate("JSON.stringify({d: getComputedStyle(document.querySelector('#in-pip')).display, main: getComputedStyle(document.querySelector('main')).display, vis: getComputedStyle(document.querySelector('main')).visibility, body: document.body.className})"))
     let P = await idOf('about:blank')
     await tab(P)
