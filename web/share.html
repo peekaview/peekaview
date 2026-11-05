@@ -471,12 +471,13 @@
       window.pvLightPicking = picking
       const width = PANEL_WIDTH
       const height = 320
-      // (in the bottom right of this browser window – on its screen: reckoned from the window, not
-      // from the screen's numbers, which Firefox gives wrong for a second screen)
-      const left = Math.round(window.screenX + window.outerWidth - width - 24)
-      // (where it cannot be moved later – Firefox on a second screen – it can only grow downwards:
-      // room for the window picker below it)
-      const top = Math.round(window.screenY + window.outerHeight - (movesWindows(screen) ? height : PICKER_ROOM.height) - 24)
+      // right where it stays: in the bottom right corner of this screen (usableArea: Firefox's numbers
+      // for a second screen made whole). Where it cannot be moved later – Firefox on a second
+      // screen – it can only grow downwards: room for the window picker below it.
+      const area = usableArea(screen)
+      const left = Math.round(area.left + area.width - width - 16)
+      // (height: the page's; the window is taller by its title and address bar, about 75 px)
+      const top = Math.round(area.top + area.height - (movesWindows(screen) ? height + 75 : PICKER_ROOM.height) - 16)
       if (params.has('debug')) qaLog({ tab: 'öffnet kleines Fenster', left, top, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
       const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
       panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
