@@ -450,6 +450,8 @@
       get busy() { return $('busy').hidden ? '' : $('busy').textContent },
       onDemand,
       park,
+      // (tests: it stays where it is until parked – a slow test would miss it)
+      hold: () => clearTimeout(idleTimer),
     }
 
     // ---------------------------------------------------------------- connected to the share page

@@ -1025,6 +1025,7 @@
         mit_titelleiste: windows.filter((w) => w.line).length,
         liste: pickCandidates().length,
         tesseract: readerState.state,
+        geaendert_prozent: pickChanged,
         titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text} @${t.line ?? '-'}`),
       }, null, 1)
     }
@@ -1167,6 +1168,8 @@
       }
       sawAway = false
       lastUsed = null
+      pickThumb = null
+      pickActive = null
       $('setup').hidden = $('running').hidden = true
       $('pick').hidden = false
       document.querySelector('main').classList.add('wide')
@@ -1186,6 +1189,9 @@
     }
 
     let fetching = false
+    let pickThumb = null // the picture last looked through, small
+    let pickActive = null // … taken while in another program
+    let pickChanged = null // % of it changed since (share.html?debug)
     async function freshPicture() {
       if (fetching || !picker) return
       fetching = true
@@ -1195,6 +1201,14 @@
         if (front && sawAway && covered(own) > 0.5) return
         const c = await frameCanvas(pickStream, sourceVideos())
         if (!c || !picker) return
+        // (the windows looked for again only when a quarter of the picture changed – or right after
+        // switching to another program: the window worked in then)
+        const thumb = scaledGray(c, 64, 36)
+        const changed = pickThumb ? thumb.px.filter((v, i) => Math.abs(v - pickThumb.px[i]) > 10).length / thumb.px.length : 1
+        pickChanged = Math.round(changed * 100)
+        if (changed < 0.25 && pickActive === !front) return renderPick()
+        pickThumb = thumb
+        pickActive = !front
         picker.setImage(c, { active: !front, scale: c.width / screen.width, own })
         if (!front) {
           sawAway = true

@@ -91,6 +91,8 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     await browser('mouse', 'up')
     await tab('t2')
     await waitFor("pvHelper.state === 'focus'")
+    // (held there until the presenter has drawn: under load the test may take longer than it stays)
+    await evaluate('pvHelper.hold(); true')
     const focus = await evaluate("({part:pvHelper.part,who:document.querySelector('#focus-who').textContent,shot:document.querySelector('#shot').width,cursor:[...document.querySelectorAll('.pv-cursor .pv-name')].map(n=>n.textContent)})")
     assert.equal(focus.who, 'Anna zeigt hier')
     assert.ok(focus.shot > 0, 'a still picture of the shared screen')
