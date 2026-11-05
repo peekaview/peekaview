@@ -1,8 +1,9 @@
 // "Bildschirmfreigabe light" end to end in one browser: the presenter's page (fake screen and
-// window), its mini window, its helper window and real viewers – connected over WebRTC, signaling
-// between the tabs instead of public relays (see light-fixture.mjs).
-//   1. as in Firefox: the helper popup comes by itself; the mini window would be a video
-//   2. as in Chrome: the mini window floats on top, "Zur Stelle" brings the helper
+// window), its helper and real viewers – connected over WebRTC, signaling between the tabs instead
+// of public relays (see light-fixture.mjs).
+//   1. as in Firefox, everything in the tab (the small window blocked): the helper comes by itself
+//   2. a window shared (as in Safari, Firefox), in the tab: the whole screen once more to find it
+//   3. as in Chrome: the share in its own small window – the whole screen, one window of it picked
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -42,7 +43,9 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     assert.equal(await evaluate("!document.querySelector('#name-error').hidden && document.querySelector('#running').hidden"), true)
     await browser('fill', '#name', 'Patrick')
 
-    // start: the picker (faked) and the helper window in the same click
+    // start (the share's small window blocked: all in this tab): the picker (faked) and the helper
+    // window in the same click
+    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); true")
     await browser('click', '#start')
     await waitFor("location.pathname.endsWith('share-helper.html') && window.pvHelper?.state === 'parked'")
     assert.match(await tabs(), /t1\].*share\.html[\s\S]*t2\].*share-helper\.html/)
@@ -54,9 +57,6 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     const room = link.split('#')[1]
     assert.match(await evaluate("document.querySelector('#running').innerText"), /Steuern, Sprache und mehr gehen nur mit PeekaView Desktop/)
     assert.equal(await evaluate("document.querySelector('#locate-step').hidden"), true, 'a whole screen needs no second step')
-    // the mini window: Firefox only puts a video into Picture-in-Picture on the user's command
-    assert.match(await evaluate("document.querySelector('#mini-step').innerText"), /rechten Maustaste auf das Bild[\s\S]*„Bild-im-Bild“/)
-    assert.equal(await evaluate("pvLight.mini.kind + '|' + (document.querySelector('#mini-video').videoWidth > 0)"), 'video|true')
 
     // a viewer asks to come in – nobody watches without "Zulassen"
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
@@ -93,9 +93,8 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     assert.deepEqual(focus.cursor, ['Anna'])
     const { part } = focus
     assert.ok(part.x < target.nx && target.nx < part.x + part.w && part.y < target.ny && target.ny < part.y + part.h, `the spot ${JSON.stringify(part)} contains the pointer`)
-    // the mini window shows it, too
     await tab('t1')
-    assert.equal(await evaluate('pvLight.mini.view.showing && pvLight.lastReveal.ping && pvLight.lastReveal.name'), 'Anna')
+    assert.equal(await evaluate('pvLight.lastReveal.ping && pvLight.lastReveal.name'), 'Anna')
     await tab('t2')
 
     // the presenter draws into the helper: the viewer sees the stroke with the presenter's name
@@ -129,21 +128,6 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     await waitFor("pvHelper.state === 'focus'")
     assert.equal(await evaluate("pvHelper.busy + '|' + document.querySelector('#focus-who').textContent"), '|Anna zeigt hier')
     await evaluate('pvHelper.park();true')
-    // the mini window turned on ("Erledigt" – Firefox does not tell): the helper still comes by itself
-    await tab('t1')
-    await browser('click', '#mini-done')
-    assert.equal(await evaluate("pvLight.status().mini && document.querySelector('#mini-step').classList.contains('away') && !document.querySelector('#mini-video').paused"), true, 'the video keeps playing out of sight')
-    await tab('t3')
-    await browser('mouse', 'move', String(target.x), String(target.y))
-    await browser('mouse', 'down')
-    await browser('mouse', 'move', String(target.x + 40), String(target.y + 10))
-    await browser('mouse', 'up')
-    await tab('t1')
-    await waitFor("pvLight.lastReveal && !pvLight.lastReveal.ping && pvLight.mini.view.showing")
-    await tab('t2')
-    await waitFor("pvHelper.state === 'focus'")
-    await evaluate('pvHelper.park();true')
-
     // "Zusehen": the viewer only watches – still told why there is no remote control
     await tab('t1')
     await browser('click', '#running-modes [data-mode=view]')
@@ -175,7 +159,7 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
   }
 })
 
-test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle" lays the drawing over the window', { timeout: 180000 }, async () => {
+test('a shared window (as in Safari): the whole screen once more to find it, the helper lays the drawing over the window', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-window-' + process.pid
@@ -194,19 +178,14 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     const win = await evaluate('qaWindowAt')
     // the shared picture: the window and its bars
     const at = { x: win.x, y: win.y - 30, width: win.width, height: win.height + 60 }
-    // the same click opens the helper "Freigabe läuft" in the corner; the mini window is offered
+    // (the share's small window blocked: all in this tab) the same click opens the helper
+    // "Freigabe läuft" in the corner
+    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); true")
     await browser('click', '#start')
     await tab('t1')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
     assert.match(await tabs(), /share-helper/)
-    assert.equal(await evaluate("document.querySelector('#mini-step').hidden"), false)
     assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /„Freigabe läuft“ wartet unten rechts[\s\S]*in die Mitte deines Bildschirms/)
-    // the mini window (Picture-in-Picture document), in a click of its own
-    await browser('click', '#mini-on')
-    await tab('t1')
-    await waitFor("pvLight.mini?.kind === 'document' && document.querySelector('#mini-step').hidden")
-    const pip = await idOf('about:blank')
-    await tab('t1')
     assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
     assert.equal(await evaluate("document.querySelector('#locate-step').hidden"), false)
     assert.match(await evaluate("document.querySelector('#locate-step').innerText"), /„Gesamter Bildschirm“[\s\S]*sehen weiterhin nur das Fenster/)
@@ -228,7 +207,6 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await evaluate('window.qaHideWindow = true; new Promise((done) => setTimeout(() => done(pvLight.check().then(() => true)), 400))')
     await waitFor("document.querySelector('#place-problem').classList.contains('problem') && !document.querySelector('#place-problem').hidden")
     assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert oder ganz verdeckt[\s\S]*mehrere Bildschirme/)
-    assert.equal(await evaluate('pvLight.mini.view.state.problem'), 'Dein Fenster ist nicht zu finden', 'the mini window says so, too')
     // back on the screen: found again by itself
     await evaluate('window.qaHideWindow = false')
     await waitFor("document.querySelector('#place-problem').hidden")
@@ -236,25 +214,20 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     // the whole screen stays here: viewers get only the window
     assert.equal(await evaluate('pvLight.locatorStream.getVideoTracks()[0].getSettings().displaySurface + "|" + pvLight.status().locator'), 'monitor|true')
 
-    // let in from the mini window
+    // let in from the helper
     const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
     const viewer = await idOf('name=Anna')
     await tab('t1')
-    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /springt es genau an die Stelle[\s\S]*„Zur Stelle“ im Mini-Fenster/)
-    await tab(pip)
+    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /springt es genau an die Stelle/)
+    await tab(await idOf('share-helper'))
     await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
-    // larger and smaller again with a click (the window may only resize in one)
-    await browser('click', '[data-size]')
-    assert.equal(await evaluate("document.querySelector('[data-size]').title"), 'Kleiner')
-    await browser('click', '[data-size]')
-    assert.equal(await evaluate("document.querySelector('[data-size]').title"), 'Größer')
     await browser('click', '[data-allow]')
     await tab(viewer)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
     assert.equal(await evaluate("document.querySelector('video').videoWidth + 'x' + document.querySelector('video').videoHeight"), `${at.width}x${at.height}`, 'only the window goes out')
 
-    // a stroke on the window: while drawing the mini window says so, afterwards it shows the spot
+    // a stroke on the window: while drawing the page knows, afterwards the helper shows the spot
     await browser('click', '.pv-dock [data-tool=draw]')
     const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
     const point = (fx, fy) => [String(Math.round(r.l + r.w * fx)), String(Math.round(r.t + r.h * fy))]
@@ -267,7 +240,7 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     await browser('mouse', 'move', ...point(0.6, 0.55))
     await browser('mouse', 'up')
     await tab('t1')
-    await waitFor('!!pvLight.lastReveal && pvLight.mini.view.showing')
+    await waitFor('!!pvLight.lastReveal')
     const capture = await evaluate('({picture: pvLight.lastReveal.capture.picture, score: pvLight.lastReveal.capture.found.score, points: pvLight.lastReveal.points.length})')
     for (const [k, v] of [['left', at.x], ['top', at.y], ['width', at.width], ['height', at.height]]) assert.ok(Math.abs(capture.picture[k] - v) <= 3, `${k}: ${capture.picture[k]} ≈ ${v}`)
     assert.ok(capture.score > 0.8)
@@ -286,28 +259,11 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
     assert.ok(shown.part.x < mid.x && mid.x < shown.part.x + shown.part.w && shown.part.y < mid.y && mid.y < shown.part.y + shown.part.h, 'the stroke is in view')
     await waitFor("pvHelper.state === 'parked'")
 
-    // "Zur Stelle" stays and always shows the drawing again – also clicked twice in a row
-    for (let i = 0; i < 2; i++) {
-      await tab(pip)
-      assert.equal(await evaluate("document.querySelector('[data-jump]').hidden"), false)
-      await browser('click', '[data-jump]')
-    }
-    await waitFor('1')
-    const list = await tabs()
-    assert.equal(list.split('\n').filter((l) => l.includes('share-helper')).length, 1, list)
-    const id = list.split('\n').find((l) => l.includes('share-helper')).match(/t\d+/)[0]
-    await tab(id)
-    await waitFor("window.pvHelper?.state === 'focus'")
-    assert.equal(await evaluate('document.querySelector("#focus-who").textContent + "|" + pvHelper.onDemand'), 'Anna zeigt hier|true')
-    // … and it stays afterwards, in the corner
-    await waitFor("pvHelper.state === 'parked'")
-
-    // stopping from the mini window ends the screen picture, too
-    await tab(pip)
-    await browser('click', '[data-stop]')
+    // stopping ends the screen picture, too
     await tab('t1')
+    await browser('click', '#stop')
     await waitFor("!document.querySelector('#ended').hidden")
-    assert.equal(await evaluate('pvLight.locatorStream + "|" + pvLight.mini'), 'null|null')
+    assert.equal(await evaluate('pvLight.locatorStream'), null)
   } finally {
     try {
       await browser('close')
@@ -317,7 +273,7 @@ test('a shared window (as in Chrome): the mini window floats on top, "Zur Stelle
   }
 })
 
-test('the whole screen shared, one window of it picked (as in Chrome): viewers get only that window', { timeout: 180000 }, async () => {
+test('the share in its own small window (as in Chrome): the whole screen, one window of it picked – viewers get only that window, the tab may be closed', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pick-' + process.pid
@@ -331,8 +287,17 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
+    // the share moves into its own small window; the tab may be closed
     await browser('click', '#start')
     await tab('t1')
+    await waitFor("!document.querySelector('#elsewhere').hidden")
+    assert.match(await evaluate("document.querySelector('#elsewhere').innerText"), /Freigabe läuft[\s\S]*Du kannst diesen Tab schließen/)
+    const P = 't2'
+    const V = 't3'
+    await tab(P)
+    await waitFor("document.body.classList.contains('panel') && document.querySelector('#name').value === 'Patrick'")
+    // it asks for the screen itself (in a click of its own: the tab's capture would end with the tab)
+    await browser('click', '#start')
     // which window? the screen with the windows found
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     assert.equal(await evaluate("document.querySelector('#running').hidden && document.querySelector('#pick-ok').disabled"), true, 'nothing shared before the choice')
@@ -352,7 +317,7 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     await waitFor("!document.querySelector('#pick-ok').disabled")
     await browser('click', '#pick-ok')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
-    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
+    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Freigabe läuft')
     assert.equal(await evaluate("document.querySelector('#locate-step').hidden && !document.querySelector('#repick').hidden"), true, 'no second screen to pick: the place is known')
     const size = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(size.width - win.width) <= 4 && Math.abs(size.height - win.height) <= 4, JSON.stringify(size))
@@ -360,10 +325,10 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     // a viewer gets only the window
     const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
-    await tab('t2')
-    await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
-    await browser('click', '[data-allow]')
-    await tab('t3')
+    await tab(P)
+    await browser('wait', '#requests [data-allow]')
+    await browser('click', '#requests [data-allow]')
+    await tab(V)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
     const video = await evaluate("[document.querySelector('video').videoWidth, document.querySelector('video').videoHeight]")
     assert.ok(Math.abs(video[0] - win.width) <= 4 && Math.abs(video[1] - win.height) <= 4, `${video}`)
@@ -376,20 +341,23 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     await browser('mouse', 'down')
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.5)), String(Math.round(r.t + r.h * 0.55)))
     await browser('mouse', 'up')
-    await tab('t1')
+    await tab(P)
     await waitFor('!!pvLight.lastReveal')
+    // the small window itself shows the spot (and goes back to its panel afterwards)
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
+    assert.equal(await evaluate("document.querySelector('#spot').contentDocument.querySelector('#focus-who').textContent"), 'Anna zeigt hier')
     const picture = await evaluate('pvLight.lastReveal.capture.picture')
     for (const [k, v] of [['left', win.x], ['top', win.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(picture[k] - v) <= 3, `${k}: ${picture[k]} ≈ ${v}`)
 
     // the window moved – and drawn on right away: the drawing appears where it is now
     const moved = { ...win, x: win.x - 160, y: win.y + 120 }
     await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; true`)
-    await tab('t3')
+    await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.4)))
     await browser('mouse', 'down')
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.7)), String(Math.round(r.t + r.h * 0.45)))
     await browser('mouse', 'up')
-    await tab('t1')
+    await tab(P)
     await waitFor(`pvLight.lastReveal?.capture?.picture?.left < ${win.x - 100}`).catch(async (e) => {
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
     })
@@ -403,25 +371,30 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     const dark = "(()=>{const v=document.querySelector('video');const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.drawImage(v,0,0);const d=x.getImageData(0,0,c.width,c.height).data;let s=0;for(let i=0;i<d.length;i+=4)s+=d[i];return s/(d.length/4)})()"
     await evaluate('qaHideWindow = true; true')
     await waitFor("document.querySelector('#problem-title').textContent === 'Wechsle zu deinem Fenster' && !document.querySelector('#place-problem').hidden")
-    await tab('t3')
+    await tab(V)
     await waitFor(`${dark} < 30`)
-    await tab('t1')
+    await tab(P)
     await evaluate('qaHideWindow = false; true')
     await waitFor("document.querySelector('#place-problem').hidden")
-    await tab('t3')
+    await tab(V)
     await waitFor(`${dark} > 60`)
-    await tab('t1')
+    await tab(P)
 
     // another choice while sharing: the whole screen – the same viewers, the whole picture
+    // (once the small window shows its panel again)
+    await waitFor("!document.body.classList.contains('spotting')")
     await browser('click', '#repick')
     await waitFor("!document.querySelector('#pick').hidden")
     await browser('click', '#pick-screen')
     await waitFor("!document.querySelector('#running').hidden && pvLight.host.surface === 'monitor'")
-    await tab('t3')
+    await tab(V)
     await waitFor(`document.querySelector('video').videoWidth === ${sw}`)
     await waitFor("document.querySelector('.pv-title').textContent === 'Bildschirm'")
 
-    await tab('t1')
+    // the tab closed: the share goes on
+    await browser('tab', 'close', 't1')
+    await tab(P)
+    assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
     await browser('click', '#stop')
     await waitFor("!document.querySelector('#ended').hidden")
   } finally {

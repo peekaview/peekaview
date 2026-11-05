@@ -66,18 +66,17 @@
   <video class="offscreen" id="screen-video" muted autoplay playsinline></video>
 
   <script type="module">
-    // The helper window of "Bildschirmfreigabe light" (opened by share.html or its mini window).
+    // The helper of "Bildschirmfreigabe light": inside the share's small window (share.html?panel),
+    // or a window of its own (opened by share.html in a tab, or for one spot on a notification's click).
     // Lays a drawing over the very spot on the presenter's screen: it jumps there, grows, and shows
     // the still picture taken when the stroke started – like a pane of glass over the spot – with
     // the stroke drawn again on top. The presenter can point and draw into it, too; that goes to
     // the viewers. Afterwards it slips back into its corner (or closes, when it was only called
     // for this spot).
     //
-    // When it comes: the share page sends each finished stroke or point ("reveal").
-    //   - Without a mini window it comes right away – but only shows on top where the browser is
-    //     the active app: a browser window in the background never comes to the front by itself.
-    //   - With the always-on-top mini window it comes when asked: "Zur Stelle" there, or a click on
-    //     the notification ("jump") – a click makes the browser the active app.
+    // When it comes: the share page sends each finished stroke or point ("reveal"); it comes right
+    // away – but only shows on top where the browser is the active app: a browser window in the
+    // background never comes to the front by itself. A click on a notification does ("jump").
     //
     // Browser limits: only windows a page opened itself can be moved and resized (window.open
     // with "popup"), and only within the screen; Firefox may forbid it
@@ -100,10 +99,17 @@
     // back into the corner after this long without anybody pointing or drawing
     const AFTER_PING = 3500
     const AFTER_DRAW = 6000
+    const params = new URLSearchParams(location.search)
     // opened for a spot (a click on "Zur Stelle" or a notification): that first, then in the corner
-    const onDemand = new URLSearchParams(location.search).has('jump')
+    // – or closed again (close=1: the share's own window waits in the corner)
+    const onDemand = params.has('jump')
+    const closeAfter = params.has('close')
+    // inside the share's own small window (share.html?panel): that window is moved, and it shows
+    // its own panel in the corner – this page only the spot
+    const embedded = window.parent !== window
+    const win = embedded ? window.top : window
 
-    const api = window.opener?.pvLight
+    const api = (embedded ? window.parent : window.opener)?.pvLight
     if (!api) {
       document.body.textContent = 'Dieses Fenster gehört zu einer Bildschirmfreigabe im Browser. Starte sie auf peekaview.de.'
       throw new Error('no share')
@@ -132,7 +138,8 @@
         if (onDemand && api.lastReveal) onJump()
         else park()
       } else if (!s.sharing && started) {
-        window.close()
+        if (!embedded) window.close()
+        started = false
       }
       // (the page takes still pictures from these where the browser has no ImageCapture)
       if ((api.locatorStream ?? null) !== $('screen-video').srcObject) play($('screen-video'), api.locatorStream)
@@ -232,23 +239,25 @@
 
     function park() {
       clearTimeout(idleTimer)
+      if (onDemand && closeAfter) return window.close()
       state = 'parked'
       part = null
       shown = null
       ann.reset()
       $('waiting').hidden = true
       $('focus').hidden = true
+      if (embedded) return api.spotDone?.()
       $('parked').hidden = false
       renderParked()
     }
 
     function chrome() {
-      return { x: Math.max(0, window.outerWidth - window.innerWidth), y: Math.max(0, window.outerHeight - window.innerHeight) }
+      return { x: Math.max(0, win.outerWidth - win.innerWidth), y: Math.max(0, win.outerHeight - win.innerHeight) }
     }
 
     // bottom right of the usable area of the screen
     function placeParked() {
-      if (state !== 'parked') return
+      if (state !== 'parked' || embedded) return
       const c = chrome()
       const height = Math.ceil($('parked').scrollHeight)
       const w = PARKED_WIDTH + c.x
@@ -258,8 +267,8 @@
 
     function moveWindow(left, top, width, height) {
       try {
-        window.resizeTo(Math.round(width), Math.round(height))
-        window.moveTo(Math.round(left), Math.round(top))
+        win.resizeTo(Math.round(width), Math.round(height))
+        win.moveTo(Math.round(left), Math.round(top))
       } catch {}
     }
 
@@ -299,10 +308,12 @@
       }
       ann.reset()
       state = 'focus'
+      // (the share's window shows this page instead of its panel)
+      if (embedded) api.spotShown?.()
       $('waiting').hidden = true
       $('parked').hidden = true
       $('focus').hidden = false
-      try { window.focus() } catch {}
+      try { win.focus() } catch {}
       // the next stroke in the part shown already: no need to move
       if (stay) return layoutSpot()
       const c = chrome()
@@ -333,7 +344,7 @@
     function layoutSpot() {
       spotLayout = true
       const c = chrome()
-      const content = { left: window.screenX + c.x / 2, top: window.screenY + c.y - c.x / 2, width: window.innerWidth, height: window.innerHeight }
+      const content = { left: win.screenX + c.x / 2, top: win.screenY + c.y - c.x / 2, width: win.innerWidth, height: win.innerHeight }
       place(stageInContent(content, shown.picture))
       const b = stageInContent(content, shown.monitor)
       Object.assign($('backdrop').style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` })
@@ -451,7 +462,7 @@
     setInterval(() => {
       let gone = true
       try { gone = !api.page || api.page.closed } catch {}
-      if (gone) window.close()
+      if (gone && !embedded) window.close()
     }, 1000)
   </script>
 </body>

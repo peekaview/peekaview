@@ -86,12 +86,29 @@
     .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
     .text-button { padding: 2px 4px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .text-button:hover { color: #fafafa; }
-    /* the mini window's picture: shown while setting it up, afterwards it keeps playing out of
-       sight (a hidden video would end its Picture-in-Picture) */
-    .mini-video { display: block; width: 100%; max-width: 300px; aspect-ratio: 16 / 10; margin: 4px 0; border-radius: 10px; border: 1px solid #3f3f46; background: #18181b; }
-    .step.away, .offscreen { position: fixed; left: -10000px; top: 0; width: 400px; }
+    .offscreen { position: fixed; left: -10000px; top: 0; width: 400px; }
     .stop { align-self: center; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
+    /* the share's own small window (share.html?panel): everything compact, in the corner */
+    body.panel main { width: 100%; margin: 0; padding: 14px 14px 12px; gap: 12px; border: 0; border-radius: 0; box-shadow: none; }
+    body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
+    body.panel #running > .note, body.panel #helper, body.panel .linkbox input, body.panel #link-label { display: none !important; }
+    body.panel .brand { font-size: 14px; }
+    body.panel h1 { font-size: 17px; }
+    body.panel .live { font-size: 15px; }
+    body.panel #running, body.panel #setup, body.panel #ended { gap: 12px !important; }
+    body.panel .step { padding: 12px; gap: 10px; }
+    body.panel .step-icon { width: 32px; height: 32px; border-radius: 10px; }
+    body.panel .step-body strong { font-size: 14px; }
+    body.panel .step-body p { font-size: 13px; }
+    body.panel .modes button { padding: 7px 4px; }
+    body.panel .connect { height: 44px; font-size: 15px; }
+    body.panel .linkbox { margin: 0; }
+    body.panel .linkbox .pill { flex: 1; }
+    body.panel .keep { margin: 0; }
+    /* someone drew: the window shows the spot instead of its panel */
+    #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
+    body.spotting main { visibility: hidden; }
     .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
   </style>
 </head>
@@ -142,16 +159,6 @@
           <div class="step-actions"><button class="pill primary" id="problem-check" type="button">Noch einmal prüfen</button><button class="pill" id="problem-screen" type="button">Anderen Bildschirm wählen</button></div>
         </div>
       </div>
-      <div class="step" id="mini-step" hidden>
-        <span class="step-icon" data-icon="windows"></span>
-        <div class="step-body">
-          <strong id="mini-title">Mini-Fenster einschalten</strong>
-          <p id="mini-text"></p>
-          <video id="mini-video" class="mini-video" muted playsinline autoplay></video>
-          <p class="error" id="mini-error" role="alert" hidden></p>
-          <div class="step-actions"><button class="pill primary" id="mini-on" type="button"></button><button class="text-button" id="mini-done" type="button"></button></div>
-        </div>
-      </div>
       <div class="step" id="locate-step" hidden>
         <span class="step-icon" data-icon="screen"></span>
         <div class="step-body">
@@ -162,7 +169,7 @@
         </div>
       </div>
       <div>
-        <label class="field" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
+        <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
         <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
       </div>
       <div id="requests-box" hidden>
@@ -185,11 +192,19 @@
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
     </section>
 
+    <!-- the tab, once the share runs in its own small window -->
+    <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
+      <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
+      <p class="lead" style="margin:0">Alles Weitere passiert im kleinen Fenster „Freigabe läuft“ unten rechts. Du kannst diesen Tab schließen.</p>
+      <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
+    </section>
+
     <!-- afterwards -->
     <section id="ended" style="display:flex;flex-direction:column;gap:18px" hidden>
       <h1>Freigabe beendet</h1>
       <p class="lead" id="ended-why" style="margin:0">Niemand sieht deinen Bildschirm mehr.</p>
       <button class="connect" id="again" type="button">Noch einmal teilen</button>
+      <button class="pill" id="panel-close" type="button" hidden>Fenster schließen</button>
       <div class="note"><span class="note-icon" data-icon="screen"></span><p>Öfter teilen? Mit PeekaView Desktop geht viel mehr.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
     </section>
     <div id="debug-box" hidden style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;background:#09090b">
@@ -205,12 +220,13 @@
 
   <script type="module">
     // "Bildschirmfreigabe light": the presenter's page. Shares with getDisplayMedia (light-host.js).
-    //   - Takes a still picture when somebody points or starts to draw (light-capture.js) and,
-    //     when they are done, shows that spot in the always-on-top mini window (light-pip.js).
-    //   - The helper window (share-helper.html) lays the drawing over the very spot on the screen:
-    //     by itself when there is no mini window, otherwise on "Zur Stelle" / a click on the
-    //     notification – a browser window in the background cannot come to the front by itself.
-    // The helper reaches this page through window.opener.pvLight.
+    //   - Takes a still picture when somebody points or starts to draw (light-capture.js).
+    //   - The helper (share-helper.html) lays the drawing over the very spot on the screen, when
+    //     they are done: embedded in the share's small window (share.html?panel), which moves
+    //     there itself – or, in a tab, a window of its own. On top only where the browser is the
+    //     active app: a browser window in the background cannot come to the front by itself (a
+    //     click on a notification can bring it, where they are allowed).
+    // The helper reaches this page through window.parent / window.opener .pvLight.
     import { LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { Cropper, cropSupported } from './light-crop.js'
@@ -218,7 +234,6 @@
     import { trafficLights, windowOfLights } from './light-windows.js'
     import { WindowPicker } from './light-pick.js'
     import { follow, grabberOf, snapRect, titleOf } from './light-track.js'
-    import { MiniWindow, documentPip, videoPip } from './light-pip.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -235,7 +250,15 @@
       { id: 'control', name: 'Steuern', note: 'nur mit Desktop' },
     ]
     const HELPER_SIZE = { width: 300, height: 132 }
-    let mode = 'draw'
+    const PANEL_WIDTH = 360
+    // The share runs in its own small window (share.html?panel), opened from this page: picking the
+    // window, who watches, what they may do – and it jumps to each drawing itself. The tab that
+    // opened it may then be closed. (Popups blocked: everything here, in the tab.)
+    const params = new URLSearchParams(location.search)
+    const panel = params.has('panel')
+    document.body.classList.toggle('panel', panel)
+    let panelWindow = null
+    let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null
     let helperBlocked = false
@@ -250,10 +273,6 @@
     let cropper = null
     let screenStream = null
     let windowLost = false
-    // the mini window; for a video: the presenter turned it on (Firefox does not tell)
-    let mini = null
-    let miniDone = false
-    let miniSkipped = false
     // strokes in progress (from -> {points, capture, name}) and the last spot shown
     const strokes = new Map()
     let lastReveal = null
@@ -261,6 +280,15 @@
 
     // ---------------------------------------------------------------- name, modes
     try { $('name').value = localStorage.getItem('pv-name') ?? '' } catch {}
+    // (the small window: the name from the tab that opened it)
+    try { if (panel && !$('name').value) $('name').value = window.opener?.document.getElementById('name')?.value ?? '' } catch {}
+    if (panel) {
+      $('setup').querySelector('h1').textContent = 'Was möchtest du teilen?'
+      $('name').parentElement.hidden = !!$('name').value.trim()
+      $('panel-close').hidden = false
+      $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
+      document.querySelector('#running .keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
+    }
     $('name').addEventListener('input', () => {
       try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
       $('name-error').hidden = true
@@ -308,14 +336,50 @@
       $('setup').hidden = false
       start()
     })
+    $('panel-close').addEventListener('click', () => window.close())
 
-    function start() {
+    function nameOrAsk() {
       const name = $('name').value.trim()
       if (!name) {
+        $('name').parentElement.hidden = false
         $('name-error').hidden = false
         $('name').classList.add('invalid')
-        return $('name').focus()
+        $('name').focus()
       }
+      return name
+    }
+
+    // in the tab: the small window takes over (it asks for the screen itself – the tab may be
+    // closed, and with it everything it captured)
+    function start() {
+      if (panel || !supported || !nameOrAsk()) return startHere()
+      const width = PANEL_WIDTH
+      const height = 300
+      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
+      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
+      const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
+      panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
+      if (!panelWindow) return startHere()
+      $('setup').hidden = true
+      $('ended').hidden = true
+      $('elsewhere').hidden = false
+      document.title = '● Freigabe läuft – PeekaView light'
+    }
+    $('elsewhere-show').addEventListener('click', () => {
+      try { panelWindow?.focus() } catch {}
+    })
+    // the small window closed: back to the start
+    setInterval(() => {
+      if (!panelWindow?.closed) return
+      panelWindow = null
+      $('elsewhere').hidden = true
+      $('setup').hidden = false
+      document.title = 'Im Browser teilen – PeekaView light'
+    }, 1000)
+
+    function startHere() {
+      const name = nameOrAsk()
+      if (!name) return
       $('start-error').hidden = true
       // Both need the click: the screen picker, and the helper window (popup blockers let
       // windows through only right in a click). The picker first – Safari spends the click on it,
@@ -326,9 +390,9 @@
       } catch (err) {
         picking = Promise.reject(err)
       }
-      // the helper: waits in the corner and comes to each drawing by itself (the mini window, which
-      // floats above everything, is offered afterwards)
-      openHelper()
+      // the helper: waits in the corner and comes to each drawing by itself – the small window is
+      // that helper itself
+      if (!panel) openHelper()
       $('start').disabled = true
       picking.then((stream) => {
         const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface ?? 'monitor'
@@ -338,8 +402,6 @@
       }).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
-        mini?.close()
-        mini = null
         $('start-error').textContent = err?.name === 'NotAllowedError'
           ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf „Bildschirm teilen“.'
           : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
@@ -376,8 +438,6 @@
       await host.start()
       window.pvLight.host = host
       $('src-video').srcObject = stream
-      // Safari, Firefox: the mini window is a video (turned on in the step below)
-      if (!documentPip) mini = MiniWindow.video($('mini-video'), miniActions)
       // where the browser lets a page bring a window forward
       try { helper?.focus() } catch {}
       $('setup').hidden = true
@@ -387,6 +447,7 @@
       document.title = '● Freigabe läuft – PeekaView light'
       renderAll()
       emit({ kind: 'status', ...status() })
+      dock()
       copyLink(true)
       // a whole screen: is it the one this browser is on?
       if (host.surface === 'monitor') setTimeout(checkPlace, 500)
@@ -402,9 +463,6 @@
       locateSkipped = false
       placeProblem = null
       placeWaiting = false
-      mini?.close()
-      mini = null
-      miniDone = miniSkipped = false
       strokes.clear()
       lastReveal = null
       $('src-video').srcObject = $('src-screen').srcObject = null
@@ -415,6 +473,37 @@
       $('ended').hidden = false
       $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
       document.title = 'Im Browser teilen – PeekaView light'
+      dock()
+    }
+
+    // ---------------------------------------------------------------- the small window's place
+    // In the bottom right corner, as large as its content; larger, in the middle, to pick a window.
+    let spotting = false
+    function dock() {
+      if (!panel || spotting || !$('pick').hidden) return
+      const cx = Math.max(0, window.outerWidth - window.innerWidth)
+      const cy = Math.max(0, window.outerHeight - window.innerHeight)
+      const width = PANEL_WIDTH + cx
+      const height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
+      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
+      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
+      try {
+        if (Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) window.resizeTo(width, height)
+        if (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2) window.moveTo(left, top)
+      } catch {}
+    }
+    function spread() {
+      if (!panel) return
+      const width = Math.round(Math.min(1100, screen.availWidth * 0.85))
+      const height = Math.round(screen.availHeight * 0.88)
+      try {
+        window.resizeTo(width, height)
+        window.moveTo(Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2), Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2))
+      } catch {}
+    }
+    if (panel) {
+      new ResizeObserver(() => requestAnimationFrame(dock)).observe(document.querySelector('main'))
+      setTimeout(dock, 50)
     }
 
     $('stop').addEventListener('click', () => host?.stop())
@@ -424,7 +513,6 @@
     })
 
     // ---------------------------------------------------------------- link
-    // (from the mini window: with its clipboard – the page itself is in the background)
     async function copyLink(quiet, from = window) {
       if (!host) return
       try {
@@ -489,8 +577,6 @@
         li.append(who(v), v.name)
         return li
       }) : [Object.assign(document.createElement('li'), { className: 'none', textContent: 'Noch niemand – schicke den Link oben.' })]))
-      mini?.set({ viewers, requests, busy: busyNames() })
-      renderMini()
       renderHelper()
     }
 
@@ -519,10 +605,10 @@
 
     function renderHelper() {
       if (host) {
-        $('live-title').textContent = host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
+        $('live-title').textContent = panel ? 'Freigabe läuft' : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
         $('repick').hidden = !cropper
       }
-      const open = !!helper && !helper.closed
+      const open = panel || (!!helper && !helper.closed)
       // (a window cut out here: its place is known – nothing to look for)
       const windowShared = !!host && host.surface !== 'monitor' && !cropper
       // not placed on the screen: the helper shows the drawing in the middle
@@ -537,91 +623,8 @@
           ? helperBlocked
             ? 'Dein Browser hat das Fenster „Freigabe läuft“ blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
             : 'Ohne das Fenster „Freigabe läuft“ siehst du nicht, wo die Zuschauer zeigen und malen.'
-          : `Das Fenster „Freigabe läuft“ wartet unten rechts. Malt jemand, springt es ${middle ? 'in die Mitte deines Bildschirms' : 'genau an die Stelle'} – mit der Zeichnung – und danach zurück.` +
-            (miniActive() ? ' Liegt es hinter einem anderen Programm, hol es mit „Zur Stelle“ im Mini-Fenster nach vorne.' : ' Liegt gerade ein anderes Programm vorne, bleibt es dahinter – das Mini-Fenster hilft dann.')
+          : `Das Fenster „Freigabe läuft“ wartet unten rechts. Malt jemand, springt es ${middle ? 'in die Mitte deines Bildschirms' : 'genau an die Stelle'} – mit der Zeichnung – und danach zurück.`
     }
-
-    // ---------------------------------------------------------------- the mini window (always on top)
-    const miniActions = {
-      onJump: (win) => jumpHelper(win),
-      onAdmit: (peer, allow) => host?.admit(peer, allow),
-      onCopy: (win) => copyLink(false, win),
-      onStop: () => host?.stop(),
-      onClose: () => {
-        if (mini?.kind === 'document') mini = null
-        renderAll()
-        emit({ kind: 'status', ...status() })
-      },
-      onEnter: () => {
-        miniDone = true
-        renderAll()
-        emit({ kind: 'status', ...status() })
-      },
-      onLeave: () => {
-        miniDone = false
-        renderAll()
-        emit({ kind: 'status', ...status() })
-      },
-    }
-
-    function miniActive() {
-      return !!mini && (mini.kind === 'document' ? !mini.closed : mini.inPip || miniDone)
-    }
-
-    // Chrome, Edge: right in a click
-    function openMini() {
-      if (mini && !mini.closed) return
-      MiniWindow.openDocument(miniActions)
-        .then((m) => {
-          mini = m
-          // the helper opened from there finds this page
-          m.win.pvLight = window.pvLight
-          renderAll()
-          emit({ kind: 'status', ...status() })
-        })
-        .catch(() => {
-          $('mini-error').textContent = 'Das Mini-Fenster ließ sich nicht öffnen. Bitte noch einmal klicken.'
-          $('mini-error').hidden = !host
-          renderAll()
-        })
-    }
-
-    function requestNotifications() {
-      if (typeof Notification === 'function' && Notification.permission === 'default') Notification.requestPermission().then(() => renderMini()).catch(() => {})
-    }
-
-    function renderMini() {
-      const firefox = !documentPip && !videoPip
-      const askNotify = !documentPip && typeof Notification === 'function' && Notification.permission === 'default'
-      const open = !!host && !miniActive() && !miniSkipped
-      $('mini-step').hidden = !host || (documentPip && !open)
-      $('mini-step').classList.toggle('away', !open)
-      $('mini-video').hidden = documentPip
-      $('mini-text').textContent = documentPip
-        ? 'Es schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
-        : firefox
-          ? 'Klicke mit der rechten Maustaste auf das Bild unten und wähle „Bild-im-Bild“. Es schwebt dann über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
-          : 'Es schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt.'
-      $('mini-on').hidden = firefox && !askNotify
-      $('mini-on').textContent = documentPip ? 'Mini-Fenster öffnen' : firefox ? 'Benachrichtigungen erlauben' : 'Mini-Fenster einschalten'
-      $('mini-done').textContent = firefox ? 'Erledigt' : 'Später'
-    }
-    $('mini-on').addEventListener('click', () => {
-      $('mini-error').hidden = true
-      if (documentPip) return openMini()
-      // (a click on a notification brings the drawing to the spot)
-      requestNotifications()
-      if (videoPip) mini?.enter()?.catch(() => {
-        $('mini-error').textContent = 'Das Mini-Fenster ließ sich nicht einschalten.'
-        $('mini-error').hidden = false
-      })
-    })
-    $('mini-done').addEventListener('click', () => {
-      if (!documentPip && !videoPip) miniDone = true
-      else miniSkipped = true
-      renderAll()
-      emit({ kind: 'status', ...status() })
-    })
 
     // ---------------------------------------------------------------- what viewers point at and draw
 
@@ -631,6 +634,9 @@
       let inHelper = []
       try {
         if (helper && !helper.closed) inHelper = [...helper.document.querySelectorAll('video')]
+      } catch {}
+      try {
+        inHelper.push(...$('spot').contentDocument.querySelectorAll('video'))
       } catch {}
       return [$('src-video'), $('src-screen'), ...inHelper]
     }
@@ -662,7 +668,6 @@
     }
 
     function busyChanged() {
-      mini?.set({ busy: busyNames() })
       emit({ kind: 'status', ...status() })
     }
 
@@ -675,14 +680,13 @@
       placed(problem)
       const peer = host.peers().list.find((p) => p.id === r.from)
       lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
-      mini?.reveal(lastReveal)
       emit({ kind: 'reveal', reveal: lastReveal })
       notify(lastReveal)
     }
 
     // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
     function notify(r) {
-      if (mini?.kind === 'document' || typeof Notification !== 'function' || Notification.permission !== 'granted') return
+      if (typeof Notification !== 'function' || Notification.permission !== 'granted') return
       try {
         const n = new Notification(r.ping ? `${r.name} zeigt dir etwas` : `${r.name} hat etwas gemalt`, { body: 'Klicke hier, dann erscheint es genau an der Stelle.', tag: 'pv-light' })
         n.onclick = () => {
@@ -693,14 +697,14 @@
       } catch {}
     }
 
-    /** The helper over the spot of the last drawing – from a click (mini window, notification). */
+    /** The helper over the spot of the last drawing – from a click (notification). */
     let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
       // a helper already open may lie behind other programs, and it cannot come to the front from a
       // click elsewhere: a new one, opened in this click, always does – it waits in the corner afterwards
       closeHelper()
-      helper = from.open('share-helper.html?jump=1', `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
+      helper = from.open(`share-helper.html?jump=1${panel ? '&close=1' : ''}`, `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
       helperBlocked = !helper
       renderHelper()
     }
@@ -712,7 +716,7 @@
       $('debug-box').hidden = false
       // at the top: to be seen without scrolling
       if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
-      $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, folgen: cropper ? trackInfo : undefined, vorne: inFront(), mini: mini?.kind ?? null }, null, 1)
+      $('debug').textContent = `${what} ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({ ...capture?.debug, folgen: cropper ? trackInfo : undefined, vorne: inFront() }, null, 1)
       // left: the screen with the best match (red) and the found place (green); right: the window
       const view = $('debug-view')
       const ctx = view.getContext('2d')
@@ -755,7 +759,6 @@
         placeProblem = problem
         placeWaiting = false
       }
-      mini?.set({ problem: placeProblem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : placeProblem ? 'Anderer Bildschirm geteilt' : '' })
       renderAll()
     }
 
@@ -842,6 +845,7 @@
       $('setup').hidden = $('running').hidden = true
       $('pick').hidden = false
       document.querySelector('main').classList.add('wide')
+      spread()
       picker?.destroy()
       picker = new WindowPicker($('pick-view'), { onChange: renderPick })
       if (host && cropper?.rect) {
@@ -892,6 +896,7 @@
       picker = null
       $('pick').hidden = true
       document.querySelector('main').classList.remove('wide')
+      setTimeout(dock, 0)
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
       const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
       // the window's real edges, its title bar and picture to follow it by: from the picture in which
@@ -1052,8 +1057,6 @@
         locator: !!locator,
         // somebody draws right now (their names)
         busy: busyNames(),
-        // the mini window floats on top: the helper comes only when asked
-        mini: miniActive(),
       }
     }
     function emit(event) {
@@ -1073,7 +1076,6 @@
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),
-      get mini() { return mini },
       status,
       subscribe(fn) {
         listeners.add(fn)
@@ -1085,6 +1087,27 @@
       annotate: (m) => host?.annotate(m),
       copyLink: () => copyLink(false),
       stop: () => host?.stop(),
+      // the spot inside the small window (share-helper.html, embedded): shown, and back to the panel
+      spotShown: () => {
+        spotting = true
+        $('spot').hidden = false
+        document.body.classList.add('spotting')
+      },
+      spotDone: () => {
+        spotting = false
+        $('spot').hidden = true
+        document.body.classList.remove('spotting')
+        dock()
+      },
+    }
+    // (created here: it finds this page's pvLight right away)
+    if (panel) {
+      const frame = document.createElement('iframe')
+      frame.id = 'spot'
+      frame.hidden = true
+      frame.title = 'Wo deine Zuschauer zeigen'
+      frame.src = 'share-helper.html'
+      document.body.append(frame)
     }
 
     let audio

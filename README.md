@@ -32,7 +32,7 @@ and screen, audio and clipboard data travel over WebRTC.
 | `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
 | `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
 | `web/desktop/` | UI of the desktop client in the same design |
-| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), picking a window from the screen and following it (`light-windows.js`, `light-pick.js`, `light-crop.js`, `light-track.js`), the mini window (`light-pip.js`, `light-mini.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
+| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), picking a window from the screen and following it (`light-windows.js`, `light-pick.js`, `light-crop.js`, `light-track.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
 | `android/` | Android app: watching (bundled viewer) and sharing the phone's screen – see `android/README.md` |
 | `build.sh` | Builds the macOS app and installs it to `/Applications` |
 | `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
@@ -291,6 +291,13 @@ The viewer site opens with a small start page:
 - **What does not:** remote control (browsers cannot inject input), voice, the shared clipboard, recording, several windows. The state says `light: true`. The viewer then shows "Steuern" greyed out, explains it on click and once when joining, and hides the clipboard.
 - **Saying so:** the start page, the share page before and during the share, and its end screen say in one short, calm line that steering, voice and more need PeekaView Desktop, and link to `download.html`.
 
+**Its own small window.** "Bildschirm teilen" opens `share.html?panel`, a small popup "Freigabe läuft" in the bottom right corner, and the tab then only says that the share runs there and the tab may be closed.
+- The popup asks for the screen itself, in a click of its own: whatever a page captured ends with that page, so the tab could not be closed otherwise.
+- Picking the window happens in it: it grows to the middle of the screen for that, and shrinks back to its corner afterwards, as tall as its content.
+- In the corner: who watches, "Zulassen"/"Ablehnen", what viewers may do (Zusehen, Zeigen & Malen, Steuern only with the desktop app), copy the link, another window, stop. Closing it ends the share.
+- It is the helper, too: the helper page runs embedded in it (`share-helper.html` in an iframe, moving the popup) and lays each drawing over its spot, then the popup goes back to its corner.
+- Popups blocked: everything stays in the tab, with the helper in a window of its own.
+
 **Picking a window from the whole screen** (Chrome, Edge).
 - The presenter shares the whole screen. The share page then shows a picture of it with the windows found outlined (`light-windows.js`: long straight edges joined at corners, each rectangle scored by how much of its four sides are edges). A click picks a window; clicking again on the same spot picks the next smaller one, and a drag draws a part by hand.
 - The window the presenter just worked in is recognized for sure by the coloured buttons of its title bar (red, yellow, green; `trafficLights`), its top and left borders followed from there (`windowOfLights`), and picked right away. A click prefers windows with a title bar over frames.
@@ -305,22 +312,15 @@ The viewer site opens with a small start page:
 - Firefox and Safari cannot cut frames: they share what was picked in the browser's dialog, as described below.
 
 **Showing where viewers point and draw.** A point is shown right away, a stroke once it is finished ("Anna malt gerade …" meanwhile). The share page takes a still picture when the point or stroke starts, so it shows what they drew on (`light-capture.js`).
-- **The mini window** (`light-pip.js`, `light-mini.js`) floats above every app – a normal browser window cannot: macOS never lets an app in the background bring its windows to the front, so `focus()` does nothing while the presenter works elsewhere.
-  - It shows that the share runs and who watches. When somebody points or has drawn, it shows the spot enlarged, with the stroke drawn again, plus a small map of the screen marking where that is.
-  - Chrome and Edge: a Picture-in-Picture *document* window (420 × 320), opened with "Mini-Fenster öffnen" on the share page, with "Zur Stelle", "Zulassen"/"Ablehnen", "Größer"/"Kleiner", copy link and stop. It cannot grow by itself: a Picture-in-Picture window resizes only in a click, and never moves.
-  - Safari: the mini view as a Picture-in-Picture *video* (a captured canvas), turned on with a click. Firefox only lets the user start Picture-in-Picture (right click on the video → "Bild-im-Bild"); the share page says so. A video has no buttons: a system notification ("Anna hat etwas gemalt") takes the click instead.
-  - It renders from a worker's clock: the share page is a background tab, where timers are slowed down and `requestAnimationFrame` stops.
-- **The helper window** (`share-helper.html`) lays the drawing over the very spot on the screen: it jumps there, grows to fit the stroke and shows the still picture 1:1 under itself like a pane of glass, with the stroke drawn again on top. The presenter can draw and point into it, too; viewers see that with the presenter's name.
-  - It opens in the start click as "Freigabe läuft" in the bottom right corner, comes to each point and stroke by itself, and goes back to its corner after 3.5 s (point) or 6 s (stroke). On top only while the browser is the active app.
-  - "Zur Stelle" (mini window) or a click on the notification makes the browser the active app and opens a new helper with the last drawing – one already open cannot come to the front from a click in another window. It then stays as the corner window.
+- **The helper** (`share-helper.html`, inside the small window) lays the drawing over the very spot on the screen: it jumps there, grows to fit the stroke and shows the still picture 1:1 under itself like a pane of glass, with the stroke drawn again on top. The presenter can draw and point into it, too; viewers see that with the presenter's name.
+  - It comes to each point and stroke by itself and goes back to its corner after 3.5 s (point) or 6 s (stroke). On top only while the browser is the active app: macOS never lets an app in the background bring its windows to the front, so it stays behind the app the presenter works in.
+  - Where notifications are allowed already, a click on one ("Anna hat etwas gemalt") makes the browser the active app and shows the drawing in a window of its own, which closes again afterwards.
 - **Position:** normalized picture coordinates × screen size + the screen's corner (`light-geometry.js`). After moving, the helper reads where the browser actually put it and lays the picture under it accordingly.
 
 **What browsers allow** (tested in Chromium with fake pictures; Firefox and Safari not yet on real machines):
 
 | | Chrome, Edge | Firefox | Safari |
 |---|---|---|---|
-| Mini window on top of all apps | Picture-in-Picture document, on a click | Picture-in-Picture video, started by the user | Picture-in-Picture video, on a click |
-| To the spot | "Zur Stelle" in the mini window | click on the notification | click on the notification |
 | Moving and resizing the helper | yes (popups only, inside the screen) | yes, unless `dom.disable_window_move_resize` | yes (popups only) |
 | Screen corner | estimated from `availLeft`/`availTop` (on a Mac minus about 25 px menu bar); exact with the "window management" permission if already granted (`getScreenDetails`, never requested) | exact (`screen.left`/`top`) | estimated |
 | Still picture | `ImageCapture.grabFrame()` | a playing `<video>` | a playing `<video>` |
@@ -332,13 +332,13 @@ The viewer site opens with a small start page:
     - The two pictures need not have the same resolution (Retina, Chrome's own limits): sizes from a quarter to three times are tried.
     - The window's edge (shadow, rounded corners) and its title bar are left out. A window that is not the active one looks different there.
     - That takes about 0.1–0.2 s and finds the window to a pixel, also after it was moved or when something covers part of it.
-  - The helper then shows the window's still picture over its place, with the desktop around it; the mini window's map marks the spot on the whole screen.
-  - Not to be seen on the screen (minimized, covered, another screen): the share page says so, with "Anderen Bildschirm wählen", and the mini window shows "Dein Fenster ist nicht zu finden".
+  - The helper then shows the window's still picture over its place, with the desktop around it.
+  - Not to be seen on the screen (minimized, covered, another screen): the share page says so, with "Anderen Bildschirm wählen".
     - Only while the presenter is elsewhere. While the share page lies in front (right after picking the screen, say), the browser may well cover the window, so the page only asks to switch to it.
     - It keeps looking every 2.5 s while the page is in the background, and the message goes away by itself once the window is found.
     - `share.html?debug` (and the console) show how each search went, including the best score when nothing was found.
 - Without that click ("Später"), when the window is not found (minimized, covered) and for another monitor, the helper shows the whole picture in the middle of the screen.
-- When the whole screen is shared, the mini window and the helper are part of the picture: viewers see them, too.
+- When the whole screen is shared, the small window "Freigabe läuft" is part of the picture: viewers see it, too. With a window picked from it, only where it lies over that window.
 - Popup blockers let windows through only right in a click. Phones and tablets cannot share from the browser at all, so the start page does not offer it there.
 - Closing or reloading the share page ends the share.
 
