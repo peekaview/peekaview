@@ -34,6 +34,21 @@ export function monitorRect(screen, { mac = false, details = null } = {}) {
   return { left, top, width: screen.width, height: screen.height }
 }
 
+/**
+ * The usable part of the screen a window is on (CSS px): {left, top, width, height}. Firefox gives
+ * availLeft/availTop of a second screen counted from that screen's own corner (left 2560, availLeft
+ * 0) – made whole here: a window placed by them would land on the first screen.
+ */
+export function usableArea(screen) {
+  const left = Number.isFinite(screen.left) ? screen.left : null
+  const top = Number.isFinite(screen.top) ? screen.top : null
+  let x = Number.isFinite(screen.availLeft) ? screen.availLeft : (left ?? 0)
+  let y = Number.isFinite(screen.availTop) ? screen.availTop : (top ?? 0)
+  if (left != null && (x < left || x >= left + screen.width)) x += left
+  if (top != null && (y < top || y >= top + screen.height)) y += top
+  return { left: x, top: y, width: screen.availWidth ?? screen.width, height: screen.availHeight ?? screen.height }
+}
+
 /** Whether a picture of this size can be the given screen (same aspect ratio, 2 % tolerance). */
 export function matchesScreen(video, monitor) {
   if (!video?.width || !video?.height || !monitor.width || !monitor.height) return false

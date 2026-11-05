@@ -307,7 +307,7 @@
     import { cropSupported, makeCropper } from './light-crop.js'
     import { scaledGray } from './light-locate.js'
     import { findWindows, platformOf, titleLine } from './light-windows.js'
-    import { monitorRect } from './light-geometry.js'
+    import { monitorRect, usableArea } from './light-geometry.js'
     import { readLine, readText, readable, readerState, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
@@ -726,8 +726,9 @@
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
       const height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
-      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
-      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
+      const area = usableArea(screen)
+      const left = Math.round(area.left + area.width - width - 16)
+      const top = Math.round(area.top + area.height - height - 16)
       try {
         if (Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) window.resizeTo(width, height)
         if (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2) window.moveTo(left, top)
@@ -739,7 +740,8 @@
       const height = Math.min(PICKER_ROOM.height, screen.availHeight)
       try {
         window.resizeTo(width, height)
-        window.moveTo(Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2), Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2))
+        const area = usableArea(screen)
+        window.moveTo(Math.round(area.left + (area.width - width) / 2), Math.round(area.top + (area.height - height) / 2))
       } catch {}
     }
     function spread() {
@@ -748,7 +750,8 @@
       const height = Math.round(screen.availHeight * 0.88)
       try {
         window.resizeTo(width, height)
-        window.moveTo(Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2), Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2))
+        const area = usableArea(screen)
+        window.moveTo(Math.round(area.left + (area.width - width) / 2), Math.round(area.top + (area.height - height) / 2))
       } catch {}
     }
     if (panel) {
@@ -834,8 +837,9 @@
     // A popup (no tab): browsers only let a page move and resize windows it opened itself.
     function openHelper() {
       if (helper && !helper.closed) return helper.focus()
-      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - HELPER_SIZE.width - 16)
-      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - HELPER_SIZE.height - 16)
+      const area = usableArea(screen)
+      const left = Math.round(area.left + area.width - HELPER_SIZE.width - 16)
+      const top = Math.round(area.top + area.height - HELPER_SIZE.height - 16)
       helper = window.open('share-helper.html', 'pv-light-helper', `popup=yes,width=${HELPER_SIZE.width},height=${HELPER_SIZE.height},left=${left},top=${top}`)
       helperBlocked = !helper
       renderHelper()

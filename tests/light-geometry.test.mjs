@@ -1,7 +1,7 @@
 // Where the helper window of "Bildschirmfreigabe light" goes on the presenter's screen.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bounds, fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, visiblePart, windowRect } from '../web/light-geometry.js'
+import { bounds, fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, usableArea, visiblePart, windowRect } from '../web/light-geometry.js'
 
 test('the shared screen: exact where the browser says, below the menu bar estimated on a Mac', () => {
   // Firefox: the screen's own corner
@@ -61,4 +61,16 @@ test('a shared window found on the screen: points map onto it, the helper stays 
 
 test('the helper grows to a whole stroke', () => {
   assert.deepEqual(bounds([[0.2, 0.5], [0.4, 0.3], [0.3, 0.6]]), { x: 0.2, y: 0.3, w: 0.2, h: 0.3 })
+})
+
+test('usableArea: the usable part of a window\'s screen – Firefox\'s second screen counted from its own corner made whole', () => {
+  // Chrome, the first screen (menu bar above)
+  assert.deepEqual(usableArea({ availLeft: 0, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }), { left: 0, top: 25, width: 2560, height: 1415 })
+  // Firefox, a second screen on the right: left 2560, availLeft 0
+  assert.deepEqual(usableArea({ left: 2560, top: 0, availLeft: 0, availTop: 0, availWidth: 2560, availHeight: 1440, width: 2560, height: 1440 }), { left: 2560, top: 0, width: 2560, height: 1440 })
+  // … on the left, and above
+  assert.deepEqual(usableArea({ left: -1920, top: 0, availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1080, width: 1920, height: 1080 }).left, -1920)
+  assert.deepEqual(usableArea({ left: 0, top: -1080, availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1080, width: 1920, height: 1080 }).top, -1080)
+  // the right numbers stay as they are
+  assert.deepEqual(usableArea({ left: 2560, top: 0, availLeft: 2560, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }), { left: 2560, top: 25, width: 2560, height: 1415 })
 })

@@ -84,7 +84,7 @@
     import { Annotations } from './annotate.js'
     import { icon, owl } from './icons.js'
     import { HOST_ID } from './light-host.js'
-    import { bounds, fit, inside, spotRect, stageInContent, visiblePart } from './light-geometry.js'
+    import { bounds, fit, inside, spotRect, stageInContent, usableArea, visiblePart } from './light-geometry.js'
 
     const $ = (id) => document.getElementById(id)
     $('owl').innerHTML = owl(20)
@@ -263,7 +263,8 @@
       const height = Math.ceil($('parked').scrollHeight)
       const w = PARKED_WIDTH + c.x
       const h = height + c.y
-      moveWindow((screen.availLeft ?? 0) + screen.availWidth - w - 16, (screen.availTop ?? 0) + screen.availHeight - h - 16, w, h)
+      const area = usableArea(screen)
+      moveWindow(area.left + area.width - w - 16, area.top + area.height - h - 16, w, h)
     }
 
     function moveWindow(left, top, width, height) {
@@ -336,7 +337,8 @@
       } else {
         const box = { width: screen.availWidth * 0.6, height: screen.availHeight * 0.6 }
         const f = fit(capture.image, box)
-        moveWindow((screen.availLeft ?? 0) + (screen.availWidth - f.width) / 2, (screen.availTop ?? 0) + (screen.availHeight - f.height) / 2, f.width + c.x, f.height + c.y)
+        const area = usableArea(screen)
+        moveWindow(area.left + (area.width - f.width) / 2, area.top + (area.height - f.height) / 2, f.width + c.x, f.height + c.y)
         layoutWhole()
         await new Promise((done) => setTimeout(done, 150))
         if (shown === capture) layoutWhole()
