@@ -9,6 +9,9 @@ const TITLE_HEIGHT = 40 // points read below a window's top (a title bar, or the
 const SIDE = 70 // points left out on the left (the three buttons)
 
 let reader = null
+// how reading goes (share.html?debug): 'aus' | 'lädt' | 'bereit' | 'Fehler: …'
+export const readerState = { state: 'aus' }
+const LIMIT = 30000 // ms for a reading (loading the first time included)
 
 function loadScript() {
   if (window.Tesseract) return Promise.resolve()
@@ -29,18 +32,31 @@ export async function readText(canvas) {
 /** … with how sure Tesseract is of it (0..100). */
 export async function readLine(canvas) {
   reader ??= (async () => {
+    readerState.state = 'lädt'
     await loadScript()
     const worker = await window.Tesseract.createWorker(['deu', 'eng'], 1, { logger: () => {} })
     // (words scattered over a bar, not a page)
     await worker.setParameters({ tessedit_pageseg_mode: '11' })
+    readerState.state = 'bereit'
     return worker
   })().catch((err) => {
     reader = null
+    readerState.state = `Fehler: ${err?.message ?? err}`
     throw err
   })
-  const worker = await reader
-  const { data } = await worker.recognize(canvas)
-  return { text: (data.text ?? '').replace(/\s+/g, ' ').trim(), confidence: data.confidence ?? 0 }
+  // (never waiting for ever: a blocked download, a worker that does not start)
+  let timer
+  const limit = new Promise((_, fail) => (timer = setTimeout(() => fail(new Error('Zeitüberschreitung beim Lesen')), LIMIT)))
+  try {
+    const worker = await Promise.race([reader, limit])
+    const { data } = await Promise.race([worker.recognize(canvas), limit])
+    return { text: (data.text ?? '').replace(/\s+/g, ' ').trim(), confidence: data.confidence ?? 0 }
+  } catch (err) {
+    if (readerState.state === 'lädt' || readerState.state === 'bereit') readerState.state = `Fehler: ${err?.message ?? err}`
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**
