@@ -10,7 +10,8 @@
 //   node tests/light-fixture.mjs [port]          – a server for the browser preview
 //   node tests/light-fixture.mjs [port] --real   – web/ as it is (real relays and screen), never
 //                                                  cached: for trying it out on this computer
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { createServer } from 'node:http'
 import { dirname, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -112,6 +113,15 @@ export function startServer(port = 0, { real = false } = {}) {
     const path = new URL(request.url, 'http://localhost').pathname
     // (trying it out: which files the browser really fetched)
     if (real) console.log(new Date().toLocaleTimeString('de-DE'), request.method, path)
+    // (trying it out: share.html?debug sends the window picker's picture here, to look at it)
+    if (real && request.method === 'POST' && path === '/qa-upload') {
+      const chunks = []
+      for await (const c of request) chunks.push(c)
+      const out = resolve(tmpdir(), `peekaview-auswahl-${Date.now()}.png`)
+      await writeFile(out, Buffer.concat(chunks))
+      console.log('saved', out)
+      return response.writeHead(200).end(out)
+    }
     const file = resolve(web, path === '/' ? 'index.html' : '.' + path)
     if (!file.startsWith(web + sep)) return response.writeHead(403).end()
     try {

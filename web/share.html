@@ -993,9 +993,16 @@
       // (the picture, to look at it closely elsewhere)
       if (!$('debug-save')) {
         const save = Object.assign(document.createElement('button'), { id: 'debug-save', type: 'button', className: 'pill', textContent: 'Auswahlbild speichern (zur Analyse)' })
-        save.addEventListener('click', () => picker?.image?.toBlob((blob) => {
+        save.addEventListener('click', () => picker?.image?.toBlob(async (blob) => {
+          // (to the test server where there is one; else a download)
+          try {
+            const res = await fetch('qa-upload', { method: 'POST', body: blob })
+            if (res.ok) return toast('Auswahlbild an den Testserver geschickt.')
+          } catch {}
           const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'peekaview-auswahl.png' })
+          document.body.append(a)
           a.click()
+          a.remove()
         }, 'image/png'))
         $('debug-box').append(save)
       }
