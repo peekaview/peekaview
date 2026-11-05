@@ -84,7 +84,7 @@
     import { Annotations } from './annotate.js'
     import { icon, owl } from './icons.js'
     import { HOST_ID } from './light-host.js'
-    import { bounds, fit, inside, spotRect, stageInContent, usableArea, visiblePart } from './light-geometry.js'
+    import { bounds, fit, inside, movesWindows, placeWindow, spotRect, stageInContent, usableArea, visiblePart } from './light-geometry.js'
 
     const $ = (id) => document.getElementById(id)
     $('owl').innerHTML = owl(20)
@@ -268,10 +268,7 @@
     }
 
     function moveWindow(left, top, width, height) {
-      try {
-        win.resizeTo(Math.round(width), Math.round(height))
-        win.moveTo(Math.round(left), Math.round(top))
-      } catch {}
+      placeWindow(win, { left, top, width, height })
     }
 
     $('stop').addEventListener('click', () => api.stop())
@@ -321,7 +318,8 @@
       if (stay) return layoutSpot()
       const c = chrome()
       const { picture, monitor } = capture
-      if (picture && center) {
+      // (a window that cannot be moved – Firefox on a second screen – shows the whole picture instead)
+      if (picture && center && movesWindows(win.screen)) {
         // large enough for the whole stroke (with a margin), at most most of the screen
         const size = {
           width: Math.min(monitor.width * 0.85, Math.max(SPOT.width, extent.w * picture.width + 160)),

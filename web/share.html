@@ -307,7 +307,7 @@
     import { cropSupported, makeCropper } from './light-crop.js'
     import { scaledGray } from './light-locate.js'
     import { findWindows, platformOf, titleLine } from './light-windows.js'
-    import { monitorRect, usableArea } from './light-geometry.js'
+    import { monitorRect, movesWindows, placeWindow, usableArea } from './light-geometry.js'
     import { readLine, readText, readable, readerState, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
@@ -456,7 +456,9 @@
       // (in the bottom right of this browser window – on its screen: reckoned from the window, not
       // from the screen's numbers, which Firefox gives wrong for a second screen)
       const left = Math.round(window.screenX + window.outerWidth - width - 24)
-      const top = Math.round(window.screenY + window.outerHeight - height - 24)
+      // (where it cannot be moved later – Firefox on a second screen – it can only grow downwards:
+      // room for the window picker below it)
+      const top = Math.round(window.screenY + window.outerHeight - (movesWindows(screen) ? height : PICKER_ROOM.height) - 24)
       if (params.has('debug')) qaLog({ tab: 'öffnet kleines Fenster', left, top, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
       const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
       panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
@@ -634,30 +636,22 @@
       const area = usableArea(screen)
       const left = Math.round(area.left + area.width - width - 16)
       const top = Math.round(area.top + area.height - height - 16)
-      try {
-        if (Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) window.resizeTo(width, height)
-        if (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2) window.moveTo(left, top)
-      } catch {}
+      const moved = movesWindows(screen) && (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2)
+      if (moved || Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) placeWindow(window, { left, top, width, height })
     }
     function roomy() {
       if (!panel || (window.outerWidth >= PICKER_ROOM.width && window.outerHeight >= PICKER_ROOM.height)) return
       const width = Math.min(PICKER_ROOM.width, screen.availWidth)
       const height = Math.min(PICKER_ROOM.height, screen.availHeight)
-      try {
-        window.resizeTo(width, height)
-        const area = usableArea(screen)
-        window.moveTo(Math.round(area.left + (area.width - width) / 2), Math.round(area.top + (area.height - height) / 2))
-      } catch {}
+      const area = usableArea(screen)
+      placeWindow(window, { left: area.left + (area.width - width) / 2, top: area.top + (area.height - height) / 2, width, height })
     }
     function spread() {
       if (!panel) return
       const width = Math.round(Math.min(1100, screen.availWidth * 0.85))
       const height = Math.round(screen.availHeight * 0.88)
-      try {
-        window.resizeTo(width, height)
-        const area = usableArea(screen)
-        window.moveTo(Math.round(area.left + (area.width - width) / 2), Math.round(area.top + (area.height - height) / 2))
-      } catch {}
+      const area = usableArea(screen)
+      placeWindow(window, { left: area.left + (area.width - width) / 2, top: area.top + (area.height - height) / 2, width, height })
     }
     if (panel) {
       new ResizeObserver(() => requestAnimationFrame(dock)).observe(document.querySelector('main'))

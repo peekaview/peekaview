@@ -1,7 +1,7 @@
 // Where the helper window of "Bildschirmfreigabe light" goes on the presenter's screen.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bounds, fit, inside, matchesScreen, monitorRect, spotRect, stageInContent, usableArea, visiblePart, windowRect } from '../web/light-geometry.js'
+import { bounds, fit, inside, matchesScreen, monitorRect, movesWindows, placeWindow, spotRect, stageInContent, usableArea, visiblePart, windowRect } from '../web/light-geometry.js'
 
 test('the shared screen: exact where the browser says, below the menu bar estimated on a Mac', () => {
   // Firefox: the screen's own corner
@@ -73,4 +73,18 @@ test('usableArea: the usable part of a window\'s screen – Firefox\'s second sc
   assert.deepEqual(usableArea({ left: 0, top: -1080, availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1080, width: 1920, height: 1080 }).top, -1080)
   // the right numbers stay as they are
   assert.deepEqual(usableArea({ left: 2560, top: 0, availLeft: 2560, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }), { left: 2560, top: 25, width: 2560, height: 1415 })
+})
+
+test('placeWindow: moved and sized – on Firefox\'s second screen only sized, within the room right of and below it', () => {
+  const calls = []
+  const fake = (screen, x, y) => ({ screen, screenX: x, screenY: y, resizeTo: (w, h) => calls.push(['size', w, h]), moveTo: (l, t) => calls.push(['move', l, t]) })
+  const first = { left: 0, top: 0, availLeft: 0, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }
+  const second = { left: 2560, top: 0, availLeft: 0, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }
+  assert.equal(movesWindows(first), true)
+  assert.equal(movesWindows(second), false)
+  assert.equal(movesWindows({ availLeft: 2560, availTop: 25, availWidth: 2560, availHeight: 1415, width: 2560, height: 1440 }), true, 'Chrome: no screen.left')
+  placeWindow(fake(first, 100, 100), { left: 2184, top: 1000, width: 360, height: 400 })
+  assert.deepEqual(calls.splice(0), [['size', 360, 400], ['move', 2184, 1000]])
+  placeWindow(fake(second, 4500, 600), { left: 3000, top: 200, width: 1100, height: 1200 })
+  assert.deepEqual(calls.splice(0), [['size', 612, 832]])
 })

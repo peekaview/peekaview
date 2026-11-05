@@ -49,6 +49,34 @@ export function usableArea(screen) {
   return { left: x, top: y, width: screen.availWidth ?? screen.width, height: screen.availHeight ?? screen.height }
 }
 
+/**
+ * Whether a page can move its window on this screen. Not in Firefox on a second screen: it keeps a
+ * moved window inside the usable area as it counts it (from that screen's own corner) – which is
+ * on the first screen. There a window can only change its size.
+ */
+export function movesWindows(screen) {
+  const outside = (avail, start, size) => Number.isFinite(start) && Number.isFinite(avail) && (avail < start || avail >= start + size)
+  return !outside(screen.availLeft, screen.left, screen.width) && !outside(screen.availTop, screen.top, screen.height)
+}
+
+/**
+ * Puts a window at {left, top, width, height} (outer, CSS px). Where it cannot be moved
+ * (movesWindows): only its size changes, as far as there is room right of and below it.
+ */
+export function placeWindow(win, { left, top, width, height }) {
+  try {
+    if (movesWindows(win.screen)) {
+      win.resizeTo(Math.round(width), Math.round(height))
+      win.moveTo(Math.round(left), Math.round(top))
+      return
+    }
+    const area = usableArea(win.screen)
+    const w = Math.max(240, Math.min(width, area.left + area.width - win.screenX - 8))
+    const h = Math.max(240, Math.min(height, area.top + area.height - win.screenY - 8))
+    win.resizeTo(Math.round(w), Math.round(h))
+  } catch {}
+}
+
 /** Whether a picture of this size can be the given screen (same aspect ratio, 2 % tolerance). */
 export function matchesScreen(video, monitor) {
   if (!video?.width || !video?.height || !monitor.width || !monitor.height) return false
