@@ -135,10 +135,11 @@
     .pip-spot canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: #18181b; }
     .pip-bar { display: flex; flex-wrap: wrap; gap: 8px; }
     .pip-bar .pill { flex: 1; }
-    body.pip-large { padding: 0; overflow: hidden; }
-    body.pip-large #running > :not(#pip-spot) { display: none !important; }
-    body.pip-large #pip-spot { position: fixed; inset: 0; padding: 10px; background: #09090b; }
-    body.pip-large #pip-spot canvas { flex: 1; min-height: 0; aspect-ratio: auto; object-fit: contain; }
+    /* (a drawing: in the place of the controls – the window keeps its size; large: all of it) */
+    body.pip-spotting { overflow: hidden; }
+    body.pip-spotting #running > :not(#pip-spot) { display: none !important; }
+    body.pip-spotting #pip-spot { position: fixed; inset: 0; padding: 8px; background: #09090b; }
+    body.pip-spotting #pip-spot canvas { flex: 1; min-height: 0; aspect-ratio: auto; object-fit: contain; }
     /* someone drew: the window shows the spot instead of its panel */
     #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
     body.spotting main { visibility: hidden; }
@@ -804,15 +805,15 @@
     // click (the one that picks the window, or its own): the running controls move into it. A
     // drawing shows there as a preview; "Ansehen" makes the window as large as it gets (only a
     // click may), "Zur Stelle" lays it over the very spot, "Kleiner" shrinks it again.
-    const PIP_SMALL = { width: 380, height: 560 }
+    const PIP_SMALL = { width: 360, height: 300 }
     const PIP_LARGE = { width: 4000, height: 3000 }
     let pipLarge = false
     let miniView = null
-    async function openPipWindow() {
+    async function openPipWindow({ initial = true, size = PIP_SMALL } = {}) {
       if (pip && !pip.closed) return
       let win
       try {
-        win = await openPip(PIP_SMALL)
+        win = await openPip(size, { initial })
       } catch {
         return renderAll()
       }
@@ -848,7 +849,7 @@
       try { pip?.close() } catch {}
       pipGone?.()
     }
-    $('pip-open').addEventListener('click', openPipWindow)
+    $('pip-open').addEventListener('click', () => openPipWindow())
 
     // small windows: the rest of the controls on demand
     $('more').addEventListener('click', () => {
@@ -862,12 +863,11 @@
       if (!miniView) {
         miniView = new MiniView($('pip-canvas'))
         miniView.onDone = () => {
-          if (!pipLarge) $('pip-spot').hidden = true
+          if (!pipLarge) endSpot()
         }
       }
       $('pip-spot').hidden = false
-      // (the preview at the top, to be seen)
-      try { pip.document.scrollingElement.scrollTop = 0 } catch {}
+      pip.document.body.classList.add('pip-spotting')
       miniView.reveal(r)
       renderPipButtons()
     }
@@ -886,19 +886,34 @@
       }
       if (pip && !pip.closed) {
         pip.document.body.classList.toggle('pip-large', large)
-        if (resize) resizePip(pip, large ? PIP_LARGE : PIP_SMALL)
+        if (large && resize) resizePip(pip, PIP_LARGE)
       }
-      if (!large && !miniView?.showing) $('pip-spot').hidden = true
+      if (!large && !miniView?.showing) endSpot()
       renderPipButtons()
     }
     function renderPipButtons() {
       $('pip-look').hidden = pipLarge
+      $('pip-jump').hidden = pipLarge
       $('pip-small').hidden = !pipLarge
     }
+    // the controls again in place of the drawing
+    function endSpot() {
+      $('pip-spot').hidden = true
+      pip?.document.body.classList.remove('pip-spotting')
+    }
     $('pip-look').addEventListener('click', () => setLarge(true))
-    $('pip-small').addEventListener('click', () => setLarge(false))
+    // small again – and back in its corner: a Picture-in-Picture window cannot be moved, but one
+    // opened anew goes to the browser's place for it (as tall as the controls)
+    $('pip-small').addEventListener('click', async () => {
+      miniView?.clear()
+      endSpot()
+      const height = Math.min(600, Math.max(200, Math.ceil($('running').scrollHeight) + 28))
+      closePip()
+      await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
+    })
     $('pip-jump').addEventListener('click', () => {
-      if (pipLarge) setLarge(false)
+      miniView?.clear()
+      endSpot()
       jumpHelper(pip)
     })
 

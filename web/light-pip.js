@@ -3,14 +3,17 @@
 // never lets a program in the background bring its windows to the front). The share page moves
 // its own controls into it. Browsers without it use a popup instead (share.html?panel).
 //
-// Limits: it opens only in a click, grows or shrinks only in a click in it, and never moves; it
-// closes with the tab that opened it.
+// Limits: it opens only in a click, grows or shrinks only in a click in it, and never moves (opened
+// anew, it goes back to the browser's corner); it closes with the tab that opened it.
 
 export const documentPip = typeof window !== 'undefined' && 'documentPictureInPicture' in window
 
-/** Opens it (right in a click), with this page's styles. */
-export async function openPip(size) {
-  const win = await window.documentPictureInPicture.requestWindow(size)
+/**
+ * Opens it (right in a click), with this page's styles. initial: at the browser's own place for it
+ * (its corner), not where the last one was left – it cannot be moved otherwise.
+ */
+export async function openPip(size, { initial = false } = {}) {
+  const win = await window.documentPictureInPicture.requestWindow({ ...size, preferInitialWindowPlacement: initial })
   for (const node of document.querySelectorAll('style, link[rel="stylesheet"]')) win.document.head.append(node.cloneNode(true))
   win.document.title = 'Freigabe läuft – PeekaView'
   return win

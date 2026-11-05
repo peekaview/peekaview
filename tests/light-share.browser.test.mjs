@@ -495,7 +495,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab('t1')
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
     assert.match(await evaluate("document.querySelector('#in-pip').innerText"), /Lass diesen Tab bitte offen[\s\S]*immer vorne/)
-    const P = await idOf('about:blank')
+    let P = await idOf('about:blank')
     await tab(P)
     assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)
 
@@ -509,39 +509,49 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab(V)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
 
-    // a stroke: a preview in the always-on-top window, with "Ansehen"
+    // a stroke: a preview in the always-on-top window, in place of the controls (its size stays)
     await browser('click', '.pv-dock [data-tool=draw]')
     const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
-    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.3)), String(Math.round(r.t + r.h * 0.5)))
-    await browser('mouse', 'down')
-    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.5)), String(Math.round(r.t + r.h * 0.55)))
-    await browser('mouse', 'up')
-    await tab(P)
-    await waitFor("!document.querySelector('#pip-spot').hidden && !document.querySelector('#pip-look').hidden")
-    // "Ansehen": the window large, nothing but the drawing – and no new pictures meanwhile
-    await browser('click', '#pip-look')
-    assert.equal(await evaluate("document.body.classList.contains('pip-large') && !document.querySelector('#pip-small').hidden"), true)
-    await tab('t1')
-    assert.equal(await evaluate('pvLight.frames.paused'), true)
-    await tab(P)
-    await new Promise((done) => setTimeout(done, 7500))
-    assert.equal(await evaluate("!document.querySelector('#pip-spot').hidden"), true, 'kept while large')
-    // "Kleiner": small again, the pictures going out again
-    await browser('click', '#pip-small')
-    assert.equal(await evaluate("document.body.classList.contains('pip-large')"), false)
-    await tab('t1')
-    assert.equal(await evaluate('pvLight.frames.paused'), false)
+    const stroke = async (from, to) => {
+      await tab(V)
+      await browser('mouse', 'move', String(Math.round(r.l + r.w * from)), String(Math.round(r.t + r.h * 0.5)))
+      await browser('mouse', 'down')
+      await browser('mouse', 'move', String(Math.round(r.l + r.w * to)), String(Math.round(r.t + r.h * 0.55)))
+      await browser('mouse', 'up')
+      await tab(P)
+      await waitFor("!document.querySelector('#pip-spot').hidden && document.body.classList.contains('pip-spotting')")
+    }
+    await stroke(0.3, 0.5)
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#link-label').parentElement).display"), 'none', 'the controls make room')
 
-    // "Zur Stelle": the drawing over the very spot, in a window of its own that closes again
-    await tab(P)
+    // "Am Fenster zeigen": the drawing over the very spot, in a window of its own that closes again;
+    // the controls back
     await browser('click', '#pip-jump')
     await waitFor('1')
+    assert.equal(await evaluate("document.body.classList.contains('pip-spotting')"), false)
     const helper = await idOf('share-helper')
     assert.ok(helper, await tabs())
     await tab(helper)
     await waitFor("window.pvHelper?.state === 'focus'")
     const picture = await evaluate('pvHelper.picture')
     assert.ok(Math.abs(picture.left - win.x) <= 3 && Math.abs(picture.top - win.y) <= 3, JSON.stringify(picture))
+
+    // "Groß anzeigen": the window large, nothing but the drawing – and no new pictures meanwhile
+    await stroke(0.4, 0.6)
+    await browser('click', '#pip-look')
+    assert.equal(await evaluate("document.body.classList.contains('pip-large') && !document.querySelector('#pip-small').hidden && document.querySelector('#pip-jump').hidden"), true)
+    await tab('t1')
+    assert.equal(await evaluate('pvLight.frames.paused'), true)
+    await tab(P)
+    await new Promise((done) => setTimeout(done, 7500))
+    assert.equal(await evaluate("!document.querySelector('#pip-spot').hidden"), true, 'kept while large')
+    // "Wieder klein": opened anew, small, in the browser's corner; the controls back, the pictures going out again
+    await browser('click', '#pip-small')
+    await tab('t1')
+    await waitFor("!pvLight.frames.paused && !document.querySelector('#in-pip').hidden")
+    P = await idOf('about:blank')
+    await tab(P)
+    await waitFor("!!document.querySelector('#running #stop') && !document.body.classList.contains('pip-spotting') && document.querySelector('#pip-spot').hidden")
 
     // stopping there ends it, and the always-on-top window closes
     await tab(P)

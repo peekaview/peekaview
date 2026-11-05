@@ -38,6 +38,14 @@ export class MiniView {
     else this.render()
   }
 
+  /** Back to rest at once. */
+  clear() {
+    this.spot = null
+    this.keep = false
+    this.stop()
+    this.render()
+  }
+
   /** The stroke drawn again (shown large now). */
   replay() {
     if (!this.spot) return
