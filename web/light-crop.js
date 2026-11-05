@@ -17,21 +17,41 @@ export class Cropper {
     this.source = source
     this.rect = null // {x, y, width, height} in the source's pixels; null: the whole picture
     this.blank = null // a note on black instead of the part (setBlank)
+    this.check = null // (frame, rect) => Promise<boolean>: is the part still what it was?
+    this.onMiss = null // called when it is not (or while it is black)
+    this.counts = { checked: 0, held: 0 } // (for share.html?debug and tests)
     this.size = { width: source.getSettings?.().width ?? 0, height: source.getSettings?.().height ?? 0 }
     this.full = { ...this.size }
     this.generator = new window.MediaStreamTrackGenerator({ kind: 'video' })
     const processor = new window.MediaStreamTrackProcessor({ track: source })
     const cut = new TransformStream({
-      transform: (frame, controller) => {
+      transform: async (frame, controller) => {
         const base = frame.visibleRect ?? { x: 0, y: 0, width: frame.displayWidth, height: frame.displayHeight }
         this.full = { width: base.width, height: base.height }
         const r = this.rect
         // the window is not to be seen: black, with a word why (nothing of what lies there now)
         if (r && this.blank) {
+          this.onMiss?.()
           const out = this.blankFrame(frame.timestamp)
           frame.close()
           if (out) controller.enqueue(out)
           return
+        }
+        // still there? (checked on every picture, not on a timer: those are slowed down while this
+        // page is in the background) Not: the picture is left out – viewers keep the last one –
+        // and the window looked for at once
+        if (r && this.check) {
+          let ok = true
+          try {
+            ok = await this.check(frame, r)
+          } catch {}
+          this.counts.checked++
+          if (!ok) {
+            this.counts.held++
+            frame.close()
+            this.onMiss?.()
+            return
+          }
         }
         if (!r) {
           this.size = { ...this.full }

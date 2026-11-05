@@ -226,6 +226,23 @@ function titleAt(grab, full, x, y, title, reach) {
   return top
 }
 
+/**
+ * How well a window's title bar (titleOf) matches in a picture, its top left at (ox, oy) of it, give
+ * or take a pixel: 0..1.
+ */
+export function titleScore(g, title, ox, oy) {
+  let best = -1
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const x = ox + dx
+      const y = oy + dy
+      if (x < 0 || y < 0 || x + title.tpl.width > g.width || y + title.tpl.height > g.height) continue
+      best = Math.max(best, tilesScore(g, title.tiles, x, y))
+    }
+  }
+  return best
+}
+
 // the title bar cut into squares; the plain ones (nothing to compare) left out
 function tilesOf(tpl) {
   const size = tpl.height

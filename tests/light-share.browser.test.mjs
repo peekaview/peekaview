@@ -349,6 +349,10 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     const picture = await evaluate('pvLight.lastReveal.capture.picture')
     for (const [k, v] of [['left', win.x], ['top', win.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(picture[k] - v) <= 3, `${k}: ${picture[k]} ≈ ${v}`)
 
+    // every picture is checked right in the video's way: while the window stays, none is held back
+    const still = await evaluate('pvLight.frames')
+    assert.ok(still.checked > 10 && still.held <= 2, JSON.stringify(still))
+
     // the window moved – and drawn on right away: the drawing appears where it is now
     const moved = { ...win, x: win.x - 160, y: win.y + 120 }
     await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; true`)
@@ -362,6 +366,8 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
     })
     const there = await evaluate('pvLight.lastReveal.capture.picture')
+    // (the move was noticed in the video's way: pictures held back until it was found)
+    assert.ok((await evaluate('pvLight.frames')).held > still.held, 'noticed on a picture')
     for (const [k, v] of [['left', moved.x], ['top', moved.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(there[k] - v) <= 3, `moved, ${k}: ${there[k]} ≈ ${v}`)
     // … and viewers still see the whole window, at the same size
     const after = await evaluate('pvLight.host.size')

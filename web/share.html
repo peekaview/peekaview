@@ -236,7 +236,7 @@
     import { detectWindows, trafficLights, windowOfLights } from './light-windows.js'
     import { readText, sameTitle, titleBar, words } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
-    import { follow, grabberOf, snapRect, titleOf } from './light-track.js'
+    import { follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -423,6 +423,13 @@
         screenStream = stream
         cropper = new Cropper(stream.getVideoTracks()[0])
         cropper.setRect(crop)
+        // every picture: is the window's title bar still where it was? Not: looked for at once
+        cropper.check = stillThere
+        cropper.onMiss = () => {
+          if (performance.now() - missAt < 250) return
+          missAt = performance.now()
+          track()
+        }
       }
       host = new LightHost({
         stream: cropper ? cropper.stream : stream,
@@ -1027,6 +1034,38 @@
     }
     setInterval(track, 350)
 
+    // The window's title bar in a picture of the screen, right in the video's way (light-crop.js):
+    // read from the frame itself (only that strip), compared with the one known.
+    let missAt = 0
+    async function stillThere(frame, r) {
+      const title = trackTitle
+      // (a plain title bar: nothing to compare – the timer's search has to do)
+      if (!title) return true
+      const base = frame.visibleRect ?? { x: 0, y: 0 }
+      const bx = r.x + title.band.x
+      const by = r.y + title.band.y
+      // (a little more around it, on even pixels: video formats keep colour for pairs of pixels)
+      const x = Math.max(0, Math.floor((bx - 2) / 2) * 2)
+      const y = Math.max(0, Math.floor((by - 2) / 2) * 2)
+      const width = Math.min(frame.displayWidth - x, Math.ceil((title.tpl.width + 6) / 2) * 2)
+      const height = Math.min(frame.displayHeight - y, Math.ceil((title.tpl.height + 6) / 2) * 2)
+      if (width < title.tpl.width || height < title.tpl.height) return false
+      const rect = { x: base.x + x, y: base.y + y, width, height }
+      const buffer = new Uint8Array(frame.allocationSize({ rect }))
+      const [plane] = await frame.copyTo(buffer, { rect })
+      const px = new Float32Array(width * height)
+      const rgb = /^(RGB|BGR)/.test(frame.format)
+      const red = frame.format?.startsWith('RGB') ? 0 : 2
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          const i = plane.offset + row * plane.stride
+          // the brightness: the first plane of NV12 / I420, else from red, green, blue
+          px[row * width + col] = rgb ? 0.299 * buffer[i + col * 4 + red] + 0.587 * buffer[i + col * 4 + 1] + 0.114 * buffer[i + col * 4 + 2 - red] : buffer[i + col]
+        }
+      }
+      return titleScore({ width, height, px }, title, bx - x, by - y) >= 0.7
+    }
+
     // The window's titles, read from its title bar (light-title.js): now and then while it stays,
     // and at once when its title bar changed. Gone from its place (moved, maximized, minimized and
     // back), the title bars on the screen are read and it is found again by a title it had.
@@ -1166,6 +1205,7 @@
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
+      get frames() { return cropper ? { ...cropper.counts } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),
