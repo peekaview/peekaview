@@ -14,7 +14,7 @@ const files = [
   'room-pcm-worklet.js',
   // "Bildschirmfreigabe light": sharing from the browser
   'share.html', 'share-helper.html', 'light-host.js', 'light-geometry.js', 'light-locate.js',
-  'light-capture.js', 'light-windows.js', 'light-crop.js', 'light-pick.js', 'light-track.js', 'light-title.js', 'light-pip.js', 'light-mini.js',
+  'light-capture.js', 'light-windows.js', 'light-crop.js', 'light-pick.js', 'light-track.js', 'light-title.js', 'light-pip.js', 'light-mini.js', 'light-help.js',
   'rooms.webmanifest', 'room-icon.png',
   'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'vendor/pdfjs/LICENSE',
 ]

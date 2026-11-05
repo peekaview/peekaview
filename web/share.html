@@ -42,7 +42,22 @@
     .connect { display: flex; align-items: center; justify-content: center; gap: 10px; height: 52px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
     .connect:hover:not(:disabled) { background: #dc2626; }
     .connect:disabled { opacity: .45; cursor: default; box-shadow: none; }
-    .start-figure { display: block; width: 100%; max-width: 440px; margin: -6px auto 0; font-family: ui-sans-serif, system-ui, sans-serif; }
+    /* beside the browser's dialog while it asks what to share (light-help.js) */
+    .screen-help { position: fixed; z-index: 60; box-sizing: border-box; width: 320px; max-width: calc(100vw - 32px); padding: 14px 14px 12px; border-radius: 16px; background: #fafafa; color: #18181b; box-shadow: 0 18px 50px rgba(0,0,0,.5); font-size: 13px; animation: in .2s ease-out; }
+    .screen-help[data-kind=firefox] { top: 12px; left: 430px; }
+    .screen-help[data-kind=chrome], .screen-help[data-kind=edge] { top: 12px; left: calc(50% + 340px); }
+    .screen-help-title { margin: 0 24px 10px 0; font-size: 14.5px; font-weight: 750; }
+    .screen-help-arrow { color: #ef4444; }
+    .screen-help-figure { display: block; width: 100%; height: auto; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .screen-help-steps { margin: 10px 0 0; padding-left: 20px; color: #27272a; line-height: 1.4; }
+    .screen-help-steps li + li { margin-top: 4px; }
+    .screen-help-note { margin: 8px 0 0; color: #52525b; font-size: 12px; }
+    .screen-help-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: #52525b; font-size: 20px; line-height: 1; cursor: pointer; }
+    .screen-help-close:hover { background: #e4e4e7; }
+    /* too narrow beside the dialog: below it, at the bottom */
+    @media (max-width: 779px) { .screen-help[data-kind=firefox] { top: auto; left: 16px; bottom: 16px; } }
+    @media (max-width: 1359px) { .screen-help[data-kind=chrome], .screen-help[data-kind=edge] { top: auto; left: auto; right: 16px; bottom: 16px; } .screen-help[data-kind=chrome] .screen-help-arrow, .screen-help[data-kind=edge] .screen-help-arrow { display: none; } }
+    @media (max-width: 779px), (max-height: 520px) { .screen-help-arrow { display: none; } }
     .hint { margin: -8px 0 0; color: #a1a1aa; font-size: 13px; text-align: center; }
     .live { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
     .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.25); animation: pulse 2s ease-in-out infinite; }
@@ -166,20 +181,10 @@
         <p class="mode-note" id="setup-mode-note" role="status"></p>
       </div>
       <button class="connect" id="start" type="button"></button>
-      <svg class="start-figure" id="start-figure" viewBox="0 0 440 120" role="img" aria-label="Im Fenster deines Browsers oben „Gesamter Bildschirm“ anklicken" hidden>
-        <rect x="1" y="1" width="438" height="118" rx="14" fill="#f4f4f5" stroke="#d4d4d8"/>
-        <text x="22" y="34" font-size="14" font-weight="600" fill="#18181b">Inhalte zum Teilen auswählen</text>
-        <text x="22" y="74" font-size="13" fill="#52525b">Chrome-Tab</text>
-        <text x="128" y="74" font-size="13" fill="#52525b">Fenster</text>
-        <text x="214" y="74" font-size="13" font-weight="700" fill="#18181b">Gesamter Bildschirm</text>
-        <rect x="210" y="82" width="140" height="3" rx="1.5" fill="#ef4444"/>
-        <path d="M392 104 L360 84" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
-        <path d="M358 94 L359 83 L369 86" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <text x="300" y="110" font-size="12" font-weight="700" fill="#ef4444">hier klicken</text>
-      </svg>
       <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
       <p class="error" id="start-error" role="alert" hidden></p>
     </section>
+    <aside class="screen-help" id="screen-help" role="note" aria-label="So teilst du deinen Bildschirm" hidden></aside>
 
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
@@ -313,6 +318,7 @@
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
     import { MiniView } from './light-mini.js'
+    import { showScreenHelp } from './light-help.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -414,8 +420,6 @@
 
     // ---------------------------------------------------------------- start
     const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
-    // (Chrome, Edge: which tab of their dialog, drawn)
-    $('start-figure').toggleAttribute('hidden', !cropSupported || panel)
     if (cropSupported) $('start-hint').textContent = 'Dein Browser fragt gleich, was du teilen möchtest: Wähle „Gesamter Bildschirm“. Danach suchst du hier aus, welches Fenster deine Zuschauer sehen.'
     if (!supported) {
       $('start').disabled = true
@@ -449,6 +453,7 @@
     function start() {
       if (panel || !supported || !nameOrAsk()) return startHere()
       const picking = askScreen()
+      helpWhile(picking)
       picking.catch(() => {})
       window.pvLightPicking = picking
       const width = PANEL_WIDTH
@@ -470,6 +475,11 @@
       document.title = '● Freigabe läuft – PeekaView light'
     }
 
+    // beside the browser's dialog, while it asks: where to click (light-help.js)
+    function helpWhile(picking) {
+      const hide = showScreenHelp($('screen-help'))
+      picking.then(hide, hide)
+    }
     function askScreen() {
       try {
         return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, displaySurface: 'monitor' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
@@ -501,6 +511,7 @@
         // (the browser's screen picker shows inside this window: room for it)
         roomy()
         picking = askScreen()
+        if (!panel) helpWhile(picking)
       }
       // the helper: waits in the corner and comes to each drawing by itself – the small window is
       // that helper itself
