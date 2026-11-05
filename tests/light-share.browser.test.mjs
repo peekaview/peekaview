@@ -340,7 +340,8 @@ test('the whole screen shared, one window of it picked (as in Chrome): viewers g
     await evaluate('document.hasFocus = () => false; true')
     await new Promise((done) => setTimeout(done, 900))
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
-    await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Klicke auf das Fenster')")
+    // the window just worked in is recognized by its title bar's buttons, and picked right away
+    await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
     // a click into the window picks it
     const box = await evaluate("(()=>{const r=document.querySelector('#pick-view').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
     const sw = await evaluate('screen.width')

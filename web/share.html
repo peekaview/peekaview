@@ -214,7 +214,8 @@
     import { LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { Cropper, cropSupported } from './light-crop.js'
-    import { scaledGray } from './light-locate.js'
+    import { grayFrom, scaledGray } from './light-locate.js'
+    import { trafficLights, windowOfLights } from './light-windows.js'
     import { WindowPicker } from './light-pick.js'
     import { follow, grabberOf, snapRect, titleOf } from './light-track.js'
     import { MiniWindow, documentPip, videoPip } from './light-pip.js'
@@ -865,7 +866,7 @@
 
     function backInFront() {
       if ($('pick').hidden || !away) return
-      picker.setImage(away)
+      picker.setImage(away, { active: true })
       away = null
       sawAway = true
       renderPick()
@@ -875,9 +876,11 @@
 
     function renderPick() {
       if (!picker) return
-      $('pick-lead').textContent = sawAway
-        ? 'Klicke auf das Fenster, das du zeigen willst. Wird es nicht erkannt, zieh mit der Maus einen Rahmen darum.'
-        : 'Wechsle kurz zu dem Fenster, das du zeigen willst, und komm dann hierher zurück – dann siehst du es hier und klickst es an. Oder zieh mit der Maus einen Rahmen auf.'
+      $('pick-lead').textContent = picker.auto
+        ? 'Erkannt: das Fenster, in dem du gerade warst (rot umrandet). Passt es, klicke unten auf „Dieses Fenster zeigen“ – sonst klicke ein anderes an.'
+        : sawAway
+          ? 'Klicke auf das Fenster, das du zeigen willst. Wird es nicht erkannt, zieh mit der Maus einen Rahmen darum.'
+          : 'Wechsle kurz zu dem Fenster, das du zeigen willst, und komm dann hierher zurück – dann siehst du es hier und klickst es an. Oder zieh mit der Maus einen Rahmen auf.'
       $('pick-ok').disabled = !picker.selection
       $('pick-ok').textContent = picker.selection?.drawn ? 'Diesen Ausschnitt zeigen' : 'Dieses Fenster zeigen'
     }
@@ -894,7 +897,8 @@
       // the window's real edges, its title bar and picture to follow it by: from the picture in which
       // it could be seen (a part drawn by hand stays as drawn)
       const seen = rect && image && image.width === f.width ? grabberOf(image) : null
-      if (seen && !selection.drawn) Object.assign(rect, snapRect(seen, rect, f))
+      // (one found by its title bar is exact already)
+      if (seen && !selection.drawn && !selection.titled) Object.assign(rect, snapRect(seen, rect, f))
       trackTitle = seen ? titleOf(seen, rect, f.width / screen.width) : null
       trackImage = seen ? cropCanvas(image, rect) : null
       trackMisses = 0
@@ -942,7 +946,19 @@
       const before = trackImage ?? cropCanvas(full, r)
       const scratch = document.createElement('canvas')
       const t0 = performance.now()
-      let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch) })
+      // (the window being dragged is the active one: its coloured buttons say where it is)
+      const places = () => {
+        const ctx = scratch.getContext('2d', { willReadFrequently: true })
+        scratch.width = full.width
+        scratch.height = full.height
+        ctx.drawImage(full, 0, 0)
+        const data = ctx.getImageData(0, 0, full.width, full.height)
+        const lights = trafficLights(data)
+        if (!lights.length) return []
+        const g = grayFrom(data)
+        return lights.map((l) => windowOfLights(g, l)).filter((w) => w && Math.abs(w.width - r.width) <= 6 && Math.abs(w.height - r.height) <= 6)
+      }
+      let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch), places })
       // (this page in front may well cover the window: a frame alone does not count then)
       const front = inFront()
       if (found && front && found.by === 'frame' && found.how !== 'same') found = null

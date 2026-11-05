@@ -293,6 +293,7 @@ The viewer site opens with a small start page:
 
 **Picking a window from the whole screen** (Chrome, Edge).
 - The presenter shares the whole screen. The share page then shows a picture of it with the windows found outlined (`light-windows.js`: long straight edges joined at corners, each rectangle scored by how much of its four sides are edges). A click picks a window; clicking again on the same spot picks the next smaller one, and a drag draws a part by hand.
+- The window the presenter just worked in is recognized for sure by the coloured buttons of its title bar (red, yellow, green; `trafficLights`), its top and left borders followed from there (`windowOfLights`), and picked right away. A click prefers windows with a title bar over frames.
 - The picture comes from a moment the share page was in the background: in front, it would cover the windows. The page asks to switch to the window and back once.
 - Viewers get only that part. It is cut out of each frame right here, before encoding (`light-crop.js`: MediaStreamTrackProcessor, a `VideoFrame` with a smaller visible rectangle, MediaStreamTrackGenerator). That needs no timers, so it keeps going in a background tab. Whatever lies over the window is part of the picture, and the page says so.
 - The part's place is known, so drawings land on it without any search. "Anderes Fenster wählen" changes it while sharing (or the whole screen).

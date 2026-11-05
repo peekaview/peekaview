@@ -104,3 +104,153 @@ export function detectWindows(g) {
 export function windowsAt(windows, p) {
   return windows.filter((r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h)
 }
+
+// ---------------------------------------------------------------- by the title bar's buttons
+// A macOS window's title bar starts with three round buttons – red, yellow, green, about 20 points
+// apart – in colour on the active window (the one the presenter just worked in). Found in the
+// screen's picture at full size, they give a window's top left corner for sure; its top and left
+// borders, followed from there, give its width and height.
+
+const T_FULL = 8 // brightness jump that counts as a border, at full size
+
+/**
+ * The three coloured buttons on a screen's picture (RGBA at full size).
+ * @returns {{x, y, gap}[]} the red button's centre and the distance between two buttons (pixels)
+ */
+export function trafficLights({ width: W, height: H, data }) {
+  const kind = new Uint8Array(W * H)
+  for (let i = 0, j = 0; i < kind.length; i++, j += 4) {
+    const r = data[j]
+    const g = data[j + 1]
+    const b = data[j + 2]
+    if (r > 190 && g > 50 && g < 140 && b > 40 && b < 135 && r - g > 90) kind[i] = 1
+    else if (r > 200 && g > 140 && g < 225 && b < 110 && r - b > 110) kind[i] = 2
+    else if (g > 150 && r < 120 && b < 130 && g - r > 60) kind[i] = 3
+  }
+  // round blobs of one colour, 8 to 30 pixels across
+  const blobs = [[], [], [], []]
+  const seen = new Uint8Array(W * H)
+  const stack = []
+  for (let i = 0; i < kind.length; i++) {
+    if (!kind[i] || seen[i]) continue
+    const k = kind[i]
+    let n = 0
+    let x0 = W
+    let x1 = 0
+    let y0 = H
+    let y1 = 0
+    let sx = 0
+    let sy = 0
+    stack.push(i)
+    seen[i] = 1
+    while (stack.length) {
+      const p = stack.pop()
+      const x = p % W
+      const y = (p - x) / W
+      n++
+      sx += x
+      sy += y
+      if (x < x0) x0 = x
+      if (x > x1) x1 = x
+      if (y < y0) y0 = y
+      if (y > y1) y1 = y
+      if (n > 1200) continue // far too large: not a button (keep marking it seen)
+      for (const q of [p - 1, p + 1, p - W, p + W]) {
+        if (q < 0 || q >= kind.length || seen[q] || kind[q] !== k) continue
+        if ((q === p - 1 && x === 0) || (q === p + 1 && x === W - 1)) continue
+        seen[q] = 1
+        stack.push(q)
+      }
+    }
+    const w = x1 - x0 + 1
+    const h = y1 - y0 + 1
+    // (a symbol inside on hover leaves less of it coloured)
+    if (n <= 1200 && w >= 8 && w <= 30 && Math.abs(w - h) <= Math.max(2, w * 0.25) && n >= w * h * 0.45) blobs[k].push({ x: sx / n, y: sy / n, d: w })
+  }
+  const lights = []
+  for (const red of blobs[1]) {
+    const yellow = blobs[2].find((b) => Math.abs(b.y - red.y) <= 2 + red.d * 0.15 && b.x - red.x > red.d * 1.2 && b.x - red.x < red.d * 2.6)
+    if (!yellow) continue
+    const gap = yellow.x - red.x
+    const green = blobs[3].find((b) => Math.abs(b.y - red.y) <= 2 + red.d * 0.15 && Math.abs(b.x - yellow.x - gap) <= 2 + gap * 0.15)
+    if (green) lights.push({ x: red.x, y: red.y, gap: (green.x - red.x) / 2 })
+  }
+  return lights
+}
+
+/**
+ * The window whose title bar starts with these buttons: its top and left borders followed from
+ * there (pixels, on the picture at full size).
+ * @param {{width, height, px}} g the screen's picture in grayscale, full size
+ */
+export function windowOfLights(g, light) {
+  const { width: W, height: H, px } = g
+  const at = (x, y) => px[y * W + x]
+  const hEdge = (x, y) => (x >= 0 && x < W && y > 0 && y < H ? Math.abs(at(x, y) - at(x, y - 1)) : 0)
+  const vEdge = (x, y) => (x > 0 && x < W && y >= 0 && y < H ? Math.abs(at(x, y) - at(x - 1, y)) : 0)
+  const gap = Math.max(4, Math.round(light.gap * 0.2))
+  // a border followed from a point, along a row or a column (±1 pixel), as long as it goes on
+  const runRight = (y, x) => {
+    let end = x
+    for (let miss = 0; x < W && miss <= gap; x++) {
+      if (hEdge(x, y) > T_FULL || hEdge(x, y - 1) > T_FULL || hEdge(x, y + 1) > T_FULL) {
+        end = x
+        miss = 0
+      } else miss++
+    }
+    return end
+  }
+  const runDown = (x, y) => {
+    let end = y
+    for (let miss = 0; y < H && miss <= gap; y++) {
+      if (vEdge(x, y) > T_FULL || vEdge(x - 1, y) > T_FULL || vEdge(x + 1, y) > T_FULL) {
+        end = y
+        miss = 0
+      } else miss++
+    }
+    return end
+  }
+  const cx = Math.round(light.x)
+  const cy = Math.round(light.y)
+  // the top border: the nearest row above the buttons with a long border to the right (further up
+  // there may be other lines: the wallpaper, another window); then the strongest of it and its
+  // neighbours (the run allows ±1)
+  let top = null
+  for (let y = Math.round(cy - light.gap * 0.4); y >= Math.max(1, cy - light.gap * 2.4); y--) {
+    const end = runRight(y, cx)
+    if (end - cx >= light.gap * 4) {
+      top = { y, end }
+      break
+    }
+  }
+  // the left border: the nearest column left of the buttons with a long border downwards
+  let left = null
+  for (let x = Math.round(cx - light.gap * 0.3); x >= Math.max(1, cx - light.gap * 2); x--) {
+    const end = runDown(x, cy)
+    if (end - cy >= light.gap * 3) {
+      left = { x, end }
+      break
+    }
+  }
+  if (!top || !left) return null
+  const along = (n, a, b) => Array.from({ length: n }, (_, i) => Math.round(a + ((b - a) * (i + 0.5)) / n))
+  const rowStrength = (y) => along(32, cx, top.end).reduce((s, x) => s + hEdge(x, y), 0)
+  const colStrength = (x) => along(32, cy, left.end).reduce((s, y) => s + vEdge(x, y), 0)
+  top.y = [top.y - 1, top.y, top.y + 1].sort((a, b) => rowStrength(b) - rowStrength(a))[0]
+  left.x = [left.x - 1, left.x, left.x + 1].sort((a, b) => colStrength(b) - colStrength(a))[0]
+  // the rounded corners at the other end: the right and bottom borders themselves, nearby
+  const reach = Math.round(light.gap * 0.8)
+  const strongest = (from, edge, along) => {
+    let best = { at: from, s: -1 }
+    for (let v = from - 2; v <= from + reach; v++) {
+      let s = 0
+      for (const a of along) s += edge(v, a)
+      if (s > best.s) best = { at: v, s }
+    }
+    return best.at
+  }
+  const rows = (y0, y1) => Array.from({ length: 24 }, (_, i) => Math.round(y0 + ((y1 - y0) * (i + 0.5)) / 24))
+  const right = strongest(top.end + 1, (x, y) => vEdge(x, y), rows(cy, left.end))
+  const bottom = strongest(left.end + 1, (y, x) => hEdge(x, y), rows(left.x + light.gap, top.end))
+  return { x: left.x, y: top.y, width: right - left.x, height: bottom - top.y }
+}

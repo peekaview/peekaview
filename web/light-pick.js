@@ -1,10 +1,11 @@
 // "Bildschirmfreigabe light": picking the window to show from a picture of the whole screen.
-// The windows found (light-windows.js) are outlined; a click picks the window under it (again on
-// the same spot: the next smaller one – a panel inside, a dialog over it), a drag draws a part by
-// hand. Everything outside the picked part is darkened: that is what viewers will not see.
+// The windows found (light-windows.js) are outlined: for sure the active one, by the coloured
+// buttons of its title bar (picked right away), less sure others by their frames. A click picks the
+// window under it (one with a title bar first; again on the same spot: the next one), a drag draws
+// a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
 
-import { scaledGray } from './light-locate.js'
-import { detectWindows, windowsAt } from './light-windows.js'
+import { grayFrom, scaledGray } from './light-locate.js'
+import { detectWindows, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
 
 const DETECT_WIDTH = 640
 const MIN_DRAG = 6 // CSS px before a press becomes a drag
@@ -32,14 +33,25 @@ export class WindowPicker {
   }
 
   /** A new picture of the screen: windows looked for again; a picked window stays picked. */
-  setImage(image) {
+  /** @param {{active?: boolean}} [options] active: taken while the presenter was in another program */
+  setImage(image, { active = false } = {}) {
     this.image = image
     const h = Math.max(1, Math.round((image.height * DETECT_WIDTH) / image.width))
-    this.windows = detectWindows(scaledGray(image, DETECT_WIDTH, h))
+    const frames = detectWindows(scaledGray(image, DETECT_WIDTH, h))
+    const titled = titledWindows(image)
+    const same = (a, b) => Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.w - b.w) < 0.015 && Math.abs(a.h - b.h) < 0.015
+    this.windows = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))]
+    // the window the presenter just worked in (not this browser): picked right away – unless they
+    // picked one themselves
+    if (active && titled.length && (!this.selection || this.auto)) {
+      this.select(titled[0])
+      this.auto = true
+    }
     this.render()
   }
 
   select(rect) {
+    this.auto = false
     this.selection = rect
     this.render()
     this.onChange(rect)
@@ -67,7 +79,7 @@ export class WindowPicker {
       if (this.drag.to || Math.hypot(p.cx - this.drag.from.cx, p.cy - this.drag.from.cy) > MIN_DRAG) this.drag.to = p
       return this.render()
     }
-    const under = windowsAt(this.windows, p)
+    const under = windowsAt(this.windows, p).sort((a, b) => (b.titled ? 1 : 0) - (a.titled ? 1 : 0) || b.w * b.h - a.w * a.h)
     const hover = under[0] ?? null
     if (hover !== this.hover) {
       this.hover = hover
@@ -91,7 +103,8 @@ export class WindowPicker {
       return
     }
     // a click: the window under it – on the same spot again, the next smaller one
-    const under = windowsAt(this.windows, p)
+    // (windows with a title bar first, the largest first)
+    const under = windowsAt(this.windows, p).sort((a, b) => (b.titled ? 1 : 0) - (a.titled ? 1 : 0) || b.w * b.h - a.w * a.h)
     if (!under.length) return this.render()
     const again = this.lastClick && Math.hypot(p.cx - this.lastClick.cx, p.cy - this.lastClick.cy) < 8
     const i = again ? under.indexOf(this.selection) : -1
@@ -146,4 +159,21 @@ export class WindowPicker {
 
 function dragRect({ from, to }) {
   return { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) }
+}
+
+/** Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`). */
+function titledWindows(image) {
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(image, 0, 0)
+  const data = ctx.getImageData(0, 0, image.width, image.height)
+  const lights = trafficLights(data)
+  if (!lights.length) return []
+  const g = grayFrom(data)
+  return lights
+    .map((l) => windowOfLights(g, l))
+    .filter(Boolean)
+    .map((r) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true }))
 }

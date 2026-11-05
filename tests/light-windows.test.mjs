@@ -79,3 +79,72 @@ test('a dark window on a dark desktop, and no window at all', () => {
   assert.ok(detectWindows(img).some((f) => close(f, dark)), 'dark window')
   assert.deepEqual(detectWindows(desktop(7)), [], 'only the wallpaper')
 })
+
+// ---------------------------------------------------------------- by the title bar's buttons
+import { grayFrom } from '../web/light-locate.js'
+import { trafficLights, windowOfLights } from '../web/light-windows.js'
+
+// a screen in colour (RGBA): wallpaper, windows with rounded corners, shadow, title bar and buttons
+function colourScreen(windows, { width = 1600, height = 1000 } = {}) {
+  const data = new Uint8ClampedArray(width * height * 4)
+  const put = (x, y, [r, g, b]) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return
+    const i = (y * width + x) * 4
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
+    data[i + 3] = 255
+  }
+  const get = (x, y) => {
+    const i = (y * width + x) * 4
+    return [data[i], data[i + 1], data[i + 2]]
+  }
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) put(x, y, [40 + (x / width) * 60, 80 + (y / height) * 50, 140])
+  for (const w of windows) {
+    const R = 10
+    const inside = (x, y) => {
+      const dx = Math.max(w.x + R - x, 0, x - (w.x + w.w - 1 - R))
+      const dy = Math.max(w.y + R - y, 0, y - (w.y + w.h - 1 - R))
+      return dx * dx + dy * dy <= R * R
+    }
+    // the shadow: darker within 8 px around
+    for (let y = w.y - 8; y < w.y + w.h + 12; y++) {
+      for (let x = w.x - 8; x < w.x + w.w + 8; x++) {
+        if (x < 0 || y < 0 || x >= width || y >= height || inside(x, y)) continue
+        const d = Math.min(Math.abs(x - w.x), Math.abs(x - (w.x + w.w)), Math.abs(y - w.y), Math.abs(y - (w.y + w.h)))
+        put(x, y, get(x, y).map((v) => v * (0.6 + Math.min(8, d) * 0.04)))
+      }
+    }
+    const bar = w.toolbar ? 52 : 28
+    for (let y = w.y; y < w.y + w.h; y++) {
+      for (let x = w.x; x < w.x + w.w; x++) {
+        if (!inside(x, y)) continue
+        const content = (x * 7 + y * 13) % 97 < 3 ? [60, 60, 60] : [252, 252, 252]
+        put(x, y, y < w.y + bar ? (w.active ? [232, 232, 232] : [244, 244, 244]) : content)
+      }
+    }
+    // the buttons, 12 px across, 20 px apart
+    const colours = w.active ? [[255, 95, 87], [254, 188, 46], [40, 200, 64]] : [[206, 206, 206], [206, 206, 206], [206, 206, 206]]
+    colours.forEach((c, i) => {
+      const cx = w.x + (w.toolbar ? 20 : 14) + i * 20
+      const cy = w.y + bar / 2
+      for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) if (x * x + y * y <= 36) put(cx + x, cy + y, c)
+    })
+  }
+  return { width, height, data }
+}
+
+test('the active window is found by its coloured buttons, to the pixel – not the one behind it', () => {
+  const behind = { x: 120, y: 90, w: 900, h: 640 }
+  const front = { x: 520, y: 260, w: 860, h: 620, active: true, toolbar: true }
+  const img = colourScreen([behind, front])
+  const lights = trafficLights(img)
+  assert.equal(lights.length, 1, JSON.stringify(lights))
+  const r = windowOfLights(grayFrom(img), lights[0])
+  assert.ok(r && Math.abs(r.x - front.x) <= 1 && Math.abs(r.y - front.y) <= 1 && Math.abs(r.width - front.w) <= 2 && Math.abs(r.height - front.h) <= 2, JSON.stringify(r))
+  // a plain title bar (28 points), too
+  const plain = { x: 200, y: 150, w: 700, h: 500, active: true }
+  const img2 = colourScreen([plain])
+  const r2 = windowOfLights(grayFrom(img2), trafficLights(img2)[0])
+  assert.ok(r2 && Math.abs(r2.x - plain.x) <= 1 && Math.abs(r2.y - plain.y) <= 1 && Math.abs(r2.width - plain.w) <= 2 && Math.abs(r2.height - plain.h) <= 2, JSON.stringify(r2))
+})

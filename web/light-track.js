@@ -86,11 +86,12 @@ export function snapRect(grab, rect, full, reach = 10) {
  * @param {Grab} grab the screen now
  * @param {{width, height}} full the screen's size (pixels)
  * @param {{x, y, width, height}} rect the window's last place (pixels)
- * @param {{title: object|null, windowAt: (w, h) => {width, height, px}}} known its title bar (titleOf),
- *   and its last picture scaled to w × h
+ * @param {{title: object|null, windowAt: (w, h) => {width, height, px}, places?: () => {x, y}[]}} known
+ *   its title bar (titleOf), its last picture scaled to w × h, and more places it may be at now (asked
+ *   for only when it is not where it was: windows found by their title bar buttons)
  * @returns {{rect, how: 'same' | 'moved' | 'frame', score: number, by: 'title' | 'picture' | 'frame'} | null}
  */
-export function follow(grab, full, rect, { title, windowAt }) {
+export function follow(grab, full, rect, { title, windowAt, places = () => [] }) {
   const fits = (x, y) => x >= 0 && y >= 0 && x + rect.width <= full.width && y + rect.height <= full.height
   const result = (x, y, score, by) => ({ rect: { ...rect, x, y }, how: x === rect.x && y === rect.y ? 'same' : 'moved', score, by })
 
@@ -139,6 +140,7 @@ export function follow(grab, full, rect, { title, windowAt }) {
   const candidates = frames
     .filter((r) => Math.abs(r.width - rect.width) < rect.width * 0.04 + 8 && Math.abs(r.height - rect.height) < rect.height * 0.04 + 8)
     .map((r) => ({ x: r.x, y: r.y, reach: 8 }))
+  for (const p of places()) candidates.unshift({ x: p.x, y: p.y, reach: 3 })
   const coarse = bestTiled(screen, win)
   if (coarse.score > 0.3) candidates.push({ x: (coarse.x - win.ox) * k, y: (coarse.y - win.oy) * k, reach: Math.ceil(k) + 2, picture: coarse.score })
 
