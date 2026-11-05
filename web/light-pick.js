@@ -59,6 +59,16 @@ export class WindowPicker {
       const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
       return (ix * iy) / (a.w * a.h + b.w * b.h - ix * iy)
     }
+    // (one window, found as several frames – its buttons the same: the largest)
+    for (let i = 0; i < frames.length; i++) {
+      const a = frames[i]
+      if (!a.line) continue
+      for (let j = 0; j < frames.length; j++) {
+        const b = frames[j]
+        if (i !== j && b.line && Math.abs(a.line.y - b.line.y) < 3 && Math.abs(a.line.x0 - b.line.x0) < 3 && b.w * b.h > a.w * a.h) a.dupe = true
+      }
+    }
+    frames.splice(0, frames.length, ...frames.filter((f) => !f.dupe))
     const previous = this.selection
     this.windows = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))].filter((w) => !own || overlap(w, own) < 0.6)
     // the picked window again among the new ones (the picture is fetched anew now and then)

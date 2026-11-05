@@ -266,11 +266,18 @@ export function windowOfLights(g, light) {
  * @returns {{x, y, gap, score} | null} x: the first button's centre, y: their centre line
  */
 export function titleButtons(g, rect, scale = 1) {
-  // (sizes differ between macOS versions: newer ones draw them larger, further apart)
+  // (sizes differ between macOS versions – newer ones draw them larger, further apart, as rings –
+  // and the pixels per point may not be known for sure: several sizes, around the expected one)
   let top = null
-  for (const [d, gap] of [[12, 20], [14, 22], [16, 24]]) {
-    const b = buttonsOfSize(g, rect, d * scale, gap * scale, scale)
-    if (b && (!top || b.score > top.score)) top = b
+  const seen = new Set()
+  for (const k of [scale, 1, 2]) {
+    for (const [d, gap] of [[12, 20], [14, 22], [15, 24]]) {
+      const key = `${Math.round(d * k)},${Math.round(gap * k)}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const b = buttonsOfSize(g, rect, d * k, gap * k, k)
+      if (b && (!top || b.score > top.score)) top = { ...b, k }
+    }
   }
   return top && top.score >= 0.6 ? top : null
 }
@@ -278,28 +285,33 @@ export function titleButtons(g, rect, scale = 1) {
 function buttonsOfSize(g, rect, d, gap, scale) {
   const tw = Math.round(2 * gap + d + 4 * scale)
   const th = Math.round(d + 4 * scale)
-  // the three discs on the bar, as a template without its mean
-  const tpl = new Float32Array(tw * th)
+  // the three buttons on the bar, as templates without their mean: filled discs, and rings (a
+  // darker edge around a light fill, as newer macOS draws inactive ones)
   const r = d / 2
-  for (let y = 0; y < th; y++) {
-    for (let x = 0; x < tw; x++) {
-      let v = 0
-      for (let i = 0; i < 3; i++) {
-        const dx = x + 0.5 - (2 * scale + r + i * gap)
-        const dy = y + 0.5 - th / 2
-        v = Math.max(v, Math.min(1, Math.max(0, r + 0.5 - Math.hypot(dx, dy))))
+  const template = (ring) => {
+    const tpl = new Float32Array(tw * th)
+    for (let y = 0; y < th; y++) {
+      for (let x = 0; x < tw; x++) {
+        let v = 0
+        for (let i = 0; i < 3; i++) {
+          const dist = Math.hypot(x + 0.5 - (2 * scale + r + i * gap), y + 0.5 - th / 2)
+          v = Math.max(v, ring ? Math.max(0, 1 - Math.abs(dist - r + 0.5)) : Math.min(1, Math.max(0, r + 0.5 - dist)))
+        }
+        tpl[y * tw + x] = v
       }
-      tpl[y * tw + x] = v
     }
+    let mean = 0
+    for (const v of tpl) mean += v
+    mean /= tpl.length
+    let vt = 0
+    for (let i = 0; i < tpl.length; i++) {
+      tpl[i] -= mean
+      vt += tpl[i] * tpl[i]
+    }
+    return { tpl, vt }
   }
-  let mean = 0
-  for (const v of tpl) mean += v
-  mean /= tpl.length
-  let vt = 0
-  for (let i = 0; i < tpl.length; i++) {
-    tpl[i] -= mean
-    vt += tpl[i] * tpl[i]
-  }
+  const disc = template(false)
+  const ring = template(true)
   const { width: W, height: H, px } = g
   const x0 = Math.max(0, Math.round(rect.x + 2 * scale))
   const x1 = Math.min(W - tw, Math.round(rect.x + 30 * scale))
@@ -311,7 +323,8 @@ function buttonsOfSize(g, rect, d, gap, scale) {
     for (let x = x0; x <= x1; x++) {
       let s = 0
       let ss = 0
-      let cov = 0
+      let c1 = 0
+      let c2 = 0
       for (let ty = 0; ty < th; ty++) {
         let i = (y + ty) * W + x
         let k = ty * tw
@@ -319,13 +332,14 @@ function buttonsOfSize(g, rect, d, gap, scale) {
           const v = px[i]
           s += v
           ss += v * v
-          cov += v * tpl[k]
+          c1 += v * disc.tpl[k]
+          c2 += v * ring.tpl[k]
         }
       }
       const vi = ss - (s * s) / n
       // (a plain bar: nothing round on it)
-      if (vi < n * 4) continue
-      const score = Math.abs(cov) / Math.sqrt(vi * vt)
+      if (vi < n * 2) continue
+      const score = Math.max(Math.abs(c1) / Math.sqrt(vi * disc.vt), Math.abs(c2) / Math.sqrt(vi * ring.vt))
       if (!top || score > top.score) top = { x: x + 2 * scale + r, y: y + th / 2, gap, score }
     }
   }
@@ -405,12 +419,13 @@ export function closeButton(g, rect, scale = 1) {
 export function titleLine(g, rect, scale = 1, platform = 'mac') {
   // (the Mac's buttons first, wherever: a Mac shared from another computer's browser looks the same)
   const b = titleButtons(g, rect, scale)
-  if (b) return { y: b.y, x0: b.x + 2 * b.gap + 14 * scale, x1: rect.x + rect.width - 12 * scale }
+  // (measured by the buttons themselves: their size says the pixels per point)
+  if (b) return { y: b.y, x0: b.x + 2.7 * b.gap, x1: rect.x + rect.width - 0.6 * b.gap, k: b.gap / 20 }
   const c = closeButton(g, rect, scale)
   if (!c) return null
   // (Windows: minimize and maximize, 46 points each, left of it)
   const buttons = platform === 'windows' ? 2 * 46 * scale + 24 * scale : 3 * 26 * scale
-  return { y: c.y, x0: rect.x + 8 * scale, x1: c.x - buttons }
+  return { y: c.y, x0: rect.x + 8 * scale, x1: c.x - buttons, k: scale }
 }
 
 /** The platform as the browser says (for titleLine). */

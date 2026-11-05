@@ -1015,7 +1015,7 @@
         farbige_knoepfe: windows.filter((w) => w.titled).length,
         mit_titelleiste: windows.filter((w) => w.line).length,
         liste: pickCandidates().length,
-        titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text}`),
+        titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text} @${t.line ?? '-'}`),
       }, null, 1)
     }
 
@@ -1284,8 +1284,14 @@
       pickReading = true
       try {
         const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
-        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width, next.line))
-        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence), confidence: Math.round(confidence) })
+        const scale = image.width / screen.width
+        let { text, confidence } = await readLine(titleBar(image, rect, scale, next.line))
+        // (no title there: the whole top of the window, once more)
+        if (!readable(text, confidence)) {
+          const again = await readLine(titleBar(image, rect, next.line?.k ?? scale))
+          if (readable(again.text, again.confidence)) ({ text, confidence } = again)
+        }
+        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence), confidence: Math.round(confidence), line: next.line && [next.line.y, next.line.x0, next.line.x1].map(Math.round) })
       } catch (err) {
         // (not to be read: no titles in the list)
         console.info('peekaview light: titles not read', err?.message ?? err)

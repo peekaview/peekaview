@@ -64,8 +64,9 @@ export function readable(text, confidence = 100) {
  */
 export function titleBar(source, rect, scale = 1, line = null) {
   if (line) {
+    const k = line.k ?? scale
     const x = Math.round(line.x0)
-    return strip(source, { x, y: Math.round(line.y - 11 * scale), width: Math.max(16, Math.round(line.x1 - x)), height: Math.round(22 * scale) }, scale)
+    return strip(source, { x, y: Math.round(line.y - 11 * k), width: Math.max(16, Math.round(line.x1 - x)), height: Math.round(22 * k) }, k)
   }
   const x = rect.x + Math.round(SIDE * scale)
   const width = Math.max(16, rect.width - Math.round(SIDE * scale) - Math.round(12 * scale))
