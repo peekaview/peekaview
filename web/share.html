@@ -507,7 +507,7 @@
       picking.then((stream) => {
         const surface = surfaceOf(stream.getVideoTracks()[0])
         // the whole screen: pick the window to show from it (where the browser can cut it out)
-        if (cropSupported && surface === 'monitor') return toSharedScreen(stream).then(() => showPick(stream, name))
+        if (cropSupported && surface === 'monitor') return showPick(stream, name)
         // a single window or tab: not taken – the window is picked here, from the whole screen
         // (only so drawings land where it is, and it is followed when moved)
         if (cropSupported) {
@@ -528,107 +528,12 @@
       })
     }
 
-    // The small window on the screen that is shared: all places on the screen are reckoned from the
-    // screen it is on (browsers tell nothing of the others). So it shows a mark for a moment and looks
-    // for it in the shared picture – not there: it asks Chrome for the screens, else to be dragged there.
-    async function toSharedScreen(stream) {
-      if (!panel || window.qaSkipScreenSearch) return
-      if ($('src-video').srcObject !== stream) {
-        $('src-video').srcObject = stream
-        $('src-video').play().catch(() => {})
-      }
-      const log = (step) => params.has('debug') && qaLog({ suche: step, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
-      if (await markSeen(stream)) return log('gefunden, hier')
-      log('nicht hier')
-      // Chrome, Edge: a window goes to another screen only with the permission to manage windows –
-      // asked for here; with it the screens are known: the one as large as the shared picture
-      const track = stream.getVideoTracks()[0]
-      const size = track?.getSettings?.() ?? {}
-      if (typeof window.getScreenDetails === 'function') {
-        try {
-          const details = await window.getScreenDetails()
-          const others = details.screens.filter((d) => d !== details.currentScreen)
-          const match = others.find((d) => Math.abs(d.width * d.devicePixelRatio - size.width) < 8 && Math.abs(d.height * d.devicePixelRatio - size.height) < 8) ?? (others.length === 1 ? others[0] : null)
-          log(`Bildschirme: ${details.screens.length}, passend: ${!!match}`)
-          if (match) {
-            window.moveTo(match.availLeft + match.availWidth - window.outerWidth - 16, match.availTop + match.availHeight - window.outerHeight - 16)
-            await new Promise((done) => setTimeout(done, 350))
-            if (await markSeen(stream)) return log('gefunden, nach Fensterverwaltung')
-          }
-        } catch (err) {
-          log(`keine Fensterverwaltung: ${err?.message ?? err}`)
-        }
-      }
-      // else (Firefox; Chrome without that permission): a web page cannot move its window to another
-      // screen – the presenter drags it there. The mark stays meanwhile and is looked for again and again.
-      log('zum Hinziehen aufgefordert')
-      const mark = showMark('Zieh dieses kleine Fenster auf den Bildschirm, den du teilst.')
-      const skip = Object.assign(document.createElement('button'), { type: 'button', id: 'screen-skip', className: 'text-button', textContent: 'Weiter, ohne es zu verschieben' })
-      skip.style.cssText = 'color:#000;text-decoration:underline'
-      mark.append(skip)
-      try {
-        await new Promise((done) => {
-          let busy = false
-          const timer = setInterval(async () => {
-            if (busy) return
-            busy = true
-            try {
-              if (await seenIn(stream)) {
-                clearInterval(timer)
-                log('gefunden nach Hinziehen')
-                done()
-              }
-            } finally {
-              busy = false
-            }
-          }, 600)
-          skip.onclick = () => {
-            clearInterval(timer)
-            log('übersprungen')
-            done()
-          }
-        })
-      } finally {
-        mark.remove()
-      }
-    }
-
     // (share.html?debug: to the local test server's log)
     function qaLog(entry) {
       fetch('qa-log', { method: 'POST', body: JSON.stringify(entry) }).catch(() => {})
     }
     function screenNumbers() {
       return { left: screen.left, top: screen.top, availLeft: screen.availLeft, availTop: screen.availTop, width: screen.width, height: screen.height, dpr: window.devicePixelRatio }
-    }
-
-    // a magenta mark over this window – to be found in the shared picture?
-    async function markSeen(stream) {
-      const mark = showMark('Einen Moment …')
-      try {
-        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 250))))
-        return await seenIn(stream)
-      } finally {
-        mark.remove()
-      }
-    }
-
-    function showMark(text) {
-      const mark = document.createElement('div')
-      mark.append(Object.assign(document.createElement('p'), { textContent: text }))
-      mark.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;gap:18px;align-items:center;justify-content:center;padding:24px;text-align:center;background:#f0f;color:#000;font:700 22px system-ui,sans-serif'
-      document.body.append(mark)
-      return mark
-    }
-
-    // the mark in the shared picture: a good part of this window's area magenta
-    async function seenIn(stream) {
-      const c = await frameCanvas(stream, sourceVideos())
-      if (!c) return false
-      const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height)
-      let hits = 0
-      for (let i = 0; i < data.length; i += 16) if (data[i] > 200 && data[i + 1] < 70 && data[i + 2] > 200) hits++
-      const scale = c.width / screen.width
-      return hits * 4 > window.innerWidth * window.innerHeight * scale * scale * 0.25
     }
 
     // what was picked in the browser's dialog (Firefox may not say: a picture as wide and as high
