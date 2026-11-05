@@ -2,7 +2,7 @@
 // window), its helper and real viewers – connected over WebRTC, signaling between the tabs instead
 // of public relays (see light-fixture.mjs).
 //   1. as in Firefox, everything in the tab (the small window blocked): the helper comes by itself
-//   2. a window shared (as in Safari, Firefox), in the tab: the whole screen once more to find it
+//   2. only the whole screen is taken: a window or tab picked in the browser's dialog is turned away
 //   3. as in Chrome: the share in its own small window – the whole screen, one window of it picked
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -163,114 +163,34 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
   }
 })
 
-test('a shared window (as in Safari): the whole screen once more to find it, the helper lays the drawing over the window', { timeout: 180000 }, async () => {
+test('only the whole screen is taken: a single window or tab picked in the browser is turned away, with what to pick instead', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
-  const session = 'pv-light-window-' + process.pid
+  const session = 'pv-light-whole-' + process.pid
   const browser = async (...args) => (await promisify(execFile)('agent-browser', ['--session', session, ...args], { encoding: 'utf8', timeout: 30000 })).stdout
   const evaluate = async (code) => JSON.parse(await browser('eval', code))
   const waitFor = (fn) => browser('wait', '--fn', fn)
   const tab = (id) => browser('tab', id)
   const tabs = async () => browser('tab', 'list')
-  const idOf = async (part) => (await tabs()).split('\n').find((l) => l.includes(part))?.match(/t\d+/)?.[0]
   try {
+    // (as in Safari: no Picture-in-Picture; the share's own window blocked: all in this tab)
     await browser('open', base + '/share.html')
-    // (Safari: no interactive Picture-in-Picture)
     await evaluate("localStorage.setItem('qaNoPip', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '900')
-    // the presenter picks a window – the fake one lies at qaWindowAt on the fake screen
-    // (Chrome letterboxes the window's picture: black bars above and below)
-    await evaluate("qaSurfaces.push('window', 'window', 'monitor');qaLetterbox=30;document.querySelector('#name').value='Patrick';true")
-    const win = await evaluate('qaWindowAt')
-    // the shared picture: the window and its bars
-    const at = { x: win.x, y: win.y - 30, width: win.width, height: win.height + 60 }
-    // (the share's own window blocked: all in this tab) the same click opens the small window
-    // "Freigabe läuft" in the corner
-    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); true")
+    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); qaSurfaces.push('window', 'monitor'); document.querySelector('#name').value = 'Patrick'; true")
+    // a window picked in the browser's dialog: not taken – said what to pick, nothing shared
+    // (clicked from here: the small window opens and closes right away, the tool would wait for it)
+    await evaluate("document.querySelector('#start').click(); true")
+    await waitFor("!document.querySelector('#start-error').hidden")
+    assert.match(await evaluate("document.querySelector('#start-error').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du danach hier aus/)
+    assert.equal(await evaluate("document.querySelector('#pick').hidden && document.querySelector('#running').hidden && !pvLight.host && !document.querySelector('#start').disabled"), true)
+    await waitFor('1')
+    assert.doesNotMatch(await tabs(), /share-helper/, 'the small window closed again')
+    // the whole screen: the window is picked here
     await browser('click', '#start')
     await tab('t1')
-    await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
-    assert.match(await tabs(), /share-helper/)
-    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /„Freigabe läuft“ wartet unten rechts[\s\S]*in die Mitte deines Bildschirms/)
-    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
-    assert.equal(await evaluate("document.querySelector('#locate-step').hidden"), false)
-    assert.match(await evaluate("document.querySelector('#locate-step').innerText"), /„Gesamter Bildschirm“[\s\S]*sehen weiterhin nur das Fenster/)
-    // a window instead of the whole screen: said what to pick
-    await browser('click', '#locate')
-    await waitFor("!document.querySelector('#locate-error').hidden")
-    assert.match(await evaluate("document.querySelector('#locate-error').textContent"), /Bitte „Gesamter Bildschirm“ wählen/)
-    // not to be seen while this page lies in front (it may cover the window): no error, just
-    // "switch to your window" – searched for again once the page is in the background
-    await evaluate('window.qaHideWindow = true')
-    await browser('click', '#locate')
-    await waitFor("document.querySelector('#locate-step').hidden && !document.querySelector('#place-problem').hidden")
-    assert.equal(await evaluate("document.querySelector('#place-problem').classList.contains('problem')"), false)
-    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Wechsle jetzt zu deinem geteilten Fenster/)
-    // the presenter switches to the window (headless Chrome keeps every tab "in front": as if)
-    await evaluate('window.qaHideWindow = false; document.hasFocus = () => false')
-    await waitFor("document.querySelector('#place-problem').hidden")
-    // still not to be seen while the presenter is over there: now that is a problem, said plainly
-    await evaluate('window.qaHideWindow = true; new Promise((done) => setTimeout(() => done(pvLight.check().then(() => true)), 400))')
-    await waitFor("document.querySelector('#place-problem').classList.contains('problem') && !document.querySelector('#place-problem').hidden")
-    assert.match(await evaluate("document.querySelector('#place-problem').innerText"), /Dein Fenster ist auf dem Bildschirm nicht zu finden[\s\S]*minimiert oder ganz verdeckt[\s\S]*mehrere Bildschirme/)
-    // back on the screen: found again by itself
-    await evaluate('window.qaHideWindow = false')
-    await waitFor("document.querySelector('#place-problem').hidden")
-    await evaluate('delete document.hasFocus; true')
-    // the whole screen stays here: viewers get only the window
-    assert.equal(await evaluate('pvLight.locatorStream.getVideoTracks()[0].getSettings().displaySurface + "|" + pvLight.status().locator'), 'monitor|true')
-
-    // let in from the helper
-    const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
-    await browser('tab', 'new', `${base}/?name=Anna#${room}`)
-    const viewer = await idOf('name=Anna')
-    await tab('t1')
-    assert.match(await evaluate("document.querySelector('#helper-text').textContent"), /springt es genau an die Stelle/)
-    await tab(await idOf('share-helper'))
-    await waitFor("document.body.innerText.includes('Anna möchte zusehen')")
-    await browser('click', '[data-allow]')
-    await tab(viewer)
-    await waitFor("document.querySelector('video')?.videoWidth > 0")
-    assert.equal(await evaluate("document.querySelector('video').videoWidth + 'x' + document.querySelector('video').videoHeight"), `${at.width}x${at.height}`, 'only the window goes out')
-
-    // a stroke on the window: while drawing the page knows, afterwards the helper shows the spot
-    await browser('click', '.pv-dock [data-tool=draw]')
-    const r = await evaluate("(()=>{const r=document.querySelector('video').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
-    const point = (fx, fy) => [String(Math.round(r.l + r.w * fx)), String(Math.round(r.t + r.h * fy))]
-    await browser('mouse', 'move', ...point(0.3, 0.4))
-    await browser('mouse', 'down')
-    for (const f of [0.35, 0.4, 0.45, 0.5]) await browser('mouse', 'move', ...point(f, 0.4 + (f - 0.3) / 2))
-    await tab('t1')
-    await waitFor("pvLight.status().busy.join() === 'Anna'")
-    await tab(viewer)
-    await browser('mouse', 'move', ...point(0.6, 0.55))
-    await browser('mouse', 'up')
-    await tab('t1')
-    await waitFor('!!pvLight.lastReveal')
-    const capture = await evaluate('({picture: pvLight.lastReveal.capture.picture, score: pvLight.lastReveal.capture.found.score, points: pvLight.lastReveal.points.length})')
-    for (const [k, v] of [['left', at.x], ['top', at.y], ['width', at.width], ['height', at.height]]) assert.ok(Math.abs(capture.picture[k] - v) <= 3, `${k}: ${capture.picture[k]} ≈ ${v}`)
-    assert.ok(capture.score > 0.8)
-    assert.deepEqual(await evaluate('pvLight.lastReveal.capture.debug.bars'), { left: 0, top: 30, right: 0, bottom: 30 }, 'the black bars are left out of the search')
-    assert.ok(capture.points >= 3, 'the whole stroke')
-
-    // the helper comes by itself: over the window's place, with the desktop around it – then back
-    // into its corner
-    await tab(await idOf('share-helper'))
-    await waitFor("window.pvHelper?.state === 'focus'")
-    const shown = await evaluate('({picture: pvHelper.picture, part: pvHelper.part, who: document.querySelector("#focus-who").textContent, backdrop: !document.querySelector("#backdrop").hidden})')
-    assert.equal(shown.who, 'Anna zeigt hier')
-    assert.equal(shown.backdrop, true, 'the desktop around the window shows, too')
-    assert.ok(Math.abs(shown.picture.left - at.x) <= 3 && Math.abs(shown.picture.top - at.y) <= 3)
-    const mid = { x: 0.45, y: 0.475 }
-    assert.ok(shown.part.x < mid.x && mid.x < shown.part.x + shown.part.w && shown.part.y < mid.y && mid.y < shown.part.y + shown.part.h, 'the stroke is in view')
-    await waitFor("pvHelper.state === 'parked'")
-
-    // stopping ends the screen picture, too
-    await tab('t1')
-    await browser('click', '#stop')
-    await waitFor("!document.querySelector('#ended').hidden")
-    assert.equal(await evaluate('pvLight.locatorStream'), null)
+    await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#start-error').hidden")
   } finally {
     try {
       await browser('close')
