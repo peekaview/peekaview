@@ -376,6 +376,7 @@
       // what was picked in the tab's click, handed over (else the button below asks here)
       let handed = null
       try { handed = window.opener?.pvLightPicking ?? null } catch {}
+      if (params.has('debug')) qaLog({ klein: 'geöffnet', x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
       if (handed) setTimeout(() => supported && $('name').value.trim() && startHere({ picking: handed }), 0)
     }
     $('name').addEventListener('input', () => {
@@ -452,8 +453,11 @@
       window.pvLightPicking = picking
       const width = PANEL_WIDTH
       const height = 320
-      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
-      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
+      // (in the bottom right of this browser window – on its screen: reckoned from the window, not
+      // from the screen's numbers, which Firefox gives wrong for a second screen)
+      const left = Math.round(window.screenX + window.outerWidth - width - 24)
+      const top = Math.round(window.screenY + window.outerHeight - height - 24)
+      if (params.has('debug')) qaLog({ tab: 'öffnet kleines Fenster', left, top, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
       const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
       panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
       // (popups blocked: everything here)
@@ -533,7 +537,7 @@
         $('src-video').srcObject = stream
         $('src-video').play().catch(() => {})
       }
-      const log = (step) => params.has('debug') && fetch('qa-log', { method: 'POST', body: JSON.stringify({ suche: step, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: { left: screen.left, top: screen.top, availLeft: screen.availLeft, availTop: screen.availTop, width: screen.width, height: screen.height } }) }).catch(() => {})
+      const log = (step) => params.has('debug') && qaLog({ suche: step, x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, bildschirm: screenNumbers() })
       if (await markSeen(stream)) return log('gefunden, hier')
       log('nicht hier')
       // Chrome, Edge: a window goes to another screen only with the permission to manage windows –
@@ -587,6 +591,14 @@
       } finally {
         mark.remove()
       }
+    }
+
+    // (share.html?debug: to the local test server's log)
+    function qaLog(entry) {
+      fetch('qa-log', { method: 'POST', body: JSON.stringify(entry) }).catch(() => {})
+    }
+    function screenNumbers() {
+      return { left: screen.left, top: screen.top, availLeft: screen.availLeft, availTop: screen.availTop, width: screen.width, height: screen.height, dpr: window.devicePixelRatio }
     }
 
     // a magenta mark over this window – to be found in the shared picture?
