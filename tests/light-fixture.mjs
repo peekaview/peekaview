@@ -56,6 +56,8 @@ if (new URLSearchParams(location.search).get('browser') === 'firefox' || qaFiref
 // localStorage qaNoPip: no interactive Picture-in-Picture (as in Firefox, Safari) – for this page
 // and the small window it opens
 try { if (localStorage.getItem('qaNoPip')) delete window.documentPictureInPicture } catch {}
+// (the fake screen never shows the small window: no looking for it there)
+window.qaSkipScreenSearch = true
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
 // black bars above and below the window's picture (px), as Chrome adds when a window's shape changed

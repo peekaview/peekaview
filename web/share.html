@@ -269,7 +269,8 @@
     <!-- the tab, once the share runs in its own small window -->
     <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
-      <p class="lead" style="margin:0">Alles Weitere passiert im kleinen Fenster „Freigabe läuft“ unten rechts. Du kannst diesen Tab schließen.</p>
+      <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“.</p>
       <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
     </section>
 
@@ -372,9 +373,10 @@
       $('panel-close').hidden = false
       $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
       document.querySelector('#running .keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
-      // the browser's screen picker right away, where it lets a window ask without a click of its
-      // own (else the button below)
-      setTimeout(() => supported && $('name').value.trim() && startHere({ auto: true }), 100)
+      // what was picked in the tab's click, handed over (else the button below asks here)
+      let handed = null
+      try { handed = window.opener?.pvLightPicking ?? null } catch {}
+      if (handed) setTimeout(() => supported && $('name').value.trim() && startHere({ picking: handed }), 0)
     }
     $('name').addEventListener('input', () => {
       try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
@@ -440,22 +442,34 @@
 
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
+    // The browser's screen picker comes right in the click, here in the tab (it would not in a
+    // window opened by it, without a click there) – and in the same click the small window opens,
+    // which gets what was picked and does the rest. The capture belongs to this tab: it stays open.
     function start() {
-      // in a popup of its own, which asks for the screen itself – the tab may be closed (Chrome, Edge:
-      // the popup opens the always-on-top window, which belongs to it then)
       if (panel || !supported || !nameOrAsk()) return startHere()
-      // (large enough for the browser's screen picker, which shows inside it; small afterwards)
-      const width = Math.min(PICKER_ROOM.width, screen.availWidth)
-      const height = Math.min(PICKER_ROOM.height, screen.availHeight)
-      const left = Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2)
-      const top = Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2)
+      const picking = askScreen()
+      picking.catch(() => {})
+      window.pvLightPicking = picking
+      const width = PANEL_WIDTH
+      const height = 320
+      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
+      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
       const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
       panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
-      if (!panelWindow) return startHere()
+      // (popups blocked: everything here)
+      if (!panelWindow) return startHere({ picking })
       $('setup').hidden = true
       $('ended').hidden = true
       $('elsewhere').hidden = false
       document.title = '● Freigabe läuft – PeekaView light'
+    }
+
+    function askScreen() {
+      try {
+        return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, displaySurface: 'monitor' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
+      } catch (err) {
+        return Promise.reject(err)
+      }
     }
     $('elsewhere-show').addEventListener('click', () => {
       try { panelWindow?.focus() } catch {}
@@ -469,21 +483,18 @@
       document.title = 'Im Browser teilen – PeekaView light'
     }, 1000)
 
-    function startHere({ auto = false } = {}) {
+    /** @param picking what was picked in the tab's click (the small window gets it handed over) */
+    function startHere({ picking = null } = {}) {
       const name = nameOrAsk()
       if (!name) return
       $('start-error').hidden = true
-      const askedAt = performance.now()
       // Both need the click: the screen picker, and the helper window (popup blockers let
       // windows through only right in a click). The picker first – Safari spends the click on it,
       // then the helper waits for a click of its own.
-      // (the browser's screen picker shows inside this window: room for it)
-      roomy()
-      let picking
-      try {
-        picking = navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, displaySurface: 'monitor' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
-      } catch (err) {
-        picking = Promise.reject(err)
+      if (!picking) {
+        // (the browser's screen picker shows inside this window: room for it)
+        roomy()
+        picking = askScreen()
       }
       // the helper: waits in the corner and comes to each drawing by itself – the small window is
       // that helper itself
@@ -492,7 +503,7 @@
       picking.then((stream) => {
         const surface = surfaceOf(stream.getVideoTracks()[0])
         // the whole screen: pick the window to show from it (where the browser can cut it out)
-        if (cropSupported && surface === 'monitor') return showPick(stream, name)
+        if (cropSupported && surface === 'monitor') return toSharedScreen(stream).then(() => showPick(stream, name))
         // a single window or tab: not taken – the window is picked here, from the whole screen
         // (only so drawings land where it is, and it is followed when moved)
         if (cropSupported) {
@@ -503,9 +514,6 @@
       }).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
-        // (asked by itself, without a click: refused at once by browsers that want one – then the
-        // button is there, nothing to say)
-        if (auto && err?.name !== 'NotWholeScreen' && performance.now() - askedAt < 1500) return dock()
         $('start-error').textContent = err?.name === 'NotWholeScreen'
           ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab) – welches Fenster deine Zuschauer sehen, suchst du danach hier aus. Klicke noch einmal auf den Knopf.'
           : err?.name === 'NotAllowedError'
@@ -514,6 +522,57 @@
         $('start-error').hidden = false
         dock()
       })
+    }
+
+    // The small window on the screen that is shared: all places on the screen are reckoned from the
+    // screen it is on (browsers tell nothing of the others). So it shows a mark for a moment and looks
+    // for it in the shared picture – not there: it tries next to its screen, on each side.
+    async function toSharedScreen(stream) {
+      if (!panel || window.qaSkipScreenSearch) return
+      if ($('src-video').srcObject !== stream) {
+        $('src-video').srcObject = stream
+        $('src-video').play().catch(() => {})
+      }
+      if (await markSeen(stream)) return
+      const home = [window.screenX, window.screenY]
+      const w = window.outerWidth
+      const h = window.outerHeight
+      const left = screen.availLeft ?? 0
+      const top = screen.availTop ?? 0
+      const sides = [
+        [left + screen.availWidth + 40, top + 80],
+        [left - w - 40, top + 80],
+        [left + 80, top + screen.availHeight + 40],
+        [left + 80, top - h - 40],
+      ]
+      for (const [x, y] of sides) {
+        try { window.moveTo(x, y) } catch {}
+        await new Promise((done) => setTimeout(done, 350))
+        // (not moved: no screen there)
+        if (Math.abs(window.screenX - home[0]) + Math.abs(window.screenY - home[1]) < 40) continue
+        if (await markSeen(stream)) return
+      }
+      try { window.moveTo(...home) } catch {}
+    }
+
+    // a magenta mark over this window – to be found in the shared picture?
+    async function markSeen(stream) {
+      const mark = Object.assign(document.createElement('div'), { textContent: 'Einen Moment …' })
+      mark.style.cssText = 'position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#f0f;color:#000;font:700 22px system-ui,sans-serif'
+      document.body.append(mark)
+      try {
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 250))))
+        const c = await frameCanvas(stream, sourceVideos())
+        if (!c) return false
+        const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height)
+        let hits = 0
+        for (let i = 0; i < data.length; i += 16) if (data[i] > 200 && data[i + 1] < 70 && data[i + 2] > 200) hits++
+        // (a good part of this window's area)
+        const scale = c.width / screen.width
+        return hits * 4 > window.innerWidth * window.innerHeight * scale * scale * 0.3
+      } finally {
+        mark.remove()
+      }
     }
 
     // what was picked in the browser's dialog (Firefox may not say: a picture as wide and as high

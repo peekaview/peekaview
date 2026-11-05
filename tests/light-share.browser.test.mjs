@@ -202,7 +202,7 @@ test('only the whole screen is taken: a single window or tab picked in the brows
   }
 })
 
-test('the share in its own small window (as in Firefox: no Picture-in-Picture, cut out on a canvas): one window of the screen picked – viewers get only that window, the tab may be closed', { timeout: 180000 }, async () => {
+test('the share in its own small window (as in Firefox: no Picture-in-Picture, cut out on a canvas): the screen picked in the tab and handed over, one window of it picked – viewers get only that window', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pick-' + process.pid
@@ -220,12 +220,18 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
-    // the share moves into its own small window; the tab may be closed
+    // the screen is picked in the tab's click and handed to the small window; the tab stays open
     await browser('click', '#start')
     await tab('t1')
     await waitFor("!document.querySelector('#elsewhere').hidden")
-    assert.match(await evaluate("document.querySelector('#elsewhere').innerText"), /Freigabe läuft[\s\S]*Du kannst diesen Tab schließen/)
+    assert.match(await evaluate("document.querySelector('#elsewhere').innerText"), /Freigabe läuft[\s\S]*Lass diesen Tab bitte offen/)
     const P = 't2'
+    // (the fake screen is the tab's – it was picked there: what happens on it, there)
+    const onScreen = async (code) => {
+      await tab('t1')
+      await evaluate(code)
+      await tab(P)
+    }
     const V = 't3'
     await tab(P)
     await waitFor("document.body.classList.contains('panel') && document.querySelector('#name').value === 'Patrick'")
@@ -295,7 +301,8 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     // the window moved – and drawn on right away: the drawing appears where it is now (the
     // presenter in another program meanwhile: a notification)
     const moved = { ...win, x: win.x - 160, y: win.y + 120 }
-    await evaluate(`qaWindowAt = ${JSON.stringify(moved)}; document.hasFocus = () => false; true`)
+    await onScreen(`qaWindowAt = ${JSON.stringify(moved)}; true`)
+    await evaluate('document.hasFocus = () => false; true')
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.4)))
     await browser('mouse', 'down')
@@ -324,13 +331,13 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await tab(V)
     const bright = await evaluate(dark)
     await tab(P)
-    await evaluate('qaHideWindow = true; true')
+    await onScreen('qaHideWindow = true; true')
     await waitFor("document.querySelector('#problem-title').textContent === 'Wechsle zu deinem Fenster' && !document.querySelector('#place-problem').hidden")
     // (blurred and darkened, with the note over it)
     await tab(V)
     await waitFor(`${dark} < ${bright * 0.6}`)
     await tab(P)
-    await evaluate('qaHideWindow = false; true')
+    await onScreen('qaHideWindow = false; true')
     await waitFor("document.querySelector('#place-problem').hidden")
     await tab(V)
     await waitFor(`${dark} > 60`)
@@ -338,7 +345,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
 
     // maximized (larger, elsewhere): found again by its title, read from its title bar
     const big = { x: 40, y: 60, width: 700, height: 460 }
-    await evaluate(`qaWindowAt = ${JSON.stringify(big)}; true`)
+    await onScreen(`qaWindowAt = ${JSON.stringify(big)}; true`)
     await waitFor(`Math.abs(pvLight.crop.x - ${big.x}) <= 4 && Math.abs(pvLight.crop.width - ${big.width}) <= 6 && Math.abs(pvLight.crop.height - ${big.height}) <= 6`).catch(async (e) => {
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked})'))}`)
     })
@@ -347,7 +354,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await tab(P)
     // made smaller where it is (its right and bottom borders move): the new size, too
     const smaller = { ...big, width: big.width - 120, height: big.height - 60 }
-    await evaluate(`qaWindowAt = ${JSON.stringify(smaller)}; true`)
+    await onScreen(`qaWindowAt = ${JSON.stringify(smaller)}; true`)
     await waitFor(`pvLight.crop.x === ${big.x} && Math.abs(pvLight.crop.width - ${smaller.width}) <= 6 && Math.abs(pvLight.crop.height - ${smaller.height}) <= 6`).catch(async (e) => {
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked})'))}`)
     })
@@ -369,8 +376,6 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await waitFor(`document.querySelector('video').videoWidth === ${sw}`)
     await waitFor("document.querySelector('.pv-title').textContent === 'Bildschirm'")
 
-    // the tab closed: the share goes on
-    await browser('tab', 'close', 't1')
     await tab(P)
     assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
     await browser('click', '#stop')
@@ -384,7 +389,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
   }
 })
 
-test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chrome): opened by the small window, the tab may be closed, a drawing shown large with a click', { timeout: 180000 }, async () => {
+test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chrome): opened by the small window, a drawing shown large with a click', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pip-' + process.pid
@@ -416,8 +421,6 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab(S)
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
     assert.match(await evaluate("document.querySelector('#in-pip').textContent"), /Lass dieses Fenster bitte offen[\s\S]*immer vorne/, await evaluate("JSON.stringify({d: getComputedStyle(document.querySelector('#in-pip')).display, main: getComputedStyle(document.querySelector('main')).display, vis: getComputedStyle(document.querySelector('main')).visibility, body: document.body.className})"))
-    // the tab is no longer needed
-    await browser('tab', 'close', 't1')
     let P = await idOf('about:blank')
     await tab(P)
     assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)
