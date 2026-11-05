@@ -240,20 +240,11 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     // the window just worked in is recognized by its title bar's buttons, and picked right away
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
-    // the windows recognized, as a list: the one just worked in first, picked; its title read
-    assert.equal(await evaluate("document.querySelector('.pick-item[aria-pressed=true]') === document.querySelector('.pick-item')"), true)
-    await waitFor("document.querySelector('.pick-item span').textContent.includes('Projektplan')").catch(async (e) => {
-      throw new Error(`${e.message}\n${await evaluate("[...document.querySelectorAll('.pick-item')].map((i) => i.innerText).join(' | ')")}`)
-    })
-    // … or in the picture: a click into the window picks it
-    await evaluate("document.querySelector('#pick-picture').open = true; true")
-    const box = await evaluate("(()=>{const r=document.querySelector('#pick-view').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
+    // a drag draws a part by hand – which would stay where it is; the window is shown here
+    assert.equal(await evaluate("document.querySelector('#pick-ok').textContent"), 'Dieses Fenster zeigen')
     const sw = await evaluate('screen.width')
-    const sh = await evaluate('screen.height')
-    await browser('mouse', 'move', String(Math.round(box.l + ((win.x + 100) / sw) * box.w)), String(Math.round(box.t + ((win.y + 200) / sh) * box.h)))
-    await browser('mouse', 'down')
-    await browser('mouse', 'up')
     await waitFor("!document.querySelector('#pick-ok').disabled")
+    await evaluate("document.querySelector('#pick-ok').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#pick-ok')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
     assert.match(await evaluate("document.querySelector('#live-title').textContent"), /^Freigabe läuft · /)
@@ -418,6 +409,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
     // "Dieses Fenster zeigen": the controls move into the always-on-top window
+    await evaluate("document.querySelector('#pick-ok').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#pick-ok')
     await tab('t1')
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")

@@ -83,16 +83,6 @@
     main.wide { width: min(980px, calc(100% - 32px)); }
     .pick-view { display: block; width: 100%; border-radius: 10px; background: #000; cursor: crosshair; touch-action: none; }
     .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
-    .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-    .pick-list:empty { display: none; }
-    .pick-item { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 8px; border: 2px solid #27272a; border-radius: 12px; background: #09090b; color: #fafafa; font: 600 13.5px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: left; cursor: pointer; }
-    .pick-item:hover { border-color: #52525b; }
-    .pick-item[aria-pressed="true"] { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
-    .pick-item canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background: #000; }
-    .pick-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pick-item small { color: #a1a1aa; font-weight: 500; }
-    .pick-picture summary { color: #a1a1aa; font-size: 13.5px; cursor: pointer; }
-    .pick-picture[open] summary { margin-bottom: 10px; }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
     .live { flex-wrap: wrap; }
     .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
@@ -186,10 +176,10 @@
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
       <h1>Welches Fenster möchtest du zeigen?</h1>
-      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest.</li><li>Komm dann hierher zurück.</li></ol>
+      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – so wird es aktiv.</li><li>Komm dann hierher zurück.</li></ol>
       <p class="lead" id="pick-lead" style="margin:0"></p>
-      <div class="pick-list" id="pick-list"></div>
-      <details class="pick-picture" id="pick-picture"><summary>Im Bild auswählen oder einen Rahmen ziehen</summary><canvas id="pick-view" class="pick-view"></canvas></details>
+      <canvas id="pick-view" class="pick-view"></canvas>
+      <p class="keep" id="pick-draw" style="margin:-4px 0 0">Oder zieh im Bild mit der Maus einen Rahmen um einen Bereich. Der bleibt fest an seiner Stelle – verschiebst du darunter ein Fenster, geht er nicht mit.</p>
       <button class="connect" id="pick-ok" type="button" disabled>Dieses Fenster zeigen</button>
       <div class="pick-more"><button class="text-button" id="pick-screen" type="button">Lieber den ganzen Bildschirm zeigen</button><button class="text-button" id="pick-again" type="button">Bild neu holen</button></div>
       <p class="keep" style="margin:0">Nur der rot umrandete Teil geht an deine Zuschauer – auch was gerade darüber liegt.</p>
@@ -997,7 +987,6 @@
       if (!params.has('debug') || !picker) return
       $('debug-box').hidden = false
       if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
-      $('pick-picture').open = true
       const windows = picker.windows
       $('debug-view').hidden = true
       // (the picture, to look at it closely elsewhere)
@@ -1021,17 +1010,15 @@
         massstab: picker.image ? +(picker.image.width / screen.width).toFixed(2) : null,
         weg_gewesen: sawAway,
         vorne: inFront(),
-        rahmen: windows.filter((w) => !w.titled).length,
-        farbige_knoepfe: windows.filter((w) => w.titled).length,
-        mit_titelleiste: windows.filter((w) => w.line).length,
-        liste: pickCandidates().length,
+        fenster: windows.length,
+        aktive: windows.filter((w) => w.titled).length,
+        gewaehlt: picker.selection ? (picker.selection.drawn ? 'Bereich' : picker.selection.kind ?? 'Fenster') : null,
         tesseract: readerState.state,
         geaendert_prozent: pickChanged,
-        titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text} @${t.line ?? '-'}`),
         eigenes_fenster: Object.fromEntries(Object.entries(ownWindow()).map(([k, v]) => [k, +v.toFixed(3)])),
         bildschirm: { left: screen.left, top: screen.top, availLeft: screen.availLeft, width: screen.width, height: screen.height, screenX: window.screenX, screenY: window.screenY, outer: [window.outerWidth, window.outerHeight] },
-        als_eigenes_weggelassen: (picker.ownLeftOut ?? []).map((w) => `${[w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')}${w.line ? ' Titelleiste' : ''}`),
-        groesste_fenster: picker.windows.slice(0, 8).map((w) => `${[w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')}${w.line ? ' Titelleiste' : ''}${w.titled ? ' farbig' : ''}`),
+        als_eigenes_weggelassen: (picker.ownLeftOut ?? []).map((w) => [w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')),
+        gefunden: picker.windows.slice(0, 8).map((w) => `${[w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')} ${w.kind}${w.titled ? ' aktiv' : ''}`),
       }
       $('debug').textContent = `Fensterauswahl ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify(report, null, 1)
       // (to the test server where there is one, to be read there)
@@ -1168,7 +1155,6 @@
     let pickName = ''
     let pickTimer = null
     let sawAway = false // a picture from while this page was in the background (the windows not covered by it)
-    let lastUsed = null // the window the presenter worked in then (0..1)
 
     function showPick(stream, name) {
       pickStream = stream
@@ -1179,7 +1165,6 @@
         $('src-video').play().catch(() => {})
       }
       sawAway = false
-      lastUsed = null
       pickThumb = null
       pickActive = null
       $('setup').hidden = $('running').hidden = true
@@ -1222,12 +1207,7 @@
         pickThumb = thumb
         pickActive = !front
         picker.setImage(c, { active: !front, own })
-        if (!front) {
-          sawAway = true
-          // (the one just worked in: marked as such, also in later pictures)
-          const used = picker.windows.find((w) => w.titled)
-          if (used) lastUsed = used
-        }
+        if (!front) sawAway = true
         renderPick()
       } finally {
         fetching = false
@@ -1252,99 +1232,17 @@
 
     function renderPick() {
       if (!picker) return
-      const list = pickCandidates()
-      // (only one window to pick: picked – the coloured buttons of the one worked in may not have been
-      // to be seen)
-      if (list.length === 1 && (!picker.selection || picker.single) && picker.selection !== list[0]) {
-        picker.select(list[0])
-        picker.single = true
-      }
-      $('pick-steps').hidden = sawAway
-      $('pick-lead').hidden = !sawAway
-      $('pick-lead').textContent = picker.auto
-        ? 'Erkannt: das Fenster, in dem du gerade warst. Stimmt es, klicke unten auf „Dieses Fenster zeigen“.'
-        : picker.single && picker.selection === list[0]
-          ? 'Erkannt: dieses Fenster. Stimmt es, klicke unten auf „Dieses Fenster zeigen“.'
-          : list.length
-          ? 'Klicke das Fenster an, das du zeigen möchtest.'
-          : 'Kein Fenster erkannt. Zieh im Bild mit der Maus einen Rahmen um das, was du zeigen möchtest.'
-      // (no window recognized: the picture right away, to draw a frame in it)
-      if (sawAway && !list.length) $('pick-picture').open = true
-      renderPickList(list)
+      const sel = picker.selection
+      $('pick-steps').hidden = sawAway && !!sel && !sel.drawn
+      $('pick-lead').hidden = !sawAway && !sel
+      $('pick-lead').textContent = sel?.drawn
+        ? 'Dein eingezeichneter Bereich (rot umrandet). Er bleibt fest an seiner Stelle.'
+        : sel
+          ? 'Erkannt: dein aktives Fenster (rot umrandet). Stimmt es, klicke auf „Dieses Fenster zeigen“. Ein anderes? Klicke einmal hinein und komm zurück.'
+          : 'Kein aktives Fenster erkannt. Klicke noch einmal in dein Fenster und komm zurück – oder zieh einen Rahmen um den Bereich.'
       showPickDebug()
-      $('pick-ok').disabled = !picker.selection
-      $('pick-ok').textContent = picker.selection?.drawn ? 'Diesen Ausschnitt zeigen' : 'Dieses Fenster zeigen'
-    }
-
-    // The windows recognized, as a list: a small picture each, and its title (read from its title
-    // bar – light-title.js – as soon as it is read)
-    // (by place: the picture is fetched anew now and then, its windows with it)
-    const pickTitleCache = new Map()
-    const placeKey = (w) => [w.x, w.y, w.w, w.h].map((v) => Math.round(v * 200)).join(',')
-    const pickTitles = { get: (w) => pickTitleCache.get(placeKey(w)), set: (w, v) => pickTitleCache.set(placeKey(w), v), has: (w) => pickTitleCache.has(placeKey(w)) }
-    let pickReading = false
-    // (windows with a title bar – its buttons found – only: their title can be read exactly)
-    function pickWindows() {
-      if (!picker?.image || !sawAway) return []
-      return picker.windows.filter((w) => w.line && w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
-    }
-    const isLastUsed = (w) => !!lastUsed && Math.abs(w.x - lastUsed.x) < 0.01 && Math.abs(w.y - lastUsed.y) < 0.01 && Math.abs(w.w - lastUsed.w) < 0.015
-    // (shown: the one just worked in, and those with a title that reads like one – not letter salad)
-    function pickCandidates() {
-      return pickWindows().filter((w) => isLastUsed(w) || pickTitles.get(w)?.ok).sort((a, b) => isLastUsed(b) - isLastUsed(a)).slice(0, 6)
-    }
-    function renderPickList(list) {
-      const image = picker.image
-      $('pick-list').replaceChildren(...list.map((w, i) => {
-        const item = document.createElement('button')
-        item.type = 'button'
-        item.className = 'pick-item'
-        item.setAttribute('aria-pressed', String(picker.selection === w))
-        const thumb = document.createElement('canvas')
-        thumb.width = 320
-        thumb.height = 200
-        const ctx = thumb.getContext('2d')
-        const sx = w.x * image.width
-        const sy = w.y * image.height
-        const sw = w.w * image.width
-        const sh = w.h * image.height
-        const k = Math.min(320 / sw, 200 / sh)
-        ctx.drawImage(image, sx, sy, sw, sh, (320 - sw * k) / 2, (200 - sh * k) / 2, sw * k, sh * k)
-        const label = document.createElement('span')
-        const title = pickTitles.get(w)
-        label.textContent = title?.ok ? title.text : isLastUsed(w) ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`
-        item.append(thumb, label)
-        if (isLastUsed(w)) item.append(Object.assign(document.createElement('small'), { textContent: 'zuletzt benutzt' }))
-        item.addEventListener('click', () => picker.select(w))
-        return item
-      }))
-      readPickTitles(pickWindows())
-    }
-    async function readPickTitles(list) {
-      if (pickReading) return
-      const image = picker?.image
-      const next = list.find((w) => !pickTitles.has(w))
-      if (!next || !image) return
-      pickReading = true
-      try {
-        const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
-        const scale = image.width / screen.width
-        let { text, confidence } = await readLine(titleBar(image, rect, scale, next.line))
-        // (no title there: the whole top of the window, once more)
-        if (!readable(text, confidence)) {
-          const again = await readLine(titleBar(image, rect, next.line?.k ?? scale))
-          if (readable(again.text, again.confidence)) ({ text, confidence } = again)
-        }
-        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence), confidence: Math.round(confidence), line: next.line && [next.line.y, next.line.x0, next.line.x1].map(Math.round) })
-      } catch (err) {
-        // (not to be read: no titles in the list)
-        console.info('peekaview light: titles not read', err?.message ?? err)
-        for (const w of list) pickTitles.set(w, { text: '', ok: false, confidence: 0, line: String(err?.message ?? err) })
-      } finally {
-        pickReading = false
-      }
-      // (on with the next one – also when the picture changed meanwhile)
-      if (picker) renderPick()
+      $('pick-ok').disabled = !sel
+      $('pick-ok').textContent = sel?.drawn ? 'Diesen Bereich zeigen' : 'Dieses Fenster zeigen'
     }
 
     function finishPick(selection) {
@@ -1359,9 +1257,10 @@
       if (documentPip && !panel) openPipWindow()
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
       const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
-      // the window's real edges, its title bar and picture to follow it by: from the picture in which
-      // it could be seen (a part drawn by hand stays as drawn)
-      const seen = rect && image && image.width === f.width ? grabberOf(image) : null
+      // a part drawn by hand stays where it is: not followed. A window: its real edges, its title bar
+      // and picture to follow it by, from the picture in which it could be seen
+      fixedPart = !!selection?.drawn
+      const seen = rect && !fixedPart && image && image.width === f.width ? grabberOf(image) : null
       // (one found by its title bar is exact already)
       if (seen && !selection.drawn && !selection.titled) Object.assign(rect, snapRect(seen, rect, f))
       trackTitle = seen ? titleOf(seen, rect, f.width / screen.width) : null
@@ -1407,8 +1306,9 @@
     let trackMisses = 0
     let trackInfo = null // how the last search went (share.html?debug)
     let tracking = null
+    let fixedPart = false // a part drawn by hand: not followed
     function track() {
-      if (!host || !cropper?.rect || picker) return Promise.resolve()
+      if (!host || !cropper?.rect || picker || fixedPart) return Promise.resolve()
       return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
@@ -1643,7 +1543,6 @@
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
-      get pickTitles() { return pickWindows().map((w) => pickTitles.get(w) ?? null) },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)

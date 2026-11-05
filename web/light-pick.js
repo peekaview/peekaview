@@ -1,9 +1,8 @@
 // "Bildschirmfreigabe light": picking the window to show from a picture of the whole screen.
-// The windows found by their title bars (light-windows.js findWindows) are outlined; the active
-// one (coloured buttons) is picked right away. A click picks the window under it (again on the same
-// spot: the next one), a drag draws a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
+// The window the presenter activated is found by its title bar (light-windows.js findWindows) and
+// picked; another one is picked by activating that one. Else a part is drawn by hand (a drag). Everything outside the picked part is darkened: that is what viewers will not see.
 
-import { findWindows, windowsAt } from './light-windows.js'
+import { findWindows } from './light-windows.js'
 
 const MIN_DRAG = 6 // CSS px before a press becomes a drag
 
@@ -15,18 +14,13 @@ export class WindowPicker {
     this.image = null
     this.windows = []
     this.selection = null // {x, y, w, h} 0..1 of the picture
-    this.hover = null
     this.drag = null
-    this.lastClick = null
     this.observer = new ResizeObserver(() => this.render())
     this.observer.observe(canvas)
     canvas.addEventListener('pointerdown', (e) => this.down(e))
     canvas.addEventListener('pointermove', (e) => this.move(e))
     canvas.addEventListener('pointerup', (e) => this.up(e))
-    canvas.addEventListener('pointerleave', () => {
-      this.hover = null
-      if (!this.drag) this.render()
-    })
+    canvas.addEventListener('pointerleave', () => !this.drag && this.render())
   }
 
   /**
@@ -54,11 +48,11 @@ export class WindowPicker {
       const again = this.windows.find((w) => overlap(w, previous) > 0.85)
       if (again) this.selection = again
     }
-    // the window the presenter just worked in (not this browser): picked right away – unless they
-    // picked one themselves
-    const titled = this.windows.filter((w) => w.titled)
-    if (active && titled.length && (!this.selection || this.auto)) {
-      this.select(titled[0])
+    // the window the presenter just activated (not this browser): picked – unless they drew a part
+    // themselves. On a Mac the active one has coloured buttons; elsewhere the largest is taken.
+    const activated = this.windows.find((w) => w.titled) ?? (this.windows.some((w) => w.kind !== 'mac') ? this.windows[0] : null)
+    if (active && activated && !this.selection?.drawn) {
+      this.select(activated)
       this.auto = true
     }
     this.render()
@@ -94,12 +88,6 @@ export class WindowPicker {
       if (this.drag.to || Math.hypot(p.cx - this.drag.from.cx, p.cy - this.drag.from.cy) > MIN_DRAG) this.drag.to = p
       return this.render()
     }
-    const under = windowsAt(this.windows, p).sort((a, b) => (b.titled ? 1 : 0) - (a.titled ? 1 : 0) || b.w * b.h - a.w * a.h)
-    const hover = under[0] ?? null
-    if (hover !== this.hover) {
-      this.hover = hover
-      this.render()
-    }
   }
 
   up(e) {
@@ -117,14 +105,8 @@ export class WindowPicker {
       else this.render()
       return
     }
-    // a click: the window under it – on the same spot again, the next smaller one
-    // (windows with a title bar first, the largest first)
-    const under = windowsAt(this.windows, p).sort((a, b) => (b.titled ? 1 : 0) - (a.titled ? 1 : 0) || b.w * b.h - a.w * a.h)
-    if (!under.length) return this.render()
-    const again = this.lastClick && Math.hypot(p.cx - this.lastClick.cx, p.cy - this.lastClick.cy) < 8
-    const i = again ? under.indexOf(this.selection) : -1
-    this.lastClick = p
-    this.select(under[(i + 1) % under.length])
+    // (a click alone picks nothing: a window is picked by activating it)
+    this.render()
   }
 
   render() {
@@ -150,19 +132,6 @@ export class WindowPicker {
       ctx.rect(...px(shown))
       ctx.fill('evenodd')
       ctx.restore()
-    }
-    // the windows found
-    ctx.lineWidth = Math.max(1, dpr)
-    for (const r of this.windows) {
-      if (r === shown) continue
-      ctx.setLineDash([6 * dpr, 4 * dpr])
-      ctx.strokeStyle = r === this.hover ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.45)'
-      ctx.strokeRect(...px(r))
-    }
-    ctx.setLineDash([])
-    if (this.hover && this.hover !== shown) {
-      ctx.fillStyle = 'rgba(239,68,68,.12)'
-      ctx.fillRect(...px(this.hover))
     }
     if (shown) {
       ctx.lineWidth = 3 * dpr
