@@ -306,7 +306,8 @@
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { cropSupported, makeCropper } from './light-crop.js'
     import { grayFrom, scaledGray } from './light-locate.js'
-    import { detectWindows, trafficLights, windowOfLights } from './light-windows.js'
+    import { detectWindows, titleButtons, trafficLights, windowOfLights } from './light-windows.js'
+    import { monitorRect } from './light-geometry.js'
     import { readLine, readText, readable, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { borderStrips, follow, grabberOf, hasLine, snapRect, titleOf, titleScore } from './light-track.js'
@@ -1105,8 +1106,8 @@
     let pickStream = null
     let pickName = ''
     let pickTimer = null
-    let away = null // the screen while this page was in the background: the windows not covered by it
-    let sawAway = false
+    let sawAway = false // a picture from while this page was in the background (the windows not covered by it)
+    let lastUsed = null // the window the presenter worked in then (0..1)
 
     function showPick(stream, name) {
       pickStream = stream
@@ -1117,7 +1118,7 @@
         $('src-video').play().catch(() => {})
       }
       sawAway = false
-      away = null
+      lastUsed = null
       $('setup').hidden = $('running').hidden = true
       $('pick').hidden = false
       document.querySelector('main').classList.add('wide')
@@ -1130,29 +1131,50 @@
       }
       freshPicture()
       clearInterval(pickTimer)
-      // this page covers the windows while it is in front: the picture from when it was not
-      pickTimer = setInterval(async () => {
-        if (inFront()) return
-        const c = await frameCanvas(pickStream, sourceVideos())
-        if (c) away = c
-      }, 700)
+      // fetched anew now and then – while this page is in front only where it leaves most of the
+      // screen to be seen (else it would cover the windows: the picture from before stays)
+      pickTimer = setInterval(freshPicture, 1500)
       renderPick()
     }
 
+    let fetching = false
     async function freshPicture() {
-      const c = await frameCanvas(pickStream, sourceVideos())
-      if (c) picker?.setImage(c)
+      if (fetching || !picker) return
+      fetching = true
+      try {
+        const front = inFront()
+        const own = ownWindow()
+        if (front && sawAway && covered(own) > 0.5) return
+        const c = await frameCanvas(pickStream, sourceVideos())
+        if (!c || !picker) return
+        picker.setImage(c, { active: !front, scale: c.width / screen.width, own })
+        if (!front) {
+          sawAway = true
+          // (the one just worked in: marked as such, also in later pictures)
+          const used = picker.windows.find((w) => w.titled)
+          if (used) lastUsed = used
+        }
+        renderPick()
+      } finally {
+        fetching = false
+      }
     }
+    window.addEventListener('focus', () => setTimeout(freshPicture, 50))
+    // (just switched to another program: the windows to be seen in a moment)
+    window.addEventListener('blur', () => setTimeout(freshPicture, 400))
+    document.addEventListener('visibilitychange', () => document.hidden && setTimeout(freshPicture, 400))
 
-    function backInFront() {
-      if ($('pick').hidden || !away) return
-      picker.setImage(away, { active: true })
-      away = null
-      sawAway = true
-      renderPick()
+    // this browser's window on the screen's picture (0..1): never a window to pick
+    function ownWindow() {
+      const m = monitorRect(screen, { mac: /Mac/.test(navigator.platform) })
+      return { x: (window.screenX - m.left) / m.width, y: (window.screenY - m.top) / m.height, w: window.outerWidth / m.width, h: window.outerHeight / m.height }
     }
-    window.addEventListener('focus', () => setTimeout(backInFront, 50))
-    document.addEventListener('visibilitychange', () => !document.hidden && setTimeout(backInFront, 50))
+    // how much of the screen it covers
+    function covered(r) {
+      const w = Math.max(0, Math.min(1, r.x + r.w) - Math.max(0, r.x))
+      const h = Math.max(0, Math.min(1, r.y + r.h) - Math.max(0, r.y))
+      return w * h
+    }
 
     function renderPick() {
       if (!picker) return
@@ -1173,15 +1195,20 @@
 
     // The windows recognized, as a list: a small picture each, and its title (read from its title
     // bar – light-title.js – as soon as it is read)
-    const pickTitles = new WeakMap()
+    // (by place: the picture is fetched anew now and then, its windows with it)
+    const pickTitleCache = new Map()
+    const placeKey = (w) => [w.x, w.y, w.w, w.h].map((v) => Math.round(v * 200)).join(',')
+    const pickTitles = { get: (w) => pickTitleCache.get(placeKey(w)), set: (w, v) => pickTitleCache.set(placeKey(w), v), has: (w) => pickTitleCache.has(placeKey(w)) }
     let pickReading = false
+    // (windows with a title bar – its three buttons found – only: their title can be read exactly)
     function pickWindows() {
       if (!picker?.image || !sawAway) return []
-      return picker.windows.filter((w) => w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
+      return picker.windows.filter((w) => w.buttons && w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
     }
+    const isLastUsed = (w) => !!lastUsed && Math.abs(w.x - lastUsed.x) < 0.01 && Math.abs(w.y - lastUsed.y) < 0.01 && Math.abs(w.w - lastUsed.w) < 0.015
     // (shown: the one just worked in, and those with a title that reads like one – not letter salad)
     function pickCandidates() {
-      return pickWindows().filter((w) => w.titled || pickTitles.get(w)?.ok).slice(0, 6)
+      return pickWindows().filter((w) => isLastUsed(w) || pickTitles.get(w)?.ok).sort((a, b) => isLastUsed(b) - isLastUsed(a)).slice(0, 6)
     }
     function renderPickList(list) {
       const image = picker.image
@@ -1202,9 +1229,9 @@
         ctx.drawImage(image, sx, sy, sw, sh, (320 - sw * k) / 2, (200 - sh * k) / 2, sw * k, sh * k)
         const label = document.createElement('span')
         const title = pickTitles.get(w)
-        label.textContent = title?.ok ? title.text : w.titled ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`
+        label.textContent = title?.ok ? title.text : isLastUsed(w) ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`
         item.append(thumb, label)
-        if (w.titled) item.append(Object.assign(document.createElement('small'), { textContent: 'zuletzt benutzt' }))
+        if (isLastUsed(w)) item.append(Object.assign(document.createElement('small'), { textContent: 'zuletzt benutzt' }))
         item.addEventListener('click', () => picker.select(w))
         return item
       }))
@@ -1218,7 +1245,7 @@
       pickReading = true
       try {
         const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
-        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width))
+        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width, next.buttons))
         pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence) })
       } catch (err) {
         // (not to be read: no titles in the list)
@@ -1391,10 +1418,19 @@
     let titleReadAt = 0
     let titleReading = false
     let titleSearchAt = 0
+    // a window's three title bar buttons (light-windows.js), looked for near its top left corner
+    function buttonsOf(source, rect, scale) {
+      const area = { x: Math.max(0, Math.round(rect.x)), y: Math.max(0, Math.round(rect.y)), width: Math.round(Math.min(rect.width, 120 * scale)), height: Math.round(Math.min(rect.height, 70 * scale)) }
+      if (area.width < 40 || area.height < 20) return null
+      const b = titleButtons(grabberOf(source)(area, area.width, area.height), { x: 0, y: 0, width: area.width, height: area.height }, scale)
+      return b && { ...b, x: b.x + area.x, y: b.y + area.y }
+    }
+
     async function learnTitle(full, rect, scale) {
       if (titleReading || Date.now() - titleReadAt < 5000) return
       titleReading = true
-      const shot = titleBar(full, rect, scale)
+      // (exactly the line of its title, beside its buttons – where they are found)
+      const shot = titleBar(full, rect, scale, buttonsOf(full, rect, scale))
       try {
         const { text, confidence } = await readLine(shot)
         titleReadAt = Date.now()
@@ -1421,19 +1457,22 @@
         ctx.drawImage(full, 0, 0)
         const data = ctx.getImageData(0, 0, full.width, full.height)
         const g = grayFrom(data)
-        const titled = trafficLights(data).map((l) => windowOfLights(g, l)).filter(Boolean)
+        const titled = trafficLights(data).map((l) => ({ rect: windowOfLights(g, l), buttons: { x: l.x, y: l.y, gap: l.gap } })).filter((w) => w.rect)
+        // (windows by their frames: only those with title bar buttons – real windows)
         const frames = detectWindows(scaledGray(full, 640, Math.round((full.height * 640) / full.width)))
           .map((w) => ({ x: Math.round(w.x * full.width), y: Math.round(w.y * full.height), width: Math.round(w.w * full.width), height: Math.round(w.h * full.height) }))
-          .filter((w) => !titled.some((t) => Math.abs(t.x - w.x) < 12 && Math.abs(t.y - w.y) < 12))
+          .filter((w) => !titled.some((t) => Math.abs(t.rect.x - w.x) < 12 && Math.abs(t.rect.y - w.y) < 12))
+          .map((rect) => ({ rect, buttons: titleButtons(g, rect, scale) }))
+          .filter((w) => w.buttons)
         let best = null
-        for (const rect of [...titled, ...frames].slice(0, 10)) {
-          const text = await readText(titleBar(full, rect, scale))
+        for (const { rect, buttons } of [...titled, ...frames].slice(0, 10)) {
+          const text = await readText(titleBar(full, rect, scale, buttons))
           const score = Math.max(0, ...titleTexts.map((t) => sameTitle(t, text)))
           if (score >= 0.6 && (!best || score > best.score)) best = { rect, score, text }
         }
         // (meanwhile found again otherwise, or the share ended: nothing to do)
         if (!best || !host || !cropper?.blank || picker) return
-        const rect = titled.includes(best.rect) ? best.rect : snapRect(grabberOf(full), best.rect, full)
+        const rect = titled.some((t) => t.rect === best.rect) ? best.rect : snapRect(grabberOf(full), best.rect, full)
         cropper.setRect(rect)
         cropper.setBlank(null)
         trackTitle = titleOf(grabberOf(full), cropper.rect, scale)

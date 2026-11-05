@@ -313,7 +313,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     assert.equal(await evaluate("document.querySelector('#running').hidden && document.querySelector('#pick-ok').disabled"), true, 'nothing shared before the choice')
     // (as if the presenter had been over at the window: the picture from the background)
-    await evaluate('document.hasFocus = () => false; true')
+    await evaluate("document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); true")
     await new Promise((done) => setTimeout(done, 900))
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     // the window just worked in is recognized by its title bar's buttons, and picked right away
@@ -491,7 +491,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab('t1')
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     assert.doesNotMatch(await tabs(), /share-helper|panel/, 'no popup: the always-on-top window instead')
-    await evaluate('document.hasFocus = () => false; true')
+    await evaluate("document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); true")
     await new Promise((done) => setTimeout(done, 900))
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")

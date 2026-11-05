@@ -257,3 +257,69 @@ export function windowOfLights(g, light) {
   const right = strongest(Math.min(top.end, bottomEnd > left.x + light.gap * 4 ? bottomEnd : top.end) + 1, (x, y) => vEdge(x, y), rows(cy, left.end))
   return { x: left.x, y: top.y, width: right - left.x, height: bottom - top.y }
 }
+
+/**
+ * The three round buttons at the start of a window's title bar – in colour or grey (inactive),
+ * on a light or dark bar – near the top left corner of `rect` (pixels of `g`, the screen in
+ * grayscale at full size). scale: pixels per point. Their shape is compared, not their colour
+ * (normalized cross-correlation, either sign: darker or lighter than the bar).
+ * @returns {{x, y, gap, score} | null} x: the first button's centre, y: their centre line
+ */
+export function titleButtons(g, rect, scale = 1) {
+  const d = 12 * scale // a button, across
+  const gap = 20 * scale // from one to the next
+  const tw = Math.round(2 * gap + d + 4 * scale)
+  const th = Math.round(d + 4 * scale)
+  // the three discs on the bar, as a template without its mean
+  const tpl = new Float32Array(tw * th)
+  const r = d / 2
+  for (let y = 0; y < th; y++) {
+    for (let x = 0; x < tw; x++) {
+      let v = 0
+      for (let i = 0; i < 3; i++) {
+        const dx = x + 0.5 - (2 * scale + r + i * gap)
+        const dy = y + 0.5 - th / 2
+        v = Math.max(v, Math.min(1, Math.max(0, r + 0.5 - Math.hypot(dx, dy))))
+      }
+      tpl[y * tw + x] = v
+    }
+  }
+  let mean = 0
+  for (const v of tpl) mean += v
+  mean /= tpl.length
+  let vt = 0
+  for (let i = 0; i < tpl.length; i++) {
+    tpl[i] -= mean
+    vt += tpl[i] * tpl[i]
+  }
+  const { width: W, height: H, px } = g
+  const x0 = Math.max(0, Math.round(rect.x + 2 * scale))
+  const x1 = Math.min(W - tw, Math.round(rect.x + 30 * scale))
+  const y0 = Math.max(0, Math.round(rect.y + 2 * scale))
+  const y1 = Math.min(H - th, Math.round(rect.y + 46 * scale))
+  let top = null
+  const n = tw * th
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      let s = 0
+      let ss = 0
+      let cov = 0
+      for (let ty = 0; ty < th; ty++) {
+        let i = (y + ty) * W + x
+        let k = ty * tw
+        for (let tx = 0; tx < tw; tx++, i++, k++) {
+          const v = px[i]
+          s += v
+          ss += v * v
+          cov += v * tpl[k]
+        }
+      }
+      const vi = ss - (s * s) / n
+      // (a plain bar: nothing round on it)
+      if (vi < n * 4) continue
+      const score = Math.abs(cov) / Math.sqrt(vi * vt)
+      if (!top || score > top.score) top = { x: x + 2 * scale + r, y: y + th / 2, gap, score }
+    }
+  }
+  return top && top.score >= 0.6 ? top : null
+}

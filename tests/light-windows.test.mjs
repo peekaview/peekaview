@@ -148,3 +148,17 @@ test('the active window is found by its coloured buttons, to the pixel – not t
   const r2 = windowOfLights(grayFrom(img2), trafficLights(img2)[0])
   assert.ok(r2 && Math.abs(r2.x - plain.x) <= 1 && Math.abs(r2.y - plain.y) <= 1 && Math.abs(r2.width - plain.w) <= 2 && Math.abs(r2.height - plain.h) <= 2, JSON.stringify(r2))
 })
+
+test('title bar buttons are found also in grey (an inactive window), not on a window without them', async () => {
+  const { titleButtons } = await import('../web/light-windows.js')
+  const behind = { x: 120, y: 90, w: 900, h: 640 }
+  const front = { x: 520, y: 260, w: 860, h: 620, active: true, toolbar: true }
+  const g = grayFrom(colourScreen([behind, front]))
+  const grey = titleButtons(g, { x: behind.x, y: behind.y, width: behind.w, height: behind.h })
+  assert.ok(grey && Math.abs(grey.x - (behind.x + 14)) <= 2 && Math.abs(grey.y - (behind.y + 14)) <= 2, JSON.stringify(grey))
+  const coloured = titleButtons(g, { x: front.x, y: front.y, width: front.w, height: front.h })
+  assert.ok(coloured && Math.abs(coloured.x - (front.x + 20)) <= 2 && Math.abs(coloured.y - (front.y + 26)) <= 2, JSON.stringify(coloured))
+  // a part of a window's content (lines of text), and the wallpaper: none
+  assert.equal(titleButtons(g, { x: front.x + 100, y: front.y + 200, width: 300, height: 200 }), null)
+  assert.equal(titleButtons(g, { x: 1100, y: 40, width: 400, height: 200 }), null)
+})

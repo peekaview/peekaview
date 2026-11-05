@@ -57,18 +57,31 @@ export function readable(text, confidence = 100) {
   return real.length >= 1 && real.join('').length >= Math.min(6, letters * 0.4)
 }
 
-/** A window's title bar as a picture to read: enlarged where the screen is not sharp (1×). */
-export function titleBar(source, rect, scale = 1) {
+/**
+ * A window's title as a picture to read – exactly the line of its title: beside its three buttons
+ * and at their height, when they are known (light-windows.js titleButtons); else the top of the
+ * window. Enlarged where the screen is not sharp (1×).
+ */
+export function titleBar(source, rect, scale = 1, buttons = null) {
+  if (buttons) {
+    const x = Math.round(buttons.x + 2 * buttons.gap + 14 * scale)
+    const y = Math.round(buttons.y - 11 * scale)
+    return strip(source, { x, y, width: Math.max(16, Math.round(rect.x + rect.width - 12 * scale - x)), height: Math.round(22 * scale) }, scale)
+  }
   const x = rect.x + Math.round(SIDE * scale)
   const width = Math.max(16, rect.width - Math.round(SIDE * scale) - Math.round(12 * scale))
   const height = Math.max(12, Math.min(Math.round(TITLE_HEIGHT * scale), Math.round(rect.height * 0.3)))
+  return strip(source, { x, y: rect.y, width, height }, scale)
+}
+
+function strip(source, { x, y, width, height }, scale) {
   const k = scale < 2 ? 2 : 1
   const canvas = document.createElement('canvas')
   canvas.width = width * k
   canvas.height = height * k
   const ctx = canvas.getContext('2d')
   ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(source, x, rect.y, width, height, 0, 0, width * k, height * k)
+  ctx.drawImage(source, x, y, width, height, 0, 0, width * k, height * k)
   return prepared(canvas)
 }
 

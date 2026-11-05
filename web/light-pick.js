@@ -5,7 +5,7 @@
 // a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
 
 import { grayFrom, scaledGray } from './light-locate.js'
-import { detectWindows, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
+import { detectWindows, titleButtons, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
 
 const DETECT_WIDTH = 640
 const MIN_DRAG = 6 // CSS px before a press becomes a drag
@@ -32,15 +32,36 @@ export class WindowPicker {
     })
   }
 
-  /** A new picture of the screen: windows looked for again; a picked window stays picked. */
-  /** @param {{active?: boolean}} [options] active: taken while the presenter was in another program */
-  setImage(image, { active = false } = {}) {
+  /**
+   * A new picture of the screen: windows looked for again; a picked window stays picked.
+   * @param {{active?: boolean, scale?: number, own?: {x, y, w, h}}} [options] active: taken while
+   *   the presenter was in another program; scale: pixels per point; own: this browser's window
+   *   (0..1 of the picture) – never one to pick
+   */
+  setImage(image, { active = false, scale = 1, own = null } = {}) {
     this.image = image
     const h = Math.max(1, Math.round((image.height * DETECT_WIDTH) / image.width))
     const frames = detectWindows(scaledGray(image, DETECT_WIDTH, h))
-    const titled = titledWindows(image)
+    const { titled, gray } = titledWindows(image)
     const same = (a, b) => Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.w - b.w) < 0.015 && Math.abs(a.h - b.h) < 0.015
-    this.windows = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))]
+    // (the windows found by their frames: their title bar buttons, also grey ones – where they are,
+    // the title can be read exactly beside them)
+    for (const f of frames) {
+      const rect = { x: f.x * image.width, y: f.y * image.height, width: f.w * image.width, height: f.h * image.height }
+      f.buttons = titleButtons(gray, rect, scale)
+    }
+    const overlap = (a, b) => {
+      const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+      const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
+      return (ix * iy) / (a.w * a.h + b.w * b.h - ix * iy)
+    }
+    const previous = this.selection
+    this.windows = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))].filter((w) => !own || overlap(w, own) < 0.6)
+    // the picked window again among the new ones (the picture is fetched anew now and then)
+    if (previous && !previous.drawn) {
+      const again = this.windows.find((w) => overlap(w, previous) > 0.85)
+      if (again) this.selection = again
+    }
     // the window the presenter just worked in (not this browser): picked right away – unless they
     // picked one themselves
     if (active && titled.length && (!this.selection || this.auto)) {
@@ -161,7 +182,10 @@ function dragRect({ from, to }) {
   return { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) }
 }
 
-/** Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`). */
+/**
+ * Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`; their
+ * buttons in pixels), and the picture in grayscale.
+ */
 function titledWindows(image) {
   const canvas = document.createElement('canvas')
   canvas.width = image.width
@@ -170,10 +194,11 @@ function titledWindows(image) {
   ctx.drawImage(image, 0, 0)
   const data = ctx.getImageData(0, 0, image.width, image.height)
   const lights = trafficLights(data)
-  if (!lights.length) return []
   const g = grayFrom(data)
-  return lights
-    .map((l) => windowOfLights(g, l))
-    .filter(Boolean)
-    .map((r) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true }))
+  if (!lights.length) return { titled: [], gray: g }
+  const titled = lights
+    .map((l) => ({ l, r: windowOfLights(g, l) }))
+    .filter(({ r }) => r)
+    .map(({ l, r }) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true, buttons: { x: l.x, y: l.y, gap: l.gap, score: 1 } }))
+  return { titled, gray: g }
 }
