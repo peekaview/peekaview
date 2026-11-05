@@ -805,7 +805,7 @@
         box.hidden = false
         box.classList.remove('problem')
         $('problem-title').textContent = 'Wechsle zu deinem Fenster'
-        $('problem-text').textContent = 'Es ist gerade nicht zu sehen – vielleicht liegt dieser Browser darüber. Solange sehen deine Zuschauer ein schwarzes Bild mit einem Hinweis.'
+        $('problem-text').textContent = 'Es ist gerade nicht zu sehen – vielleicht liegt dieser Browser darüber. Solange sehen deine Zuschauer dein letztes Bild verschwommen, mit einem Hinweis.'
         $('problem-check').hidden = $('problem-screen').hidden = true
         return
       }
@@ -960,7 +960,7 @@
     // the picked window moved (or changed): followed by its title bar – several times a second, and
     // right before each still picture (a drawing then appears where the window is now). Not to be
     // seen: viewers get black with a note, never what lies there instead.
-    const NOT_SEEN = 'Fenster nicht mehr auf dem geteilten Bildschirm sichtbar'
+    const notSeen = () => `Fenster gerade nicht verfügbar\nbei ${host?.name ?? 'der Person, die teilt'} – gleich geht es weiter`
     let trackImage = null
     let trackTitle = null
     let trackMisses = 0
@@ -999,7 +999,7 @@
       if (!found) {
         findByTitle(full, scale)
         if (!cropper.blank) {
-          cropper.setBlank(NOT_SEEN)
+          cropper.setBlank(notSeen())
           renderAll()
         }
         // (said on this page after a few seconds – not while this page lies over it)

@@ -373,12 +373,17 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     const after = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(after.width - size.width) <= 2 && Math.abs(after.height - size.height) <= 2, JSON.stringify(after))
 
-    // the window gone from the screen: viewers see black with a note, never what lies there now
+    // the window gone from the screen: viewers see its last picture blurred with a note, never what
+    // lies there now
     const dark = "(()=>{const v=document.querySelector('video');const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.drawImage(v,0,0);const d=x.getImageData(0,0,c.width,c.height).data;let s=0;for(let i=0;i<d.length;i+=4)s+=d[i];return s/(d.length/4)})()"
+    await tab(V)
+    const bright = await evaluate(dark)
+    await tab(P)
     await evaluate('qaHideWindow = true; true')
     await waitFor("document.querySelector('#problem-title').textContent === 'Wechsle zu deinem Fenster' && !document.querySelector('#place-problem').hidden")
+    // (blurred and darkened, with the note over it)
     await tab(V)
-    await waitFor(`${dark} < 30`)
+    await waitFor(`${dark} < ${bright * 0.6}`)
     await tab(P)
     await evaluate('qaHideWindow = false; true')
     await waitFor("document.querySelector('#place-problem').hidden")

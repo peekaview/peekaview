@@ -66,6 +66,9 @@ export class Cropper {
           const out = new window.VideoFrame(frame, { visibleRect: { x: base.x + x, y: base.y + y, width, height } })
           frame.close()
           this.size = { width, height }
+          // (the last right picture, for the blurred one while the window is not to be seen)
+          this.last?.close()
+          this.last = out.clone()
           controller.enqueue(out)
         } catch {
           controller.enqueue(frame)
@@ -77,11 +80,12 @@ export class Cropper {
   }
 
   /**
-   * Viewers see black with this note instead of the part (the window moved away or got covered);
-   * null: the part again.
+   * Viewers see the last right picture blurred, with this note over it, instead of the part (the
+   * window moved away or got covered; lines split by "\n"); null: the part again.
    */
   setBlank(note) {
     this.blank = note || null
+    if (!this.blank) this.canvasNote = null
   }
 
   blankFrame(timestamp) {
@@ -93,16 +97,42 @@ export class Cropper {
       this.canvas.height = height
       this.canvasNote = this.blank
       const ctx = this.canvas.getContext('2d')
-      ctx.fillStyle = '#000'
+      ctx.fillStyle = '#18181b'
       ctx.fillRect(0, 0, width, height)
-      // the note, as large as fits (also when viewers see the picture small)
+      // the last right picture, blurred (nothing of what lies there now), and darkened
+      if (this.last) {
+        try {
+          ctx.filter = `blur(${Math.max(16, Math.round(width / 40))}px)`
+          ctx.drawImage(this.last, -20, -20, width + 40, height + 40)
+        } catch {}
+        ctx.filter = 'none'
+      }
+      ctx.fillStyle = 'rgba(9, 9, 11, .55)'
+      ctx.fillRect(0, 0, width, height)
+      // the note in a box, as large as fits (also when viewers see the picture small)
+      const [head, ...rest] = this.blank.split('\n')
       let size = Math.round(Math.min(height * 0.07, width * 0.05))
-      ctx.font = `600 ${size}px system-ui, sans-serif`
-      while (size > 10 && ctx.measureText(this.blank).width > width * 0.86) ctx.font = `600 ${(size -= 2)}px system-ui, sans-serif`
-      ctx.fillStyle = '#e5e7eb'
+      const widest = () => Math.max(ctx.measureText(head).width, ...rest.map((l) => ctx.measureText(l).width * 0.75))
+      ctx.font = `700 ${size}px system-ui, sans-serif`
+      while (size > 10 && widest() > width * 0.8) ctx.font = `700 ${(size -= 2)}px system-ui, sans-serif`
+      const lineHeight = size * 1.4
+      const boxW = widest() + size * 2
+      const boxH = lineHeight * (1 + rest.length * 0.8) + size * 1.2
+      ctx.fillStyle = 'rgba(24, 24, 27, .88)'
+      ctx.beginPath()
+      ctx.roundRect?.((width - boxW) / 2, (height - boxH) / 2, boxW, boxH, size * 0.6)
+      ctx.fill()
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(this.blank, width / 2, height / 2)
+      ctx.fillStyle = '#fafafa'
+      let y = (height - boxH) / 2 + size * 0.6 + lineHeight / 2
+      ctx.fillText(head, width / 2, y)
+      ctx.font = `500 ${Math.round(size * 0.75)}px system-ui, sans-serif`
+      ctx.fillStyle = '#d4d4d8'
+      for (const line of rest) {
+        y += lineHeight * 0.8
+        ctx.fillText(line, width / 2, y)
+      }
     }
     try {
       return new window.VideoFrame(this.canvas, { timestamp })
@@ -119,6 +149,8 @@ export class Cropper {
   }
 
   stop() {
+    this.last?.close()
+    this.last = null
     this.source.stop()
     this.generator.stop()
   }
