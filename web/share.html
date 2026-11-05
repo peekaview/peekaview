@@ -981,6 +981,28 @@
       renderHelper()
     }
 
+    // what the window picker found (share.html?debug): frames, title bars, titles read – and the
+    // picture with the frames, open
+    function showPickDebug() {
+      if (!params.has('debug') || !picker) return
+      $('debug-box').hidden = false
+      if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
+      $('pick-picture').open = true
+      const windows = picker.windows
+      $('debug-view').hidden = true
+      $('debug').textContent = `Fensterauswahl ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({
+        bild: picker.image ? `${picker.image.width}x${picker.image.height}` : null,
+        massstab: picker.image ? +(picker.image.width / screen.width).toFixed(2) : null,
+        weg_gewesen: sawAway,
+        vorne: inFront(),
+        rahmen: windows.filter((w) => !w.titled).length,
+        farbige_knoepfe: windows.filter((w) => w.titled).length,
+        mit_titelleiste: windows.filter((w) => w.line).length,
+        liste: pickCandidates().length,
+        titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text}`),
+      }, null, 1)
+    }
+
     // how the still picture and the search went: the console, and here with share.html?debug
     function showDebug(what, capture) {
       console.info(`peekaview light: ${what}`, capture?.debug)
@@ -1189,6 +1211,7 @@
       // (no window recognized: the picture right away, to draw a frame in it)
       if (sawAway && !list.length) $('pick-picture').open = true
       renderPickList(list)
+      showPickDebug()
       $('pick-ok').disabled = !picker.selection
       $('pick-ok').textContent = picker.selection?.drawn ? 'Diesen Ausschnitt zeigen' : 'Dieses Fenster zeigen'
     }
@@ -1246,7 +1269,7 @@
       try {
         const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
         const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width, next.line))
-        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence) })
+        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence), confidence: Math.round(confidence) })
       } catch (err) {
         // (not to be read: no titles in the list)
         console.info('peekaview light: titles not read', err?.message ?? err)

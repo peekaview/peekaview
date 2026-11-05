@@ -266,8 +266,16 @@ export function windowOfLights(g, light) {
  * @returns {{x, y, gap, score} | null} x: the first button's centre, y: their centre line
  */
 export function titleButtons(g, rect, scale = 1) {
-  const d = 12 * scale // a button, across
-  const gap = 20 * scale // from one to the next
+  // (sizes differ between macOS versions: newer ones draw them larger, further apart)
+  let top = null
+  for (const [d, gap] of [[12, 20], [14, 22], [16, 24]]) {
+    const b = buttonsOfSize(g, rect, d * scale, gap * scale, scale)
+    if (b && (!top || b.score > top.score)) top = b
+  }
+  return top && top.score >= 0.6 ? top : null
+}
+
+function buttonsOfSize(g, rect, d, gap, scale) {
   const tw = Math.round(2 * gap + d + 4 * scale)
   const th = Math.round(d + 4 * scale)
   // the three discs on the bar, as a template without its mean
@@ -321,7 +329,7 @@ export function titleButtons(g, rect, scale = 1) {
       if (!top || score > top.score) top = { x: x + 2 * scale + r, y: y + th / 2, gap, score }
     }
   }
-  return top && top.score >= 0.6 ? top : null
+  return top
 }
 
 /**
