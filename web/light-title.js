@@ -23,6 +23,11 @@ function loadScript() {
 
 /** The text in a picture (a canvas): read by Tesseract, German and English. */
 export async function readText(canvas) {
+  return (await readLine(canvas)).text
+}
+
+/** … with how sure Tesseract is of it (0..100). */
+export async function readLine(canvas) {
   reader ??= (async () => {
     await loadScript()
     const worker = await window.Tesseract.createWorker(['deu', 'eng'], 1, { logger: () => {} })
@@ -35,7 +40,21 @@ export async function readText(canvas) {
   })
   const worker = await reader
   const { data } = await worker.recognize(canvas)
-  return (data.text ?? '').replace(/\s+/g, ' ').trim()
+  return { text: (data.text ?? '').replace(/\s+/g, ' ').trim(), confidence: data.confidence ?? 0 }
+}
+
+/**
+ * A title worth showing – not letter salad (a toolbar, icons, a picture read as text): Tesseract
+ * fairly sure, and most of it words that look like words.
+ */
+export function readable(text, confidence = 100) {
+  if (confidence < 55) return false
+  const chars = text.replace(/\s/g, '')
+  if (chars.length < 3) return false
+  const letters = (chars.match(/[\p{L}\p{N}]/gu) ?? []).length
+  if (letters / chars.length < 0.6) return false
+  const real = words(text).filter((w) => /[aeiouyäöüàéèô]/i.test(w) && !/(.)\1\1/.test(w) && w.length <= 30)
+  return real.length >= 1 && real.join('').length >= Math.min(6, letters * 0.4)
 }
 
 /** A window's title bar as a picture to read: enlarged where the screen is not sharp (1×). */
@@ -50,14 +69,14 @@ export function titleBar(source, rect, scale = 1) {
   const ctx = canvas.getContext('2d')
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(source, x, rect.y, width, height, 0, 0, width * k, height * k)
-  return readable(canvas)
+  return prepared(canvas)
 }
 
 /**
  * Made easy to read: grey, its contrast stretched, dark text on light ground (Tesseract reads that
  * best – a dark title bar, or white on colour, is turned around).
  */
-function readable(canvas) {
+function prepared(canvas) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const px = data.data

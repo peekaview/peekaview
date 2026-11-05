@@ -267,13 +267,6 @@
       <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.</p>
     </section>
 
-    <!-- the tab, once the share runs in its own small window -->
-    <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
-      <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
-      <p class="lead" style="margin:0">Alles Weitere passiert im kleinen Fenster „Freigabe läuft“ unten rechts. Du kannst diesen Tab schließen.</p>
-      <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
-    </section>
-
     <!-- afterwards -->
     <section id="ended" style="display:flex;flex-direction:column;gap:18px" hidden>
       <h1>Freigabe beendet</h1>
@@ -304,10 +297,10 @@
     // The helper reaches this page through window.parent / window.opener .pvLight.
     import { LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
-    import { Cropper, cropSupported } from './light-crop.js'
+    import { cropSupported, makeCropper } from './light-crop.js'
     import { grayFrom, scaledGray } from './light-locate.js'
     import { detectWindows, trafficLights, windowOfLights } from './light-windows.js'
-    import { readText, sameTitle, titleBar, words } from './light-title.js'
+    import { readLine, readText, readable, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { borderStrips, follow, grabberOf, hasLine, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
@@ -334,13 +327,12 @@
     const PANEL_WIDTH = 360
     // the browser's screen picker is shown inside the window that asks: it needs about this much
     const PICKER_ROOM = { width: 760, height: 660 }
-    // The share runs in its own small window (share.html?panel), opened from this page: picking the
-    // window, who watches, what they may do – and it jumps to each drawing itself. The tab that
-    // opened it may then be closed. (Popups blocked: everything here, in the tab.)
+    // The share runs in this tab; the small window "Freigabe läuft" opens along the way (Chrome,
+    // Edge: always on top; else the helper popup). share.html?panel: the whole share in a popup of
+    // its own, which jumps to each drawing itself and lets the tab be closed – not offered now.
     const params = new URLSearchParams(location.search)
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
-    let panelWindow = null
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null
@@ -437,32 +429,11 @@
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
     function start() {
-      // (Chrome, Edge: here, with the always-on-top window opened along the way)
-      if (panel || !supported || documentPip || !nameOrAsk()) return startHere()
-      // (large enough for the browser's screen picker, which shows inside it; small afterwards)
-      const width = Math.min(PICKER_ROOM.width, screen.availWidth)
-      const height = Math.min(PICKER_ROOM.height, screen.availHeight)
-      const left = Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2)
-      const top = Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2)
-      const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
-      panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
-      if (!panelWindow) return startHere()
-      $('setup').hidden = true
-      $('ended').hidden = true
-      $('elsewhere').hidden = false
-      document.title = '● Freigabe läuft – PeekaView light'
+      // here, in this tab – the small window "Freigabe läuft" opens along the way (Chrome, Edge:
+      // always on top; else a popup, in this very click). (share.html?panel: the share in a
+      // popup of its own – not offered any more.)
+      return startHere()
     }
-    $('elsewhere-show').addEventListener('click', () => {
-      try { panelWindow?.focus() } catch {}
-    })
-    // the small window closed: back to the start
-    setInterval(() => {
-      if (!panelWindow?.closed) return
-      panelWindow = null
-      $('elsewhere').hidden = true
-      $('setup').hidden = false
-      document.title = 'Im Browser teilen – PeekaView light'
-    }, 1000)
 
     function startHere() {
       const name = nameOrAsk()
@@ -484,7 +455,7 @@
       if (!panel && !documentPip) openHelper()
       $('start').disabled = true
       picking.then((stream) => {
-        const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface ?? 'monitor'
+        const surface = surfaceOf(stream.getVideoTracks()[0])
         // the whole screen: pick the window to show from it (where the browser can cut it out)
         if (cropSupported && surface === 'monitor') return showPick(stream, name)
         return begin(stream, name)
@@ -498,11 +469,20 @@
       })
     }
 
+    // what was picked in the browser's dialog (Firefox may not say: a picture as wide and as high
+    // as this screen is the screen)
+    function surfaceOf(track) {
+      const settings = track?.getSettings?.() ?? {}
+      if (settings.displaySurface) return settings.displaySurface
+      if (!settings.width || !settings.height) return 'monitor'
+      return Math.abs(settings.width / settings.height - screen.width / screen.height) < 0.02 ? 'monitor' : 'window'
+    }
+
     /** @param crop the part of the whole screen to share (pixels), null for all of it; undefined: no cutting */
     async function begin(stream, name, crop) {
       if (crop !== undefined && cropSupported) {
         screenStream = stream
-        cropper = new Cropper(stream.getVideoTracks()[0])
+        cropper = makeCropper(stream.getVideoTracks()[0])
         cropper.setRect(crop)
         // every picture: is the window's title bar still where it was? Not: looked for at once
         cropper.check = stillThere
@@ -1100,6 +1080,11 @@
     function showPick(stream, name) {
       pickStream = stream
       pickName = name
+      // (Firefox, Safari: pictures of it from a playing video – no ImageCapture there)
+      if ($('src-video').srcObject !== stream) {
+        $('src-video').srcObject = stream
+        $('src-video').play().catch(() => {})
+      }
       sawAway = false
       away = null
       $('setup').hidden = $('running').hidden = true
@@ -1117,14 +1102,14 @@
       // this page covers the windows while it is in front: the picture from when it was not
       pickTimer = setInterval(async () => {
         if (inFront()) return
-        const c = await frameCanvas(pickStream)
+        const c = await frameCanvas(pickStream, sourceVideos())
         if (c) away = c
       }, 700)
       renderPick()
     }
 
     async function freshPicture() {
-      const c = await frameCanvas(pickStream)
+      const c = await frameCanvas(pickStream, sourceVideos())
       if (c) picker?.setImage(c)
     }
 
@@ -1159,9 +1144,13 @@
     // bar – light-title.js – as soon as it is read)
     const pickTitles = new WeakMap()
     let pickReading = false
-    function pickCandidates() {
+    function pickWindows() {
       if (!picker?.image || !sawAway) return []
-      return picker.windows.filter((w) => w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 6)
+      return picker.windows.filter((w) => w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
+    }
+    // (shown: the one just worked in, and those with a title that reads like one – not letter salad)
+    function pickCandidates() {
+      return pickWindows().filter((w) => w.titled || pickTitles.get(w)?.ok).slice(0, 6)
     }
     function renderPickList(list) {
       const image = picker.image
@@ -1182,13 +1171,13 @@
         ctx.drawImage(image, sx, sy, sw, sh, (320 - sw * k) / 2, (200 - sh * k) / 2, sw * k, sh * k)
         const label = document.createElement('span')
         const title = pickTitles.get(w)
-        label.textContent = title || (w.titled ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`)
+        label.textContent = title?.ok ? title.text : w.titled ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`
         item.append(thumb, label)
         if (w.titled) item.append(Object.assign(document.createElement('small'), { textContent: 'zuletzt benutzt' }))
         item.addEventListener('click', () => picker.select(w))
         return item
       }))
-      readPickTitles(list)
+      readPickTitles(pickWindows())
     }
     async function readPickTitles(list) {
       if (pickReading) return
@@ -1198,12 +1187,12 @@
       pickReading = true
       try {
         const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
-        const text = (await readText(titleBar(image, rect, image.width / screen.width))).slice(0, 60)
-        pickTitles.set(next, words(text).length ? text : '')
+        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width))
+        pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence) })
       } catch (err) {
         // (not to be read: no titles in the list)
         console.info('peekaview light: titles not read', err?.message ?? err)
-        for (const w of list) pickTitles.set(w, '')
+        for (const w of list) pickTitles.set(w, { text: '', ok: false })
       } finally {
         pickReading = false
       }
@@ -1276,7 +1265,7 @@
       return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
-      const full = await frameCanvas(screenStream)
+      const full = await frameCanvas(screenStream, sourceVideos())
       const r = cropper?.rect
       if (!full || !r || picker) return
       const grab = grabberOf(full)
@@ -1344,47 +1333,24 @@
     // The window's title bar in a picture of the screen, right in the video's way (light-crop.js):
     // read from the frame itself (only that strip), compared with the one known.
     let missAt = 0
-    async function stillThere(frame, r) {
+    // (src: the screen's picture right now – its size, and the brightness of a part of it)
+    async function stillThere(src, r) {
       const title = trackTitle
       // (a plain title bar: nothing to compare – the timer's search has to do)
       if (!title) return true
       const bx = r.x + title.band.x
       const by = r.y + title.band.y
-      const strip = await lumaOf(frame, { x: bx - 2, y: by - 2, width: title.tpl.width + 6, height: title.tpl.height + 6 })
+      const strip = await src.luma({ x: bx - 2, y: by - 2, width: title.tpl.width + 6, height: title.tpl.height + 6 })
       if (!strip || strip.width < title.tpl.width || strip.height < title.tpl.height) return false
       if (titleScore(strip, title, bx - strip.x, by - strip.y) < 0.7) return false
       // … and its right and bottom borders where they were (made larger or smaller: not)
       const [right, bottom] = borderStrips(r)
       for (const [area, across] of [[right, true], [bottom, false]]) {
-        if (area.x < 1 || area.y < 1 || area.x + area.width > frame.displayWidth || area.y + area.height > frame.displayHeight) continue
-        const g = await lumaOf(frame, area)
+        if (area.x < 1 || area.y < 1 || area.x + area.width > src.width || area.y + area.height > src.height) continue
+        const g = await src.luma(area)
         if (g && !hasLine(g, across)) return false
       }
       return true
-    }
-
-    /** The brightness of a part of a video frame (on even pixels: video formats keep colour for pairs). */
-    async function lumaOf(frame, area) {
-      const base = frame.visibleRect ?? { x: 0, y: 0 }
-      const x = Math.max(0, Math.floor(area.x / 2) * 2)
-      const y = Math.max(0, Math.floor(area.y / 2) * 2)
-      const width = Math.min(frame.displayWidth - x, Math.ceil((area.width + area.x - x) / 2) * 2)
-      const height = Math.min(frame.displayHeight - y, Math.ceil((area.height + area.y - y) / 2) * 2)
-      if (width < 2 || height < 2) return null
-      const rect = { x: base.x + x, y: base.y + y, width, height }
-      const buffer = new Uint8Array(frame.allocationSize({ rect }))
-      const [plane] = await frame.copyTo(buffer, { rect })
-      const px = new Float32Array(width * height)
-      const rgb = /^(RGB|BGR)/.test(frame.format)
-      const red = frame.format?.startsWith('RGB') ? 0 : 2
-      for (let row = 0; row < height; row++) {
-        const i = plane.offset + row * plane.stride
-        for (let col = 0; col < width; col++) {
-          // the first plane of NV12 / I420, else from red, green, blue
-          px[row * width + col] = rgb ? 0.299 * buffer[i + col * 4 + red] + 0.587 * buffer[i + col * 4 + 1] + 0.114 * buffer[i + col * 4 + 2 - red] : buffer[i + col]
-        }
-      }
-      return { x, y, width, height, px }
     }
 
     // The window's titles, read from its title bar (light-title.js): now and then while it stays,
@@ -1399,9 +1365,10 @@
       titleReading = true
       const shot = titleBar(full, rect, scale)
       try {
-        const text = await readText(shot)
+        const { text, confidence } = await readLine(shot)
         titleReadAt = Date.now()
-        if (words(text).length && !titleTexts.some((t) => sameTitle(t, text) >= 0.9)) titleTexts = [text, ...titleTexts].slice(0, 8)
+        // (letter salad is no title to find it by)
+        if (readable(text, confidence) && !titleTexts.some((t) => sameTitle(t, text) >= 0.9)) titleTexts = [text, ...titleTexts].slice(0, 8)
       } catch (err) {
         // (no reading – Tesseract not to be loaded: following by the title bar's picture only)
         titleReadAt = Date.now() + 60000
@@ -1526,7 +1493,7 @@
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
-      get pickTitles() { return pickCandidates().map((w) => pickTitles.get(w) ?? null) },
+      get pickTitles() { return pickWindows().map((w) => pickTitles.get(w) ?? null) },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
