@@ -526,7 +526,7 @@
 
     // The small window on the screen that is shared: all places on the screen are reckoned from the
     // screen it is on (browsers tell nothing of the others). So it shows a mark for a moment and looks
-    // for it in the shared picture – not there: it tries next to its screen, on each side.
+    // for it in the shared picture – not there: it asks Chrome for the screens, else to be dragged there.
     async function toSharedScreen(stream) {
       if (!panel || window.qaSkipScreenSearch) return
       if ($('src-video').srcObject !== stream) {
@@ -555,50 +555,68 @@
           log(`keine Fensterverwaltung: ${err?.message ?? err}`)
         }
       }
-      const home = [window.screenX, window.screenY]
-      const w = window.outerWidth
-      const h = window.outerHeight
-      const left = screen.availLeft ?? 0
-      const top = screen.availTop ?? 0
-      const sides = [
-        [left + screen.availWidth + 40, top + 80],
-        [left - w - 40, top + 80],
-        [left + 80, top + screen.availHeight + 40],
-        [left + 80, top - h - 40],
-      ]
-      for (const [x, y] of sides) {
-        try { window.moveTo(x, y) } catch {}
-        await new Promise((done) => setTimeout(done, 350))
-        // (not moved: no screen there)
-        if (Math.abs(window.screenX - home[0]) + Math.abs(window.screenY - home[1]) < 40) {
-          log(`nicht verschoben nach ${x},${y}`)
-          continue
-        }
-        if (await markSeen(stream)) return log(`gefunden bei ${x},${y}`)
-        log(`verschoben nach ${x},${y}, nicht gefunden`)
+      // else (Firefox; Chrome without that permission): a web page cannot move its window to another
+      // screen – the presenter drags it there. The mark stays meanwhile and is looked for again and again.
+      log('zum Hinziehen aufgefordert')
+      const mark = showMark('Zieh dieses kleine Fenster auf den Bildschirm, den du teilst.')
+      const skip = Object.assign(document.createElement('button'), { type: 'button', id: 'screen-skip', className: 'text-button', textContent: 'Weiter, ohne es zu verschieben' })
+      skip.style.cssText = 'color:#000;text-decoration:underline'
+      mark.append(skip)
+      try {
+        await new Promise((done) => {
+          let busy = false
+          const timer = setInterval(async () => {
+            if (busy) return
+            busy = true
+            try {
+              if (await seenIn(stream)) {
+                clearInterval(timer)
+                log('gefunden nach Hinziehen')
+                done()
+              }
+            } finally {
+              busy = false
+            }
+          }, 600)
+          skip.onclick = () => {
+            clearInterval(timer)
+            log('übersprungen')
+            done()
+          }
+        })
+      } finally {
+        mark.remove()
       }
-      try { window.moveTo(...home) } catch {}
-      log('aufgegeben')
     }
 
     // a magenta mark over this window – to be found in the shared picture?
     async function markSeen(stream) {
-      const mark = Object.assign(document.createElement('div'), { textContent: 'Einen Moment …' })
-      mark.style.cssText = 'position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#f0f;color:#000;font:700 22px system-ui,sans-serif'
-      document.body.append(mark)
+      const mark = showMark('Einen Moment …')
       try {
         await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 250))))
-        const c = await frameCanvas(stream, sourceVideos())
-        if (!c) return false
-        const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height)
-        let hits = 0
-        for (let i = 0; i < data.length; i += 16) if (data[i] > 200 && data[i + 1] < 70 && data[i + 2] > 200) hits++
-        // (a good part of this window's area)
-        const scale = c.width / screen.width
-        return hits * 4 > window.innerWidth * window.innerHeight * scale * scale * 0.3
+        return await seenIn(stream)
       } finally {
         mark.remove()
       }
+    }
+
+    function showMark(text) {
+      const mark = document.createElement('div')
+      mark.append(Object.assign(document.createElement('p'), { textContent: text }))
+      mark.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;gap:18px;align-items:center;justify-content:center;padding:24px;text-align:center;background:#f0f;color:#000;font:700 22px system-ui,sans-serif'
+      document.body.append(mark)
+      return mark
+    }
+
+    // the mark in the shared picture: a good part of this window's area magenta
+    async function seenIn(stream) {
+      const c = await frameCanvas(stream, sourceVideos())
+      if (!c) return false
+      const { data } = c.getContext('2d').getImageData(0, 0, c.width, c.height)
+      let hits = 0
+      for (let i = 0; i < data.length; i += 16) if (data[i] > 200 && data[i + 1] < 70 && data[i + 2] > 200) hits++
+      const scale = c.width / screen.width
+      return hits * 4 > window.innerWidth * window.innerHeight * scale * scale * 0.25
     }
 
     // what was picked in the browser's dialog (Firefox may not say: a picture as wide and as high

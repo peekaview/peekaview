@@ -214,7 +214,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     // (as in Firefox: no Picture-in-Picture, no MediaStreamTrackGenerator – the window
     // "Freigabe läuft" is a popup, a canvas cuts the window out)
     await browser('open', base + '/share.html')
-    await evaluate("localStorage.setItem('qaFirefox', '1'); true")
+    await evaluate("localStorage.setItem('qaFirefox', '1'); localStorage.setItem('qaScreenSearch', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '1000')
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
@@ -235,6 +235,12 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     const V = 't3'
     await tab(P)
     await waitFor("document.body.classList.contains('panel') && document.querySelector('#name').value === 'Patrick'")
+    // not to be seen in the shared picture (the fake screen never shows it), and Firefox cannot move
+    // it to another screen: the presenter is asked to drag it there (or to go on without)
+    await waitFor("!!document.querySelector('#screen-skip')")
+    assert.match(await evaluate('document.body.innerText'), /Zieh dieses kleine Fenster auf den Bildschirm, den du teilst/)
+    await evaluate("localStorage.removeItem('qaScreenSearch'); true")
+    await browser('click', '#screen-skip')
     // it asks for the screen itself, right away (where a browser wants a click there: its button)
     // which window? the screen with the windows found
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")

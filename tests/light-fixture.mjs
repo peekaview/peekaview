@@ -52,12 +52,17 @@ if (new URLSearchParams(location.search).get('browser') === 'firefox' || qaFiref
   Object.defineProperty(Document.prototype, 'pictureInPictureEnabled', { get: () => false })
   // … and no cutting a window out of the screen (MediaStreamTrackGenerator)
   delete window.MediaStreamTrackGenerator
+  // … nor the screens asked for (window management)
+  delete window.getScreenDetails
 }
 // localStorage qaNoPip: no interactive Picture-in-Picture (as in Firefox, Safari) – for this page
 // and the small window it opens
 try { if (localStorage.getItem('qaNoPip')) delete window.documentPictureInPicture } catch {}
-// (the fake screen never shows the small window: no looking for it there)
-window.qaSkipScreenSearch = true
+// (the fake screen never shows the small window: no looking for it there – unless localStorage
+// qaScreenSearch: to see it asked to be dragged)
+let qaScreenSearch = false
+try { qaScreenSearch = !!localStorage.getItem('qaScreenSearch') } catch {}
+window.qaSkipScreenSearch = !qaScreenSearch
 window.qaSurfaces = []
 window.qaWindowAt = { x: 220, y: 140, width: 480, height: 320 }
 // black bars above and below the window's picture (px), as Chrome adds when a window's shape changed
