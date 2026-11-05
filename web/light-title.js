@@ -50,6 +50,34 @@ export function titleBar(source, rect, scale = 1) {
   const ctx = canvas.getContext('2d')
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(source, x, rect.y, width, height, 0, 0, width * k, height * k)
+  return readable(canvas)
+}
+
+/**
+ * Made easy to read: grey, its contrast stretched, dark text on light ground (Tesseract reads that
+ * best – a dark title bar, or white on colour, is turned around).
+ */
+function readable(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const px = data.data
+  const n = px.length / 4
+  const gray = new Float32Array(n)
+  for (let i = 0; i < n; i++) gray[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]
+  // the ground is what most of the bar is: brighter or darker than its middle
+  const sorted = Float32Array.from(gray).sort()
+  const low = sorted[Math.floor(n * 0.02)]
+  const high = sorted[Math.floor(n * 0.98)]
+  const ground = sorted[Math.floor(n / 2)]
+  const invert = ground < (low + high) / 2
+  const span = Math.max(1, high - low)
+  for (let i = 0; i < n; i++) {
+    let v = Math.min(255, Math.max(0, ((gray[i] - low) / span) * 255))
+    if (invert) v = 255 - v
+    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v
+    px[i * 4 + 3] = 255
+  }
+  ctx.putImageData(data, 0, 0)
   return canvas
 }
 

@@ -313,7 +313,13 @@ test('the share in its own small window (no Picture-in-Picture): the whole scree
     await evaluate("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
     // the window just worked in is recognized by its title bar's buttons, and picked right away
     await waitFor("document.querySelector('#pick-lead').textContent.startsWith('Erkannt') && !document.querySelector('#pick-ok').disabled")
-    // a click into the window picks it
+    // the windows recognized, as a list: the one just worked in first, picked; its title read
+    assert.equal(await evaluate("document.querySelector('.pick-item[aria-pressed=true]') === document.querySelector('.pick-item')"), true)
+    await waitFor("document.querySelector('.pick-item span').textContent.includes('Projektplan')").catch(async (e) => {
+      throw new Error(`${e.message}\n${await evaluate("[...document.querySelectorAll('.pick-item')].map((i) => i.innerText).join(' | ')")}`)
+    })
+    // … or in the picture: a click into the window picks it
+    await evaluate("document.querySelector('#pick-picture').open = true; true")
     const box = await evaluate("(()=>{const r=document.querySelector('#pick-view').getBoundingClientRect();return {l:r.left,t:r.top,w:r.width,h:r.height}})()")
     const sw = await evaluate('screen.width')
     const sh = await evaluate('screen.height')
@@ -323,7 +329,7 @@ test('the share in its own small window (no Picture-in-Picture): the whole scree
     await waitFor("!document.querySelector('#pick-ok').disabled")
     await browser('click', '#pick-ok')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
-    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Freigabe läuft')
+    assert.match(await evaluate("document.querySelector('#live-title').textContent"), /^Freigabe läuft · /)
     assert.equal(await evaluate("document.querySelector('#locate-step').hidden && !document.querySelector('#repick').hidden"), true, 'no second screen to pick: the place is known')
     const size = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(size.width - win.width) <= 4 && Math.abs(size.height - win.height) <= 4, JSON.stringify(size))
@@ -435,6 +441,8 @@ test('the share in its own small window (no Picture-in-Picture): the whole scree
     // (once the small window shows its panel again)
     await waitFor("!document.body.classList.contains('spotting')")
     await waitFor('!pvLight.frames.paused')
+    // (under "Mehr" in the small window)
+    await browser('click', '#more')
     await browser('click', '#repick')
     await waitFor("!document.querySelector('#pick').hidden")
     await browser('click', '#pick-screen')
@@ -486,7 +494,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await browser('click', '#pick-ok')
     await tab('t1')
     await waitFor("!document.querySelector('#in-pip').hidden && !!pvLight.host && !document.getElementById('running')")
-    assert.match(await evaluate("document.querySelector('#in-pip').innerText"), /immer vorne[\s\S]*Lass diesen Tab offen/)
+    assert.match(await evaluate("document.querySelector('#in-pip').innerText"), /Lass diesen Tab bitte offen[\s\S]*immer vorne/)
     const P = await idOf('about:blank')
     await tab(P)
     assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)

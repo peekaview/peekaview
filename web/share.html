@@ -42,6 +42,7 @@
     .connect { display: flex; align-items: center; justify-content: center; gap: 10px; height: 52px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
     .connect:hover:not(:disabled) { background: #dc2626; }
     .connect:disabled { opacity: .45; cursor: default; box-shadow: none; }
+    .start-figure { display: block; width: 100%; max-width: 440px; margin: -6px auto 0; font-family: ui-sans-serif, system-ui, sans-serif; }
     .hint { margin: -8px 0 0; color: #a1a1aa; font-size: 13px; text-align: center; }
     .live { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
     .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.25); animation: pulse 2s ease-in-out infinite; }
@@ -81,6 +82,17 @@
     /* picking the window: a picture of the screen, the windows found outlined */
     main.wide { width: min(980px, calc(100% - 32px)); }
     .pick-view { display: block; width: 100%; border-radius: 10px; background: #000; cursor: crosshair; touch-action: none; }
+    .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
+    .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .pick-list:empty { display: none; }
+    .pick-item { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 8px; border: 2px solid #27272a; border-radius: 12px; background: #09090b; color: #fafafa; font: 600 13.5px/1.3 ui-sans-serif, system-ui, sans-serif; text-align: left; cursor: pointer; }
+    .pick-item:hover { border-color: #52525b; }
+    .pick-item[aria-pressed="true"] { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
+    .pick-item canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; background: #000; }
+    .pick-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pick-item small { color: #a1a1aa; font-weight: 500; }
+    .pick-picture summary { color: #a1a1aa; font-size: 13.5px; cursor: pointer; }
+    .pick-picture[open] summary { margin-bottom: 10px; }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
     .live { flex-wrap: wrap; }
     .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
@@ -108,9 +120,17 @@
     body.panel .linkbox { margin: 0; }
     body.panel .linkbox .pill { flex: 1; }
     body.panel .keep { margin: 0; }
+    .stay { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; background: #27272a; }
+    .stay-icon { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fafafa; color: #18181b; }
+    .stay strong { display: block; font-size: 19px; }
+    .stay p { margin: 4px 0 0; color: #d4d4d8; font-size: 15px; }
+    /* small windows: the essentials, the rest under "Mehr" */
+    #more { display: none; align-self: center; }
+    body.pip #more, body.panel #more { display: inline; }
+    body.pip #running:not(.more) .extra, body.panel #running:not(.more) .extra { display: none !important; }
     /* the always-on-top window (Picture-in-Picture): the running controls, compact; a drawing as a
        preview on top – and "Ansehen": as large as it gets, nothing else */
-    body.pip { margin: 0; padding: 14px; overflow-y: auto; background: #18181b; }
+    body.pip { box-sizing: border-box; min-height: 100vh; margin: 0; padding: 14px; overflow-y: auto; background: #18181b; }
     .pip-spot { display: flex; flex-direction: column; gap: 8px; }
     .pip-spot canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: #18181b; }
     .pip-bar { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -147,6 +167,17 @@
         <p class="mode-note" id="setup-mode-note" role="status"></p>
       </div>
       <button class="connect" id="start" type="button"></button>
+      <svg class="start-figure" id="start-figure" viewBox="0 0 440 120" role="img" aria-label="Im Fenster deines Browsers oben „Gesamter Bildschirm“ anklicken" hidden>
+        <rect x="1" y="1" width="438" height="118" rx="14" fill="#f4f4f5" stroke="#d4d4d8"/>
+        <text x="22" y="34" font-size="14" font-weight="600" fill="#18181b">Inhalte zum Teilen auswählen</text>
+        <text x="22" y="74" font-size="13" fill="#52525b">Chrome-Tab</text>
+        <text x="128" y="74" font-size="13" fill="#52525b">Fenster</text>
+        <text x="214" y="74" font-size="13" font-weight="700" fill="#18181b">Gesamter Bildschirm</text>
+        <rect x="210" y="82" width="140" height="3" rx="1.5" fill="#ef4444"/>
+        <path d="M392 104 L360 84" stroke="#ef4444" stroke-width="3" stroke-linecap="round"/>
+        <path d="M358 94 L359 83 L369 86" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="300" y="110" font-size="12" font-weight="700" fill="#ef4444">hier klicken</text>
+      </svg>
       <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
       <p class="error" id="start-error" role="alert" hidden></p>
     </section>
@@ -154,8 +185,10 @@
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
       <h1>Welches Fenster möchtest du zeigen?</h1>
+      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest.</li><li>Komm dann hierher zurück.</li></ol>
       <p class="lead" id="pick-lead" style="margin:0"></p>
-      <canvas id="pick-view" class="pick-view"></canvas>
+      <div class="pick-list" id="pick-list"></div>
+      <details class="pick-picture" id="pick-picture"><summary>Im Bild auswählen oder einen Rahmen ziehen</summary><canvas id="pick-view" class="pick-view"></canvas></details>
       <button class="connect" id="pick-ok" type="button" disabled>Dieses Fenster zeigen</button>
       <div class="pick-more"><button class="text-button" id="pick-screen" type="button">Lieber den ganzen Bildschirm zeigen</button><button class="text-button" id="pick-again" type="button">Bild neu holen</button></div>
       <p class="keep" style="margin:0">Nur der rot umrandete Teil geht an deine Zuschauer – auch was gerade darüber liegt.</p>
@@ -163,7 +196,7 @@
 
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
-      <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
+      <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill extra" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
       <div class="step problem" id="place-problem" role="alert" hidden>
         <span class="step-icon" data-icon="window"></span>
         <div class="step-body">
@@ -174,7 +207,7 @@
       </div>
       <div class="pip-spot" id="pip-spot" hidden>
         <canvas id="pip-canvas"></canvas>
-        <div class="pip-bar"><button class="pill primary" id="pip-look" type="button">Ansehen</button><button class="pill" id="pip-jump" type="button">Zur Stelle</button><button class="pill" id="pip-small" type="button" hidden>Kleiner</button></div>
+        <div class="pip-bar"><button class="pill primary" id="pip-look" type="button">Groß anzeigen</button><button class="pill" id="pip-jump" type="button">Am Fenster zeigen</button><button class="pill" id="pip-small" type="button" hidden>Wieder klein</button></div>
       </div>
       <div class="step" id="pip-step" hidden>
         <span class="step-icon" data-icon="windows"></span>
@@ -209,17 +242,18 @@
         <p class="section-title">Möchte zusehen</p>
         <div class="requests" id="requests"></div>
       </div>
-      <div>
+      <div class="extra">
         <p class="section-title" id="viewers-title">Schauen zu</p>
         <ul class="viewers" id="viewers"></ul>
       </div>
-      <div>
+      <div class="extra">
         <p class="modes-title">Was dürfen die Zuschauer?</p>
         <div class="modes" id="running-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
         <p class="mode-note" id="running-mode-note" role="status"></p>
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
-      <div class="note"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster</button>
 
       <button class="pill stop" id="stop" type="button"></button>
       <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
@@ -228,7 +262,8 @@
     <!-- the tab, while the controls are in the always-on-top window (Chrome, Edge) -->
     <section id="in-pip" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
-      <p class="lead" style="margin:0">Alles Weitere im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne. Lass diesen Tab offen: Schließt du ihn, endet die Freigabe.</p>
+      <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.</p>
     </section>
 
     <!-- the tab, once the share runs in its own small window -->
@@ -371,6 +406,8 @@
 
     // ---------------------------------------------------------------- start
     const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
+    // (Chrome, Edge: which tab of their dialog, drawn)
+    $('start-figure').toggleAttribute('hidden', !cropSupported || panel)
     if (cropSupported) $('start-hint').textContent = 'Dein Browser fragt gleich, was du teilen möchtest: Wähle „Gesamter Bildschirm“. Danach suchst du hier aus, welches Fenster deine Zuschauer sehen.'
     if (!supported) {
       $('start').disabled = true
@@ -679,7 +716,10 @@
       $('pip-step').hidden = !(documentPip && !panel && host && !pip)
       $('helper').hidden = documentPip && !panel
       if (host) {
-        $('live-title').textContent = panel ? 'Freigabe läuft' : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
+        const watching = host.viewerList.length
+        $('live-title').textContent = panel || pip
+          ? `Freigabe läuft · ${watching === 0 ? 'noch niemand schaut zu' : watching === 1 ? `${host.viewerList[0].name} schaut zu` : `${watching} schauen zu`}`
+          : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
         $('repick').hidden = !cropper
       }
       const open = panel || (!!helper && !helper.closed)
@@ -809,6 +849,14 @@
       pipGone?.()
     }
     $('pip-open').addEventListener('click', openPipWindow)
+
+    // small windows: the rest of the controls on demand
+    $('more').addEventListener('click', () => {
+      const open = $('running').classList.toggle('more')
+      $('more').setAttribute('aria-expanded', String(open))
+      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster'
+      dock()
+    })
 
     function showInPip(r) {
       if (!miniView) {
@@ -1077,13 +1125,75 @@
 
     function renderPick() {
       if (!picker) return
+      const list = pickCandidates()
+      $('pick-steps').hidden = sawAway
+      $('pick-lead').hidden = !sawAway
       $('pick-lead').textContent = picker.auto
-        ? 'Erkannt: das Fenster, in dem du gerade warst (rot umrandet). Passt es, klicke unten auf „Dieses Fenster zeigen“ – sonst klicke ein anderes an.'
-        : sawAway
-          ? 'Klicke auf das Fenster, das du zeigen willst. Wird es nicht erkannt, zieh mit der Maus einen Rahmen darum.'
-          : 'Wechsle kurz zu dem Fenster, das du zeigen willst, und komm dann hierher zurück – dann siehst du es hier und klickst es an. Oder zieh mit der Maus einen Rahmen auf.'
+        ? 'Erkannt: das Fenster, in dem du gerade warst. Stimmt es, klicke unten auf „Dieses Fenster zeigen“.'
+        : list.length
+          ? 'Klicke das Fenster an, das du zeigen möchtest.'
+          : 'Kein Fenster erkannt. Zieh im Bild mit der Maus einen Rahmen um das, was du zeigen möchtest.'
+      // (no window recognized: the picture right away, to draw a frame in it)
+      if (sawAway && !list.length) $('pick-picture').open = true
+      renderPickList(list)
       $('pick-ok').disabled = !picker.selection
       $('pick-ok').textContent = picker.selection?.drawn ? 'Diesen Ausschnitt zeigen' : 'Dieses Fenster zeigen'
+    }
+
+    // The windows recognized, as a list: a small picture each, and its title (read from its title
+    // bar – light-title.js – as soon as it is read)
+    const pickTitles = new WeakMap()
+    let pickReading = false
+    function pickCandidates() {
+      if (!picker?.image || !sawAway) return []
+      return picker.windows.filter((w) => w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 6)
+    }
+    function renderPickList(list) {
+      const image = picker.image
+      $('pick-list').replaceChildren(...list.map((w, i) => {
+        const item = document.createElement('button')
+        item.type = 'button'
+        item.className = 'pick-item'
+        item.setAttribute('aria-pressed', String(picker.selection === w))
+        const thumb = document.createElement('canvas')
+        thumb.width = 320
+        thumb.height = 200
+        const ctx = thumb.getContext('2d')
+        const sx = w.x * image.width
+        const sy = w.y * image.height
+        const sw = w.w * image.width
+        const sh = w.h * image.height
+        const k = Math.min(320 / sw, 200 / sh)
+        ctx.drawImage(image, sx, sy, sw, sh, (320 - sw * k) / 2, (200 - sh * k) / 2, sw * k, sh * k)
+        const label = document.createElement('span')
+        const title = pickTitles.get(w)
+        label.textContent = title || (w.titled ? 'Zuletzt benutztes Fenster' : `Fenster ${i + 1}`)
+        item.append(thumb, label)
+        if (w.titled) item.append(Object.assign(document.createElement('small'), { textContent: 'zuletzt benutzt' }))
+        item.addEventListener('click', () => picker.select(w))
+        return item
+      }))
+      readPickTitles(list)
+    }
+    async function readPickTitles(list) {
+      if (pickReading) return
+      const image = picker?.image
+      const next = list.find((w) => !pickTitles.has(w))
+      if (!next || !image) return
+      pickReading = true
+      try {
+        const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
+        const text = (await readText(titleBar(image, rect, image.width / screen.width))).slice(0, 60)
+        pickTitles.set(next, words(text).length ? text : '')
+      } catch (err) {
+        // (not to be read: no titles in the list)
+        console.info('peekaview light: titles not read', err?.message ?? err)
+        for (const w of list) pickTitles.set(w, '')
+      } finally {
+        pickReading = false
+      }
+      // (on with the next one – also when the picture changed meanwhile)
+      if (picker) renderPick()
     }
 
     function finishPick(selection) {
@@ -1401,6 +1511,7 @@
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
+      get pickTitles() { return pickCandidates().map((w) => pickTitles.get(w) ?? null) },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
