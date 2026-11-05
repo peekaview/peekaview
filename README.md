@@ -296,25 +296,29 @@ The viewer site opens with a small start page:
 - The picture comes from a moment the share page was in the background: in front, it would cover the windows. The page asks to switch to the window and back once.
 - Viewers get only that part. It is cut out of each frame right here, before encoding (`light-crop.js`: MediaStreamTrackProcessor, a `VideoFrame` with a smaller visible rectangle, MediaStreamTrackGenerator). That needs no timers, so it keeps going in a background tab. Whatever lies over the window is part of the picture, and the page says so.
 - The part's place is known, so drawings land on it without any search. "Anderes Fenster wählen" changes it while sharing (or the whole screen).
-- A moved window is followed every second and right before each still picture, so a drawing appears where the window is now (`light-track.js`). It is found by its own picture at its own size: first at its old place, then where a frame of the same size is, then over the whole screen, refined to the pixel. Its title bar is left out, since it looks different when inactive. When its content changed too much (scrolled), the frame at its old place keeps it. A window partly off the screen is not found. After three misses in the background the page says the window is no longer there.
+- The picked window is snapped onto its real edges at full resolution (the frames are found on a 640 px copy), so nothing beside it is shared.
+- A moved window is followed about three times a second and right before each still picture, so the cut-out moves along and a drawing appears where the window is now (`light-track.js`).
+  - It goes by the window's **title bar**: that stays the same while the content scrolls or changes, and an inactive one differs only in contrast, which the comparison (normalized cross-correlation, tile by tile) does not mind.
+  - Places to check: its old place, frames of the same size, and where its own picture fits best on a small copy. The title bar decides, to the pixel. A plain title bar falls back to the window's own picture; a changed one (another document) is taken anew once the window is found otherwise.
+- Not to be seen (moved away, covered by the share page, closed, partly off the screen): viewers get **black with "Fenster nicht mehr auf dem geteilten Bildschirm sichtbar"** instead of what lies there now. The share page says "Wechsle zu deinem Fenster", and after about 3 s in the background that the window is no longer at its place.
 - Firefox and Safari cannot cut frames: they share what was picked in the browser's dialog, as described below.
 
 **Showing where viewers point and draw.** A point is shown right away, a stroke once it is finished ("Anna malt gerade …" meanwhile). The share page takes a still picture when the point or stroke starts, so it shows what they drew on (`light-capture.js`).
 - **The mini window** (`light-pip.js`, `light-mini.js`) floats above every app – a normal browser window cannot: macOS never lets an app in the background bring its windows to the front, so `focus()` does nothing while the presenter works elsewhere.
   - It shows that the share runs and who watches. When somebody points or has drawn, it shows the spot enlarged, with the stroke drawn again, plus a small map of the screen marking where that is.
-  - Chrome and Edge: a Picture-in-Picture *document* window (420 × 320), opened in the same click as the screen picker, with "Zur Stelle", "Zulassen"/"Ablehnen", "Größer"/"Kleiner", copy link and stop. It cannot grow by itself: a Picture-in-Picture window resizes only in a click, and never moves.
+  - Chrome and Edge: a Picture-in-Picture *document* window (420 × 320), opened with "Mini-Fenster öffnen" on the share page, with "Zur Stelle", "Zulassen"/"Ablehnen", "Größer"/"Kleiner", copy link and stop. It cannot grow by itself: a Picture-in-Picture window resizes only in a click, and never moves.
   - Safari: the mini view as a Picture-in-Picture *video* (a captured canvas), turned on with a click. Firefox only lets the user start Picture-in-Picture (right click on the video → "Bild-im-Bild"); the share page says so. A video has no buttons: a system notification ("Anna hat etwas gemalt") takes the click instead.
   - It renders from a worker's clock: the share page is a background tab, where timers are slowed down and `requestAnimationFrame` stops.
 - **The helper window** (`share-helper.html`) lays the drawing over the very spot on the screen: it jumps there, grows to fit the stroke and shows the still picture 1:1 under itself like a pane of glass, with the stroke drawn again on top. The presenter can draw and point into it, too; viewers see that with the presenter's name.
-  - With a mini window it comes on "Zur Stelle" or a click on the notification – the click makes the browser the active app, so the helper can show on top – and closes again after 3.5 s (point) or 6 s (stroke). "Zur Stelle" stays and always shows the last drawing. Each click opens a new helper, since a helper already open cannot come to the front from a click in another window.
-  - Without one (not turned on, popup only) it waits in the bottom right corner and comes by itself – on top only while the browser is the active app.
+  - It opens in the start click as "Freigabe läuft" in the bottom right corner, comes to each point and stroke by itself, and goes back to its corner after 3.5 s (point) or 6 s (stroke). On top only while the browser is the active app.
+  - "Zur Stelle" (mini window) or a click on the notification makes the browser the active app and opens a new helper with the last drawing – one already open cannot come to the front from a click in another window. It then stays as the corner window.
 - **Position:** normalized picture coordinates × screen size + the screen's corner (`light-geometry.js`). After moving, the helper reads where the browser actually put it and lays the picture under it accordingly.
 
 **What browsers allow** (tested in Chromium with fake pictures; Firefox and Safari not yet on real machines):
 
 | | Chrome, Edge | Firefox | Safari |
 |---|---|---|---|
-| Mini window on top of all apps | Picture-in-Picture document, in the start click | Picture-in-Picture video, started by the user | Picture-in-Picture video, on a click |
+| Mini window on top of all apps | Picture-in-Picture document, on a click | Picture-in-Picture video, started by the user | Picture-in-Picture video, on a click |
 | To the spot | "Zur Stelle" in the mini window | click on the notification | click on the notification |
 | Moving and resizing the helper | yes (popups only, inside the screen) | yes, unless `dom.disable_window_move_resize` | yes (popups only) |
 | Screen corner | estimated from `availLeft`/`availTop` (on a Mac minus about 25 px menu bar); exact with the "window management" permission if already granted (`getScreenDetails`, never requested) | exact (`screen.left`/`top`) | estimated |

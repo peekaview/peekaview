@@ -100,7 +100,7 @@
     // back into the corner after this long without anybody pointing or drawing
     const AFTER_PING = 3500
     const AFTER_DRAW = 6000
-    // called for one spot (from the mini window or a notification): closes afterwards
+    // opened for a spot (a click on "Zur Stelle" or a notification): that first, then in the corner
     const onDemand = new URLSearchParams(location.search).has('jump')
 
     const api = window.opener?.pvLight
@@ -155,7 +155,7 @@
 
     function onReveal(r) {
       if (!started) return
-      if (state === 'focus' || !status.mini) enqueue(() => showReveal(r))
+      enqueue(() => showReveal(r))
     }
 
     function onJump() {
@@ -232,7 +232,6 @@
 
     function park() {
       clearTimeout(idleTimer)
-      if (onDemand) return window.close()
       state = 'parked'
       part = null
       shown = null
@@ -450,7 +449,9 @@
     window.addEventListener('pagehide', () => unsubscribe())
     // the share page is gone (closed, reloaded): so is the share
     setInterval(() => {
-      if (!window.opener || window.opener.closed) window.close()
+      let gone = true
+      try { gone = !api.page || api.page.closed } catch {}
+      if (gone) window.close()
     }, 1000)
   </script>
 </body>

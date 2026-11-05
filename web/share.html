@@ -216,7 +216,7 @@
     import { Cropper, cropSupported } from './light-crop.js'
     import { scaledGray } from './light-locate.js'
     import { WindowPicker } from './light-pick.js'
-    import { follow } from './light-track.js'
+    import { follow, grabberOf, snapRect, titleOf } from './light-track.js'
     import { MiniWindow, documentPip, videoPip } from './light-pip.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
@@ -325,9 +325,9 @@
       } catch (err) {
         picking = Promise.reject(err)
       }
-      // Chrome, Edge: the mini window floats above everything; the helper comes on "Zur Stelle"
-      if (documentPip) openMini()
-      else openHelper()
+      // the helper: waits in the corner and comes to each drawing by itself (the mini window, which
+      // floats above everything, is offered afterwards)
+      openHelper()
       $('start').disabled = true
       picking.then((stream) => {
         const surface = stream.getVideoTracks()[0]?.getSettings?.().displaySurface ?? 'monitor'
@@ -528,20 +528,16 @@
       const middle = (windowShared && !locator) || !!placeProblem
       $('locate-step').hidden = !windowShared || !!locator || locateSkipped
       renderProblem(windowShared)
-      // with the mini window the helper comes only on "Zur Stelle"
-      $('helper-open').hidden = open || !host || miniActive()
+      $('helper-open').hidden = open || !host
       $('helper-locate').hidden = !windowShared || !!locator || !locateSkipped
       $('helper-text').textContent = !host
         ? ''
-        : miniActive()
-          ? mini.kind === 'document'
-            ? `Das Mini-Fenster schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt. „Zur Stelle“ legt die Zeichnung ${middle ? 'in die Mitte deines Bildschirms' : 'genau über die Stelle'}.`
-            : `Das Mini-Fenster schwebt über allen Programmen und zeigt dir, wo jemand zeigt oder malt. Ein Klick auf die Benachrichtigung legt die Zeichnung ${middle ? 'in die Mitte deines Bildschirms' : 'genau über die Stelle'}.`
-          : !open
-            ? helperBlocked
-              ? 'Dein Browser hat das Hilfsfenster blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
-              : 'Ohne Hilfsfenster siehst du nicht, wo die Zuschauer zeigen und malen.'
-            : `Das Hilfsfenster wartet unten rechts. Zeigt oder malt jemand, erscheint es ${middle ? 'in der Mitte deines Bildschirms' : 'genau über der Stelle'} – mit der Zeichnung. Liegt es hinter anderen Programmen, bleibt es dort: Browser dürfen Fenster nicht nach vorne holen.`
+        : !open
+          ? helperBlocked
+            ? 'Dein Browser hat das Fenster „Freigabe läuft“ blockiert. Klicke auf „Hilfsfenster öffnen“ – sonst siehst du nicht, wo die Zuschauer zeigen.'
+            : 'Ohne das Fenster „Freigabe läuft“ siehst du nicht, wo die Zuschauer zeigen und malen.'
+          : `Das Fenster „Freigabe läuft“ wartet unten rechts. Malt jemand, springt es ${middle ? 'in die Mitte deines Bildschirms' : 'genau an die Stelle'} – mit der Zeichnung – und danach zurück.` +
+            (miniActive() ? ' Liegt es hinter einem anderen Programm, hol es mit „Zur Stelle“ im Mini-Fenster nach vorne.' : ' Liegt gerade ein anderes Programm vorne, bleibt es dahinter – das Mini-Fenster hilft dann.')
     }
 
     // ---------------------------------------------------------------- the mini window (always on top)
@@ -700,18 +696,9 @@
     let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
-      if (helper && !helper.closed) {
-        let onDemand = false
-        try { onDemand = !!helper.pvHelper?.onDemand } catch {}
-        // the helper in the corner (no mini window): it shows the spot itself
-        if (!onDemand) {
-          try { helper.focus() } catch {}
-          return emit({ kind: 'jump' })
-        }
-        // one for the spot already open – maybe behind other programs, and an open window cannot
-        // come to the front from a click elsewhere: a new one in this click always does
-        closeHelper()
-      }
+      // a helper already open may lie behind other programs, and it cannot come to the front from a
+      // click elsewhere: a new one, opened in this click, always does – it waits in the corner afterwards
+      closeHelper()
       helper = from.open('share-helper.html?jump=1', `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
       helperBlocked = !helper
       renderHelper()
@@ -784,6 +771,15 @@
         return
       }
       $('problem-screen').textContent = 'Anderen Bildschirm wählen'
+      // the window is not to be seen right now (this browser over it?): viewers see black
+      if (host && cropper?.blank) {
+        box.hidden = false
+        box.classList.remove('problem')
+        $('problem-title').textContent = 'Wechsle zu deinem Fenster'
+        $('problem-text').textContent = 'Es ist gerade nicht zu sehen – vielleicht liegt dieser Browser darüber. Solange sehen deine Zuschauer ein schwarzes Bild mit einem Hinweis.'
+        $('problem-check').hidden = $('problem-screen').hidden = true
+        return
+      }
       box.hidden = !host || (!placeProblem && !placeWaiting)
       box.classList.toggle('problem', !!placeProblem)
       $('problem-check').hidden = $('problem-screen').hidden = !placeProblem
@@ -895,11 +891,16 @@
       document.querySelector('main').classList.remove('wide')
       const f = cropper?.full?.width ? cropper.full : { width: image?.width ?? 1, height: image?.height ?? 1 }
       const rect = selection ? { x: Math.round(selection.x * f.width), y: Math.round(selection.y * f.height), width: Math.round(selection.w * f.width), height: Math.round(selection.h * f.height) } : null
-      // (the picture to follow the window by: from when it could be seen)
-      trackImage = rect && image && image.width === f.width ? cropCanvas(image, rect) : null
+      // the window's real edges, its title bar and picture to follow it by: from the picture in which
+      // it could be seen (a part drawn by hand stays as drawn)
+      const seen = rect && image && image.width === f.width ? grabberOf(image) : null
+      if (seen && !selection.drawn) Object.assign(rect, snapRect(seen, rect, f))
+      trackTitle = seen ? titleOf(seen, rect, f.width / screen.width) : null
+      trackImage = seen ? cropCanvas(image, rect) : null
       trackMisses = 0
       windowLost = false
       if (host) {
+        cropper.setBlank(null)
         cropper.setRect(rect)
         host.update()
         $('running').hidden = false
@@ -919,33 +920,48 @@
     }
     $('repick').addEventListener('click', repick)
 
-    // the picked window moved (or changed): followed – every second, and right before each still
-    // picture (a drawing then appears where the window is now, not where it was)
+    // the picked window moved (or changed): followed by its title bar – several times a second, and
+    // right before each still picture (a drawing then appears where the window is now). Not to be
+    // seen: viewers get black with a note, never what lies there instead.
+    const NOT_SEEN = 'Fenster nicht mehr auf dem geteilten Bildschirm sichtbar'
     let trackImage = null
+    let trackTitle = null
     let trackMisses = 0
     let trackInfo = null // how the last search went (share.html?debug)
     let tracking = null
     function track() {
       if (!host || !cropper?.rect || picker) return Promise.resolve()
-      return (tracking ??= followWindow().finally(() => (tracking = null)))
+      return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
       const full = await frameCanvas(screenStream)
       const r = cropper?.rect
       if (!full || !r || picker) return
+      const grab = grabberOf(full)
+      const scale = full.width / screen.width
       const before = trackImage ?? cropCanvas(full, r)
       const scratch = document.createElement('canvas')
       const t0 = performance.now()
-      const found = follow((w, h) => scaledGray(full, w, h, scratch), (w, h) => scaledGray(before, w, h, scratch), full, r)
-      // (this page in front may well cover the window: only a sure find counts then)
+      let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch) })
+      // (this page in front may well cover the window: a frame alone does not count then)
       const front = inFront()
-      trackInfo = { how: found?.how ?? 'nicht gefunden', score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front }
-      if (!found || (front && found.how === 'frame')) {
-        if (!front && ++trackMisses >= 3 && !windowLost) {
+      if (found && front && found.by === 'frame' && found.how !== 'same') found = null
+      trackInfo = { how: found?.how ?? 'nicht gefunden', by: found?.by ?? null, score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front, titel: !!trackTitle }
+      if (!found) {
+        if (!cropper.blank) {
+          cropper.setBlank(NOT_SEEN)
+          renderAll()
+        }
+        // (said on this page after a few seconds – not while this page lies over it)
+        if (!front && ++trackMisses >= 8 && !windowLost) {
           windowLost = true
           renderAll()
         }
         return
+      }
+      if (cropper.blank) {
+        cropper.setBlank(null)
+        renderAll()
       }
       trackMisses = 0
       if (windowLost) {
@@ -958,8 +974,10 @@
         host.update()
       }
       trackImage = cropCanvas(full, cropper.rect)
+      // found without its title bar (it changed: another document, another tab): take the new one
+      if (found.by !== 'title') trackTitle = titleOf(grab, cropper.rect, scale)
     }
-    setInterval(track, 1000)
+    setInterval(track, 350)
 
     // ---------------------------------------------------------------- finding a shared window
     $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'
@@ -1029,6 +1047,7 @@
     }
     window.pvLight = {
       host: null,
+      page: window,
       get stream() { return host?.stream ?? null },
       get locatorStream() { return locator },
       get lastReveal() { return lastReveal },

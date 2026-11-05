@@ -1,7 +1,7 @@
 // Following the picked window when it is moved ("Bildschirmfreigabe light").
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { follow } from '../web/light-track.js'
+import { follow, snapRect, titleOf } from '../web/light-track.js'
 
 const W = 1600
 const H = 1000
@@ -28,6 +28,17 @@ function screenWith(windows, { wallpaper = 1 } = {}) {
       for (let y = r.y - d; y < r.y + r.h + d; y++) for (const x of [r.x - d, r.x + r.w - 1 + d]) set(x, y, (px[y * W + x] ?? 0) * (0.7 + d * 0.04))
     }
     for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) set(x, y, y < r.y + 28 ? (r.inactive ? 236 : 214) : r.dark ? 38 : 250)
+    // its title bar: the three buttons (grey when inactive) and the title (lighter when inactive)
+    for (const [i, v] of [[0, 120], [1, 175], [2, 140]]) {
+      const cx = r.x + 20 + i * 20
+      for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) if (x * x + y * y <= 36) set(cx + x, r.y + 14 + y, r.inactive ? 196 : v)
+    }
+    const name = rng(r.title ?? r.seed)
+    const tx = r.x + r.w / 2 - 80
+    for (let x = 0; x < 160; x++) {
+      if (name() < 0.3) continue
+      for (let y = 9; y < 19; y++) if (name() < 0.6) set(Math.round(tx + x), r.y + y, r.inactive ? 150 : 40)
+    }
     // its content: lines of text, (scroll: the lines shifted)
     const text = rng(r.seed)
     for (let line = 0; r.y + 44 + line * 18 < r.y + r.h - 10; line++) {
@@ -68,7 +79,12 @@ function cut(g, r) {
   return { width: r.width, height: r.height, px }
 }
 
-const run = (screen, before, rect) => follow((w, h) => scaled(screen, w, h), (w, h) => scaled(before, w, h), screen, rect)
+// the screen's picture as the page grabs it: a part of it, scaled
+const grabber = (g) => (r, w, h) => scaled(cut(g, { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }), w, h)
+function run(screen, before, rect, pick = before) {
+  const title = titleOf(grabber(pick), { x: 0, y: 0, width: rect.width, height: rect.height })
+  return follow(grabber(screen), screen, rect, { title, windowAt: (w, h) => scaled(before, w, h) })
+}
 
 const editor = { x: 300, y: 180, w: 700, h: 520, seed: 11 }
 const other = { x: 820, y: 420, w: 560, h: 420, seed: 12 }
@@ -81,12 +97,13 @@ test('a window that stays where it is: unchanged, also when it became inactive',
   const inactive = screenWith([{ ...editor, inactive: true }, other])
   const r = run(inactive, before, rectOf(editor))
   assert.equal(r?.how, 'same')
+  assert.equal(r.by, 'title')
 })
 
-test('a moved window is found again to the pixel – also partly behind another one', () => {
+test('a moved window is found by its title bar to the pixel – active or not, its content changed', () => {
   const before = cut(screenWith([other, editor]), rectOf(editor))
-  for (const [dx, dy] of [[237, -81], [-283, 117], [5, 3]]) {
-    const moved = { ...editor, x: editor.x + dx, y: editor.y + dy }
+  for (const [dx, dy, extra] of [[237, -81, {}], [-283, 117, { inactive: true }], [5, 3, {}], [180, 60, { scroll: 9, seed: 99, inactive: true }]]) {
+    const moved = { ...editor, ...extra, x: editor.x + dx, y: editor.y + dy, title: editor.seed }
     const r = run(screenWith([other, moved]), before, rectOf(editor))
     assert.deepEqual(r?.rect, rectOf(moved), `moved by ${dx},${dy}: ${JSON.stringify(r)}`)
     assert.equal(r.how, 'moved')
@@ -97,9 +114,16 @@ test('a moved window is found again to the pixel – also partly behind another 
   assert.deepEqual(r?.rect, rectOf(under), JSON.stringify(r))
 })
 
-test('scrolled in place: its frame keeps it; closed: not found', () => {
+test('another window with another title is not taken for it; closed: not found', () => {
   const before = cut(screenWith([other, editor]), rectOf(editor))
-  const scrolled = run(screenWith([other, { ...editor, scroll: 9, seed: 99 }]), before, rectOf(editor))
-  assert.deepEqual(scrolled?.rect, rectOf(editor), JSON.stringify(scrolled))
+  // the same size elsewhere, with other content and title
+  const twin = { ...editor, x: 600, y: 300, seed: 50, title: 51 }
+  assert.equal(run(screenWith([other, twin]), before, rectOf(editor))?.rect?.x === 600, false)
   assert.equal(run(screenWith([other]), before, rectOf(editor)), null)
+})
+
+test('the picked part snaps onto the window\'s real edges', () => {
+  const screen = screenWith([other, editor])
+  const off = { x: editor.x + 4, y: editor.y - 3, width: editor.w - 7, height: editor.h + 5 }
+  assert.deepEqual(snapRect(grabber(screen), off, screen), rectOf(editor))
 })
