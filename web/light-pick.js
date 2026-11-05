@@ -90,6 +90,7 @@ export class WindowPicker {
 
   select(rect) {
     this.auto = false
+    this.single = false
     this.selection = rect
     this.render()
     this.onChange(rect)

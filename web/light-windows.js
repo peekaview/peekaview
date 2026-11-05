@@ -271,7 +271,7 @@ export function titleButtons(g, rect, scale = 1) {
   let top = null
   const seen = new Set()
   for (const k of [scale, 1, 2]) {
-    for (const [d, gap] of [[12, 20], [14, 22], [15, 24]]) {
+    for (const [d, gap] of [[12, 20], [14, 22], [16, 24], [17, 26]]) {
       const key = `${Math.round(d * k)},${Math.round(gap * k)}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -279,7 +279,8 @@ export function titleButtons(g, rect, scale = 1) {
       if (b && (!top || b.score > top.score)) top = { ...b, k }
     }
   }
-  return top && top.score >= 0.6 ? top : null
+  // (on a real screen: the grey buttons of an inactive window about 0.65–0.7, elsewhere at most 0.4)
+  return top && top.score >= 0.5 ? top : null
 }
 
 function buttonsOfSize(g, rect, d, gap, scale) {

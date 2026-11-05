@@ -1253,11 +1253,19 @@
     function renderPick() {
       if (!picker) return
       const list = pickCandidates()
+      // (only one window to pick: picked – the coloured buttons of the one worked in may not have been
+      // to be seen)
+      if (list.length === 1 && (!picker.selection || picker.single) && picker.selection !== list[0]) {
+        picker.select(list[0])
+        picker.single = true
+      }
       $('pick-steps').hidden = sawAway
       $('pick-lead').hidden = !sawAway
       $('pick-lead').textContent = picker.auto
         ? 'Erkannt: das Fenster, in dem du gerade warst. Stimmt es, klicke unten auf „Dieses Fenster zeigen“.'
-        : list.length
+        : picker.single && picker.selection === list[0]
+          ? 'Erkannt: dieses Fenster. Stimmt es, klicke unten auf „Dieses Fenster zeigen“.'
+          : list.length
           ? 'Klicke das Fenster an, das du zeigen möchtest.'
           : 'Kein Fenster erkannt. Zieh im Bild mit der Maus einen Rahmen um das, was du zeigen möchtest.'
       // (no window recognized: the picture right away, to draw a frame in it)
