@@ -127,3 +127,16 @@ test('the picked part snaps onto the window\'s real edges', () => {
   const off = { x: editor.x + 4, y: editor.y - 3, width: editor.w - 7, height: editor.h + 5 }
   assert.deepEqual(snapRect(grabber(screen), off, screen), rectOf(editor))
 })
+
+test('a window with a quarter or more under another one is covered; one seen whole is not', async () => {
+  const { covered } = await import('../web/light-track.js')
+  const win = { x: 300, y: 180, w: 700, h: 520, seed: 11 }
+  const luma = (screen) => (a) => scaled(cut(screen, a), a.width, a.height)
+  assert.equal(await covered(luma(screenWith([win])), rectOf(win), { width: W, height: H }), false)
+  // another window over its right half and its bottom
+  const over = { x: 640, y: 420, w: 600, h: 450, seed: 13 }
+  assert.equal(await covered(luma(screenWith([win, over])), rectOf(win), { width: W, height: H }), true)
+  // only a little over a corner: still seen
+  const corner = { x: 920, y: 620, w: 400, h: 300, seed: 14 }
+  assert.equal(await covered(luma(screenWith([win, corner])), rectOf(win), { width: W, height: H }), false)
+})

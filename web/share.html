@@ -300,7 +300,7 @@
     import { monitorRect } from './light-geometry.js'
     import { readLine, readText, readable, readerState, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
-    import { borderStrips, follow, grabberOf, hasLine, snapRect, titleOf, titleScore } from './light-track.js'
+    import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
     import { MiniView } from './light-mini.js'
     import { icon, owl } from './icons.js'
@@ -1330,6 +1330,9 @@
         return findWindows(data)
       }
       let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch), places })
+      // (found, but a quarter or more of it covered – also when it seems to have another shape, a
+      // corner of it under another window: not to be seen)
+      if (found && (await windowCovered((a) => grab(a, a.width, a.height), found.rect, full))) found = null
       // (this page in front may well cover the window: a frame alone does not count then)
       const front = inFront()
       if (found && front && found.by === 'frame' && found.how !== 'same') found = null
@@ -1387,14 +1390,9 @@
       const strip = await src.luma({ x: bx - 2, y: by - 2, width: title.tpl.width + 6, height: title.tpl.height + 6 })
       if (!strip || strip.width < title.tpl.width || strip.height < title.tpl.height) return false
       if (titleScore(strip, title, bx - strip.x, by - strip.y) < 0.7) return false
-      // … and its right and bottom borders where they were (made larger or smaller: not)
-      const [right, bottom] = borderStrips(r)
-      for (const [area, across] of [[right, true], [bottom, false]]) {
-        if (area.x < 1 || area.y < 1 || area.x + area.width > src.width || area.y + area.height > src.height) continue
-        const g = await src.luma(area)
-        if (g && !hasLine(g, across)) return false
-      }
-      return true
+      // … and its borders where they were, to be seen (made larger or smaller: not; a quarter or more
+      // of it under another window: covered)
+      return !(await windowCovered(src.luma, r, src))
     }
 
     // The window's titles, read from its title bar (light-title.js): now and then while it stays,

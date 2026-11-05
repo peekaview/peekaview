@@ -332,3 +332,80 @@ export function grabberOf(source, canvas = document.createElement('canvas')) {
     return grayFrom(ctx.getImageData(0, 0, w, h))
   }
 }
+
+// ---------------------------------------------------------------- covered?
+// A window partly under another one loses its border there – the other window's picture is in
+// its place. How much of its four sides still is a border tells how much of it can be seen.
+
+const COVERED_PART = 0.15 // this much of it under something else, as told by its borders (they show a little more than is seen: about a quarter): covered
+
+/** Strips across a window's four sides (the middle 80 % of each), pixels; `across`: a jump between columns. */
+export function sideStrips(r) {
+  const w = r.width
+  const h = r.height
+  return [
+    { area: { x: Math.round(r.x + w * 0.1), y: Math.round(r.y - 4), width: Math.round(w * 0.8), height: 8 }, across: false },
+    { area: { x: Math.round(r.x + w * 0.1), y: Math.round(r.y + h - 4), width: Math.round(w * 0.8), height: 8 }, across: false },
+    { area: { x: Math.round(r.x - 4), y: Math.round(r.y + h * 0.1), width: 8, height: Math.round(h * 0.8) }, across: true },
+    { area: { x: Math.round(r.x + w - 4), y: Math.round(r.y + h * 0.1), width: 8, height: Math.round(h * 0.8) }, across: true },
+  ]
+}
+
+/**
+ * The share of a strip along which there is a border: a jump across it, on one line – the border's
+ * (text or pictures of a window over it jump here and there, not on one line).
+ */
+export function sideCover(g, across) {
+  const n = across ? g.height : g.width
+  const m = across ? g.width : g.height
+  const jumps = (i, j) => {
+    if (j < 1 || j >= m) return false
+    const a = across ? g.px[i * g.width + j] : g.px[j * g.width + i]
+    const b = across ? g.px[i * g.width + j - 1] : g.px[(j - 1) * g.width + i]
+    return Math.abs(a - b) > 8
+  }
+  // the line the border runs on: where most of the jumps are
+  let line = 1
+  let most = -1
+  for (let j = 1; j < m; j++) {
+    let c = 0
+    for (let i = 0; i < n; i++) if (jumps(i, j)) c++
+    if (c > most) {
+      most = c
+      line = j
+    }
+  }
+  // (a border goes on: pieces shorter than 4 pixels – text, a picture – do not count)
+  let on = 0
+  let run = 0
+  for (let i = 0; i <= n; i++) {
+    if (i < n && (jumps(i, line) || jumps(i, line - 1) || jumps(i, line + 1))) run++
+    else {
+      if (run >= 4) on += run
+      run = 0
+    }
+  }
+  return on / Math.max(1, n)
+}
+
+/**
+ * Is the window at `r` covered – a quarter or more of it under another window (or the share
+ * page)? Told by what is missing of its borders: at a corner the missing parts of both sides
+ * span the covered part, across the window those of two opposite sides. Sides at the picture's edge
+ * count as seen. luma(area) → its brightness (sync or async).
+ */
+export async function covered(luma, r, full) {
+  const missing = []
+  for (const { area, across } of sideStrips(r)) {
+    if (area.x < 0 || area.y < 0 || area.x + area.width > full.width || area.y + area.height > full.height) {
+      missing.push(0)
+      continue
+    }
+    const g = await luma(area)
+    missing.push(g ? 1 - sideCover(g, across) : 0)
+  }
+  const [top, bottom, left, right] = missing
+  const part = Math.max(top * left, top * right, bottom * left, bottom * right, Math.min(left, right), Math.min(top, bottom))
+  // (the border found is a little more than the one to be seen: a window over it has edges, too)
+  return part >= COVERED_PART
+}

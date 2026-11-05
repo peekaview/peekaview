@@ -166,6 +166,7 @@ export class CanvasCropper {
     this.scratch = document.createElement('canvas')
     this.stream = this.canvas.captureStream(30)
     this.shown = null // what the canvas shows: 'part' | the note
+    this.ticks = 0
     try {
       this.ticker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 33)'], { type: 'text/javascript' })))
       this.ticker.onmessage = () => this.tick()
@@ -199,12 +200,17 @@ export class CanvasCropper {
         }
         return
       }
+      // (checked on every third picture: drawing and reading the strips costs here; in between the
+      // last answer holds)
       if (r && this.check) {
-        let ok = true
-        try {
-          ok = await this.check({ width: v.videoWidth, height: v.videoHeight, luma: (area) => lumaOfImage(v, area, this.scratch) }, r)
-        } catch {}
-        this.counts.checked++
+        let ok = this.lastOk ?? true
+        if (this.ticks++ % 3 === 0) {
+          try {
+            ok = await this.check({ width: v.videoWidth, height: v.videoHeight, luma: (area) => lumaOfImage(v, area, this.scratch) }, r)
+          } catch {}
+          this.lastOk = ok
+          this.counts.checked++
+        }
         if (!ok) {
           this.counts.held++
           this.onMiss?.()
