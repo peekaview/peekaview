@@ -14,6 +14,7 @@ export class WindowPicker {
     this.image = null
     this.windows = []
     this.selection = null // {x, y, w, h} 0..1 of the picture
+    this.drawing = false // a part is being drawn by hand: no window picked meanwhile
     this.drag = null
     this.observer = new ResizeObserver(() => this.render())
     this.observer.observe(canvas)
@@ -51,7 +52,7 @@ export class WindowPicker {
     // the window the presenter just activated (not this browser): picked – unless they drew a part
     // themselves. On a Mac the active one has coloured buttons; elsewhere the largest is taken.
     const activated = this.windows.find((w) => w.titled) ?? (this.windows.some((w) => w.kind !== 'mac') ? this.windows[0] : null)
-    if (active && activated && !this.selection?.drawn) {
+    if (active && activated && !this.selection?.drawn && !this.drawing) {
       this.select(activated)
       this.auto = true
     }

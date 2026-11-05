@@ -82,6 +82,8 @@
     /* picking the window: a picture of the screen, the windows found outlined */
     main.wide { width: min(980px, calc(100% - 32px)); }
     .pick-view { display: block; width: 100%; border-radius: 10px; background: #000; cursor: crosshair; touch-action: none; }
+    .pick-preview { display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: 10px; background: #000; }
+    body.panel .pick-steps { font-size: 14px; }
     .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
     .live { flex-wrap: wrap; }
@@ -96,7 +98,8 @@
     body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
     body.panel #running > .note, body.panel #helper, body.panel .linkbox input, body.panel #link-label { display: none !important; }
     body.panel .brand { font-size: 14px; }
-    body.panel #in-pip .lead { display: block !important; font-size: 13.5px; }
+    body.panel #in-pip .lead, body.panel #pick-lead { display: block !important; font-size: 13.5px; }
+    body.panel #pick-lead[hidden] { display: none !important; }
     body.panel .stay { padding: 12px; gap: 12px; }
     body.panel .stay strong { font-size: 15px; }
     body.panel .stay p { font-size: 13px; }
@@ -183,11 +186,12 @@
       <h1>Welches Fenster möchtest du zeigen?</h1>
       <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – so wird es aktiv.</li><li>Komm dann hierher zurück.</li></ol>
       <p class="lead" id="pick-lead" style="margin:0"></p>
+      <canvas id="pick-preview" class="pick-preview" hidden></canvas>
       <canvas id="pick-view" class="pick-view"></canvas>
-      <p class="keep" id="pick-draw" style="margin:-4px 0 0">Oder zieh im Bild mit der Maus einen Rahmen um einen Bereich. Der bleibt fest an seiner Stelle – verschiebst du darunter ein Fenster, geht er nicht mit.</p>
+      <p class="keep" id="pick-draw" style="margin:-4px 0 0">Zieh im Bild mit der Maus einen Rahmen um den Bereich. Er bleibt fest an seiner Stelle – verschiebst du darunter ein Fenster, geht er nicht mit.</p>
       <button class="connect" id="pick-ok" type="button" disabled>Dieses Fenster zeigen</button>
-      <div class="pick-more"><button class="text-button" id="pick-screen" type="button">Lieber den ganzen Bildschirm zeigen</button><button class="text-button" id="pick-again" type="button">Bild neu holen</button></div>
-      <p class="keep" style="margin:0">Nur der rot umrandete Teil geht an deine Zuschauer – auch was gerade darüber liegt.</p>
+      <div class="pick-more"><button class="text-button" id="pick-drawing" type="button">Bereich selbst einzeichnen</button><button class="text-button" id="pick-screen" type="button">Ganzen Bildschirm zeigen</button></div>
+      <p class="keep" id="pick-note" style="margin:0">Nur der rot umrandete Teil geht an deine Zuschauer – auch was gerade darüber liegt.</p>
     </section>
 
     <!-- while sharing -->
@@ -595,7 +599,7 @@
     let spotting = false
     function dock() {
       // (before the share: as large as the browser's screen picker needs)
-      if (!panel || spotting || !$('pick').hidden || (!host && $('ended').hidden)) return
+      if (!panel || spotting || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
@@ -999,12 +1003,15 @@
     let lastPickReport = ''
     function showPickDebug() {
       if (!params.has('debug') || !picker) return
-      $('debug-box').hidden = false
-      if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
       const windows = picker.windows
-      $('debug-view').hidden = true
+      // (the small window shows nothing of it: the findings go to the test server only)
+      if (!panel) {
+        $('debug-box').hidden = false
+        if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
+        $('debug-view').hidden = true
+      }
       // (the picture, to look at it closely elsewhere)
-      if (!$('debug-save')) {
+      if (!panel && !$('debug-save')) {
         const save = Object.assign(document.createElement('button'), { id: 'debug-save', type: 'button', className: 'pill', textContent: 'Auswahlbild speichern (zur Analyse)' })
         save.addEventListener('click', () => picker?.image?.toBlob(async (blob) => {
           // (to the test server where there is one; else a download)
@@ -1046,7 +1053,7 @@
     // how the still picture and the search went: the console, and here with share.html?debug
     function showDebug(what, capture) {
       console.info(`peekaview light: ${what}`, capture?.debug)
-      if (!new URLSearchParams(location.search).has('debug')) return
+      if (!new URLSearchParams(location.search).has('debug') || panel) return
       $('debug-box').hidden = false
       // at the top: to be seen without scrolling
       if ($('debug-box').previousElementSibling?.matches('.brand') !== true) document.querySelector('main .brand').after($('debug-box'))
@@ -1184,7 +1191,10 @@
       $('setup').hidden = $('running').hidden = true
       $('pick').hidden = false
       document.querySelector('main').classList.add('wide')
-      spread()
+      // (the small window stays small – it grows only to draw a part by hand)
+      pickDrawing = false
+      if (!panel) spread()
+      else setTimeout(dock, 0)
       picker?.destroy()
       picker = new WindowPicker($('pick-view'), { onChange: renderPick })
       if (host && cropper?.rect) {
@@ -1244,23 +1254,63 @@
       return w * h
     }
 
+    // In the small window: the window activated, as a small picture – the whole screen only to
+    // draw a part by hand (the window grows for that). In a tab: the whole screen right away.
+    let pickDrawing = false
     function renderPick() {
       if (!picker) return
+      const drawing = pickDrawing || !panel
       const sel = picker.selection
-      $('pick-steps').hidden = sawAway && !!sel && !sel.drawn
-      $('pick-lead').hidden = !sawAway && !sel
-      $('pick-lead').textContent = sel?.drawn
-        ? 'Dein eingezeichneter Bereich (rot umrandet). Er bleibt fest an seiner Stelle.'
-        : sel
-          ? 'Erkannt: dein aktives Fenster (rot umrandet). Stimmt es, klicke auf „Dieses Fenster zeigen“. Ein anderes? Klicke einmal hinein und komm zurück.'
-          : 'Kein aktives Fenster erkannt. Klicke noch einmal in dein Fenster und komm zurück – oder zieh einen Rahmen um den Bereich.'
+      const windowSel = sel && !sel.drawn ? sel : null
+      $('pick-steps').hidden = pickDrawing || (sawAway && !!windowSel)
+      $('pick-lead').hidden = !pickDrawing && !sawAway && !sel
+      $('pick-lead').textContent = pickDrawing
+        ? sel?.drawn ? 'Dein Bereich (rot umrandet). Er bleibt fest an seiner Stelle.' : 'Zieh mit der Maus einen Rahmen um den Bereich, den du zeigen möchtest.'
+        : windowSel
+          ? 'Erkannt: dein aktives Fenster. Ein anderes? Klicke einmal hinein und komm zurück.'
+          : 'Kein aktives Fenster erkannt. Klicke noch einmal hinein und komm zurück.'
+      $('pick-view').hidden = !drawing
+      $('pick-draw').hidden = !drawing || !!sel?.drawn
+      $('pick-note').hidden = !drawing
+      $('pick-drawing').hidden = !panel
+      $('pick-drawing').textContent = pickDrawing ? 'Zurück zum Fenster' : 'Bereich selbst einzeichnen'
+      // the window picked, small
+      const preview = $('pick-preview')
+      preview.hidden = drawing || !windowSel
+      if (!preview.hidden) {
+        const img = picker.image
+        const sw = windowSel.w * img.width
+        const sh = windowSel.h * img.height
+        preview.width = 640
+        preview.height = Math.max(1, Math.round((640 * sh) / sw))
+        preview.getContext('2d').drawImage(img, windowSel.x * img.width, windowSel.y * img.height, sw, sh, 0, 0, preview.width, preview.height)
+      }
       showPickDebug()
-      $('pick-ok').disabled = !sel
-      $('pick-ok').textContent = sel?.drawn ? 'Diesen Bereich zeigen' : 'Dieses Fenster zeigen'
+      const usable = pickDrawing ? sel?.drawn : panel ? !!windowSel : !!sel
+      $('pick-ok').disabled = !usable
+      $('pick-ok').textContent = sel?.drawn && (pickDrawing || !panel) ? 'Diesen Bereich zeigen' : 'Dieses Fenster zeigen'
     }
+    let windowBeforeDrawing = null
+    $('pick-drawing').addEventListener('click', () => {
+      pickDrawing = !pickDrawing
+      if (picker) picker.drawing = pickDrawing
+      if (pickDrawing) {
+        windowBeforeDrawing = picker?.selection?.drawn ? null : picker?.selection
+        // (nothing picked yet: the part is drawn now)
+        if (picker && !picker.selection?.drawn) picker.selection = null
+        spread()
+      } else {
+        // (back: the window again, not the part drawn)
+        if (picker) picker.selection = windowBeforeDrawing
+      }
+      renderPick()
+      requestAnimationFrame(() => picker?.render())
+      if (!pickDrawing) setTimeout(dock, 0)
+    })
 
     function finishPick(selection) {
       clearInterval(pickTimer)
+      pickDrawing = false
       const image = picker.image
       picker.destroy()
       picker = null
@@ -1298,7 +1348,6 @@
     }
     $('pick-ok').addEventListener('click', () => picker?.selection && finishPick(picker.selection))
     $('pick-screen').addEventListener('click', () => finishPick(null))
-    $('pick-again').addEventListener('click', freshPicture)
 
     function repick() {
       if (!host || !cropper) return

@@ -311,8 +311,9 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
     await evaluate('delete document.hasFocus; qaNotes[0].onclick(); true')
     await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
-    // (the move was noticed in the video's way: pictures held back until it was found)
-    assert.ok((await evaluate('pvLight.frames')).held > still.held, 'noticed on a picture')
+    // (the move was noticed – in the video's way, pictures held back until it was found, or by the
+    // search itself first: on a canvas only every third picture is checked)
+    assert.ok((await evaluate('pvLight.frames')).held > still.held || (await evaluate('pvLight.tracked?.how')) !== 'nicht gefunden', 'noticed')
     for (const [k, v] of [['left', moved.x], ['top', moved.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(there[k] - v) <= 3, `moved, ${k}: ${there[k]} ≈ ${v}`)
     // … and viewers still see the whole window, at the same size
     const after = await evaluate('pvLight.host.size')
