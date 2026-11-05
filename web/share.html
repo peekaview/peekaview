@@ -267,6 +267,13 @@
       <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.</p>
     </section>
 
+    <!-- the tab, once the share runs in its own small window -->
+    <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
+      <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
+      <p class="lead" style="margin:0">Alles Weitere passiert im kleinen Fenster „Freigabe läuft“ unten rechts. Du kannst diesen Tab schließen.</p>
+      <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
+    </section>
+
     <!-- afterwards -->
     <section id="ended" style="display:flex;flex-direction:column;gap:18px" hidden>
       <h1>Freigabe beendet</h1>
@@ -327,10 +334,12 @@
     const PANEL_WIDTH = 360
     // the browser's screen picker is shown inside the window that asks: it needs about this much
     const PICKER_ROOM = { width: 760, height: 660 }
-    // The share runs in this tab; the small window "Freigabe läuft" opens along the way (Chrome,
-    // Edge: always on top; else the helper popup). share.html?panel: the whole share in a popup of
-    // its own, which jumps to each drawing itself and lets the tab be closed – not offered now.
+    // Chrome, Edge: the share runs in this tab, the small window "Freigabe läuft" (always on top)
+    // opens along the way. Else the share runs in a small window of its own (share.html?panel),
+    // opened from this page: picking the window, who watches, what they may do – and it jumps to
+    // each drawing itself; this tab may then be closed. (Popups blocked: everything here.)
     const params = new URLSearchParams(location.search)
+    let panelWindow = null
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
@@ -429,11 +438,33 @@
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
     function start() {
-      // here, in this tab – the small window "Freigabe läuft" opens along the way (Chrome, Edge:
-      // always on top; else a popup, in this very click). (share.html?panel: the share in a
-      // popup of its own – not offered any more.)
-      return startHere()
+      // Chrome, Edge: here, with the always-on-top window opened along the way (it closes with the
+      // tab). Else in a popup of its own, which asks for the screen itself – the tab may be closed.
+      if (panel || !supported || documentPip || !nameOrAsk()) return startHere()
+      // (large enough for the browser's screen picker, which shows inside it; small afterwards)
+      const width = Math.min(PICKER_ROOM.width, screen.availWidth)
+      const height = Math.min(PICKER_ROOM.height, screen.availHeight)
+      const left = Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2)
+      const top = Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2)
+      const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
+      panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
+      if (!panelWindow) return startHere()
+      $('setup').hidden = true
+      $('ended').hidden = true
+      $('elsewhere').hidden = false
+      document.title = '● Freigabe läuft – PeekaView light'
     }
+    $('elsewhere-show').addEventListener('click', () => {
+      try { panelWindow?.focus() } catch {}
+    })
+    // the small window closed: back to the start
+    setInterval(() => {
+      if (!panelWindow?.closed) return
+      panelWindow = null
+      $('elsewhere').hidden = true
+      $('setup').hidden = false
+      document.title = 'Im Browser teilen – PeekaView light'
+    }, 1000)
 
     function startHere() {
       const name = nameOrAsk()

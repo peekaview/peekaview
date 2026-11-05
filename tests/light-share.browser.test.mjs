@@ -43,7 +43,9 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     assert.equal(await evaluate("!document.querySelector('#name-error').hidden && document.querySelector('#running').hidden"), true)
     await browser('fill', '#name', 'Patrick')
 
-    // start: the picker (faked) and the helper window in the same click; the whole screen shown
+    // start (the share's own window blocked: all in this tab): the picker (faked) and the helper
+    // window in the same click; the whole screen shown
+    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); true")
     await browser('click', '#start')
     await tab('t1')
     await waitFor("!document.querySelector('#pick').hidden")
@@ -183,7 +185,9 @@ test('a shared window (as in Safari): the whole screen once more to find it, the
     const win = await evaluate('qaWindowAt')
     // the shared picture: the window and its bars
     const at = { x: win.x, y: win.y - 30, width: win.width, height: win.height + 60 }
-    // the same click opens the small window "Freigabe läuft" in the corner
+    // (the share's own window blocked: all in this tab) the same click opens the small window
+    // "Freigabe läuft" in the corner
+    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); true")
     await browser('click', '#start')
     await tab('t1')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
@@ -276,7 +280,7 @@ test('a shared window (as in Safari): the whole screen once more to find it, the
   }
 })
 
-test('a window picked from the whole screen (as in Firefox: cut out on a canvas): the small window opens in the same click, viewers get only the window, it is followed', { timeout: 180000 }, async () => {
+test('the share in its own small window (as in Firefox: no Picture-in-Picture, cut out on a canvas): one window of the screen picked – viewers get only that window, the tab may be closed', { timeout: 180000 }, async () => {
   const server = await startServer()
   const base = `http://127.0.0.1:${server.address().port}`
   const session = 'pv-light-pick-' + process.pid
@@ -284,21 +288,27 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
   const evaluate = async (code) => JSON.parse(await browser('eval', code))
   const waitFor = (fn) => browser('wait', '--fn', fn)
   const tab = (id) => browser('tab', id)
-  const tabs = async () => browser('tab', 'list')
-  const idOf = async (part) => (await tabs()).split('\n').find((l) => l.includes(part))?.match(/t\d+/)?.[0]
   try {
-    // (as in Firefox: no Picture-in-Picture window, no MediaStreamTrackGenerator – a canvas cuts)
-    await browser('open', base + '/share.html?browser=firefox')
+    // (as in Firefox: no Picture-in-Picture, no MediaStreamTrackGenerator – the window
+    // "Freigabe läuft" is a popup, a canvas cuts the window out)
+    await browser('open', base + '/share.html')
+    await evaluate("localStorage.setItem('qaFirefox', '1'); true")
+    await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '1000')
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
-    // one click: the screen picker, and the small window "Freigabe läuft" along with it
+    // the share moves into its own small window; the tab may be closed
     await browser('click', '#start')
-    const P = 't1'
+    await tab('t1')
+    await waitFor("!document.querySelector('#elsewhere').hidden")
+    assert.match(await evaluate("document.querySelector('#elsewhere').innerText"), /Freigabe läuft[\s\S]*Du kannst diesen Tab schließen/)
+    const P = 't2'
+    const V = 't3'
     await tab(P)
-    const H = await idOf('share-helper')
-    assert.ok(H, 'the small window opened in the same click')
+    await waitFor("document.body.classList.contains('panel') && document.querySelector('#name').value === 'Patrick'")
+    // it asks for the screen itself (in a click of its own: the tab's capture would end with the tab)
+    await browser('click', '#start')
     // which window? the screen with the windows found
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     assert.equal(await evaluate("document.querySelector('#running').hidden && document.querySelector('#pick-ok').disabled"), true, 'nothing shared before the choice')
@@ -324,7 +334,7 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     await waitFor("!document.querySelector('#pick-ok').disabled")
     await browser('click', '#pick-ok')
     await waitFor("!document.querySelector('#running').hidden && !!pvLight.host")
-    assert.equal(await evaluate("document.querySelector('#live-title').textContent"), 'Dein Fenster wird geteilt')
+    assert.match(await evaluate("document.querySelector('#live-title').textContent"), /^Freigabe läuft · /)
     assert.equal(await evaluate("document.querySelector('#locate-step').hidden && !document.querySelector('#repick').hidden"), true, 'no second screen to pick: the place is known')
     const size = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(size.width - win.width) <= 4 && Math.abs(size.height - win.height) <= 4, JSON.stringify(size))
@@ -332,7 +342,6 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     // a viewer gets only the window
     const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
-    const V = await idOf('name=Anna')
     await tab(P)
     await browser('wait', '#requests [data-allow]')
     await browser('click', '#requests [data-allow]')
@@ -356,11 +365,9 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     await browser('mouse', 'up')
     await tab(P)
     await waitFor('!!pvLight.lastReveal')
-    // the small window shows the spot (and goes back to its corner afterwards)
-    await tab(H)
-    await waitFor("window.pvHelper?.state === 'focus'")
-    assert.equal(await evaluate("document.querySelector('#focus-who').textContent"), 'Anna zeigt hier')
-    await tab(P)
+    // the small window itself shows the spot (and goes back to its panel afterwards)
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
+    assert.equal(await evaluate("document.querySelector('#spot').contentDocument.querySelector('#focus-who').textContent"), 'Anna zeigt hier')
     // … and meanwhile no new pictures go out (the drawing over the window would be seen twice)
     assert.equal(await evaluate('pvLight.frames.paused'), true)
     const picture = await evaluate('pvLight.lastReveal.capture.picture')
@@ -371,7 +378,7 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     assert.ok(still.checked > 10 && still.held <= 2, JSON.stringify(still))
 
     // (the helper back in its corner, the pictures going out again)
-    await waitFor('!pvLight.frames.paused')
+    await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
 
     // the window moved – and drawn on right away: the drawing appears where it is now (the
     // presenter in another program meanwhile: a notification)
@@ -388,12 +395,9 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     })
     const there = await evaluate('pvLight.lastReveal.capture.picture')
     // a notification – its click brings the small window with the drawing to the front
-    assert.equal(await evaluate('qaNotes.at(-1).title'), 'Anna hat etwas gemalt')
-    await evaluate('delete document.hasFocus; qaNotes.at(-1).onclick(); true')
-    await waitFor('1')
-    await tab(await idOf('share-helper'))
-    await waitFor("window.pvHelper?.state === 'focus'")
-    await tab(P)
+    assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
+    await evaluate('delete document.hasFocus; qaNotes[0].onclick(); true')
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
     // (the move was noticed in the video's way: pictures held back until it was found)
     assert.ok((await evaluate('pvLight.frames')).held > still.held, 'noticed on a picture')
     for (const [k, v] of [['left', moved.x], ['top', moved.y], ['width', win.width], ['height', win.height]]) assert.ok(Math.abs(there[k] - v) <= 3, `moved, ${k}: ${there[k]} ≈ ${v}`)
@@ -439,7 +443,11 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     await tab(P)
 
     // another choice while sharing: the whole screen – the same viewers, the whole picture
+    // (once the small window shows its panel again)
+    await waitFor("!document.body.classList.contains('spotting')")
     await waitFor('!pvLight.frames.paused')
+    // (under "Mehr" in the small window)
+    await browser('click', '#more')
     await browser('click', '#repick')
     await waitFor("!document.querySelector('#pick').hidden")
     await browser('click', '#pick-screen')
@@ -448,7 +456,10 @@ test('a window picked from the whole screen (as in Firefox: cut out on a canvas)
     await waitFor(`document.querySelector('video').videoWidth === ${sw}`)
     await waitFor("document.querySelector('.pv-title').textContent === 'Bildschirm'")
 
+    // the tab closed: the share goes on
+    await browser('tab', 'close', 't1')
     await tab(P)
+    assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
     await browser('click', '#stop')
     await waitFor("!document.querySelector('#ended').hidden")
   } finally {

@@ -43,7 +43,10 @@ Signaling.open = async ({ hostKey = null, secretKey, strictFrom = false, onMessa
 // "window" is exactly that window's picture – so the window can be found on the screen.
 const fakeScreen = `<script>
 // ?browser=firefox: no Picture-in-Picture windows for pages (only the user's own on videos)
-if (new URLSearchParams(location.search).get('browser') === 'firefox') {
+// (also for the small window it opens: localStorage qaFirefox)
+let qaFirefox = false
+try { qaFirefox = !!localStorage.getItem('qaFirefox') } catch {}
+if (new URLSearchParams(location.search).get('browser') === 'firefox' || qaFirefox) {
   delete window.documentPictureInPicture
   Object.defineProperty(Document.prototype, 'pictureInPictureEnabled', { get: () => false })
   // … and no cutting a window out of the screen (MediaStreamTrackGenerator)
