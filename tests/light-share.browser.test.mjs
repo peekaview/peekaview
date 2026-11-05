@@ -229,8 +229,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     const V = 't3'
     await tab(P)
     await waitFor("document.body.classList.contains('panel') && document.querySelector('#name').value === 'Patrick'")
-    // it asks for the screen itself (in a click of its own: the tab's capture would end with the tab)
-    await browser('click', '#start')
+    // it asks for the screen itself, right away (where a browser wants a click there: its button)
     // which window? the screen with the windows found
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     assert.equal(await evaluate("document.querySelector('#running').hidden && document.querySelector('#pick-ok').disabled"), true, 'nothing shared before the choice')
@@ -405,8 +404,6 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab('t1')
     await waitFor("!document.querySelector('#elsewhere').hidden")
     const S = await idOf('panel')
-    await tab(S)
-    await browser('click', '#start')
     await tab(S)
     await waitFor("!document.querySelector('#pick').hidden && document.querySelector('#pick-view').width > 0")
     await evaluate("document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); true")

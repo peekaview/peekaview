@@ -372,6 +372,9 @@
       $('panel-close').hidden = false
       $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
       document.querySelector('#running .keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
+      // the browser's screen picker right away, where it lets a window ask without a click of its
+      // own (else the button below)
+      setTimeout(() => supported && $('name').value.trim() && startHere({ auto: true }), 100)
     }
     $('name').addEventListener('input', () => {
       try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
@@ -466,10 +469,11 @@
       document.title = 'Im Browser teilen – PeekaView light'
     }, 1000)
 
-    function startHere() {
+    function startHere({ auto = false } = {}) {
       const name = nameOrAsk()
       if (!name) return
       $('start-error').hidden = true
+      const askedAt = performance.now()
       // Both need the click: the screen picker, and the helper window (popup blockers let
       // windows through only right in a click). The picker first – Safari spends the click on it,
       // then the helper waits for a click of its own.
@@ -499,6 +503,9 @@
       }).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
+        // (asked by itself, without a click: refused at once by browsers that want one – then the
+        // button is there, nothing to say)
+        if (auto && err?.name !== 'NotWholeScreen' && performance.now() - askedAt < 1500) return dock()
         $('start-error').textContent = err?.name === 'NotWholeScreen'
           ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab) – welches Fenster deine Zuschauer sehen, suchst du danach hier aus. Klicke noch einmal auf den Knopf.'
           : err?.name === 'NotAllowedError'

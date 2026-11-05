@@ -6,7 +6,9 @@
 // Limits: it opens only in a click, grows or shrinks only in a click in it, and never moves (opened
 // anew, it goes back to the browser's corner); it closes with the tab that opened it.
 
-export const documentPip = typeof window !== 'undefined' && 'documentPictureInPicture' in window
+// (Chrome, Edge only: Firefox has begun to offer it, as a second window beside the small one –
+// there everything stays in the one small window)
+export const documentPip = typeof window !== 'undefined' && 'documentPictureInPicture' in window && !/Firefox\//.test(navigator.userAgent)
 
 /**
  * Opens it (right in a click), with this page's styles. initial: at the browser's own place for it
