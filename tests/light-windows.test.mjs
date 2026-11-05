@@ -209,3 +209,54 @@ test('title bar buttons are found when the frame found starts a few pixels insid
   const line = titleLine(g, { x: win.x + 4, y: win.y + 8, width: win.w - 4, height: win.h - 8 }, 1, 'mac')
   assert.ok(line && Math.abs(line.y - (win.y + 14)) <= 2, JSON.stringify(line))
 })
+
+test('findWindows: Mac windows by their buttons – the active one and the grey one behind it; nothing on a wallpaper', async () => {
+  const { findWindows } = await import('../web/light-windows.js')
+  const behind = { x: 120, y: 90, w: 900, h: 640 }
+  const front = { x: 520, y: 260, w: 860, h: 620, active: true, toolbar: true }
+  const found = findWindows(colourScreen([behind, front]))
+  const near = (f, r) => Math.abs(f.x - r.x) <= 3 && Math.abs(f.y - r.y) <= 3 && Math.abs(f.width - r.w) <= 4
+  const a = found.find((f) => near(f, front))
+  assert.ok(a && a.active && Math.abs(a.height - front.h) <= 4, JSON.stringify(found))
+  const b = found.find((f) => near(f, behind))
+  assert.ok(b && !b.active, JSON.stringify(found))
+  assert.equal(found.length, 2, JSON.stringify(found))
+  assert.deepEqual(findWindows(colourScreen([])), [])
+})
+
+test('findWindows: a Windows window by "─ □ ✕" at its top right', async () => {
+  const { findWindows } = await import('../web/light-windows.js')
+  const width = 1400
+  const height = 900
+  const data = new Uint8ClampedArray(width * height * 4)
+  const put = (x, y, v) => {
+    const i = (Math.round(y) * width + Math.round(x)) * 4
+    data[i] = data[i + 1] = data[i + 2] = v
+    data[i + 3] = 255
+  }
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) put(x, y, 90 + (y / height) * 40)
+  const win = { x: 200, y: 120, w: 900, h: 600 }
+  for (let y = win.y - 6; y < win.y + win.h + 6; y++) for (let x = win.x - 6; x < win.x + win.w + 6; x++) {
+    const inside = x >= win.x && x < win.x + win.w && y >= win.y && y < win.y + win.h
+    put(x, y, inside ? (y < win.y + 32 ? 243 : 252) : 70)
+  }
+  // the buttons: ─ □ ✕, 46 px apart, glyphs 10 px
+  const cy = win.y + 16
+  const close = win.x + win.w - 23
+  for (let t = -5; t <= 5; t += 0.25) {
+    put(close + t, cy + t, 20)
+    put(close + t, cy - t, 20)
+  }
+  const box = close - 46
+  for (let t = -5; t <= 5; t++) {
+    put(box + t, cy - 5, 20)
+    put(box + t, cy + 5, 20)
+    put(box - 5, cy + t, 20)
+    put(box + 5, cy + t, 20)
+  }
+  for (let t = -5; t <= 5; t++) put(close - 92 + t, cy, 20)
+  const found = findWindows({ width, height, data })
+  assert.equal(found.length, 1, JSON.stringify(found))
+  const f = found[0]
+  assert.ok(f.kind === 'windows' && Math.abs(f.x - win.x) <= 3 && Math.abs(f.y - win.y) <= 3 && Math.abs(f.width - win.w) <= 4 && Math.abs(f.height - win.h) <= 4, JSON.stringify(f))
+})

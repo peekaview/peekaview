@@ -1,13 +1,10 @@
 // "Bildschirmfreigabe light": picking the window to show from a picture of the whole screen.
-// The windows found (light-windows.js) are outlined: for sure the active one, by the coloured
-// buttons of its title bar (picked right away), less sure others by their frames. A click picks the
-// window under it (one with a title bar first; again on the same spot: the next one), a drag draws
-// a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
+// The windows found by their title bars (light-windows.js findWindows) are outlined; the active
+// one (coloured buttons) is picked right away. A click picks the window under it (again on the same
+// spot: the next one), a drag draws a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
 
-import { grayFrom, scaledGray } from './light-locate.js'
-import { detectWindows, platformOf, titleLine, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
+import { findWindows, windowsAt } from './light-windows.js'
 
-const DETECT_WIDTH = 640
 const MIN_DRAG = 6 // CSS px before a press becomes a drag
 
 export class WindowPicker {
@@ -34,43 +31,21 @@ export class WindowPicker {
 
   /**
    * A new picture of the screen: windows looked for again; a picked window stays picked.
-   * @param {{active?: boolean, scale?: number, own?: {x, y, w, h}}} [options] active: taken while
-   *   the presenter was in another program; scale: pixels per point; own: this browser's window
-   *   (0..1 of the picture) – never one to pick
+   * @param {{active?: boolean, own?: {x, y, w, h}}} [options] active: taken while the presenter was
+   *   in another program; own: this browser's window (0..1 of the picture) – never one to pick
    */
-  setImage(image, { active = false, scale = 1, own = null, platform = platformOf() } = {}) {
+  setImage(image, { active = false, own = null } = {}) {
     this.image = image
-    const h = Math.max(1, Math.round((image.height * DETECT_WIDTH) / image.width))
-    const frames = detectWindows(scaledGray(image, DETECT_WIDTH, h))
-    const { titled, gray } = titledWindows(image)
-    const same = (a, b) => Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.w - b.w) < 0.015 && Math.abs(a.h - b.h) < 0.015
-    // (the windows found by their frames: their title bar – the Mac's buttons, also grey ones, or a
-    // close button – where it is, the title can be read exactly there)
-    for (const f of frames) {
-      const rect = { x: f.x * image.width, y: f.y * image.height, width: f.w * image.width, height: f.h * image.height }
-      f.line = titleLine(gray, rect, scale, platform)
-    }
-    for (const t of titled) {
-      const right = (t.x + t.w) * image.width
-      t.line = { y: t.lights.y, x0: t.lights.x + 2 * t.lights.gap + 14 * scale, x1: right - 12 * scale }
-    }
+    // the windows by their title bars (light-windows.js findWindows): a part of the screen without
+    // the buttons of one is no window of its own
+    const found = findWindows(imageData(image)).map((r) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: r.active, line: r.line, kind: r.kind }))
     const overlap = (a, b) => {
       const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
       const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
       return (ix * iy) / (a.w * a.h + b.w * b.h - ix * iy)
     }
-    // (one window, found as several frames – its buttons the same: the largest)
-    for (let i = 0; i < frames.length; i++) {
-      const a = frames[i]
-      if (!a.line) continue
-      for (let j = 0; j < frames.length; j++) {
-        const b = frames[j]
-        if (i !== j && b.line && Math.abs(a.line.y - b.line.y) < 3 && Math.abs(a.line.x0 - b.line.x0) < 3 && b.w * b.h > a.w * a.h) a.dupe = true
-      }
-    }
-    frames.splice(0, frames.length, ...frames.filter((f) => !f.dupe))
     const previous = this.selection
-    const all = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))]
+    const all = found
     this.windows = all.filter((w) => !own || overlap(w, own) < 0.6)
     // (for share.html?debug: what was taken for this browser's window)
     this.ownLeftOut = all.filter((w) => !this.windows.includes(w))
@@ -81,6 +56,7 @@ export class WindowPicker {
     }
     // the window the presenter just worked in (not this browser): picked right away – unless they
     // picked one themselves
+    const titled = this.windows.filter((w) => w.titled)
     if (active && titled.length && (!this.selection || this.auto)) {
       this.select(titled[0])
       this.auto = true
@@ -200,23 +176,12 @@ function dragRect({ from, to }) {
   return { x: Math.min(from.x, to.x), y: Math.min(from.y, to.y), w: Math.abs(to.x - from.x), h: Math.abs(to.y - from.y) }
 }
 
-/**
- * Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`; the
- * buttons in pixels), and the picture in grayscale.
- */
-function titledWindows(image) {
+/** A picture's pixels (RGBA, full size). */
+function imageData(image) {
   const canvas = document.createElement('canvas')
   canvas.width = image.width
   canvas.height = image.height
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   ctx.drawImage(image, 0, 0)
-  const data = ctx.getImageData(0, 0, image.width, image.height)
-  const lights = trafficLights(data)
-  const g = grayFrom(data)
-  if (!lights.length) return { titled: [], gray: g }
-  const titled = lights
-    .map((l) => ({ l, r: windowOfLights(g, l) }))
-    .filter(({ r }) => r)
-    .map(({ l, r }) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true, lights: l }))
-  return { titled, gray: g }
+  return ctx.getImageData(0, 0, image.width, image.height)
 }

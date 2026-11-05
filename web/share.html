@@ -305,8 +305,8 @@
     import { LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { cropSupported, makeCropper } from './light-crop.js'
-    import { grayFrom, scaledGray } from './light-locate.js'
-    import { detectWindows, platformOf, titleLine, trafficLights, windowOfLights } from './light-windows.js'
+    import { scaledGray } from './light-locate.js'
+    import { findWindows, platformOf, titleLine } from './light-windows.js'
     import { monitorRect } from './light-geometry.js'
     import { readLine, readText, readable, readerState, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
@@ -1221,7 +1221,7 @@
         if (changed < 0.25 && pickActive === !front) return renderPick()
         pickThumb = thumb
         pickActive = !front
-        picker.setImage(c, { active: !front, scale: c.width / screen.width, own })
+        picker.setImage(c, { active: !front, own })
         if (!front) {
           sawAway = true
           // (the one just worked in: marked as such, also in later pictures)
@@ -1427,10 +1427,7 @@
         scratch.height = full.height
         ctx.drawImage(full, 0, 0)
         const data = ctx.getImageData(0, 0, full.width, full.height)
-        const lights = trafficLights(data)
-        if (!lights.length) return []
-        const g = grayFrom(data)
-        return lights.map((l) => windowOfLights(g, l)).filter(Boolean)
+        return findWindows(data)
       }
       let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch), places })
       // (this page in front may well cover the window: a frame alone does not count then)
@@ -1539,33 +1536,23 @@
       titleSearchAt = Date.now()
       titleReading = true
       try {
-        // windows with a title bar: by their buttons (exact), else by their frames
         const canvas = document.createElement('canvas')
         canvas.width = full.width
         canvas.height = full.height
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         ctx.drawImage(full, 0, 0)
         const data = ctx.getImageData(0, 0, full.width, full.height)
-        const g = grayFrom(data)
-        const titled = trafficLights(data)
-          .map((l) => ({ l, rect: windowOfLights(g, l) }))
-          .filter((w) => w.rect)
-          .map(({ l, rect }) => ({ rect, line: { y: l.y, x0: l.x + 2 * l.gap + 14 * scale, x1: rect.x + rect.width - 12 * scale } }))
-        // (windows by their frames: only those with a title bar – real windows)
-        const frames = detectWindows(scaledGray(full, 640, Math.round((full.height * 640) / full.width)))
-          .map((w) => ({ x: Math.round(w.x * full.width), y: Math.round(w.y * full.height), width: Math.round(w.w * full.width), height: Math.round(w.h * full.height) }))
-          .filter((w) => !titled.some((t) => Math.abs(t.rect.x - w.x) < 12 && Math.abs(t.rect.y - w.y) < 12))
-          .map((rect) => ({ rect, line: titleLine(g, rect, scale, platform) }))
-          .filter((w) => w.line)
+        // the windows by their title bars (light-windows.js findWindows)
+        const candidates = findWindows(data).map((w) => ({ rect: { x: w.x, y: w.y, width: w.width, height: w.height }, line: w.line }))
         let best = null
-        for (const { rect, line } of [...titled, ...frames].slice(0, 10)) {
+        for (const { rect, line } of candidates.slice(0, 10)) {
           const text = await readText(titleBar(full, rect, scale, line))
           const score = Math.max(0, ...titleTexts.map((t) => sameTitle(t, text)))
           if (score >= 0.6 && (!best || score > best.score)) best = { rect, score, text }
         }
         // (meanwhile found again otherwise, or the share ended: nothing to do)
         if (!best || !host || !cropper?.blank || picker) return
-        const rect = titled.some((t) => t.rect === best.rect) ? best.rect : snapRect(grabberOf(full), best.rect, full)
+        const rect = best.rect
         cropper.setRect(rect)
         cropper.setBlank(null)
         trackTitle = titleOf(grabberOf(full), cropper.rect, scale)
