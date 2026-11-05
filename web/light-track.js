@@ -93,7 +93,26 @@ export function snapRect(grab, rect, full, reach = 10) {
  */
 export function follow(grab, full, rect, { title, windowAt, places = () => [] }) {
   const fits = (x, y) => x >= 0 && y >= 0 && x + rect.width <= full.width && y + rect.height <= full.height
-  const result = (x, y, score, by) => ({ rect: { ...rect, x, y }, how: x === rect.x && y === rect.y ? 'same' : 'moved', score, by })
+  let titled = null
+  const titledNow = () => (titled ??= places())
+  let frames = null
+  const W = 640
+  const framesNow = () =>
+    (frames ??= detectWindows(grab({ x: 0, y: 0, width: full.width, height: full.height }, W, Math.round((full.height * W) / full.width))).map((r) => ({ x: r.x * full.width, y: r.y * full.height, width: r.w * full.width, height: r.h * full.height })))
+  // found by its top left corner: is it still as large? (maximized, made smaller)
+  const sized = (x, y) => {
+    if (hasBorders(grab, full, { x, y, width: rect.width, height: rect.height })) return { x, y, width: rect.width, height: rect.height }
+    const exact = titledNow().find((w) => Math.abs(w.x - x) <= 4 && Math.abs(w.y - y) <= 4)
+    if (exact) return { x: exact.x, y: exact.y, width: exact.width, height: exact.height }
+    const frame = framesNow().find((w) => Math.abs(w.x - x) <= 8 && Math.abs(w.y - y) <= 8)
+    if (frame) return snapRect(grab, frame, full)
+    return { x, y, width: rect.width, height: rect.height }
+  }
+  const result = (x, y, score, by) => {
+    const r = sized(x, y)
+    const same = r.x === rect.x && r.y === rect.y && r.width === rect.width && r.height === rect.height
+    return { rect: r, how: same ? 'same' : r.width === rect.width && r.height === rect.height ? 'moved' : 'frame', score, by }
+  }
 
   // still there (or moved a little)? its title bar says so
   if (title) {
@@ -133,14 +152,11 @@ export function follow(grab, full, rect, { title, windowAt, places = () => [] })
     }
   }
 
-  // places to look at: frames of the same size, and where its picture fits best
-  const W = 640
-  const screenSmall = grab({ x: 0, y: 0, width: full.width, height: full.height }, W, Math.round((full.height * W) / full.width))
-  const frames = detectWindows(screenSmall).map((r) => ({ x: r.x * full.width, y: r.y * full.height, width: r.w * full.width, height: r.h * full.height }))
-  const candidates = frames
+  // places to look at: windows with a title bar, frames of the same size, and where its picture fits best
+  const candidates = framesNow()
     .filter((r) => Math.abs(r.width - rect.width) < rect.width * 0.04 + 8 && Math.abs(r.height - rect.height) < rect.height * 0.04 + 8)
     .map((r) => ({ x: r.x, y: r.y, reach: 8 }))
-  for (const p of places()) candidates.unshift({ x: p.x, y: p.y, reach: 3 })
+  for (const p of titledNow()) candidates.unshift({ x: p.x, y: p.y, reach: 3 })
   const coarse = bestTiled(screen, win)
   if (coarse.score > 0.3) candidates.push({ x: (coarse.x - win.ox) * k, y: (coarse.y - win.oy) * k, reach: Math.ceil(k) + 2, picture: coarse.score })
 
@@ -161,11 +177,32 @@ export function follow(grab, full, rect, { title, windowAt, places = () => [] })
   }
 
   // still the same frame where it was (its content and title changed), or resized there
-  const frame = frames.map((r) => ({ r, o: overlap(r, rect) })).filter((c) => c.o > 0.6).sort((a, b) => b.o - a.o)[0]
+  const frame = framesNow().map((r) => ({ r, o: overlap(r, rect) })).filter((c) => c.o > 0.6).sort((a, b) => b.o - a.o)[0]
   if (!frame) return null
   const r = frame.r
   if (Math.abs(r.x - rect.x) <= 6 && Math.abs(r.y - rect.y) <= 6 && Math.abs(r.width - rect.width) <= 8 && Math.abs(r.height - rect.height) <= 8) return { rect, how: 'same', score: frame.o, by: 'frame' }
   return { rect: snapRect(grab, r, full), how: 'frame', score: frame.o, by: 'frame' }
+}
+
+/** Are there borders where the right and bottom side of this window would be? (beyond the screen: yes) */
+function hasBorders(grab, full, r) {
+  const strip = (area, across) => {
+    if (area.x < 1 || area.y < 1 || area.x + area.width > full.width || area.y + area.height > full.height) return true
+    const g = grab(area, area.width, area.height)
+    let best = 0
+    // the strongest line in the strip (across: the jump is between columns, else between rows)
+    const n = across ? g.width : g.height
+    for (let i = 1; i < n; i++) {
+      let sum = 0
+      const m = across ? g.height : g.width
+      for (let j = 0; j < m; j++) sum += across ? Math.abs(g.px[j * g.width + i] - g.px[j * g.width + i - 1]) : Math.abs(g.px[i * g.width + j] - g.px[(i - 1) * g.width + j])
+      best = Math.max(best, sum / m)
+    }
+    return best >= 6
+  }
+  const right = strip({ x: r.x + r.width - 4, y: Math.round(r.y + r.height * 0.2), width: 8, height: Math.round(r.height * 0.6) }, true)
+  const bottom = strip({ x: Math.round(r.x + r.width * 0.2), y: r.y + r.height - 4, width: Math.round(r.width * 0.6), height: 8 }, false)
+  return right && bottom
 }
 
 /** The best place of the title bar for a window near (x, y), within `reach` pixels; 1:1. */

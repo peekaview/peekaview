@@ -250,7 +250,10 @@ export function windowOfLights(g, light) {
     return best.at
   }
   const rows = (y0, y1) => Array.from({ length: 24 }, (_, i) => Math.round(y0 + ((y1 - y0) * (i + 0.5)) / 24))
-  const right = strongest(top.end + 1, (x, y) => vEdge(x, y), rows(cy, left.end))
   const bottom = strongest(left.end + 1, (y, x) => hEdge(x, y), rows(left.x + light.gap, top.end))
+  // the right side: where both the top and the bottom border end (a line on the wallpaper may go on
+  // from one of them, hardly from both)
+  const bottomEnd = runRight(bottom, Math.round(left.x + light.gap))
+  const right = strongest(Math.min(top.end, bottomEnd > left.x + light.gap * 4 ? bottomEnd : top.end) + 1, (x, y) => vEdge(x, y), rows(cy, left.end))
   return { x: left.x, y: top.y, width: right - left.x, height: bottom - top.y }
 }

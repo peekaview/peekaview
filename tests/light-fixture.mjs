@@ -59,6 +59,8 @@ const paintWindow = (ctx, t) => {
   ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, width, 34)
   // the title bar's buttons (as on macOS, in colour: the active window)
   for (const [i, c] of ['#ff5f57', '#febc2e', '#28c840'].entries()) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(16 + i * 20, 17, 6, 0, 7); ctx.fill() }
+  // … and its title
+  ctx.fillStyle = '#fff'; ctx.font = '600 15px system-ui'; ctx.fillText('Projektplan.txt – Editor', 96, 23)
   ctx.fillStyle = '#18181b'; ctx.font = '600 20px system-ui'
   for (let i = 0; i < 7; i++) ctx.fillText('Testzeile ' + (i + 1) + ' – im Fenster', 24, 70 + i * 36)
   ctx.fillStyle = '#16a34a'; ctx.fillRect(width - 120, 60, 90, 90)

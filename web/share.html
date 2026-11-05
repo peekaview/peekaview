@@ -231,7 +231,8 @@
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { Cropper, cropSupported } from './light-crop.js'
     import { grayFrom, scaledGray } from './light-locate.js'
-    import { trafficLights, windowOfLights } from './light-windows.js'
+    import { detectWindows, trafficLights, windowOfLights } from './light-windows.js'
+    import { readText, sameTitle, titleBar, words } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { follow, grabberOf, snapRect, titleOf } from './light-track.js'
     import { icon, owl } from './icons.js'
@@ -906,6 +907,9 @@
       if (seen && !selection.drawn && !selection.titled) Object.assign(rect, snapRect(seen, rect, f))
       trackTitle = seen ? titleOf(seen, rect, f.width / screen.width) : null
       trackImage = seen ? cropCanvas(image, rect) : null
+      titleTexts = []
+      titleReadAt = 0
+      if (seen && rect) learnTitle(image, rect, f.width / screen.width)
       trackMisses = 0
       windowLost = false
       if (host) {
@@ -951,7 +955,7 @@
       const before = trackImage ?? cropCanvas(full, r)
       const scratch = document.createElement('canvas')
       const t0 = performance.now()
-      // (the window being dragged is the active one: its coloured buttons say where it is)
+      // (the window being dragged is the active one: its coloured buttons say where it is, and how large)
       const places = () => {
         const ctx = scratch.getContext('2d', { willReadFrequently: true })
         scratch.width = full.width
@@ -961,14 +965,15 @@
         const lights = trafficLights(data)
         if (!lights.length) return []
         const g = grayFrom(data)
-        return lights.map((l) => windowOfLights(g, l)).filter((w) => w && Math.abs(w.width - r.width) <= 6 && Math.abs(w.height - r.height) <= 6)
+        return lights.map((l) => windowOfLights(g, l)).filter(Boolean)
       }
       let found = follow(grab, full, r, { title: trackTitle, windowAt: (w, h) => scaledGray(before, w, h, scratch), places })
       // (this page in front may well cover the window: a frame alone does not count then)
       const front = inFront()
       if (found && front && found.by === 'frame' && found.how !== 'same') found = null
-      trackInfo = { how: found?.how ?? 'nicht gefunden', by: found?.by ?? null, score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front, titel: !!trackTitle }
+      trackInfo = { how: found?.how ?? 'nicht gefunden', by: found?.by ?? null, score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front, titel: !!trackTitle, titeltexte: titleTexts }
       if (!found) {
+        findByTitle(full, scale)
         if (!cropper.blank) {
           cropper.setBlank(NOT_SEEN)
           renderAll()
@@ -996,9 +1001,79 @@
       }
       trackImage = cropCanvas(full, cropper.rect)
       // found without its title bar (it changed: another document, another tab): take the new one
-      if (found.by !== 'title') trackTitle = titleOf(grab, cropper.rect, scale)
+      // – and read it at once
+      if (found.by !== 'title') {
+        trackTitle = titleOf(grab, cropper.rect, scale)
+        titleReadAt = 0
+      }
+      learnTitle(full, cropper.rect, scale)
     }
     setInterval(track, 350)
+
+    // The window's titles, read from its title bar (light-title.js): now and then while it stays,
+    // and at once when its title bar changed. Gone from its place (moved, maximized, minimized and
+    // back), the title bars on the screen are read and it is found again by a title it had.
+    let titleTexts = []
+    let titleReadAt = 0
+    let titleReading = false
+    let titleSearchAt = 0
+    async function learnTitle(full, rect, scale) {
+      if (titleReading || Date.now() - titleReadAt < 5000) return
+      titleReading = true
+      const shot = titleBar(full, rect, scale)
+      try {
+        const text = await readText(shot)
+        titleReadAt = Date.now()
+        if (words(text).length && !titleTexts.some((t) => sameTitle(t, text) >= 0.9)) titleTexts = [text, ...titleTexts].slice(0, 8)
+      } catch (err) {
+        // (no reading – Tesseract not to be loaded: following by the title bar's picture only)
+        titleReadAt = Date.now() + 60000
+        console.info('peekaview light: titles not read', err?.message ?? err)
+      } finally {
+        titleReading = false
+      }
+    }
+    async function findByTitle(full, scale) {
+      if (!titleTexts.length || titleReading || Date.now() - titleSearchAt < 2500) return
+      titleSearchAt = Date.now()
+      titleReading = true
+      try {
+        // windows with a title bar: by their buttons (exact), else by their frames
+        const canvas = document.createElement('canvas')
+        canvas.width = full.width
+        canvas.height = full.height
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(full, 0, 0)
+        const data = ctx.getImageData(0, 0, full.width, full.height)
+        const g = grayFrom(data)
+        const titled = trafficLights(data).map((l) => windowOfLights(g, l)).filter(Boolean)
+        const frames = detectWindows(scaledGray(full, 640, Math.round((full.height * 640) / full.width)))
+          .map((w) => ({ x: Math.round(w.x * full.width), y: Math.round(w.y * full.height), width: Math.round(w.w * full.width), height: Math.round(w.h * full.height) }))
+          .filter((w) => !titled.some((t) => Math.abs(t.x - w.x) < 12 && Math.abs(t.y - w.y) < 12))
+        let best = null
+        for (const rect of [...titled, ...frames].slice(0, 10)) {
+          const text = await readText(titleBar(full, rect, scale))
+          const score = Math.max(0, ...titleTexts.map((t) => sameTitle(t, text)))
+          if (score >= 0.6 && (!best || score > best.score)) best = { rect, score, text }
+        }
+        // (meanwhile found again otherwise, or the share ended: nothing to do)
+        if (!best || !host || !cropper?.blank || picker) return
+        const rect = titled.includes(best.rect) ? best.rect : snapRect(grabberOf(full), best.rect, full)
+        cropper.setRect(rect)
+        cropper.setBlank(null)
+        trackTitle = titleOf(grabberOf(full), cropper.rect, scale)
+        trackImage = cropCanvas(full, cropper.rect)
+        trackMisses = 0
+        windowLost = false
+        trackInfo = { ...trackInfo, how: 'titeltext', score: +best.score.toFixed(2), gelesen: best.text }
+        host.update()
+        renderAll()
+      } catch (err) {
+        console.info('peekaview light: titles not read', err?.message ?? err)
+      } finally {
+        titleReading = false
+      }
+    }
 
     // ---------------------------------------------------------------- finding a shared window
     $('locate').innerHTML = icon('screen', 16) + 'Bildschirm auswählen'

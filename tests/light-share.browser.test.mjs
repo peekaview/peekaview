@@ -380,6 +380,16 @@ test('the share in its own small window (as in Chrome): the whole screen, one wi
     await waitFor(`${dark} > 60`)
     await tab(P)
 
+    // maximized (larger, elsewhere): found again by its title, read from its title bar
+    const big = { x: 40, y: 60, width: 700, height: 460 }
+    await evaluate(`qaWindowAt = ${JSON.stringify(big)}; true`)
+    await waitFor(`Math.abs(pvLight.crop.x - ${big.x}) <= 4 && Math.abs(pvLight.crop.width - ${big.width}) <= 6 && Math.abs(pvLight.crop.height - ${big.height}) <= 6`).catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked})'))}`)
+    })
+    await tab(V)
+    await waitFor(`Math.abs(document.querySelector('video').videoWidth - ${big.width}) <= 6 && ${dark} > 60`)
+    await tab(P)
+
     // another choice while sharing: the whole screen – the same viewers, the whole picture
     // (once the small window shows its panel again)
     await waitFor("!document.body.classList.contains('spotting')")

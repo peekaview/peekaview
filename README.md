@@ -32,7 +32,7 @@ and screen, audio and clipboard data travel over WebRTC.
 | `client/src-tauri/` | Desktop client: capture, encoder, P2P hub (`p2p/`), overlay, input guard, recording |
 | `web/` | Static viewer site (`index.html`) and npm package `@peekaview/viewer`: `mountViewer()`, `/react`, Nostr signaling (`signal.js`), voice |
 | `web/desktop/` | UI of the desktop client in the same design |
-| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), picking a window from the screen and following it (`light-windows.js`, `light-pick.js`, `light-crop.js`, `light-track.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
+| `web/share.html`, `web/share-helper.html` | Bildschirmfreigabe light: sharing from the browser (`light-host.js`), picking a window from the screen and following it (`light-windows.js`, `light-pick.js`, `light-crop.js`, `light-track.js`, `light-title.js`), still pictures (`light-capture.js`, `light-locate.js`) and the helper window (`light-geometry.js`) |
 | `android/` | Android app: watching (bundled viewer) and sharing the phone's screen – see `android/README.md` |
 | `build.sh` | Builds the macOS app and installs it to `/Applications` |
 | `docs/meetzi-integration.md` | How to embed PeekaView into meetzi |
@@ -308,6 +308,8 @@ The viewer site opens with a small start page:
 - A moved window is followed about three times a second and right before each still picture, so the cut-out moves along and a drawing appears where the window is now (`light-track.js`).
   - It goes by the window's **title bar**: that stays the same while the content scrolls or changes, and an inactive one differs only in contrast, which the comparison (normalized cross-correlation, tile by tile) does not mind.
   - Places to check: its old place, frames of the same size, and where its own picture fits best on a small copy. The title bar decides, to the pixel. A plain title bar falls back to the window's own picture; a changed one (another document) is taken anew once the window is found otherwise.
+  - Found by its top left corner, its right and bottom borders are checked: a maximized or smaller window gets its new size (from its buttons, or the frame there).
+  - Its **titles** are read from the title bar with Tesseract (`light-title.js`, tesseract.js 6.0.1 from jsDelivr, loaded only for this, reading in the browser): every few seconds while it stays, at once when its title bar changed (another tab, another document); up to eight are kept. Gone from its place, the title bars of the windows on the screen are read and the window is taken back by a title it had (most of its words, one letter may be misread). Without Tesseract (blocked, offline) it is followed by the title bar's picture only.
 - Not to be seen (moved away, covered by the share page, closed, partly off the screen): viewers get **black with "Fenster nicht mehr auf dem geteilten Bildschirm sichtbar"** instead of what lies there now. The share page says "Wechsle zu deinem Fenster", and after about 3 s in the background that the window is no longer at its place.
 - Firefox and Safari cannot cut frames: they share what was picked in the browser's dialog, as described below.
 
