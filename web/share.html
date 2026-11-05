@@ -990,6 +990,15 @@
       $('pick-picture').open = true
       const windows = picker.windows
       $('debug-view').hidden = true
+      // (the picture, to look at it closely elsewhere)
+      if (!$('debug-save')) {
+        const save = Object.assign(document.createElement('button'), { id: 'debug-save', type: 'button', className: 'pill', textContent: 'Auswahlbild speichern (zur Analyse)' })
+        save.addEventListener('click', () => picker?.image?.toBlob((blob) => {
+          const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'peekaview-auswahl.png' })
+          a.click()
+        }, 'image/png'))
+        $('debug-box').append(save)
+      }
       $('debug').textContent = `Fensterauswahl ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({
         bild: picker.image ? `${picker.image.width}x${picker.image.height}` : null,
         massstab: picker.image ? +(picker.image.width / screen.width).toFixed(2) : null,
