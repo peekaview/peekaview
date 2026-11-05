@@ -201,3 +201,11 @@ test('Windows and Linux title bars are found by their close button; the line of 
   assert.equal(titleLine(g, { x: win.x + 50, y: win.y + 100, width: 400, height: 300 }, 1, 'windows'), null)
   assert.equal(titleLine(g, { x: 1000, y: 650, width: 400, height: 300 }, 1, 'linux'), null)
 })
+
+test('title bar buttons are found when the frame found starts a few pixels inside the window (large rounded corners)', async () => {
+  const { titleLine } = await import('../web/light-windows.js')
+  const win = { x: 300, y: 200, w: 900, h: 600 }
+  const g = grayFrom(colourScreen([win]))
+  const line = titleLine(g, { x: win.x + 4, y: win.y + 8, width: win.w - 4, height: win.h - 8 }, 1, 'mac')
+  assert.ok(line && Math.abs(line.y - (win.y + 14)) <= 2, JSON.stringify(line))
+})

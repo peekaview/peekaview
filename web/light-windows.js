@@ -313,9 +313,11 @@ function buttonsOfSize(g, rect, d, gap, scale) {
   const disc = template(false)
   const ring = template(true)
   const { width: W, height: H, px } = g
-  const x0 = Math.max(0, Math.round(rect.x + 2 * scale))
+  // (a little above and left of the frame, too: with large rounded corners the frame found may
+  // start a few pixels inside the window)
+  const x0 = Math.max(0, Math.round(rect.x - 6 * scale))
   const x1 = Math.min(W - tw, Math.round(rect.x + 30 * scale))
-  const y0 = Math.max(0, Math.round(rect.y + 2 * scale))
+  const y0 = Math.max(0, Math.round(rect.y - 12 * scale))
   const y1 = Math.min(H - th, Math.round(rect.y + 46 * scale))
   let top = null
   const n = tw * th
