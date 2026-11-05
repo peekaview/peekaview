@@ -162,3 +162,42 @@ test('title bar buttons are found also in grey (an inactive window), not on a wi
   assert.equal(titleButtons(g, { x: front.x + 100, y: front.y + 200, width: 300, height: 200 }), null)
   assert.equal(titleButtons(g, { x: 1100, y: 40, width: 400, height: 200 }), null)
 })
+
+// Windows and Linux: no coloured buttons – a close button "✕" at the top right
+function otherScreen(windows, { width = 1600, height = 1000 } = {}) {
+  const px = new Float32Array(width * height)
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) px[y * width + x] = 60 + (x / width) * 40
+  const set = (x, y, v) => x >= 0 && y >= 0 && x < width && y < height && (px[Math.round(y) * width + Math.round(x)] = v)
+  for (const w of windows) {
+    const bar = w.bar ?? 32
+    for (let y = w.y; y < w.y + w.h; y++) for (let x = w.x; x < w.x + w.w; x++) set(x, y, y < w.y + bar ? (w.dark ? 40 : 238) : 252)
+    // the close button: an ✕ (GNOME: on a grey disc)
+    const cx = w.x + w.w - (w.gnome ? 20 : 23)
+    const cy = w.y + bar / 2
+    if (w.gnome) for (let y = -12; y <= 12; y++) for (let x = -12; x <= 12; x++) if (x * x + y * y <= 144) set(cx + x, cy + y, 215)
+    for (let t = -5; t <= 5; t += 0.25) {
+      set(cx + t, cy + t, w.dark ? 230 : 30)
+      set(cx + t, cy - t, w.dark ? 230 : 30)
+    }
+    // the title: some letters
+    for (let x = 0; x < 120; x += 3) for (let y = -4; y <= 4; y++) if ((x * 7 + y * 3) % 5 < 2) set((w.gnome ? w.x + w.w / 2 - 60 : w.x + 40) + x, cy + y, w.dark ? 220 : 50)
+  }
+  return { width, height, px }
+}
+
+test('Windows and Linux title bars are found by their close button; the line of the title beside it', async () => {
+  const { titleLine } = await import('../web/light-windows.js')
+  const win = { x: 100, y: 80, w: 700, h: 500 }
+  const gnome = { x: 850, y: 120, w: 600, h: 450, gnome: true, bar: 46 }
+  const dark = { x: 300, y: 620, w: 500, h: 300, dark: true }
+  const g = otherScreen([win, gnome, dark])
+  const a = titleLine(g, { x: win.x, y: win.y, width: win.w, height: win.h }, 1, 'windows')
+  assert.ok(a && Math.abs(a.y - (win.y + 16)) <= 2 && a.x0 < win.x + 40 && a.x1 < win.x + win.w - 100, JSON.stringify(a))
+  const b = titleLine(g, { x: gnome.x, y: gnome.y, width: gnome.w, height: gnome.h }, 1, 'linux')
+  assert.ok(b && Math.abs(b.y - (gnome.y + 23)) <= 2 && b.x1 > gnome.x + gnome.w / 2 + 60, JSON.stringify(b))
+  const c = titleLine(g, { x: dark.x, y: dark.y, width: dark.w, height: dark.h }, 1, 'windows')
+  assert.ok(c && Math.abs(c.y - (dark.y + 16)) <= 2, JSON.stringify(c))
+  // the content of a window, the wallpaper: no title bar
+  assert.equal(titleLine(g, { x: win.x + 50, y: win.y + 100, width: 400, height: 300 }, 1, 'windows'), null)
+  assert.equal(titleLine(g, { x: 1000, y: 650, width: 400, height: 300 }, 1, 'linux'), null)
+})

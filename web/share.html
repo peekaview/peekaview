@@ -306,7 +306,7 @@
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { cropSupported, makeCropper } from './light-crop.js'
     import { grayFrom, scaledGray } from './light-locate.js'
-    import { detectWindows, titleButtons, trafficLights, windowOfLights } from './light-windows.js'
+    import { detectWindows, platformOf, titleLine, trafficLights, windowOfLights } from './light-windows.js'
     import { monitorRect } from './light-geometry.js'
     import { readLine, readText, readable, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
@@ -1200,10 +1200,10 @@
     const placeKey = (w) => [w.x, w.y, w.w, w.h].map((v) => Math.round(v * 200)).join(',')
     const pickTitles = { get: (w) => pickTitleCache.get(placeKey(w)), set: (w, v) => pickTitleCache.set(placeKey(w), v), has: (w) => pickTitleCache.has(placeKey(w)) }
     let pickReading = false
-    // (windows with a title bar – its three buttons found – only: their title can be read exactly)
+    // (windows with a title bar – its buttons found – only: their title can be read exactly)
     function pickWindows() {
       if (!picker?.image || !sawAway) return []
-      return picker.windows.filter((w) => w.buttons && w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
+      return picker.windows.filter((w) => w.line && w.w * w.h >= 0.02 && !(w.w > 0.97 && w.h > 0.9)).slice(0, 8)
     }
     const isLastUsed = (w) => !!lastUsed && Math.abs(w.x - lastUsed.x) < 0.01 && Math.abs(w.y - lastUsed.y) < 0.01 && Math.abs(w.w - lastUsed.w) < 0.015
     // (shown: the one just worked in, and those with a title that reads like one – not letter salad)
@@ -1245,7 +1245,7 @@
       pickReading = true
       try {
         const rect = { x: Math.round(next.x * image.width), y: Math.round(next.y * image.height), width: Math.round(next.w * image.width), height: Math.round(next.h * image.height) }
-        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width, next.buttons))
+        const { text, confidence } = await readLine(titleBar(image, rect, image.width / screen.width, next.line))
         pickTitles.set(next, { text: text.slice(0, 60), ok: readable(text, confidence) })
       } catch (err) {
         // (not to be read: no titles in the list)
@@ -1418,19 +1418,20 @@
     let titleReadAt = 0
     let titleReading = false
     let titleSearchAt = 0
-    // a window's three title bar buttons (light-windows.js), looked for near its top left corner
-    function buttonsOf(source, rect, scale) {
-      const area = { x: Math.max(0, Math.round(rect.x)), y: Math.max(0, Math.round(rect.y)), width: Math.round(Math.min(rect.width, 120 * scale)), height: Math.round(Math.min(rect.height, 70 * scale)) }
+    // the line of a window's title (light-windows.js titleLine): looked for in its top
+    const platform = platformOf()
+    function lineOf(source, rect, scale) {
+      const area = { x: Math.max(0, Math.round(rect.x)), y: Math.max(0, Math.round(rect.y)), width: Math.round(rect.width), height: Math.round(Math.min(rect.height, 70 * scale)) }
       if (area.width < 40 || area.height < 20) return null
-      const b = titleButtons(grabberOf(source)(area, area.width, area.height), { x: 0, y: 0, width: area.width, height: area.height }, scale)
-      return b && { ...b, x: b.x + area.x, y: b.y + area.y }
+      const l = titleLine(grabberOf(source)(area, area.width, area.height), { x: 0, y: 0, width: area.width, height: area.height }, scale, platform)
+      return l && { y: l.y + area.y, x0: l.x0 + area.x, x1: l.x1 + area.x }
     }
 
     async function learnTitle(full, rect, scale) {
       if (titleReading || Date.now() - titleReadAt < 5000) return
       titleReading = true
       // (exactly the line of its title, beside its buttons – where they are found)
-      const shot = titleBar(full, rect, scale, buttonsOf(full, rect, scale))
+      const shot = titleBar(full, rect, scale, lineOf(full, rect, scale))
       try {
         const { text, confidence } = await readLine(shot)
         titleReadAt = Date.now()
@@ -1457,16 +1458,19 @@
         ctx.drawImage(full, 0, 0)
         const data = ctx.getImageData(0, 0, full.width, full.height)
         const g = grayFrom(data)
-        const titled = trafficLights(data).map((l) => ({ rect: windowOfLights(g, l), buttons: { x: l.x, y: l.y, gap: l.gap } })).filter((w) => w.rect)
-        // (windows by their frames: only those with title bar buttons – real windows)
+        const titled = trafficLights(data)
+          .map((l) => ({ l, rect: windowOfLights(g, l) }))
+          .filter((w) => w.rect)
+          .map(({ l, rect }) => ({ rect, line: { y: l.y, x0: l.x + 2 * l.gap + 14 * scale, x1: rect.x + rect.width - 12 * scale } }))
+        // (windows by their frames: only those with a title bar – real windows)
         const frames = detectWindows(scaledGray(full, 640, Math.round((full.height * 640) / full.width)))
           .map((w) => ({ x: Math.round(w.x * full.width), y: Math.round(w.y * full.height), width: Math.round(w.w * full.width), height: Math.round(w.h * full.height) }))
           .filter((w) => !titled.some((t) => Math.abs(t.rect.x - w.x) < 12 && Math.abs(t.rect.y - w.y) < 12))
-          .map((rect) => ({ rect, buttons: titleButtons(g, rect, scale) }))
-          .filter((w) => w.buttons)
+          .map((rect) => ({ rect, line: titleLine(g, rect, scale, platform) }))
+          .filter((w) => w.line)
         let best = null
-        for (const { rect, buttons } of [...titled, ...frames].slice(0, 10)) {
-          const text = await readText(titleBar(full, rect, scale, buttons))
+        for (const { rect, line } of [...titled, ...frames].slice(0, 10)) {
+          const text = await readText(titleBar(full, rect, scale, line))
           const score = Math.max(0, ...titleTexts.map((t) => sameTitle(t, text)))
           if (score >= 0.6 && (!best || score > best.score)) best = { rect, score, text }
         }

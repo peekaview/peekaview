@@ -58,15 +58,14 @@ export function readable(text, confidence = 100) {
 }
 
 /**
- * A window's title as a picture to read – exactly the line of its title: beside its three buttons
- * and at their height, when they are known (light-windows.js titleButtons); else the top of the
- * window. Enlarged where the screen is not sharp (1×).
+ * A window's title as a picture to read – exactly the line of its title when it is known
+ * (light-windows.js titleLine: beside the Mac's three buttons, or left of a close button); else the
+ * top of the window. Enlarged where the screen is not sharp (1×).
  */
-export function titleBar(source, rect, scale = 1, buttons = null) {
-  if (buttons) {
-    const x = Math.round(buttons.x + 2 * buttons.gap + 14 * scale)
-    const y = Math.round(buttons.y - 11 * scale)
-    return strip(source, { x, y, width: Math.max(16, Math.round(rect.x + rect.width - 12 * scale - x)), height: Math.round(22 * scale) }, scale)
+export function titleBar(source, rect, scale = 1, line = null) {
+  if (line) {
+    const x = Math.round(line.x0)
+    return strip(source, { x, y: Math.round(line.y - 11 * scale), width: Math.max(16, Math.round(line.x1 - x)), height: Math.round(22 * scale) }, scale)
   }
   const x = rect.x + Math.round(SIDE * scale)
   const width = Math.max(16, rect.width - Math.round(SIDE * scale) - Math.round(12 * scale))

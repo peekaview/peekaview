@@ -323,3 +323,90 @@ export function titleButtons(g, rect, scale = 1) {
   }
   return top && top.score >= 0.6 ? top : null
 }
+
+/**
+ * The close button of a Windows, GNOME or KDE title bar: an "✕" near the top right corner of
+ * `rect` (in a circle or not, either sign). Same method as titleButtons.
+ * @returns {{x, y, size, score} | null} its centre
+ */
+export function closeButton(g, rect, scale = 1) {
+  const { width: W, height: H, px } = g
+  let top = null
+  for (const size of [10, 14]) {
+    const s = Math.max(6, Math.round(size * scale))
+    const t = s + Math.round(6 * scale)
+    const tpl = new Float32Array(t * t)
+    const c = (t - 1) / 2
+    const half = s / 2
+    const line = Math.max(1, 0.8 * scale)
+    for (let y = 0; y < t; y++) {
+      for (let x = 0; x < t; x++) {
+        const dx = x - c
+        const dy = y - c
+        if (Math.abs(dx) > half || Math.abs(dy) > half) continue
+        // distance to either diagonal
+        const d = Math.min(Math.abs(dx - dy), Math.abs(dx + dy)) / Math.SQRT2
+        tpl[y * t + x] = Math.max(0, Math.min(1, line + 0.5 - d))
+      }
+    }
+    let mean = 0
+    for (const v of tpl) mean += v
+    mean /= tpl.length
+    let vt = 0
+    for (let i = 0; i < tpl.length; i++) {
+      tpl[i] -= mean
+      vt += tpl[i] * tpl[i]
+    }
+    const n = t * t
+    const x0 = Math.max(0, Math.round(rect.x + rect.width - 64 * scale))
+    const x1 = Math.min(W - t, Math.round(rect.x + rect.width - t))
+    const y0 = Math.max(0, Math.round(rect.y + 1 * scale))
+    const y1 = Math.min(H - t, Math.round(rect.y + 46 * scale))
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        let sum = 0
+        let ss = 0
+        let cov = 0
+        for (let ty = 0; ty < t; ty++) {
+          let i = (y + ty) * W + x
+          let k = ty * t
+          for (let tx = 0; tx < t; tx++, i++, k++) {
+            const v = px[i]
+            sum += v
+            ss += v * v
+            cov += v * tpl[k]
+          }
+        }
+        const vi = ss - (sum * sum) / n
+        if (vi < n * 4) continue
+        const score = Math.abs(cov) / Math.sqrt(vi * vt)
+        if (!top || score > top.score) top = { x: x + c, y: y + c, size: s, score }
+      }
+    }
+  }
+  return top && top.score >= 0.6 ? top : null
+}
+
+/**
+ * The line of a window's title, to read – and whether it has a title bar at all: beside the three
+ * buttons of a Mac (left), else left of the close button (Windows: the title at the left, after
+ * minimize and maximize; GNOME, KDE: in the middle). null: no title bar found.
+ * @param {'mac' | 'windows' | 'linux'} platform
+ * @returns {{y, x0, x1} | null} pixels of g
+ */
+export function titleLine(g, rect, scale = 1, platform = 'mac') {
+  // (the Mac's buttons first, wherever: a Mac shared from another computer's browser looks the same)
+  const b = titleButtons(g, rect, scale)
+  if (b) return { y: b.y, x0: b.x + 2 * b.gap + 14 * scale, x1: rect.x + rect.width - 12 * scale }
+  const c = closeButton(g, rect, scale)
+  if (!c) return null
+  // (Windows: minimize and maximize, 46 points each, left of it)
+  const buttons = platform === 'windows' ? 2 * 46 * scale + 24 * scale : 3 * 26 * scale
+  return { y: c.y, x0: rect.x + 8 * scale, x1: c.x - buttons }
+}
+
+/** The platform as the browser says (for titleLine). */
+export function platformOf(nav = typeof navigator !== 'undefined' ? navigator : {}) {
+  const p = nav.userAgentData?.platform ?? nav.platform ?? ''
+  return /mac/i.test(p) ? 'mac' : /win/i.test(p) ? 'windows' : 'linux'
+}

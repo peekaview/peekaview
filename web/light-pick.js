@@ -5,7 +5,7 @@
 // a part by hand. Everything outside the picked part is darkened: that is what viewers will not see.
 
 import { grayFrom, scaledGray } from './light-locate.js'
-import { detectWindows, titleButtons, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
+import { detectWindows, platformOf, titleLine, trafficLights, windowOfLights, windowsAt } from './light-windows.js'
 
 const DETECT_WIDTH = 640
 const MIN_DRAG = 6 // CSS px before a press becomes a drag
@@ -38,17 +38,21 @@ export class WindowPicker {
    *   the presenter was in another program; scale: pixels per point; own: this browser's window
    *   (0..1 of the picture) – never one to pick
    */
-  setImage(image, { active = false, scale = 1, own = null } = {}) {
+  setImage(image, { active = false, scale = 1, own = null, platform = platformOf() } = {}) {
     this.image = image
     const h = Math.max(1, Math.round((image.height * DETECT_WIDTH) / image.width))
     const frames = detectWindows(scaledGray(image, DETECT_WIDTH, h))
     const { titled, gray } = titledWindows(image)
     const same = (a, b) => Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.w - b.w) < 0.015 && Math.abs(a.h - b.h) < 0.015
-    // (the windows found by their frames: their title bar buttons, also grey ones – where they are,
-    // the title can be read exactly beside them)
+    // (the windows found by their frames: their title bar – the Mac's buttons, also grey ones, or a
+    // close button – where it is, the title can be read exactly there)
     for (const f of frames) {
       const rect = { x: f.x * image.width, y: f.y * image.height, width: f.w * image.width, height: f.h * image.height }
-      f.buttons = titleButtons(gray, rect, scale)
+      f.line = titleLine(gray, rect, scale, platform)
+    }
+    for (const t of titled) {
+      const right = (t.x + t.w) * image.width
+      t.line = { y: t.lights.y, x0: t.lights.x + 2 * t.lights.gap + 14 * scale, x1: right - 12 * scale }
     }
     const overlap = (a, b) => {
       const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
@@ -183,7 +187,7 @@ function dragRect({ from, to }) {
 }
 
 /**
- * Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`; their
+ * Windows with coloured title bar buttons on a picture (0..1 of it, exact; `titled: true`; the
  * buttons in pixels), and the picture in grayscale.
  */
 function titledWindows(image) {
@@ -199,6 +203,6 @@ function titledWindows(image) {
   const titled = lights
     .map((l) => ({ l, r: windowOfLights(g, l) }))
     .filter(({ r }) => r)
-    .map(({ l, r }) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true, buttons: { x: l.x, y: l.y, gap: l.gap, score: 1 } }))
+    .map(({ l, r }) => ({ x: r.x / image.width, y: r.y / image.height, w: r.width / image.width, h: r.height / image.height, titled: true, lights: l }))
   return { titled, gray: g }
 }
