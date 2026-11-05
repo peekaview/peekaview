@@ -94,6 +94,8 @@
     body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
     body.panel #running > .note, body.panel #helper, body.panel .linkbox input, body.panel #link-label { display: none !important; }
     body.panel .brand { font-size: 14px; }
+    /* before the share the window is large (the browser's screen picker shows in it): centred */
+    body.panel #setup { width: min(440px, 100%); margin: 6vh auto 0; }
     body.panel h1 { font-size: 17px; }
     body.panel .live { font-size: 15px; }
     body.panel #running, body.panel #setup, body.panel #ended { gap: 12px !important; }
@@ -252,6 +254,8 @@
     ]
     const HELPER_SIZE = { width: 300, height: 132 }
     const PANEL_WIDTH = 360
+    // the browser's screen picker is shown inside the window that asks: it needs about this much
+    const PICKER_ROOM = { width: 760, height: 660 }
     // The share runs in its own small window (share.html?panel), opened from this page: picking the
     // window, who watches, what they may do – and it jumps to each drawing itself. The tab that
     // opened it may then be closed. (Popups blocked: everything here, in the tab.)
@@ -354,10 +358,11 @@
     // closed, and with it everything it captured)
     function start() {
       if (panel || !supported || !nameOrAsk()) return startHere()
-      const width = PANEL_WIDTH
-      const height = 300
-      const left = Math.round((screen.availLeft ?? 0) + screen.availWidth - width - 16)
-      const top = Math.round((screen.availTop ?? 0) + screen.availHeight - height - 16)
+      // (large enough for the browser's screen picker, which shows inside it; small afterwards)
+      const width = Math.min(PICKER_ROOM.width, screen.availWidth)
+      const height = Math.min(PICKER_ROOM.height, screen.availHeight)
+      const left = Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2)
+      const top = Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2)
       const url = `share.html?panel&mode=${mode}${params.has('debug') ? '&debug' : ''}`
       panelWindow = window.open(url, 'pv-light-panel', `popup=yes,width=${width},height=${height},left=${left},top=${top}`)
       if (!panelWindow) return startHere()
@@ -385,6 +390,8 @@
       // Both need the click: the screen picker, and the helper window (popup blockers let
       // windows through only right in a click). The picker first – Safari spends the click on it,
       // then the helper waits for a click of its own.
+      // (the browser's screen picker shows inside this window: room for it)
+      roomy()
       let picking
       try {
         picking = navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, displaySurface: 'monitor' }, audio: false, selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
@@ -481,7 +488,8 @@
     // In the bottom right corner, as large as its content; larger, in the middle, to pick a window.
     let spotting = false
     function dock() {
-      if (!panel || spotting || !$('pick').hidden) return
+      // (before the share: as large as the browser's screen picker needs)
+      if (!panel || spotting || !$('pick').hidden || (!host && $('ended').hidden)) return
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
@@ -491,6 +499,15 @@
       try {
         if (Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) window.resizeTo(width, height)
         if (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2) window.moveTo(left, top)
+      } catch {}
+    }
+    function roomy() {
+      if (!panel || (window.outerWidth >= PICKER_ROOM.width && window.outerHeight >= PICKER_ROOM.height)) return
+      const width = Math.min(PICKER_ROOM.width, screen.availWidth)
+      const height = Math.min(PICKER_ROOM.height, screen.availHeight)
+      try {
+        window.resizeTo(width, height)
+        window.moveTo(Math.round((screen.availLeft ?? 0) + (screen.availWidth - width) / 2), Math.round((screen.availTop ?? 0) + (screen.availHeight - height) / 2))
       } catch {}
     }
     function spread() {
@@ -1088,6 +1105,7 @@
       const error = $('locate-error')
       error.hidden = true
       let stream
+      roomy()
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor', frameRate: { ideal: 5 } }, audio: false, selfBrowserSurface: 'exclude', monitorTypeSurfaces: 'include' })
       } catch (err) {
