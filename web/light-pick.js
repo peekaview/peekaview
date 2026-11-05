@@ -70,7 +70,10 @@ export class WindowPicker {
     }
     frames.splice(0, frames.length, ...frames.filter((f) => !f.dupe))
     const previous = this.selection
-    this.windows = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))].filter((w) => !own || overlap(w, own) < 0.6)
+    const all = [...titled, ...frames.filter((f) => !titled.some((t) => same(t, f)))]
+    this.windows = all.filter((w) => !own || overlap(w, own) < 0.6)
+    // (for share.html?debug: what was taken for this browser's window)
+    this.ownLeftOut = all.filter((w) => !this.windows.includes(w))
     // the picked window again among the new ones (the picture is fetched anew now and then)
     if (previous && !previous.drawn) {
       const again = this.windows.find((w) => overlap(w, previous) > 0.85)

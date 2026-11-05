@@ -992,6 +992,7 @@
 
     // what the window picker found (share.html?debug): frames, title bars, titles read – and the
     // picture with the frames, open
+    let lastPickReport = ''
     function showPickDebug() {
       if (!params.has('debug') || !picker) return
       $('debug-box').hidden = false
@@ -1015,7 +1016,7 @@
         }, 'image/png'))
         $('debug-box').append(save)
       }
-      $('debug').textContent = `Fensterauswahl ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify({
+      const report = {
         bild: picker.image ? `${picker.image.width}x${picker.image.height}` : null,
         massstab: picker.image ? +(picker.image.width / screen.width).toFixed(2) : null,
         weg_gewesen: sawAway,
@@ -1027,7 +1028,18 @@
         tesseract: readerState.state,
         geaendert_prozent: pickChanged,
         titel: pickWindows().map((w) => pickTitles.get(w)).filter(Boolean).map((t) => `${t.ok ? '✓' : '✗'} ${t.confidence ?? '?'} ${t.text} @${t.line ?? '-'}`),
-      }, null, 1)
+        eigenes_fenster: Object.fromEntries(Object.entries(ownWindow()).map(([k, v]) => [k, +v.toFixed(3)])),
+        bildschirm: { left: screen.left, top: screen.top, availLeft: screen.availLeft, width: screen.width, height: screen.height, screenX: window.screenX, screenY: window.screenY, outer: [window.outerWidth, window.outerHeight] },
+        als_eigenes_weggelassen: (picker.ownLeftOut ?? []).map((w) => `${[w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')}${w.line ? ' Titelleiste' : ''}`),
+        groesste_fenster: picker.windows.slice(0, 8).map((w) => `${[w.x, w.y, w.w, w.h].map((v) => v.toFixed(3)).join(',')}${w.line ? ' Titelleiste' : ''}${w.titled ? ' farbig' : ''}`),
+      }
+      $('debug').textContent = `Fensterauswahl ${new Date().toLocaleTimeString('de-DE')}\n` + JSON.stringify(report, null, 1)
+      // (to the test server where there is one, to be read there)
+      const sent = JSON.stringify(report)
+      if (sent !== lastPickReport) {
+        lastPickReport = sent
+        fetch('qa-log', { method: 'POST', body: sent }).catch(() => {})
+      }
     }
 
     // how the still picture and the search went: the console, and here with share.html?debug

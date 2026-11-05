@@ -113,6 +113,13 @@ export function startServer(port = 0, { real = false } = {}) {
     const path = new URL(request.url, 'http://localhost').pathname
     // (trying it out: which files the browser really fetched)
     if (real) console.log(new Date().toLocaleTimeString('de-DE'), request.method, path)
+    // (trying it out: share.html?debug sends what the window picker found here, to read it)
+    if (real && request.method === 'POST' && path === '/qa-log') {
+      const chunks = []
+      for await (const c of request) chunks.push(c)
+      console.log('qa-log', Buffer.concat(chunks).toString())
+      return response.writeHead(200).end()
+    }
     // (trying it out: share.html?debug sends the window picker's picture here, to look at it)
     if (real && request.method === 'POST' && path === '/qa-upload') {
       const chunks = []
