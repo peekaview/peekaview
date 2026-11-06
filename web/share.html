@@ -280,11 +280,17 @@
     .pip-spot canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: #18181b; }
     .pip-bar { display: flex; flex-wrap: wrap; gap: 8px; }
     .pip-bar .pill { flex: 1; }
-    /* (a drawing: in the place of the controls – the window keeps its size; large: all of it) */
+    /* (a drawing: in the place of the controls, above the footer – which stays where it is; the
+       window keeps its size; large: all of it, nothing else) */
     body.pip-spotting { overflow: hidden; }
-    body.pip-spotting #running > :not(#pip-spot) { display: none !important; }
-    body.pip-spotting #pip-spot { position: fixed; inset: 0; padding: 8px; background: #09090b; }
+    body.pip-spotting #running > :not(#pip-spot):not(#run-footer) { display: none !important; }
+    body.panel.pip-spotting #running { height: calc(100vh - 26px); }
+    body.pip.pip-spotting #running { height: calc(100vh - 28px); }
+    body.pip-spotting #pip-spot { flex: 1 1 0; min-height: 0; }
     body.pip-spotting #pip-spot canvas { flex: 1; min-height: 0; aspect-ratio: auto; object-fit: contain; }
+    body.pip-spotting #footer-modes, body.pip-spotting #footer-mode-note { display: none !important; }
+    body.pip-large #run-footer { display: none !important; }
+    body.pip-large #pip-spot { position: fixed; inset: 0; padding: 8px; background: #09090b; }
     /* someone drew: the window shows the spot instead of its panel */
     #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
     body.spotting main { visibility: hidden; }
@@ -1242,17 +1248,35 @@
     }
     // (while pictures are held – something of ours shown over the window – the last one without it:
     // else the preview would show itself)
-    const capture = () =>
+    // A still picture is never black or empty (a frame not there yet, not painted, a capture that
+    // failed): taken again a few times – else the last good one. While pictures are held (something
+    // of ours shown over the window) the last good one right away: else the preview would show itself.
+    const blackPicture = (image) => {
+      if (!image?.width || !image?.height) return true
+      try {
+        return scaledGray(image, 48, 27).px.every((v) => v < 6)
+      } catch {
+        return false
+      }
+    }
+    const takeOne = () =>
       cropper
-        ? cropper.paused && cleanCapture
-          ? Promise.resolve(cleanCapture)
-          : track()
-              .then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos() }))
-              .then((c) => {
-                if (c?.image && cropper && !cropper.paused) cleanCapture = c
-                return c
-              })
+        ? track().then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos(), frame: cropper?.snapshot() }))
         : takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
+    async function capture() {
+      if (cropper?.paused && cleanCapture) return cleanCapture
+      for (let tries = 0; ; tries++) {
+        const c = await takeOne()
+        if (!host) return c
+        if (!blackPicture(c?.image)) {
+          if (!cropper?.paused) cleanCapture = c
+          return c
+        }
+        if (tries >= 3) return cleanCapture ?? c
+        await new Promise((done) => setTimeout(done, 120))
+        if (cropper?.paused && cleanCapture) return cleanCapture
+      }
+    }
 
     // a point right away; a stroke when it is finished – with the picture from its start
     function watch(m) {
@@ -1368,6 +1392,7 @@
         dock()
       }
       win.addEventListener('pagehide', () => pipGone?.())
+      win.addEventListener('resize', fitSpot)
       renderAll()
     }
     let pipGone = null
@@ -1395,9 +1420,17 @@
       spotDoc().body.classList.add('pip-spotting')
       // (before it is drawn: no picture with it goes out)
       holdPictures()
+      fitSpot()
       miniView.reveal(r)
       renderPipButtons()
     }
+    // the preview shaped like the room it has (the window made larger, or smaller)
+    function fitSpot() {
+      if (!miniView || $('pip-spot').hidden) return
+      const r = $('pip-canvas').getBoundingClientRect()
+      miniView.fit(r.width, r.height)
+    }
+    window.addEventListener('resize', fitSpot)
 
     // large: nothing but the drawing – and no new pictures meanwhile (the window lies over the
     // screen: viewers would see the drawing twice)
@@ -1418,6 +1451,8 @@
       }
       if (!large && !miniView?.showing) endSpot()
       renderPipButtons()
+      // (the footer gone, or back)
+      fitSpot()
     }
     function renderPipButtons() {
       // ("Groß anzeigen": only the always-on-top window – the small one cannot lie over everything)
@@ -1995,7 +2030,7 @@
       return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
-      const full = await frameCanvas(screenStream, sourceVideos())
+      const full = cropper?.snapshot() ?? (await frameCanvas(screenStream, sourceVideos()))
       const r = cropper?.rect
       if (!full || !r || picker) return
       const grab = grabberOf(full)

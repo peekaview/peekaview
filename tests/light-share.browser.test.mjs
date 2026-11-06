@@ -172,6 +172,23 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     await tab('t4')
     await waitFor("document.querySelector('.pv-notice-text').textContent.includes('abgelehnt')")
 
+    // a viewer whose browser is closed, without a word (no "bye", nothing closed by the page): gone
+    // from the list and the title in a few seconds
+    await browser('tab', 'new', `${base}/?name=Cara#${room}`)
+    await tab('t1')
+    await browser('wait', '#requests [data-allow]')
+    await browser('click', '#requests [data-allow]')
+    await waitFor("document.querySelector('#viewers').innerText.includes('Cara')")
+    await tab('t5')
+    await waitFor("document.querySelector('video')?.videoWidth > 0")
+    await evaluate("WebSocket.prototype.send = () => {}; RTCPeerConnection.prototype.close = () => {}; RTCDataChannel.prototype.close = () => {}; true")
+    await browser('tab', 'close', 't5')
+    await tab('t1')
+    const t0 = Date.now()
+    await waitFor("!document.querySelector('#viewers').innerText.includes('Cara') && pvLight.host.viewerList.every((v) => v.name !== 'Cara')")
+    assert.ok(Date.now() - t0 < 12000, `gone after ${Date.now() - t0} ms`)
+    assert.match(await evaluate("document.querySelector('#viewers').innerText"), /Anna/)
+
     // stopping ends it everywhere: the helper closes, the viewer waits for the next share
     await tab('t1')
     await browser('click', '#stop')
@@ -591,7 +608,28 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await waitFor("document.querySelector('#live-note').hidden || document.body.classList.contains('pip-spotting')")
 
     await stroke(0.3, 0.5)
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
+    // the drawing in the place of the controls – the footer stays where it is; the preview shaped like
+    // its room (no empty bands), with the very picture (not black)
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display !== 'none' && getComputedStyle(document.querySelector('#requests-box')).display === 'none'"), true, 'the controls make room, the footer stays')
+    const shape = await evaluate("(()=>{const c=document.querySelector('#pip-canvas');const r=c.getBoundingClientRect();return {canvas: c.width / c.height, room: r.width / r.height, top: r.top, footer: document.querySelector('#run-footer').getBoundingClientRect().top}})()")
+    assert.ok(Math.abs(shape.canvas - Math.min(2, Math.max(1, shape.room))) < 0.03 && shape.top < shape.footer, JSON.stringify(shape))
+    await tab(S)
+    const lit2 = "(()=>{const i=pvLight.lastReveal.capture.image;const d=i.getContext('2d').getImageData(0,0,i.width,i.height).data;let s=0;for(let k=0;k<d.length;k+=16)s+=d[k]+d[k+1]+d[k+2];return s>0})()"
+    assert.equal(await evaluate(lit2), true, 'not black')
+    // a still picture that comes out black (a frame not there yet): taken again – and never black,
+    // the last good one rather
+    await evaluate("window.qaBlack = 2; window.qaAt = pvLight.lastReveal.at; const draw = CanvasRenderingContext2D.prototype.drawImage; CanvasRenderingContext2D.prototype.drawImage = function (src, ...a) { if (window.qaBlack > 0 && typeof VideoFrame === 'function' && src instanceof VideoFrame && a.length === 2) { qaBlack--; return } return draw.call(this, src, ...a) }; true")
+    await stroke(0.35, 0.45)
+    await tab(S)
+    await waitFor('pvLight.lastReveal.at > qaAt')
+    assert.equal(await evaluate(`qaBlack === 0 && ${lit2}`), true, 'taken again')
+    await evaluate('window.qaGood = pvLight.lastReveal.capture; window.qaAt = pvLight.lastReveal.at; qaBlack = 99; true')
+    await stroke(0.4, 0.5)
+    await tab(S)
+    await waitFor('pvLight.lastReveal.at > qaAt')
+    assert.equal(await evaluate('pvLight.lastReveal.capture === qaGood'), true, 'the last good one')
+    await evaluate('qaBlack = 0; true')
+    await tab(P)
     // Anna moves her mouse: the preview follows it calmly – her pointer inside the part shown
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.9)), String(Math.round(r.t + r.h * 0.45)))

@@ -39,6 +39,14 @@ export class Cropper {
       transform: async (frame, controller) => {
         const base = frame.visibleRect ?? { x: 0, y: 0, width: frame.displayWidth, height: frame.displayHeight }
         this.full = { width: base.width, height: base.height }
+        // (the whole screen, as it is now – for still pictures and following the window: no
+        // ImageCapture, which may fail, and no video, which a window in the background may not paint)
+        this.latest?.close()
+        try {
+          this.latest = frame.clone()
+        } catch {
+          this.latest = null
+        }
         const r = this.rect
         // paused (the helper shows a drawing over the window: viewers would see it twice): no new
         // pictures – viewers keep the last one
@@ -128,6 +136,21 @@ export class Cropper {
     return this.blank && this.canvas ? this.canvas : this.last
   }
 
+  /** The whole screen as it is now, on a canvas – null before the first picture. */
+  snapshot() {
+    const f = this.latest
+    if (!f) return null
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = f.displayWidth
+      canvas.height = f.displayHeight
+      canvas.getContext('2d').drawImage(f, 0, 0)
+      return canvas
+    } catch {
+      return null
+    }
+  }
+
   /** The part to share (source pixels), or null for the whole screen. */
   setRect(rect) {
     this.rect = rect ? { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } : null
@@ -138,6 +161,8 @@ export class Cropper {
   stop() {
     this.last?.close()
     this.last = null
+    this.latest?.close()
+    this.latest = null
     this.source.stop()
     this.generator.stop()
   }
@@ -245,6 +270,17 @@ export class CanvasCropper {
   /** What goes out now (drawable – for the live preview). */
   picture() {
     return this.shown ? this.canvas : null
+  }
+
+  /** The whole screen as it is now, on a canvas – null before the first picture. */
+  snapshot() {
+    const v = this.video
+    if (v.readyState < 2 || !v.videoWidth) return null
+    const canvas = document.createElement('canvas')
+    canvas.width = v.videoWidth
+    canvas.height = v.videoHeight
+    canvas.getContext('2d').drawImage(v, 0, 0)
+    return canvas
   }
 
   setRect(rect) {

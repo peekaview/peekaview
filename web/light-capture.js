@@ -40,10 +40,10 @@ export async function frameCanvas(stream, videos = []) {
  *          videos?: HTMLVideoElement[], screen?: Screen}} source
  *   crop: the whole screen is captured (`stream`) and this part of it shared – its place is known
  */
-export async function takeCapture({ stream, locator = null, surface, crop, videos = [], screen: scr = screen }) {
+export async function takeCapture({ stream, locator = null, surface, crop, videos = [], screen: scr = screen, frame = null }) {
   const t0 = performance.now()
   const monitor = monitorRect(scr, { mac, details: await screenDetails() })
-  if (crop !== undefined) return cropCapture(stream, crop, monitor, videos)
+  if (crop !== undefined) return cropCapture(stream, crop, monitor, videos, frame)
   const image = await frameCanvas(stream, videos)
   const capture = { image, picture: null, monitor, screenImage: null, found: null }
   // what happened – for share.html?debug and the console
@@ -97,9 +97,10 @@ export async function takeCapture({ stream, locator = null, surface, crop, video
   return { ...capture, picture, screenImage, found }
 }
 
-// a part of the whole screen: picture and place straight from the crop
-async function cropCapture(stream, crop, monitor, videos) {
-  const full = await frameCanvas(stream, videos)
+// a part of the whole screen: picture and place straight from the crop (`frame`: the whole screen
+// already at hand)
+async function cropCapture(stream, crop, monitor, videos, frame) {
+  const full = frame ?? (await frameCanvas(stream, videos))
   const debug = { version: VERSION, surface: crop ? 'Ausschnitt' : 'monitor', screen: `${monitor.width}x${monitor.height}@${monitor.left},${monitor.top}` }
   const capture = { image: null, picture: null, monitor, screenImage: null, found: null, debug }
   if (!full) return capture
