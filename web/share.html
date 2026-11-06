@@ -473,7 +473,7 @@
     import { cropSupported, makeCropper } from './light-crop.js'
     import { scaledGray } from './light-locate.js'
     import { findWindows, platformOf, titleLine } from './light-windows.js'
-    import { monitorRect, movesWindows, placeWindow, usableArea } from './light-geometry.js'
+    import { monitorRect, movesWindows, placeWindow, usableArea, windowRect } from './light-geometry.js'
     import { readLine, readText, readable, readerState, sameTitle, titleBar } from './light-title.js'
     import { WindowPicker } from './light-pick.js'
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
@@ -530,6 +530,8 @@
     // strokes in progress (from -> {points, capture, name}) and the last spot shown
     const strokes = new Map()
     let lastReveal = null
+    // the last still picture taken while nothing of ours lay over the window (see holdPictures)
+    let cleanCapture = null
     const listeners = new Set()
 
     // ---------------------------------------------------------------- name, modes
@@ -856,6 +858,7 @@
       closeClip()
       renderClip()
       cropper = null
+      cleanCapture = null
       screenStream = null
       windowLost = false
       for (const t of locator?.getTracks() ?? []) t.stop()
@@ -1215,9 +1218,18 @@
       } catch {}
       return [$('src-video'), $('src-screen'), ...inHelper]
     }
+    // (while pictures are held – something of ours shown over the window – the last one without it:
+    // else the preview would show itself)
     const capture = () =>
       cropper
-        ? track().then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos() }))
+        ? cropper.paused && cleanCapture
+          ? Promise.resolve(cleanCapture)
+          : track()
+              .then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos() }))
+              .then((c) => {
+                if (c?.image && cropper && !cropper.paused) cleanCapture = c
+                return c
+              })
         : takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
 
     // a point right away; a stroke when it is finished – with the picture from its start
@@ -1347,6 +1359,8 @@
       }
       $('pip-spot').hidden = false
       pip.document.body.classList.add('pip-spotting')
+      // (before it is drawn: no picture with it goes out)
+      holdPictures()
       miniView.reveal(r)
       renderPipButtons()
     }
@@ -1356,7 +1370,7 @@
     function setLarge(large, { resize = true } = {}) {
       pipLarge = large
       if (!large) overlayUntil = performance.now() + 1500
-      if (cropper) cropper.paused = large
+      holdPictures()
       if (miniView) {
         miniView.keep = large
         // (as sharp as the screen the window may grow to)
@@ -1380,6 +1394,48 @@
     function endSpot() {
       $('pip-spot').hidden = true
       pip?.document.body.classList.remove('pip-spotting')
+      holdPictures()
+    }
+
+    // Something of ours shown over the shared window – the helper with a drawing, the window "Freigabe
+    // läuft" large, or small with its preview lying over the window: no new pictures meanwhile, viewers
+    // keep the last one (else they would see it, and the preview itself, in the picture). Going on a
+    // moment after it is gone (moving a window away takes a moment).
+    let unholdTimer = null
+    const previewOver = () => !!pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && overShared(pip)
+    function holdPictures() {
+      if (!cropper) return
+      if (spotting || pipLarge || previewOver()) {
+        clearTimeout(unholdTimer)
+        unholdTimer = null
+        cropper.paused = true
+      } else if (cropper.paused && !unholdTimer) {
+        unholdTimer = setTimeout(() => {
+          unholdTimer = null
+          if (!cropper || spotting || pipLarge || previewOver()) return
+          cropper.paused = false
+          // (a moment more without looking for the window: no "not in its place" while it repaints)
+          overlayUntil = Math.max(overlayUntil, performance.now() + 1500)
+        }, 300)
+      }
+    }
+    // (the window may be moved over it, or away, meanwhile)
+    setInterval(() => pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && holdPictures(), 250)
+    /** Whether a window of ours lies over the shared one (unknown where: yes). */
+    function overShared(w) {
+      const r = cropper?.rect
+      const full = cropper?.full
+      const mon = (lastReveal?.capture ?? cleanCapture)?.monitor
+      if (!r) return false
+      if (!mon || !full?.width || !full?.height) return true
+      try {
+        const a = { left: w.screenX, top: w.screenY, width: w.outerWidth, height: w.outerHeight }
+        if (!(a.width > 0 && a.height > 0)) return true
+        const p = windowRect({ x: r.x / full.width, y: r.y / full.height, w: r.width / full.width, h: r.height / full.height }, mon)
+        return a.left < p.left + p.width && p.left < a.left + a.width && a.top < p.top + p.height && p.top < a.top + a.height
+      } catch {
+        return true
+      }
     }
     $('pip-look').addEventListener('click', () => setLarge(true))
     // small again – and back in its corner: a Picture-in-Picture window cannot be moved, but one
@@ -2100,7 +2156,7 @@
       // small window, share-helper.html embedded: shown instead of the panel, then the panel again.)
       spotShown: () => {
         spotting = true
-        if (cropper) cropper.paused = true
+        holdPictures()
         if (!panel) return
         $('spot').hidden = false
         document.body.classList.add('spotting')
@@ -2109,9 +2165,7 @@
         spotting = false
         overlayUntil = performance.now() + 1500
         // (once the helper is out of the way: moving a window takes a moment)
-        setTimeout(() => {
-          if (!spotting && cropper) cropper.paused = false
-        }, 300)
+        holdPictures()
         if (!panel) return
         $('spot').hidden = true
         document.body.classList.remove('spotting')

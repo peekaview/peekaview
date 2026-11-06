@@ -89,38 +89,46 @@ test('placeWindow: moved and sized – on Firefox\'s second screen only sized, w
   assert.deepEqual(calls.splice(0), [['size', 612, 832]])
 })
 
-test('keepInView: still while the points lie inside, on just enough when one nears the edge, larger for several, within the picture', async () => {
-  const { keepInView } = await import('../web/light-geometry.js')
-  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
-  const cur = { x: 100, y: 100, w: 400, h: 250 }
-  // inside the middle 65 %: unchanged
-  assert.deepEqual(keepInView(cur, [{ x: 300, y: 225 }, { x: 380, y: 270 }], opts), cur)
-  // past the right edge of the inner part (100 + 400 * .825 = 430): moved so it lies on that edge
-  const moved = keepInView(cur, [{ x: 480, y: 225 }], opts)
-  assert.deepEqual([moved.w, moved.h, moved.y], [400, 250, 100])
-  assert.ok(Math.abs(moved.x + 400 * 0.825 - 480) < 1e-9, JSON.stringify(moved))
-  // two far apart: larger, both inside, the shape kept
-  const both = keepInView(cur, [{ x: 100, y: 100 }, { x: 800, y: 500 }], opts)
-  assert.ok(both.w > 700 && Math.abs(both.w / both.h - 1.6) < 1e-9 && both.x <= 100 && both.x + both.w >= 800, JSON.stringify(both))
-  assert.ok(both.w <= 1000 && both.h <= 600 && both.x >= 0 && both.y >= 0)
-  // at the picture's edge: within it
-  const edge = keepInView(cur, [{ x: 999, y: 599 }], opts)
-  assert.deepEqual(edge, { x: 600, y: 350, w: 400, h: 250 })
-})
-
-test('calmFollow: still inside; moved on at the edge, then gliding slowly to the middle – also when the points rest', async () => {
+test('calmFollow: one pointer, the same size; still in the middle 90 % and while it trembles; past it a new part with the pointer in its middle', async () => {
   const { calmFollow } = await import('../web/light-geometry.js')
-  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
+  const opts = { width: 1000, height: 600 }
   const cur = { x: 100, y: 100, w: 400, h: 250 }
   const state = {}
-  assert.deepEqual(calmFollow(state, cur, [{ x: 300, y: 225 }], 16, opts), cur)
-  assert.equal(!!state.centering, false)
-  // near the edge: moved just enough …
-  const pushed = calmFollow(state, cur, [{ x: 480, y: 225 }], 16, opts)
-  assert.ok(pushed.x > 100 && pushed.x + 200 < 470, JSON.stringify(pushed))
-  assert.equal(state.centering, true)
-  // … then on, slowly (no points coming any more), until 480 is its middle
-  let g = pushed
-  for (let i = 0; i < 500; i++) g = calmFollow(state, cur, [], 16, opts)
-  assert.ok(Math.abs(g.x + 200 - 480) < 1 && state.centering === false, JSON.stringify(g))
+  const step = (points, ms = 16) => calmFollow(state, cur, points, ms, opts)
+  // inside the middle 90 % (120..480, 112.5..337.5): still
+  assert.deepEqual(step([{ id: 'a', x: 125, y: 225 }]), cur)
+  assert.deepEqual(step([{ id: 'a', x: 475, y: 120 }]), cur)
+  // past it: a new part, the pointer in its middle on that side – the size kept
+  let g = step([{ id: 'a', x: 490, y: 225 }])
+  assert.deepEqual(g, { x: 290, y: 100, w: 400, h: 250 })
+  // and still there again – also trembling, also resting
+  for (let t = 0; t < 3000; t += 100) assert.deepEqual(step([{ id: 'a', x: 490 + (t % 200 ? 3 : -3), y: 226 }], 100), g)
+  // at the picture's edge: within it
+  g = step([{ id: 'a', x: 990, y: 590 }])
+  assert.deepEqual(g, { x: 600, y: 350, w: 400, h: 250 })
+
+  // a second pointer moving while the first one moves, too: still the first one followed
+  const s2 = {}
+  const cur2 = { x: 300, y: 175, w: 400, h: 250 }
+  let h = calmFollow(s2, cur2, [{ id: 'a', x: 500, y: 300 }], 16, opts)
+  for (let i = 0; i < 5; i++) h = calmFollow(s2, cur2, [{ id: 'a', x: 600 + i * 30, y: 300 }, { id: 'b', x: 50 + i * 10, y: 50 }], 100, opts)
+  assert.equal(s2.lead, 'a')
+  assert.ok(h.x > 300, 'on with a')
+  // the first resting: the other one, moving, taken over
+  for (let i = 0; i < 12; i++) h = calmFollow(s2, cur2, [{ id: 'a', x: 720, y: 300 }, { id: 'b', x: 100 + i * 10, y: 50 + i * 5 }], 100, opts)
+  assert.equal(s2.lead, 'b')
+  assert.ok(h.x < 300 && h.w === 400, 'b inside, never larger or smaller')
+})
+
+test('softMove: eased in and out to the new part, anew when it changes', async () => {
+  const { softMove } = await import('../web/light-geometry.js')
+  const anim = {}
+  const a = { x: 0, y: 0, w: 100, h: 50 }
+  const b = { x: 300, y: 0, w: 100, h: 50 }
+  assert.deepEqual(softMove(anim, a, b, 0, 1000), a)
+  assert.ok(softMove(anim, a, b, 100, 1000).x < 3, 'slow at first')
+  assert.equal(softMove(anim, a, b, 500, 1000).x, 150)
+  assert.ok(softMove(anim, a, b, 900, 1000).x > 297, 'slow at the end')
+  assert.deepEqual(softMove(anim, a, b, 1000, 1000), b)
+  assert.equal(anim.done, true)
 })

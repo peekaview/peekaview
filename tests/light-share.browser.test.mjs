@@ -392,7 +392,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.75)), String(Math.round(r.t + r.h * 0.3)))
     await tab(P)
-    await waitFor("(()=>{const p=document.querySelector('#spot').contentWindow.pvHelper.part;return p.x + p.w * 0.15 < 0.75 && 0.75 < p.x + p.w * 0.85 && p.y + p.h * 0.15 < 0.3 && 0.3 < p.y + p.h * 0.85})()")
+    await waitFor("(()=>{const p=document.querySelector('#spot').contentWindow.pvHelper.part;return p.x + p.w * 0.12 < 0.75 && 0.75 < p.x + p.w * 0.88 && p.y + p.h * 0.12 < 0.3 && 0.3 < p.y + p.h * 0.88})()")
     await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
 
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
@@ -530,13 +530,36 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
       await tab(P)
       await waitFor("!document.querySelector('#pip-spot').hidden && document.body.classList.contains('pip-spotting')")
     }
+    // the window with the preview lying over the shared one: no new pictures meanwhile (viewers – and
+    // the preview itself – would see it); moved off it: going on
+    const shared = { left: win.x, top: win.y, width: win.width, height: win.height }
+    const placePip = (left, top) => evaluate(`Object.defineProperties(window, { screenX: { get: () => ${left}, configurable: true }, screenY: { get: () => ${top}, configurable: true }, outerWidth: { get: () => 360, configurable: true }, outerHeight: { get: () => 420, configurable: true } }); true`)
+    await tab(P)
+    await placePip(Math.round(shared.left + shared.width / 2), Math.round(shared.top + shared.height / 2))
+    await stroke(0.2, 0.3)
+    await tab(S)
+    await waitFor('pvLight.frames.paused')
+    const held = await evaluate('pvLight.frames.pausedFrames')
+    await waitFor(`pvLight.frames.pausedFrames > ${held}`)
+    // (another stroke meanwhile: shown on the last picture without the window over it)
+    await evaluate('window.qaClean = pvLight.lastReveal.capture; window.qaAt = pvLight.lastReveal.at; true')
+    await stroke(0.25, 0.35)
+    await tab(S)
+    await waitFor('pvLight.lastReveal.at > qaAt')
+    assert.equal(await evaluate('pvLight.lastReveal.capture === qaClean && pvLight.frames.paused'), true)
+    await tab(P)
+    await placePip(Math.round(shared.left + shared.width + 400), Math.round(shared.top))
+    await tab(S)
+    await waitFor('!pvLight.frames.paused')
+    await tab(P)
+
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
     // Anna moves her mouse: the preview follows it calmly – her pointer inside the part shown
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.9)), String(Math.round(r.t + r.h * 0.45)))
     await tab(P)
-    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const px=x*p.image.width,py=y*p.image.height,c=p.crop;return px>c.x+c.w*0.15&&px<c.x+c.w*0.85&&py>c.y+c.h*0.15&&py<c.y+c.h*0.85})()")
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const px=x*p.image.width,py=y*p.image.height,c=p.crop;return px>c.x+c.w*0.12&&px<c.x+c.w*0.88&&py>c.y+c.h*0.12&&py<c.y+c.h*0.88})()")
     assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.9) < 0.05)
     // … and when it rests, its pointer goes (no longer followed)
     await waitFor('pvLight.preview && pvLight.preview.pointers.length === 0')
