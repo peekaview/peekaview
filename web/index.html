@@ -561,11 +561,8 @@
           ? 'In der PeekaView-App geöffnet – oder hier im Browser verbinden.'
         : gaveUp === selected && !st?.online
           ? 'Es kam keine Verbindung zustande. Ein Link gilt meist nur, solange die Freigabe läuft – bitte die teilende Person um einen neuen Link.'
-          : st?.checking
-            ? 'Prüfe, ob der Raum online ist …'
-            : st?.online
-              ? ''
-              : ''
+          // (online or not, checking: the room's dot says it)
+          : ''
     }
 
     // ---------------------------------------------------------------- online check
