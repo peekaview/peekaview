@@ -307,14 +307,14 @@
     <section id="in-pip" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
       <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
-      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.</p>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!</p>
     </section>
 
     <!-- the tab, once the share runs in its own small window -->
     <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
       <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
-      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“.</p>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!</p>
       <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
     </section>
 
@@ -1034,7 +1034,7 @@
       if (panel) {
         $('in-pip').querySelector('strong').textContent = 'Lass dieses Fenster bitte offen.'
         $('in-pip').querySelector('.stay p').textContent = 'Schließt du es, endet die Freigabe.'
-        $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.'
+        $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!'
       }
       setTimeout(dock, 0)
       // (where the browser put it is known a moment later; it may be moved or made larger)
