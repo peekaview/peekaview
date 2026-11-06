@@ -368,10 +368,15 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
     })
     const there = await evaluate('pvLight.lastReveal.capture.picture')
-    // a notification – its click brings the small window with the drawing to the front
+    // not in front: it does not jump (it would land behind the other programs) – a preview in the
+    // small window instead, with "Am Fenster zeigen" (no "Groß anzeigen": it cannot lie over everything)
+    await waitFor("document.body.classList.contains('pip-spotting') && !document.querySelector('#pip-spot').hidden")
+    assert.equal(await evaluate("!document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus' && document.querySelector('#pip-look').hidden && !document.querySelector('#pip-jump').hidden"), true)
+    // … and a notification – its click brings the small window with the drawing to the front, at its place
     assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
     await evaluate('delete document.hasFocus; qaNotes[0].onclick(); true')
     await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
+    assert.equal(await evaluate("document.body.classList.contains('pip-spotting')"), false, 'the preview made room')
     // (the move was noticed – in the video's way, pictures held back until it was found, or by the
     // search itself first: on a canvas only every third picture is checked)
     assert.ok((await evaluate('pvLight.frames')).held > still.held || (await evaluate('pvLight.tracked?.how')) !== 'nicht gefunden', 'noticed')
@@ -556,9 +561,20 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await placePip(Math.round(shared.left + shared.width / 2), Math.round(shared.top + shared.height / 2))
     // (lying over it, it does not show itself live: a note to move it aside)
     await waitFor("!document.querySelector('#live-note').hidden && document.querySelector('#live-canvas').hidden")
+    // (the presenter in another program: none of its windows in front – nothing jumps to the spot, the
+    // preview only)
+    await evaluate('document.hasFocus = () => false; true')
+    await tab(S)
+    await evaluate('document.hasFocus = () => false; true')
+    await tab(P)
     await stroke(0.2, 0.3)
     await tab(S)
     await waitFor('pvLight.frames.paused')
+    assert.equal(await evaluate("!document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus'"), true, 'the small window did not jump')
+    await evaluate('delete document.hasFocus; true')
+    await tab(P)
+    await evaluate('delete document.hasFocus; true')
+    await tab(S)
     const held = await evaluate('pvLight.frames.pausedFrames')
     await waitFor(`pvLight.frames.pausedFrames > ${held}`)
     // (another stroke meanwhile: shown on the last picture without the window over it)

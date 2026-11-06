@@ -886,7 +886,8 @@
     let spotting = false
     function dock() {
       // (before the share: as large as the browser's screen picker needs)
-      if (!panel || spotting || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
+      // (a drawing as a preview: the size it has – the preview fills it)
+      if (!panel || spotting || document.body.classList.contains('pip-spotting') || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
       if (pip && !pip.closed) return tuck()
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
@@ -1257,9 +1258,13 @@
       placed(problem)
       const peer = host.peers().list.find((p) => p.id === r.from)
       lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
-      emit({ kind: 'reveal', reveal: lastReveal })
-      if (pip) showInPip(lastReveal)
-      else notify(lastReveal)
+      // at its place (the helper, or the small window jumping there) only while a window of ours is
+      // the one in front: else it would open behind the others, and only confuse – then a preview in
+      // the window "Freigabe läuft", and "Am Fenster zeigen" brings it there
+      const front = ownFocus()
+      emit({ kind: 'reveal', reveal: lastReveal, jump: front })
+      if (pip || (panel && !front)) showSpot(lastReveal)
+      if (!pip && !front) notify(lastReveal)
     }
 
     // ---------------------------------------------------------------- the always-on-top window
@@ -1340,7 +1345,11 @@
     // small windows: another window, by a link
     $('repick-link').addEventListener('click', repick)
 
-    function showInPip(r) {
+    // the window "Freigabe läuft" itself: the always-on-top one, or the small one (Firefox) – and its document
+    const liveWindow = () => (pip && !pip.closed ? pip : panel ? window : null)
+    const spotDoc = () => (pip && !pip.closed ? pip.document : document)
+    /** A drawing as a preview in the window "Freigabe läuft" (the always-on-top one, or the small one). */
+    function showSpot(r) {
       if (!miniView) {
         miniView = new MiniView($('pip-canvas'))
         miniView.onDone = () => {
@@ -1348,7 +1357,7 @@
         }
       }
       $('pip-spot').hidden = false
-      pip.document.body.classList.add('pip-spotting')
+      spotDoc().body.classList.add('pip-spotting')
       // (before it is drawn: no picture with it goes out)
       holdPictures()
       miniView.reveal(r)
@@ -1376,14 +1385,15 @@
       renderPipButtons()
     }
     function renderPipButtons() {
-      $('pip-look').hidden = pipLarge
+      // ("Groß anzeigen": only the always-on-top window – the small one cannot lie over everything)
+      $('pip-look').hidden = pipLarge || !pip
       $('pip-jump').hidden = pipLarge
       $('pip-small').hidden = !pipLarge
     }
     // the controls again in place of the drawing
     function endSpot() {
       $('pip-spot').hidden = true
-      pip?.document.body.classList.remove('pip-spotting')
+      spotDoc().body.classList.remove('pip-spotting')
       holdPictures()
     }
 
@@ -1392,7 +1402,7 @@
     // keep the last one (else they would see it, and the preview itself, in the picture). Going on a
     // moment after it is gone (moving a window away takes a moment).
     let unholdTimer = null
-    const previewOver = () => !!pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && overShared(pip)
+    const previewOver = () => !!liveWindow() && spotDoc().body.classList.contains('pip-spotting') && overShared(liveWindow())
     function holdPictures() {
       if (!cropper) return
       if (spotting || pipLarge || previewOver()) {
@@ -1458,7 +1468,7 @@
     }
 
     // (the window may be moved over it, or away, meanwhile)
-    setInterval(() => pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && holdPictures(), 250)
+    setInterval(() => liveWindow() && spotDoc().body.classList.contains('pip-spotting') && holdPictures(), 250)
     /** Whether a window of ours lies over the shared one (unknown where: yes). */
     function overShared(w) {
       if (!cropper) return false
@@ -1485,11 +1495,7 @@
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
-    $('pip-jump').addEventListener('click', () => {
-      miniView?.clear()
-      endSpot()
-      jumpHelper(pip)
-    })
+    $('pip-jump').addEventListener('click', () => jumpHelper(pip && !pip.closed ? pip : window))
 
     // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
     // (not while the presenter is in this window anyway: then it shows by itself, in front)
@@ -1530,6 +1536,9 @@
     let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
+      // (the preview makes room)
+      miniView?.clear()
+      endSpot()
       // the small window is the helper: in front now (the click made the browser the active
       // program), it shows the drawing again. (From the always-on-top window: a helper of its own,
       // opened in that click – the small window would not come to the front from there.)
@@ -1633,6 +1642,18 @@
 
     // this page in front – then the browser may well lie over the shared window
     const inFront = () => !document.hidden && document.hasFocus()
+    // a window of ours is the one in front (this page – the small window or the tab –, the always-on-top
+    // one, the helper)
+    function ownFocus() {
+      const has = (w) => {
+        try {
+          return !!w && !w.closed && !w.document.hidden && w.document.hasFocus()
+        } catch {
+          return false
+        }
+      }
+      return has(window) || has(pip) || has(helper)
+    }
 
     /** The result of a search: found (null) or a problem – said only when the window could be seen. */
     function placed(problem) {
