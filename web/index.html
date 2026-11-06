@@ -23,7 +23,7 @@
     /* sharing from the browser: share.html in a dialog over the start page */
     #share-dialog { box-sizing: border-box; width: min(540px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3f3f46; border-radius: 18px; background: #18181b; color: #fafafa; box-shadow: 0 24px 80px #0009; overflow: hidden; }
     #share-dialog[open] { display: flex; flex-direction: column; }
-    #share-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }
+    #share-dialog::backdrop { background: rgba(9,9,11,.82); -webkit-backdrop-filter: blur(12px) saturate(.7); backdrop-filter: blur(12px) saturate(.7); }
     #share-dialog iframe { display: block; width: 100%; height: 560px; max-height: calc(100dvh - 32px - 72px); border: 0; background: #18181b; }
     #share-close { flex: none; display: grid; place-items: center; width: 38px; height: 38px; margin-left: auto; padding: 0; border: 1px solid #3f3f46; border-radius: 50%; background: #27272a; color: #fafafa; cursor: pointer; }
     #share-close:hover { background: #3f3f46; }
