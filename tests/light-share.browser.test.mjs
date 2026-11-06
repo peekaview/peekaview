@@ -247,6 +247,12 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     // the screen is picked in the tab's click, checked there and handed to the small window; the
     // tab stays open. (The click spent while the browser asked, as after 5 s: one more,
     // "Freigabe starten" – the small window not even tried before)
+    // notifications: asked beside "Bildschirm teilen", optional, with a click of its own (a fake one
+    // here – the browser's own asks the user)
+    await evaluate("window.Notification = class { static permission = 'default'; static requestPermission() { Notification.permission = 'granted'; return Promise.resolve('granted') } }; window.dispatchEvent(new Event('focus')); true")
+    assert.match(await evaluate("document.querySelector('#notify-opt').innerText"), /Benachrichtigen, wenn jemand etwas zeigt oder malt\s*optional/)
+    await browser('click', '#notify-on')
+    await waitFor("document.querySelector('#notify-on').checked && document.querySelector('#notify-on').disabled && !document.querySelector('#notify-text').hidden")
     await evaluate("Object.defineProperty(navigator, 'userActivation', { value: { isActive: false }, configurable: true }); true")
     await browser('click', '#start')
     await waitFor("!document.querySelector('#start-ready').hidden && document.querySelector('#start').hidden")
@@ -298,11 +304,8 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     // (the headless browser keeps the small window at its first size: the request scrolled up, clear of the footer)
     await evaluate("document.querySelector('#requests [data-allow]').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#requests [data-allow]')
-    // asked once: notifications (a fake one here – the browser's own asks the user)
-    await waitFor("!document.querySelector('#notify-step').hidden")
-    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'default'; static requestPermission() { Notification.permission = 'granted'; return Promise.resolve('granted') } constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
-    await browser('click', '#notify-on')
-    await waitFor("document.querySelector('#notify-step').hidden")
+    // (notifications were allowed in the tab before: allowed for the page – a fake one here)
+    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'granted'; constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
     // what viewers may: switched right in the small window's footer – "Steuern" only with the desktop app
     await evaluate("document.querySelector('#footer-modes [data-mode=view]').click(); true")
     await waitFor("pvLight.host.mode === 'view' && document.querySelector('#footer-modes [data-mode=view]').getAttribute('aria-pressed') === 'true'")
