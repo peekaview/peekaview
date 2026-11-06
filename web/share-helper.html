@@ -92,7 +92,7 @@
     import { Annotations } from './annotate.js'
     import { icon, owl } from './icons.js'
     import { HOST_ID } from './light-host.js'
-    import { bounds, fit, inside, keepInView, movesWindows, placeWindow, spotRect, stageInContent, usableArea, visiblePart } from './light-geometry.js'
+    import { bounds, calmFollow, fit, inside, movesWindows, placeWindow, spotRect, stageInContent, usableArea, visiblePart } from './light-geometry.js'
 
     const $ = (id) => document.getElementById(id)
     $('owl').innerHTML = owl(20)
@@ -135,9 +135,10 @@
     let zoom = null // 'zoom': {center, extent} of the drawing
     // 'zoom': the part shown – {x, y: its middle (0..1 of the picture), w, h: image pixels}; null: the
     // drawing's. It follows the viewers' pointers calmly: still while they move in its inner part,
-    // on (softly, just enough) when one comes near its edge (keepInView); larger for several.
+    // on (softly, just enough) when one comes near its edge, then gliding slowly to the middle
+    // (calmFollow); larger for several.
     let view = null
-    let viewGoal = null // where it is going (image pixels {x, y, w, h})
+    let viewFollow = {} // where it is going (calmFollow's state: goal in image pixels)
     let viewBase = null // what was seen first (image pixels)
     let viewFrame = 0
     let viewAt = 0
@@ -370,7 +371,7 @@
         // picture) the part around the drawing, fitted into it – as large as it may get where it is
         zoom = { center, extent }
         view = null
-        viewGoal = null
+        viewFollow = {}
         viewBase = null
         // (never smaller: it reaches down to the bottom)
         moveWindow(win.screenX, win.screenY, Math.max(win.outerWidth, SPOT.width + c.x), Math.max(win.outerHeight, SPOT.height + c.y))
@@ -434,7 +435,8 @@
       }
     }
     // (pointers coming to rest: the part shrinks to the others)
-    setInterval(() => state === 'focus' && layout === 'zoom' && pointers.size && follow(), 300)
+    // (and gliding on to the middle after it moved on)
+    setInterval(() => state === 'focus' && layout === 'zoom' && (pointers.size || viewFollow.centering) && follow(), 300)
     /** The part holding the pointers moved lately: {x, y (middle, 0..1), w, h (image pixels)} or null. */
     function viewTarget(now) {
       const active = []
@@ -442,14 +444,14 @@
         if (now - p.at > POINTER_IDLE) pointers.delete(id)
         else active.push(p)
       }
-      if (!active.length) return viewGoal && toView(viewGoal)
+      if (!active.length && !viewFollow.centering) return viewFollow.goal ? toView(viewFollow.goal) : null
       const { width: iw, height: ih } = shown.image
       // (from what is seen now: the first time, without a jump)
       viewBase ??= { x: part.x * iw, y: part.y * ih, w: part.w * iw, h: part.h * ih }
-      const cur = viewGoal ?? viewBase
       const points = active.map((p) => ({ x: Math.min(1, Math.max(0, p.x)) * iw, y: Math.min(1, Math.max(0, p.y)) * ih }))
-      viewGoal = keepInView(cur, points, { minW: viewBase.w, minH: viewBase.h, width: iw, height: ih, aspect: viewBase.w / viewBase.h })
-      return toView(viewGoal)
+      const dt = Math.max(0, now - (viewFollow.at ?? now))
+      viewFollow.at = now
+      return toView(calmFollow(viewFollow, viewBase, points, dt, { minW: viewBase.w, minH: viewBase.h, width: iw, height: ih, aspect: viewBase.w / viewBase.h }))
     }
     function toView(r) {
       const { width: iw, height: ih } = shown.image
@@ -466,8 +468,8 @@
       viewAt = now
       view = { x: view.x + (target.x - view.x) * k, y: view.y + (target.y - view.y) * k, w: view.w + (target.w - view.w) * k, h: view.h + (target.h - view.h) * k }
       layoutZoom()
-      // (there: rests – within half a pixel of the picture)
-      if (Math.abs(target.x - view.x) * iw > 0.5 || Math.abs(target.y - view.y) * ih > 0.5 || Math.abs(target.w - view.w) > 0.5 || Math.abs(target.h - view.h) > 0.5) viewFrame = requestAnimationFrame(followStep)
+      // (there: rests – within half a pixel of the picture – unless still gliding to the middle)
+      if (viewFollow.centering || Math.abs(target.x - view.x) * iw > 0.5 || Math.abs(target.y - view.y) * ih > 0.5 || Math.abs(target.w - view.w) > 0.5 || Math.abs(target.h - view.h) > 0.5) viewFrame = requestAnimationFrame(followStep)
     }
 
     /** The drawing's part of the picture (image pixels). */

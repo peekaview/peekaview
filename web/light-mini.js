@@ -2,10 +2,10 @@
 // läuft" (a Picture-in-Picture document window, light-pip.js): that spot of the still picture,
 // enlarged, with the stroke drawn again, plus a small map of the whole screen marking where that
 // is. Then back to rest – unless it is kept (shown large, until made smaller). While viewers move
-// their mice, the part shown follows them calmly: it stays put while they move in its inner part and
-// moves, softly and just enough, when one comes near its edge; it grows to hold several. A pointer
-// at rest fades out and is no longer followed.
-import { keepInView } from './light-geometry.js'
+// their mice, the part shown follows them calmly: it stays put while they move in its inner part,
+// moves on, softly and just enough, when one comes near its edge, and then glides slowly on until it
+// is in its middle; it grows to hold several. A pointer at rest fades out and is no longer followed.
+import { calmFollow } from './light-geometry.js'
 //
 // It renders from a worker's clock: the share page sits in a background tab, where browsers slow
 // down timers and stop requestAnimationFrame.
@@ -136,7 +136,7 @@ export class MiniView {
   render() {
     const { ctx } = this
     // (kept: drawn on while pointers move or fade)
-    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW) && !(this.keep && this.pointers.size)) {
+    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW) && !(this.keep && (this.pointers.size || this.spot.follow?.centering))) {
       if (this.keep) {
         // (kept: the stroke stays drawn – the clock may stop)
         this.spot.at = performance.now() - DRAW - 600
@@ -295,12 +295,9 @@ function follow(spot, pointers) {
   const img = spot.capture.image
   const c = spot.crop
   spot.base ??= { w: c.w, h: c.h }
-  if (pointers.length) {
-    const points = pointers.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
-    spot.target = keepInView(spot.target ?? c, points, { minW: spot.base.w, minH: spot.base.h, width: img.width, height: img.height, aspect: W / H })
-  }
-  const t = spot.target
-  if (!t) return
+  spot.follow ??= {}
+  const points = pointers.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
+  const t = calmFollow(spot.follow, c, points, dt, { minW: spot.base.w, minH: spot.base.h, width: img.width, height: img.height, aspect: W / H })
   const k = 1 - Math.exp(-dt / FOLLOW)
   spot.crop = { x: c.x + (t.x - c.x) * k, y: c.y + (t.y - c.y) * k, w: c.w + (t.w - c.w) * k, h: c.h + (t.h - c.h) * k }
 }

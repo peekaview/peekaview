@@ -203,3 +203,37 @@ export function keepInView(cur, points, { minW, minH, width, height, aspect = nu
     h,
   }
 }
+
+/** The part (same size) with the points' middle in its middle, within the picture. */
+export function centerOn(cur, points, { width, height }) {
+  if (!points.length) return cur
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+  return { ...cur, x: Math.max(0, Math.min(width - cur.w, cx - cur.w / 2)), y: Math.max(0, Math.min(height - cur.h, cy - cur.h / 2)) }
+}
+
+/**
+ * Where the part shown goes, a step at a time (calmly): still while the points move in its inner
+ * part; on, just enough, when one comes near its edge – and from then on gliding slowly on until they
+ * are in its middle (even when they rest). `state` keeps {goal, centering, points} between steps.
+ * @param dt ms since the last step
+ */
+export function calmFollow(state, cur, points, dt, opts, glide = 1100) {
+  if (points.length) state.points = points
+  const goal = state.goal ?? cur
+  if (points.length) {
+    const next = keepInView(goal, points, opts)
+    if (Math.abs(next.x - goal.x) > 0.5 || Math.abs(next.y - goal.y) > 0.5 || Math.abs(next.w - goal.w) > 0.5) state.centering = true
+    state.goal = next
+  }
+  if (state.centering && state.points) {
+    const g = state.goal ?? cur
+    const c = centerOn(g, state.points, opts)
+    const k = 1 - Math.exp(-dt / glide)
+    state.goal = { ...g, x: g.x + (c.x - g.x) * k, y: g.y + (c.y - g.y) * k }
+    if (Math.abs(c.x - state.goal.x) < 0.5 && Math.abs(c.y - state.goal.y) < 0.5) state.centering = false
+  }
+  return state.goal ?? cur
+}

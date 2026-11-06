@@ -35,13 +35,18 @@ test('the preview follows the viewers\' pointers calmly: still while they move i
 
     // far off to the right: the part moves on, just so far that the pointer is inside again (not to the middle)
     view.pointer('anna', 0.7, 0.4)
-    await frames(view)
+    await frames(view, 12)
     let c = view.spot.crop
     assert.ok(inner(c, 700, 240), `the pointer inside: ${JSON.stringify(c)}`)
-    assert.ok(c.x + c.w / 2 < 690, 'not centered on it')
+    assert.ok(c.x + c.w / 2 < 640, 'not centered on it at once')
     assert.deepEqual([c.w, c.h].map(Math.round), [first.w, first.h].map(Math.round), 'the same size')
+    // … then it glides slowly on until the pointer is in the middle (the pointer resting)
+    await frames(view, 100)
+    c = view.spot.crop
+    assert.ok(Math.abs(c.x + c.w / 2 - 700) < 6 && Math.abs(c.y + c.h / 2 - 240) < 6, `centered in the end: ${JSON.stringify(c)}`)
 
-    // Ben, too, far away: the part grows to hold both
+    // (Anna's pointer rested meanwhile and went: it moves again) Ben, too, far away: the part grows to hold both
+    view.pointer('anna', 0.7, 0.4)
     view.pointer('ben', 0.2, 0.75)
     await frames(view)
     c = view.spot.crop

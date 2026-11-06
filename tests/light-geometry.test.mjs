@@ -107,3 +107,20 @@ test('keepInView: still while the points lie inside, on just enough when one nea
   const edge = keepInView(cur, [{ x: 999, y: 599 }], opts)
   assert.deepEqual(edge, { x: 600, y: 350, w: 400, h: 250 })
 })
+
+test('calmFollow: still inside; moved on at the edge, then gliding slowly to the middle – also when the points rest', async () => {
+  const { calmFollow } = await import('../web/light-geometry.js')
+  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
+  const cur = { x: 100, y: 100, w: 400, h: 250 }
+  const state = {}
+  assert.deepEqual(calmFollow(state, cur, [{ x: 300, y: 225 }], 16, opts), cur)
+  assert.equal(!!state.centering, false)
+  // near the edge: moved just enough …
+  const pushed = calmFollow(state, cur, [{ x: 480, y: 225 }], 16, opts)
+  assert.ok(pushed.x > 100 && pushed.x + 200 < 470, JSON.stringify(pushed))
+  assert.equal(state.centering, true)
+  // … then on, slowly (no points coming any more), until 480 is its middle
+  let g = pushed
+  for (let i = 0; i < 500; i++) g = calmFollow(state, cur, [], 16, opts)
+  assert.ok(Math.abs(g.x + 200 - 480) < 1 && state.centering === false, JSON.stringify(g))
+})
