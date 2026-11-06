@@ -241,12 +241,19 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await evaluate("localStorage.setItem('qaFirefox', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '1000')
-    assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
+    // (what to pick is said beside the browser's dialog – no line under the button)
+    assert.equal(await evaluate("document.querySelector('#start-hint').hidden"), true)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
     // the screen is picked in the tab's click, checked there and handed to the small window; the
     // tab stays open. (The click spent while the browser asked, as after 5 s: one more,
     // "Freigabe starten" – the small window not even tried before)
+    // notifications: asked beside "Bildschirm teilen", optional, with a click of its own (a fake one
+    // here – the browser's own asks the user)
+    await evaluate("window.Notification = class { static permission = 'default'; static requestPermission() { Notification.permission = 'granted'; return Promise.resolve('granted') } }; window.dispatchEvent(new Event('focus')); true")
+    assert.match(await evaluate("document.querySelector('#notify-opt').innerText"), /Benachrichtigen, wenn jemand etwas zeigt oder malt\s*optional/)
+    await browser('click', '#notify-on')
+    await waitFor("document.querySelector('#notify-on').checked && document.querySelector('#notify-on').disabled && !document.querySelector('#notify-text').hidden")
     await evaluate("Object.defineProperty(navigator, 'userActivation', { value: { isActive: false }, configurable: true }); true")
     await browser('click', '#start')
     await waitFor("!document.querySelector('#start-ready').hidden && document.querySelector('#start').hidden")
@@ -295,12 +302,19 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
     await tab(P)
     await browser('wait', '#requests [data-allow]')
+    // (the headless browser keeps the small window at its first size: the request scrolled up, clear of the footer)
+    await evaluate("document.querySelector('#requests [data-allow]').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#requests [data-allow]')
-    // asked once: notifications (a fake one here – the browser's own asks the user)
-    await waitFor("!document.querySelector('#notify-step').hidden")
-    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'default'; static requestPermission() { Notification.permission = 'granted'; return Promise.resolve('granted') } constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
-    await browser('click', '#notify-on')
-    await waitFor("document.querySelector('#notify-step').hidden")
+    // (notifications were allowed in the tab before: allowed for the page – a fake one here)
+    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'granted'; constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
+    // what viewers may: switched right in the small window's footer – "Steuern" only with the desktop app
+    await evaluate("document.querySelector('#footer-modes [data-mode=view]').click(); true")
+    await waitFor("pvLight.host.mode === 'view' && document.querySelector('#footer-modes [data-mode=view]').getAttribute('aria-pressed') === 'true'")
+    await evaluate("document.querySelector('#footer-modes [data-mode=control]').click(); true")
+    assert.match(await evaluate("document.querySelector('#footer-mode-note').textContent"), /PeekaView Desktop/)
+    assert.equal(await evaluate('pvLight.host.mode'), 'view')
+    await evaluate("document.querySelector('#footer-modes [data-mode=draw]').click(); true")
+    await waitFor("pvLight.host.mode === 'draw'")
     await tab(V)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
     const video = await evaluate("[document.querySelector('video').videoWidth, document.querySelector('video').videoHeight]")
@@ -374,6 +388,13 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.equal(zoomed.layout, 'zoom', JSON.stringify(zoomed))
     assert.ok(zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
     assert.ok(zoomed.part.x < 0.25 && 0.25 < zoomed.part.x + zoomed.part.w && zoomed.part.y < 0.72 && 0.72 < zoomed.part.y + zoomed.part.h, `the drawing in the part shown: ${JSON.stringify(zoomed.part)}`)
+    // Anna moves her mouse: the part shown follows it softly, her pointer in its middle
+    await tab(V)
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.75)), String(Math.round(r.t + r.h * 0.3)))
+    await tab(P)
+    await waitFor("(()=>{const h=document.querySelector('#spot').contentWindow.pvHelper;return h.view && Math.abs(h.view.x - 0.75) < 0.03 && Math.abs(h.view.y - 0.3) < 0.03})()")
+    const followed = await evaluate("document.querySelector('#spot').contentWindow.pvHelper.part")
+    assert.ok(followed.x < 0.75 && 0.75 < followed.x + followed.w && followed.y < 0.3 && 0.3 < followed.y + followed.h, `the pointer in the part shown: ${JSON.stringify(followed)}`)
     await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
 
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
@@ -429,8 +450,12 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
 
     await tab(P)
     assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
-    await browser('click', '#stop')
-    await waitFor("!document.querySelector('#ended').hidden")
+    // stopped: the small window closes by itself – "Freigabe beendet" in the tab, to share again from there
+    await evaluate("setTimeout(() => document.querySelector('#stop').click(), 50); true")
+    await tab('t1')
+    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#elsewhere').hidden && !!document.querySelector('#again')")
+    await waitFor('1')
+    assert.doesNotMatch(await browser('tab', 'list'), /panel/)
   } finally {
     try {
       await browser('close')
@@ -503,7 +528,15 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
       await waitFor("!document.querySelector('#pip-spot').hidden && document.body.classList.contains('pip-spotting')")
     }
     await stroke(0.3, 0.5)
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('#link-label').parentElement).display"), 'none', 'the controls make room')
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
+    // Anna moves her mouse: the preview follows it right away, her pointer in its middle (within the picture)
+    await tab(V)
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.45)))
+    await tab(P)
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const want=(v,size,max)=>Math.max(0,Math.min(max-size,v*max-size/2));return Math.abs(p.crop.x-want(x,p.crop.w,p.image.width))<2&&Math.abs(p.crop.y-want(y,p.crop.h,p.image.height))<2})()")
+    assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.6) < 0.05)
+    // … and when it rests, its pointer goes (no longer followed)
+    await waitFor('pvLight.preview && pvLight.preview.pointers.length === 0')
 
     // "Am Fenster zeigen": the drawing over the very spot, in a window of its own that closes again;
     // the controls back
@@ -535,12 +568,15 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await waitFor("!!document.querySelector('#running #stop') && !document.body.classList.contains('pip-spotting') && document.querySelector('#pip-spot').hidden")
 
     // stopping there ends it, and the always-on-top window closes
+    // (… and the small window, too: "Freigabe beendet" in the tab)
     await tab(P)
-    await browser('click', '#stop')
-    await tab(S)
-    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#in-pip').hidden").catch(async (e) => {
-      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, inPip: document.querySelector('#in-pip').hidden, host: !!pvLight.host})"))}\n${await tabs()}`)
+    await evaluate("setTimeout(() => document.querySelector('#stop').click(), 50); true")
+    await tab('t1')
+    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#elsewhere').hidden").catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, elsewhere: document.querySelector('#elsewhere').hidden})"))}\n${await tabs()}`)
     })
+    await waitFor('1')
+    assert.doesNotMatch(await tabs(), /panel|about:blank/)
   } finally {
     try {
       await browser('close')

@@ -72,7 +72,12 @@
     .screen-help { position: fixed; z-index: 60; box-sizing: border-box; width: 320px; max-width: calc(100vw - 32px); padding: 14px 14px 12px; border-radius: 16px; background: #fafafa; color: #18181b; box-shadow: 0 18px 50px rgba(0,0,0,.5); font-size: 13px; animation: in .2s ease-out; }
     .screen-help[data-kind=firefox] { top: 12px; left: 430px; }
     .screen-help[data-kind=chrome], .screen-help[data-kind=edge] { top: 12px; left: calc(50% + 340px); }
-    .screen-help-title { margin: 0 24px 10px 0; font-size: 14.5px; font-weight: 750; }
+    .screen-help-title { margin: 0 24px 10px 0; color: #dc2626; font-size: 18px; font-weight: 800; line-height: 1.25; }
+    .screen-help-after { margin: 8px 0 0; color: #27272a; font-size: 12.5px; font-weight: 600; }
+    /* "Gesamter Bildschirm" in the drawn dialog: marked, pulsing */
+    .screen-help-pulse { transform-box: fill-box; transform-origin: center; animation: help-pulse 1.6s ease-out infinite; }
+    @keyframes help-pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12, 1.6); } }
+    @media (prefers-reduced-motion: reduce) { .screen-help-pulse { animation: none; opacity: 0; } }
     .screen-help-arrow { color: #ef4444; }
     .screen-help-warn { margin: 0 28px 10px 0; padding: 8px 10px; border-radius: 10px; background: #fee2e2; color: #991b1b; font-size: 12.5px; font-weight: 650; line-height: 1.35; }
     .screen-help-figure { display: block; width: 100%; height: auto; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -100,6 +105,15 @@
     .requests { display: flex; flex-direction: column; gap: 6px; }
     .request { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.08); animation: in .2s ease-out; }
     @keyframes in { from { opacity: 0; transform: translateY(-4px); } }
+    /* a join request lights up as a window found does – again and again, until answered (rows drawn
+       anew keep in step: their delay from the clock) */
+    .request { animation: in .2s ease-out, request-glow 2s ease-in-out infinite; }
+    @keyframes request-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(239,68,68,0); }
+      45% { box-shadow: 0 0 0 2px rgba(239,68,68,.95), 0 0 22px 6px rgba(239,68,68,.55); }
+      65% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 14px 4px rgba(255,255,255,.25); }
+    }
+    @media (prefers-reduced-motion: reduce) { .request { animation: none; outline: 2px solid #ef4444; outline-offset: 1px; } }
     .request div { flex: 1; min-width: 0; }
     .request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .request span { color: #a1a1aa; font-size: 12.5px; }
@@ -137,8 +151,25 @@
       100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(255,255,255,0); }
     }
     @media (prefers-reduced-motion: reduce) { .pick-preview.glow { animation: none; outline: 3px solid #ef4444; } }
-    body.panel .pick-steps { font-size: 14px; }
-    .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
+    .pick-steps { display: flex; flex-direction: column; gap: 6px; }
+    .pick-steps p { margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.45; text-align: center; }
+    body.panel .pick-steps p { font-size: 13px; }
+    /* the window dragged over (6 s, again and again), clicked into: it lights up, its picture here */
+    .pick-anim { display: block; width: 100%; max-width: 380px; height: auto; margin: 0 auto; }
+    .pick-anim .pa-win { animation: pa-win 6s ease-in-out infinite; }
+    .pick-anim .pa-cursor { transform: translate(200px, 72px); animation: pa-cursor 6s ease-in-out infinite; }
+    .pick-anim .pa-ring { opacity: 0; transform-origin: 200px 72px; animation: pa-ring 6s ease-out infinite; }
+    .pick-anim .pa-glow { animation: pa-glow 6s ease-in-out infinite; }
+    .pick-anim .pa-thumb { animation: pa-thumb 6s ease-in-out infinite; }
+    .pick-anim .pa-check { transform-origin: 304px 60px; animation: pa-check 6s ease-out infinite; }
+    @keyframes pa-win { 0% { transform: translate(-134px, -18px); opacity: 0; } 5%, 12% { transform: translate(-134px, -18px); opacity: 1; } 42%, 92% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(0, 0); opacity: 0; } }
+    @keyframes pa-cursor { 0% { transform: translate(56px, 27px); opacity: 0; } 5%, 12% { transform: translate(56px, 27px); opacity: 1; } 42% { transform: translate(190px, 45px); } 50%, 92% { transform: translate(200px, 72px); opacity: 1; } 100% { transform: translate(200px, 72px); opacity: 0; } }
+    @keyframes pa-ring { 0%, 51% { opacity: 0; transform: scale(.4); } 53% { opacity: .9; transform: scale(.6); } 66%, 100% { opacity: 0; transform: scale(2.2); } }
+    @keyframes pa-glow { 0%, 53% { opacity: 0; } 58%, 92% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes pa-thumb { 0%, 58% { opacity: 0; } 64%, 92% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes pa-check { 0%, 64% { opacity: 0; transform: scale(.4); } 70%, 92% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+    /* (no motion wanted: the end, still) */
+    @media (prefers-reduced-motion: reduce) { .pick-anim * { animation: none !important; } }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
     .live { flex-wrap: wrap; }
     .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
@@ -151,7 +182,15 @@
     .clip-open[aria-expanded="true"] { background: #52525b; }
     .clip-count { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11.5px; line-height: 16px; }
     .clip-box { height: 320px; }
+    .notify-opt label { display: flex; align-items: flex-start; gap: 9px; color: #d4d4d8; font-size: 13px; line-height: 1.4; cursor: pointer; }
+    .notify-opt input { flex: none; width: 16px; height: 16px; margin: 1px 0 0; accent-color: #ef4444; }
+    .notify-opt .opt { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 11px; font-weight: 600; }
+    .notify-note { margin: 5px 0 0 25px; color: #a1a1aa; font-size: 12px; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
+    /* while sharing: what is always there (link, clipboard, stop) in a footer of its own */
+    .run-gap { display: none; }
+    .run-footer { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
+    .run-footer .keep { margin: -4px 0 0; }
     /* the share's own small window (share.html?panel): everything compact, in the corner */
     body.panel main { width: 100%; margin: 0; padding: 14px 14px 12px; gap: 12px; border: 0; border-radius: 0; box-shadow: none; }
     body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
@@ -177,6 +216,46 @@
     body.panel .linkbox { margin: 0; }
     body.panel .linkbox .pill { flex: 1; }
     body.panel .keep { margin: 0; }
+    /* small windows: the footer at the window's bottom, always in the same place – link and
+       clipboard side by side, the rest above it (scrolling when there is more) */
+    body.panel #running { min-height: calc(100vh - 26px); }
+    body.pip #running { min-height: calc(100vh - 28px); }
+    body.panel .run-gap { display: block; flex: 1 0 0; margin-top: -12px; }
+    body.panel .run-footer { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 -14px -12px; padding: 10px 14px 12px; background: #18181b; }
+    body.pip .run-footer { margin: 0 -14px -14px; padding-bottom: 14px; }
+    body.panel .run-footer > * { grid-column: 1 / -1; }
+    body.panel .run-footer > .run-link { grid-column: 1; }
+    body.panel .run-footer > .clip-open { grid-column: 2; }
+    body.panel .run-footer .clip-long { display: none; }
+    body.panel .run-footer .stop { justify-self: stretch; }
+    body.panel .run-footer .keep { margin: 0; font-size: 12px; }
+    /* what viewers may: in the tab above; in small windows a compact switch in the footer (only there) */
+    .run-modes, .run-mode-note { display: none !important; }
+    /* (as in the desktop app's toolbar: a segmented switch, the one chosen light) */
+    body.panel .run-modes { display: flex !important; gap: 2px; padding: 2px; border-radius: 10px; background: #09090b; }
+    body.panel .run-modes button { flex: 1 1 auto; flex-direction: row; justify-content: center; gap: 5px; height: 28px; padding: 0 7px; border-radius: 8px; color: #a1a1aa; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
+    body.panel .run-modes button:hover { color: #fafafa; }
+    body.panel .run-modes button[aria-pressed="true"] { background: #fafafa; color: #09090b; }
+    body.panel .run-modes button svg { display: none; }
+    body.panel .run-modes button small { display: none; }
+    /* "Steuern": plainly only with the desktop app */
+    body.panel .run-modes button.unavailable { color: #71717a; }
+    body.panel .run-modes button.unavailable small { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #27272a; color: #d4d4d8; font-size: 10px; font-weight: 650; }
+    /* the buttons as in the desktop app's toolbar: quiet with a fine edge, "Beenden" reddish */
+    body.panel .pill { min-height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: #18181b; font-size: 12.5px; transition: background .15s; }
+    body.panel .pill:hover:not(:disabled) { background: #27272a; }
+    body.panel .pill.primary { border-color: transparent; background: #ef4444; }
+    body.panel .pill.primary:hover:not(:disabled) { background: #dc2626; }
+    body.panel .run-footer #copy { border-color: rgba(255,255,255,.08); background: #18181b; }
+    body.panel .run-footer #copy:hover { background: #27272a; }
+    body.panel .run-footer .stop { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); color: #fca5a5; }
+    body.panel .run-footer .stop:hover { background: rgba(239,68,68,.22); }
+    body.panel .run-mode-note { display: block !important; margin: -2px 0 0; font-size: 12px; }
+    body.panel .run-mode-note:empty { display: none !important; }
+    body.panel #running .extra:has(#running-modes) { display: none !important; }
+    body.panel .toast { top: 12px; bottom: auto; left: 12px; right: 12px; max-width: none; transform: none; }
+    /* (scrolled to: never under the footer) */
+    html:has(body.panel), body.pip { scroll-padding-bottom: 196px; }
     .stay { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; background: #27272a; }
     .stay-icon { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fafafa; color: #18181b; }
     .stay strong { display: block; font-size: 19px; }
@@ -200,7 +279,7 @@
     /* someone drew: the window shows the spot instead of its panel */
     #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
     body.spotting main { visibility: hidden; }
-    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+    .toast { position: fixed; z-index: 5; pointer-events: none; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
   </style>
 </head>
 <body>
@@ -224,8 +303,13 @@
         <div class="modes" id="setup-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
         <p class="mode-note" id="setup-mode-note" role="status"></p>
       </div>
+      <!-- (optional, asked with a click of its own: where no always-on-top window shows drawings) -->
+      <div class="notify-opt" id="notify-opt" hidden>
+        <label><input type="checkbox" id="notify-on"><span>Benachrichtigen, wenn jemand etwas zeigt oder malt <span class="opt">optional</span></span></label>
+        <p class="notify-note" id="notify-text" hidden></p>
+      </div>
       <button class="connect" id="start" type="button"></button>
-      <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
+      <p class="hint" id="start-hint" hidden></p>
       <p class="error" id="start-error" role="alert" hidden></p>
       <!-- the screen is picked, the small window could not open in that click: one more -->
       <div id="start-ready" style="display:flex;flex-direction:column;gap:10px;align-items:center" hidden>
@@ -239,7 +323,33 @@
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
       <h1>Welches Fenster möchtest du zeigen?</h1>
-      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – es erscheint dann hier.</li></ol>
+      <!-- what to do, shown: the window dragged onto the shared screen, clicked into, here it is -->
+      <div class="pick-steps" id="pick-steps">
+        <svg class="pick-anim" viewBox="0 0 320 132" role="img" aria-label="Das Fenster auf den geteilten Bildschirm ziehen, einmal hineinklicken – es erscheint im kleinen Fenster">
+          <rect x="6" y="8" width="120" height="82" rx="6" fill="#27272a" stroke="#3f3f46"/>
+          <rect x="56" y="91" width="20" height="9" fill="#3f3f46"/><rect x="42" y="100" width="48" height="4" rx="2" fill="#3f3f46"/>
+          <rect x="140" y="8" width="174" height="104" rx="6" fill="#27272a" stroke="#ef4444" stroke-width="2"/>
+          <rect x="217" y="113" width="20" height="9" fill="#3f3f46"/><rect x="203" y="122" width="48" height="4" rx="2" fill="#3f3f46"/>
+          <rect x="146" y="14" width="46" height="14" rx="7" fill="#ef4444"/><text x="169" y="24.5" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">geteilt</text>
+          <!-- the small window, its picture, the check -->
+          <rect x="252" y="58" width="56" height="48" rx="4" fill="#18181b" stroke="#52525b"/>
+          <circle cx="258" cy="64" r="1.6" fill="#ef4444"/><rect x="263" y="63" width="26" height="2.4" rx="1" fill="#52525b"/>
+          <rect x="258" y="71" width="44" height="28" rx="2" fill="#09090b"/>
+          <g class="pa-thumb"><rect x="260" y="73" width="40" height="24" rx="1.5" fill="#e4e4e7"/><rect x="260" y="73" width="40" height="5" rx="1.5" fill="#71717a"/><rect x="263" y="82" width="22" height="2" fill="#a1a1aa"/><rect x="263" y="87" width="30" height="2" fill="#a1a1aa"/></g>
+          <g class="pa-check"><circle cx="304" cy="60" r="7.5" fill="#22c55e"/><path d="M300.5 60.2l2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+          <!-- the window to show (drawn where it ends up) -->
+          <g class="pa-win">
+            <rect class="pa-glow" x="157" y="37" width="84" height="60" rx="5" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="160" y="40" width="78" height="54" rx="3" fill="#e4e4e7"/>
+            <rect x="160" y="40" width="78" height="10" rx="3" fill="#71717a"/>
+            <circle cx="165" cy="45" r="1.6" fill="#ff5f57"/><circle cx="170" cy="45" r="1.6" fill="#febc2e"/><circle cx="175" cy="45" r="1.6" fill="#28c840"/>
+            <rect x="166" y="57" width="40" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="64" width="58" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="71" width="50" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="78" width="30" height="3" rx="1" fill="#a1a1aa"/>
+          </g>
+          <circle class="pa-ring" cx="200" cy="72" r="6" fill="none" stroke="#fafafa" stroke-width="2"/>
+          <g class="pa-cursor"><path d="M0 0v13l3.4-3.1 2.4 5.3 2.1-.9-2.4-5.2h4.9z" fill="#fafafa" stroke="#09090b" stroke-width="1" stroke-linejoin="round"/></g>
+        </svg>
+        <p>Liegt das Fenster, das du zeigen möchtest, auf einem anderen Bildschirm? Zieh es auf den geteilten. Dann klicke einmal hinein – es erscheint hier.</p>
+      </div>
       <p class="lead" id="pick-lead" style="margin:0"></p>
       <canvas id="pick-preview" class="pick-preview" hidden></canvas>
       <canvas id="pick-view" class="pick-view"></canvas>
@@ -274,14 +384,6 @@
           <div class="step-actions"><button class="pill primary" id="pip-open" type="button">Kleines Fenster öffnen</button></div>
         </div>
       </div>
-      <div class="step" id="notify-step" hidden>
-        <span class="step-icon" data-icon="bell"></span>
-        <div class="step-body">
-          <strong>Zeichnungen sofort sehen</strong>
-          <p id="notify-text"></p>
-          <div class="step-actions"><button class="pill primary" id="notify-on" type="button">Benachrichtigungen erlauben</button><button class="text-button" id="notify-later" type="button">Später</button></div>
-        </div>
-      </div>
       <div class="step" id="locate-step" hidden>
         <span class="step-icon" data-icon="screen"></span>
         <div class="step-body">
@@ -290,10 +392,6 @@
           <p class="error" id="locate-error" role="alert" hidden></p>
           <div class="step-actions"><button class="pill primary" id="locate" type="button"></button><button class="text-button" id="locate-skip" type="button">Später</button></div>
         </div>
-      </div>
-      <div>
-        <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
-        <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
       </div>
       <div id="requests-box" hidden>
         <p class="section-title">Möchte zusehen</p>
@@ -310,12 +408,23 @@
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
-      <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span>Gemeinsame Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
       <div class="clip-box" id="clip-box" hidden></div>
-      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster</button>
-
-      <button class="pill stop" id="stop" type="button"></button>
-      <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, anderes Fenster</button>
+      <!-- (small windows: the room between, so that the footer stays at the bottom) -->
+      <div class="run-gap" id="run-gap" aria-hidden="true"></div>
+      <!-- what is always there, always in the same place -->
+      <footer class="run-footer" id="run-footer">
+        <!-- (small windows: what viewers may, switched right here) -->
+        <div class="modes run-modes" id="footer-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
+        <p class="mode-note run-mode-note" id="footer-mode-note" role="status"></p>
+        <div class="run-link">
+          <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
+          <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
+        </div>
+        <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span><span class="clip-long">Gemeinsame </span>Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
+        <button class="pill stop" id="stop" type="button"></button>
+        <p class="keep" id="run-keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+      </footer>
     </section>
 
     <!-- the tab, while the controls are in the always-on-top window (Chrome, Edge) -->
@@ -372,7 +481,7 @@
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
     import { MiniView } from './light-mini.js'
-    import { showScreenHelp } from './light-help.js'
+    import { dialogKind, showScreenHelp } from './light-help.js'
     import { ClipPanel, browserCopyable, filesFromClipboard, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
@@ -434,7 +543,9 @@
       $('name').parentElement.hidden = !!$('name').value.trim()
       $('panel-close').hidden = false
       $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
-      document.querySelector('#running .keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
+      // ("Beenden", as in the desktop app's toolbar)
+      Object.assign($('stop'), { innerHTML: icon('stop', 15) + 'Beenden', title: 'Freigabe beenden' })
+      $('run-keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
       // what was picked in the tab's click, handed over (else the button below asks here)
       let handed = null
       try { handed = window.opener?.pvLightPicking ?? null } catch {}
@@ -476,9 +587,11 @@
 
     // ---------------------------------------------------------------- start
     const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
-    if (cropSupported) $('start-hint').textContent = 'Dein Browser fragt gleich, was du teilen möchtest: Wähle „Gesamter Bildschirm“. Danach suchst du hier aus, welches Fenster deine Zuschauer sehen.'
+    // (what to pick is said beside the browser's dialog – light-help.js; where there is no card, Safari: one line)
+    if (cropSupported && !dialogKind()) Object.assign($('start-hint'), { textContent: 'Wähle im Browser gleich den ganzen Bildschirm, nicht ein einzelnes Fenster.', hidden: false })
     if (!supported) {
       $('start').disabled = true
+      $('start-hint').hidden = false
       $('start-hint').textContent = 'Dieser Browser kann den Bildschirm nicht teilen (auf Handys und Tablets geht das nicht). Bitte am Computer Chrome, Edge, Firefox oder Safari verwenden – oder PeekaView Desktop.'
     }
 
@@ -545,7 +658,7 @@
     function startUnready() {
       readyStream = null
       $('start').hidden = false
-      $('start-hint').hidden = false
+      $('start-hint').hidden = !$('start-hint').textContent
       $('start-ready').hidden = true
     }
     $('start-open').addEventListener('click', () => {
@@ -596,6 +709,15 @@
     $('elsewhere-show').addEventListener('click', () => {
       try { panelWindow?.focus() } catch {}
     })
+    // the share ended in the small window (which closes): said here, "Noch einmal teilen" here
+    window.pvLightEnded = (why) => {
+      panelWindow = null
+      $('elsewhere').hidden = true
+      $('setup').hidden = true
+      $('ended').hidden = false
+      $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
+      document.title = 'Im Browser teilen – PeekaView light'
+    }
     // the small window closed: back to the start
     setInterval(() => {
       if (!panelWindow?.closed) return
@@ -753,6 +875,12 @@
       document.title = 'Im Browser teilen – PeekaView light'
       closePip()
       dock()
+      // the small window: closes by itself – "Freigabe beendet" shows in the tab (if it is still there;
+      // else nothing is left to show). (It stays only where the browser does not let it close.)
+      if (panel) {
+        try { window.opener?.pvLightEnded?.(why) } catch {}
+        setTimeout(() => window.close(), 0)
+      }
     }
 
     // ---------------------------------------------------------------- the small window's place
@@ -780,7 +908,7 @@
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
-      let height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
+      let height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(naturalHeight(document.querySelector('main'))) + cy)
       const area = usableArea(screen)
       // (not to be moved – Firefox on a second screen: its top stays where it opened; down to the
       // bottom of the screen all the same, never floating above it)
@@ -789,6 +917,11 @@
       const top = Math.round(area.top + area.height - height - 16)
       const moved = movesWindows(screen) && (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2)
       if (moved || Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) placeWindow(window, { left, top, width, height })
+    }
+    // how tall it is by its content (small windows: without the room kept between it and the footer)
+    function naturalHeight(el) {
+      const gap = $('run-gap')
+      return el.scrollHeight - (el.contains(gap) ? gap.offsetHeight : 0)
     }
     function roomy() {
       if (!panel || (window.outerWidth >= PICKER_ROOM.width && window.outerHeight >= PICKER_ROOM.height)) return
@@ -910,7 +1043,7 @@
       shareStyles(box.ownerDocument)
       clipPanel.setItems(clipItems())
       clipPanel.focus()
-      if (pip && win === pip && !pipLarge) resizePip(pip, { width: PIP_SMALL.width, height: Math.min(720, Math.ceil(pip.document.body.scrollHeight) + 8) })
+      if (pip && win === pip && !pipLarge) resizePip(pip, { width: PIP_SMALL.width, height: Math.min(720, Math.ceil(naturalHeight(pip.document.body)) + 8) })
       dock()
     }
     function closeClip() {
@@ -938,6 +1071,7 @@
     function renderAll() {
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
+      renderModes($('footer-modes'), $('footer-mode-note'))
       if (!host) return
       $('stuck-note').hidden = !panel || movesWindows(screen)
       const requests = host.requestList
@@ -948,6 +1082,7 @@
       $('requests').replaceChildren(...requests.map((r) => {
         const row = document.createElement('div')
         row.className = 'request'
+        row.style.animationDelay = `0s, -${Date.now() % 2000}ms`
         row.innerHTML = '<div><strong></strong><span>möchte deinen Bildschirm sehen</span></div><button class="pill" type="button" data-deny>Ablehnen</button><button class="pill primary" type="button" data-allow>Zulassen</button>'
         row.prepend(who(r))
         row.querySelector('strong').textContent = r.name
@@ -1047,7 +1182,11 @@
     // a point right away; a stroke when it is finished – with the picture from its start
     function watch(m) {
       if (!host) return
+      // (the preview follows the pointer of the one shown)
+      if (m.t === 'ptr') return miniView?.pointer(m.from, m.x, m.y, host.peers().list.find((p) => p.id === m.from)?.color)
+      if (m.t === 'hide') return miniView?.hidePointer(m.from)
       if (m.t === 'left') {
+        miniView?.hidePointer(m.id)
         if (strokes.delete(m.id)) busyChanged()
         return
       }
@@ -1151,7 +1290,7 @@
     $('more').addEventListener('click', () => {
       const open = $('running').classList.toggle('more')
       $('more').setAttribute('aria-expanded', String(open))
-      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster'
+      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, anderes Fenster'
       dock()
     })
 
@@ -1204,7 +1343,7 @@
     $('pip-small').addEventListener('click', async () => {
       miniView?.clear()
       endSpot()
-      const height = Math.min(600, Math.max(200, Math.ceil($('running').scrollHeight) + 28))
+      const height = Math.min(600, Math.max(200, Math.ceil(naturalHeight($('running'))) + 28))
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
@@ -1228,25 +1367,26 @@
       } catch {}
     }
 
-    // asked once, with a click of its own (browsers want one), while the share runs
-    let notifySkipped = false
+    // Asked before the share, beside "Bildschirm teilen" – optional, quietly, with a click of its own
+    // (browsers want one). (Chrome, Edge: the always-on-top window shows drawings instead.)
     function renderNotify() {
       const can = typeof Notification === 'function'
       const permission = can ? Notification.permission : 'denied'
-      // (Chrome, Edge: the always-on-top window shows drawings instead)
-      $('notify-step').hidden = !host || !can || permission === 'granted' || notifySkipped || documentPip
-      $('notify-text').textContent = permission === 'denied'
-        ? 'Benachrichtigungen sind für diese Seite gesperrt. Erlauben kannst du sie über das Symbol links neben der Adresse.'
-        : 'Arbeitest du in einem anderen Programm, meldet sich PeekaView, sobald jemand etwas zeigt oder malt. Ein Klick auf die Meldung zeigt es dir genau an der Stelle.'
-      $('notify-on').hidden = permission === 'denied'
+      $('notify-opt').hidden = !can || documentPip
+      $('notify-on').checked = permission === 'granted'
+      $('notify-on').disabled = permission !== 'default'
+      $('notify-text').hidden = permission === 'default'
+      $('notify-text').textContent = permission === 'granted'
+        ? 'Arbeitest du in einem anderen Programm, meldet sich PeekaView. Ein Klick auf die Meldung zeigt es dir genau an der Stelle.'
+        : 'Benachrichtigungen sind für diese Seite gesperrt – erlauben kannst du sie über das Symbol links neben der Adresse.'
     }
-    $('notify-on').addEventListener('click', () => {
-      Notification.requestPermission().then(renderNotify).catch(() => {})
+    $('notify-on').addEventListener('change', () => {
+      if (!$('notify-on').checked) return
+      Notification.requestPermission().then(renderNotify, renderNotify)
     })
-    $('notify-later').addEventListener('click', () => {
-      notifySkipped = true
-      renderNotify()
-    })
+    renderNotify()
+    // (allowed meanwhile in the browser's settings)
+    window.addEventListener('focus', renderNotify)
 
     /** The helper over the spot of the last drawing – from a click (notification). */
     let jumps = 0
@@ -1895,6 +2035,8 @@
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
+      // the preview's part of the still picture (image pixels), and the pointers it follows
+      get preview() { return miniView?.spot ? { crop: miniView.spot.crop, pointers: miniView.activePointers().map((p) => [p.x, p.y]), image: { width: miniView.spot.capture.image.width, height: miniView.spot.capture.image.height } } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),

@@ -41,12 +41,13 @@ function firefoxCard(platform, host) {
   return `
     <button class="screen-help-close" type="button" aria-label="Schließen">×</button>
     <p class="screen-help-warn" role="alert">Die Bedienung mit Firefox ist stark eingeschränkt. Verwende wenn möglich Chrome.</p>
-    <p class="screen-help-title"><span class="screen-help-arrow" aria-hidden="true">←</span> So teilst du deinen Bildschirm</p>
+    <p class="screen-help-title"><span class="screen-help-arrow" aria-hidden="true">←</span> Wähle „Gesamter Bildschirm“</p>
     ${firefoxFigure(mac, host)}
     <ol class="screen-help-steps">
       <li>Im Feld links oben <b>„Gesamter Bildschirm“</b> wählen – bei mehreren Bildschirmen den, auf dem dein Fenster liegt (<b>„Bildschirm 1“</b>, <b>„Bildschirm 2“</b>).</li>
       <li><b>„Erlauben“</b> klicken.</li>
     </ol>
+    <p class="screen-help-after">Welches Fenster deine Zuschauer sehen, suchst du danach aus.</p>
     ${mac ? '<p class="screen-help-note">Fragt dein Mac nach „Bildschirmaufnahme“: in den Systemeinstellungen für Firefox einschalten, Firefox neu starten.</p>' : ''}`
 }
 
@@ -54,13 +55,14 @@ function chromeCard(kind) {
   const tab = kind === 'edge' ? 'Microsoft Edge-Tab' : 'Chrome-Tab'
   return `
     <button class="screen-help-close" type="button" aria-label="Schließen">×</button>
-    <p class="screen-help-title"><span class="screen-help-arrow" aria-hidden="true">←</span> So teilst du deinen Bildschirm</p>
+    <p class="screen-help-title"><span class="screen-help-arrow" aria-hidden="true">←</span> Wähle „Gesamter Bildschirm“</p>
     ${chromeFigure(tab)}
     <ol class="screen-help-steps">
       <li>Oben <b>„Gesamter Bildschirm“</b> wählen.</li>
       <li>Den Bildschirm anklicken (bei mehreren: den, auf dem dein Fenster liegt).</li>
       <li><b>„Teilen“</b> klicken.</li>
-    </ol>`
+    </ol>
+    <p class="screen-help-after">Welches Fenster deine Zuschauer sehen, suchst du danach aus.</p>`
 }
 
 // Firefox: a browser window's top (Mac: the three buttons on the left; Windows: on the right), its
@@ -90,7 +92,8 @@ function firefoxFigure(mac, host) {
       <text x="26" y="106" font-size="10.5" fill="#a1a1aa">Fenster oder Bildschirm auswählen …</text>
       <rect x="20" y="113" width="260" height="22" rx="3" fill="#0061e0"/>
       <text x="28" y="128" font-size="11" font-weight="700" fill="#fff">Gesamter Bildschirm</text>
-      <rect x="17" y="110" width="266" height="28" rx="5" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+      <rect class="screen-help-pulse" x="17" y="110" width="266" height="28" rx="5" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+      <rect x="16" y="109" width="268" height="30" rx="6" fill="none" stroke="#ef4444" stroke-width="3.5"/>
       <circle cx="270" cy="124" r="8" fill="#ef4444"/><text x="270" y="128" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">1</text>
       <text x="28" y="152" font-size="10.5" fill="#52525b">Firefox – PeekaView</text>
       <text x="28" y="172" font-size="10.5" fill="#52525b">${mac ? 'Finder' : 'Explorer'}</text>
@@ -115,7 +118,8 @@ function chromeFigure(tab) {
       <text x="${96 + d + (d ? 4 : 0)}" y="54" font-size="10.5" fill="#52525b">Fenster</text>
       <text x="${146 + d}" y="54" font-size="10.5" font-weight="700" fill="#0b57d0">Gesamter Bildschirm</text>
       <rect x="${144 + d}" y="59" width="112" height="2.5" fill="#0b57d0"/>
-      <rect x="${140 + d}" y="40" width="120" height="26" rx="6" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+      <rect class="screen-help-pulse" x="${140 + d}" y="40" width="120" height="26" rx="6" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+      <rect x="${139 + d}" y="39" width="122" height="28" rx="7" fill="none" stroke="#ef4444" stroke-width="3.5"/>
       <circle cx="${258 + d}" cy="42" r="8" fill="#ef4444"/><text x="${258 + d}" y="46" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">1</text>
       <rect x="16" y="76" width="112" height="70" rx="6" fill="#dbeafe" stroke="#0b57d0" stroke-width="2"/>
       <rect x="24" y="84" width="60" height="38" rx="3" fill="#93c5fd"/><rect x="62" y="98" width="56" height="38" rx="3" fill="#bfdbfe"/>
