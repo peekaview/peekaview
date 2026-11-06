@@ -24,6 +24,14 @@
     button.primary:hover { background: #dc2626; }
     button.icon { width: 28px; padding: 0; }
     .request { padding: 7px 8px; border-radius: 9px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.1); }
+    /* (lights up until answered, as in the share's page) */
+    .request { animation: request-glow 2s ease-in-out infinite; }
+    @keyframes request-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(239,68,68,0); }
+      45% { box-shadow: 0 0 0 2px rgba(239,68,68,.95), 0 0 16px 4px rgba(239,68,68,.55); }
+      65% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 10px 3px rgba(255,255,255,.25); }
+    }
+    @media (prefers-reduced-motion: reduce) { .request { animation: none; outline: 2px solid #ef4444; outline-offset: 1px; } }
     /* somebody is drawing: it shows up as soon as they let go */
     #busy { padding: 7px 9px; border-radius: 9px; background: #27272a; color: #fafafa; }
     #busy .dot { animation: pulse 1s ease-in-out infinite; box-shadow: none; }
@@ -236,6 +244,7 @@
       $('requests').replaceChildren(...(status.requests ?? []).map((r) => {
         const row = document.createElement('div')
         row.className = 'row request'
+        row.style.animationDelay = `-${Date.now() % 2000}ms`
         row.innerHTML = '<span></span><button data-deny>Ablehnen</button><button class="primary" data-allow>Zulassen</button>'
         row.querySelector('span').textContent = `${r.name} möchte zusehen`
         row.querySelector('[data-allow]').addEventListener('click', () => api.admit(r.peer, true))

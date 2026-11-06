@@ -74,6 +74,15 @@
     .requests { display: flex; flex-direction: column; gap: 6px; }
     .request { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(239,68,68,.5); background: rgba(239,68,68,.08); animation: in .2s ease-out; }
     @keyframes in { from { opacity: 0; transform: translateY(-4px); } }
+    /* a join request lights up as a window found does – again and again, until answered (rows drawn
+       anew keep in step: their delay from the clock) */
+    .request { animation: in .2s ease-out, request-glow 2s ease-in-out infinite; }
+    @keyframes request-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(239,68,68,0); }
+      45% { box-shadow: 0 0 0 2px rgba(239,68,68,.95), 0 0 22px 6px rgba(239,68,68,.55); }
+      65% { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 14px 4px rgba(255,255,255,.25); }
+    }
+    @media (prefers-reduced-motion: reduce) { .request { animation: none; outline: 2px solid #ef4444; outline-offset: 1px; } }
     .request div { flex: 1; min-width: 0; }
     .request strong, .request span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .request span { color: #a1a1aa; font-size: 12.5px; }
@@ -986,6 +995,7 @@
       $('requests').replaceChildren(...requests.map((r) => {
         const row = document.createElement('div')
         row.className = 'request'
+        row.style.animationDelay = `0s, -${Date.now() % 2000}ms`
         row.innerHTML = '<div><strong></strong><span>möchte deinen Bildschirm sehen</span></div><button class="pill" type="button" data-deny>Ablehnen</button><button class="pill primary" type="button" data-allow>Zulassen</button>'
         row.prepend(who(r))
         row.querySelector('strong').textContent = r.name
