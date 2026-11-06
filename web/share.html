@@ -280,6 +280,9 @@
     .pip-spot canvas { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: #18181b; }
     .pip-bar { display: flex; flex-wrap: wrap; gap: 8px; }
     .pip-bar .pill { flex: 1; }
+    .pip-hint { margin: -2px 0 0; color: #a1a1aa; font-size: 11.5px; line-height: 1.35; text-align: center; }
+    .pip-hint kbd { padding: 0 5px; border: 1px solid #3f3f46; border-radius: 4px; background: #27272a; color: #e4e4e7; font: inherit; font-size: 11px; }
+    body.pip-large .pip-hint { display: none; }
     /* (a drawing: in the place of the controls, above the footer – which stays where it is; the
        window keeps its size; large: all of it, nothing else) */
     body.pip-spotting { overflow: hidden; }
@@ -318,7 +321,7 @@
         <div class="modes" id="setup-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
         <p class="mode-note" id="setup-mode-note" role="status"></p>
       </div>
-      <!-- (optional, asked with a click of its own: where no always-on-top window shows drawings) -->
+      <!-- (optional, asked with a click of its own: its click brings the drawing to its place from another program) -->
       <div class="notify-opt" id="notify-opt" hidden>
         <label><input type="checkbox" id="notify-on"><span>Benachrichtigen, wenn jemand etwas zeigt oder malt <span class="opt">optional</span></span></label>
         <p class="notify-note" id="notify-text" hidden></p>
@@ -393,6 +396,7 @@
       <div class="pip-spot" id="pip-spot" hidden>
         <canvas id="pip-canvas"></canvas>
         <div class="pip-bar"><button class="pill primary" id="pip-look" type="button">Groß anzeigen</button><button class="pill" id="pip-jump" type="button">Am Fenster zeigen</button><button class="pill" id="pip-small" type="button" hidden>Wieder klein</button></div>
+        <p class="pip-hint" id="pip-hint"></p>
       </div>
       <div class="step" id="pip-step" hidden>
         <span class="step-icon" data-icon="windows"></span>
@@ -1320,18 +1324,19 @@
       // at its place (the helper, or the small window jumping there) only while a window of ours is
       // the one in front: else it would open behind the others, and only confuse – then a preview in
       // the window "Freigabe läuft", and "Am Fenster zeigen" brings it there
-      const front = ownFocus()
+      const inFront = frontWindow()
+      const front = !!inFront
       waiting = null
-      // (Chrome: the helper opens only in a click – one just made in our window in front will do)
-      const clicked = front && !panel && !helperOpen() ? [pip, window].find((w) => focused(w) && activated(w)) : null
-      if (clicked) return jumpHelper(clicked)
+      // (Chrome: the helper opens only in a click – one just made in our window in front will do; or
+      // without one, where pop-ups are allowed for the page)
+      if (front && !panel && !helperOpen() && jumpHelper(inFront, { unasked: !activated(inFront) })) return
       // (the PeekaView tab in front: the small window comes before it – it is the helper)
       if (panel && front) showPanel()
       emit({ kind: 'reveal', reveal: lastReveal, jump: front })
       if (pip || (panel && !front)) showSpot(lastReveal)
       // not at its place: it goes there once a window of ours comes to the front (see jumpByItself)
       if (!front || !(panel || helperOpen())) waiting = lastReveal
-      if (!pip && !front) notify(lastReveal)
+      if (!front) notify(lastReveal)
     }
 
     // ---------------------------------------------------------------- the always-on-top window
@@ -1404,6 +1409,7 @@
       // (in front: a drawing waiting goes to its place – see jumpByItself)
       win.addEventListener('focus', () => onOwnFocus(win))
       win.document.addEventListener('click', (e) => onOwnClick(e, win), true)
+      win.document.addEventListener('keydown', (e) => onOwnKey(e, win), true)
       renderAll()
     }
     let pipGone = null
@@ -1431,6 +1437,7 @@
       spotDoc().body.classList.add('pip-spotting')
       // (before it is drawn: no picture with it goes out)
       holdPictures()
+      renderHint()
       fitSpot()
       miniView.reveal(r)
       renderPipButtons()
@@ -1576,28 +1583,29 @@
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
-    $('pip-jump').addEventListener('click', () => jumpHelper(pip && !pip.closed ? pip : window))
+    $('pip-jump').addEventListener('click', () => jumpFrom(pip && !pip.closed ? pip : window))
 
-    // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
-    // (not while the presenter is in this window anyway: then it shows by itself, in front)
+    // A notification – its click brings the browser forward, and the helper with it (Chrome: opened
+    // in that click). (Not while a window of ours is in front anyway: then it shows by itself.)
     function notify(r) {
-      if (typeof Notification !== 'function' || Notification.permission !== 'granted' || inFront()) return
+      if (typeof Notification !== 'function' || Notification.permission !== 'granted' || ownFocus()) return
       try {
         const n = new Notification(r.ping ? `${r.name} zeigt dir etwas` : `${r.name} hat etwas gemalt`, { body: 'Klicke hier, dann siehst du es genau an der Stelle.', tag: 'pv-light' })
         n.onclick = () => {
           n.close()
           try { window.focus() } catch {}
-          jumpHelper()
+          jumpFrom(window)
         }
       } catch {}
     }
 
     // Asked before the share, beside "Bildschirm teilen" – optional, quietly, with a click of its own
-    // (browsers want one). (Chrome, Edge: the always-on-top window shows drawings instead.)
+    // (browsers want one). (Chrome, Edge, too: the always-on-top window shows a preview, the
+    // notification's click brings the drawing to its place.)
     function renderNotify() {
       const can = typeof Notification === 'function'
       const permission = can ? Notification.permission : 'denied'
-      $('notify-opt').hidden = !can || documentPip
+      $('notify-opt').hidden = !can
       $('notify-on').checked = permission === 'granted'
       $('notify-on').disabled = permission !== 'default'
       $('notify-text').hidden = permission === 'default'
@@ -1616,29 +1624,72 @@
     /** The helper over the spot of the last drawing – from a click (notification). */
     let jumps = 0
     let jumped = { reveal: null, at: 0 }
-    function jumpHelper(from = window) {
-      if (!lastReveal || !host) return
-      waiting = null
+    // (without a click: tried once a drawing – a refused pop-up shows its sign in the address bar)
+    let triedUnasked = null
+    let popupsRefused = false
+    /** The drawing at its place: true when it went there. `unasked`: not in a click (Chrome then opens
+     *  the helper only where pop-ups are allowed for the page – else the preview stays). */
+    function jumpHelper(from = window, { unasked = false } = {}) {
+      if (!lastReveal || !host) return false
       // (once: a click that also brought the window forward – or a notification's – jumps by itself, too)
-      if (jumped.reveal === lastReveal && performance.now() - jumped.at < 1000) return
-      jumped = { reveal: lastReveal, at: performance.now() }
-      // (the preview makes room)
-      miniView?.clear()
-      endSpot()
+      if (jumped.reveal === lastReveal && performance.now() - jumped.at < 1000) return true
       // the small window is the helper: in front now (the click made the browser the active
       // program), it shows the drawing again. (From the always-on-top window: a helper of its own,
       // opened in that click – the small window would not come to the front from there.)
       if (panel && from === window) {
+        done()
         try { window.focus() } catch {}
-        return emit({ kind: 'jump' })
+        emit({ kind: 'jump' })
+        return true
       }
+      if (unasked && triedUnasked === lastReveal) return false
+      if (unasked) triedUnasked = lastReveal
       // a helper already open may lie behind other programs, and it cannot come to the front from a
       // click elsewhere: a new one, opened in this click, always does – it waits in the corner afterwards
+      let opened = null
+      try {
+        opened = from.open(`share-helper.html?jump=1${panel || pip ? '&close=1' : ''}`, `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
+      } catch {}
+      if (!opened) {
+        if (unasked) popupsRefused = true
+        else helperBlocked = true
+        renderHint()
+        renderHelper()
+        return false
+      }
+      if (unasked) popupsRefused = false
+      done()
       closeHelper()
-      helper = from.open(`share-helper.html?jump=1${panel || pip ? '&close=1' : ''}`, `pv-light-spot-${++jumps}`, 'popup=yes,width=560,height=400')
-      helperBlocked = !helper
+      helper = opened
+      helperBlocked = false
       renderHelper()
+      return true
+      function done() {
+        waiting = null
+        jumped = { reveal: lastReveal, at: performance.now() }
+        // (the preview makes room)
+        miniView?.clear()
+        endSpot()
+      }
     }
+    /** From a window of ours (the small window jumps itself – unless from the always-on-top one). */
+    function jumpFrom(from, options) {
+      if (panel && from !== pip) {
+        showPanel()
+        return jumpHelper(window)
+      }
+      return jumpHelper(from, options)
+    }
+    // under the preview: the key for it – or, where a pop-up was refused, how it goes without a click
+    function renderHint() {
+      const hint = $('pip-hint')
+      if (!hint) return
+      // (the small window alone: it comes to the drawing by itself once it is in front)
+      hint.hidden = panel && !pip
+      if (popupsRefused) hint.textContent = 'Tipp: Erlaube Pop-ups für diese Seite (Symbol rechts in der Adresszeile) – dann kommt jede Zeichnung ohne Klick an ihre Stelle.'
+      else hint.innerHTML = '<kbd>Leertaste</kbd> zeigt es am Fenster'
+    }
+    renderHint()
 
     // what the window picker found (share.html?debug): frames, title bars, titles read – and the
     // picture with the frames, open
@@ -1731,7 +1782,10 @@
     // a window of ours is the one in front (this page – the small window or the tab –, the always-on-top
     // one, the helper)
     function ownFocus() {
-      return focused(window) || focused(pip) || focused(helper) || peekaviewWindows().some(focused)
+      return !!frontWindow()
+    }
+    function frontWindow() {
+      return [pip, window, helper, ...peekaviewWindows()].find(focused) ?? null
     }
     function focused(w) {
       try {
@@ -1785,11 +1839,7 @@
     /** At its place now, where it may be without a click: true when it went there. */
     function jumpByItself(from) {
       if (!waitingFresh()) return false
-      if (panel) {
-        showPanel()
-        jumpHelper(window)
-        return true
-      }
+      if (panel && from !== pip) return jumpFrom(from)
       if (helperOpen()) {
         waiting = null
         miniView?.clear()
@@ -1797,11 +1847,7 @@
         emit({ kind: 'jump' })
         return true
       }
-      if (focused(from) && activated(from)) {
-        jumpHelper(from)
-        return true
-      }
-      return false
+      return focused(from) && jumpHelper(from, { unasked: !activated(from) })
     }
     function onOwnFocus(from) {
       focusedAt = performance.now()
@@ -1814,12 +1860,26 @@
       if (!e.target.closest?.('#pip-spot') && performance.now() - focusedAt > 1500) return
       // (nothing else for this click: the window "Freigabe läuft" would grow under it)
       e.stopPropagation()
-      jumpHelper(from)
+      jumpFrom(from)
+    }
+    // the space bar, in a window of ours, while a drawing waits or shows as a preview (a key counts as
+    // a click: Chrome opens the helper then) – not while writing
+    function onOwnKey(e, from) {
+      if (e.key !== ' ' || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return
+      if (e.target.closest?.('input, textarea, select, [contenteditable]')) return
+      if (!waitingFresh() && !(lastReveal && spotDoc().body.classList.contains('pip-spotting') && !pipLarge)) return
+      e.preventDefault()
+      e.stopPropagation()
+      jumpFrom(from)
     }
     window.addEventListener('focus', () => onOwnFocus(window))
     document.addEventListener('click', (e) => onOwnClick(e, window), true)
+    document.addEventListener('keydown', (e) => onOwnKey(e, window), true)
     for (const w of peekaviewWindows()) {
-      try { w.addEventListener('focus', () => onOwnFocus(w)) } catch {}
+      try {
+        w.addEventListener('focus', () => onOwnFocus(w))
+        w.document.addEventListener('keydown', (e) => onOwnKey(e, w), true)
+      } catch {}
     }
     // (the tab that opened the small window: brings it to the front)
     window.pvLightShowPanel = () => {
@@ -2361,6 +2421,8 @@
       get stream() { return host?.stream ?? null },
       get locatorStream() { return locator },
       get lastReveal() { return lastReveal },
+      // a drawing waiting to go to its place by itself (see jumpByItself)
+      get waiting() { return waitingFresh() },
       // the picked part of the screen, and how following it went last
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
