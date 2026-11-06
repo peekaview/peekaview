@@ -1012,6 +1012,8 @@
     // a point right away; a stroke when it is finished – with the picture from its start
     function watch(m) {
       if (!host) return
+      // (the preview follows the pointer of the one shown)
+      if (m.t === 'ptr') return miniView?.pointer(m.from, m.x, m.y)
       if (m.t === 'left') {
         if (strokes.delete(m.id)) busyChanged()
         return
@@ -1860,6 +1862,8 @@
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
+      // the preview's part of the still picture (image pixels), and the pointer it follows
+      get preview() { return miniView?.spot ? { crop: miniView.spot.crop, pointer: miniView.spot.pointer ?? null, image: { width: miniView.spot.capture.image.width, height: miniView.spot.capture.image.height } } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),

@@ -127,6 +127,13 @@
     // around the drawing, fitted – where the window cannot jump there), 'whole'
     let layout = null
     let zoom = null // 'zoom': {center, extent} of the drawing
+    // 'zoom': the middle of the part shown (0..1 of the picture; null: the drawing's) – it follows
+    // the pointer of the one shown, softly
+    let view = null
+    let viewTarget = null
+    let viewFrame = 0
+    let viewAt = 0
+    let shownFrom = null
     let idleTimer
     // one jump after the other
     let queue = Promise.resolve()
@@ -163,6 +170,7 @@
       if (m.t === 'peers' || m.t === 'state') return ann.handle(m)
       // cursors, hiding, clearing while something is shown (points and strokes come as "reveal")
       if (state === 'focus' && ['ptr', 'hide', 'clear', 'left'].includes(m.t)) ann.handle(m)
+      if (m.t === 'ptr' && state === 'focus' && layout === 'zoom' && m.from === shownFrom) followPointer(m.x, m.y)
     }
 
     function onReveal(r) {
@@ -180,6 +188,7 @@
     }
 
     async function showReveal(r) {
+      shownFrom = r.from
       const b = bounds(r.points)
       await show(r.capture, { x: b.x + b.w / 2, y: b.y + b.h / 2 }, b)
       showWho(r.from)
@@ -283,6 +292,7 @@
       enqueue(async () => {
         const capture = await api.capture()
         if (!capture?.image) return
+        shownFrom = HOST_ID
         await show({ ...capture, picture: null }, null)
         showWho(HOST_ID)
         idle(AFTER_DRAW * 2)
@@ -346,6 +356,7 @@
         // (a window that cannot be moved – Firefox on a second screen: 1:1 it would show its own old
         // picture) the part around the drawing, fitted into it – as large as it may get where it is
         zoom = { center, extent }
+        view = null
         // (never smaller: it reaches down to the bottom)
         moveWindow(win.screenX, win.screenY, Math.max(win.outerWidth, SPOT.width + c.x), Math.max(win.outerHeight, SPOT.height + c.y))
         layoutZoom()
@@ -392,12 +403,41 @@
       const sw = iw * s
       const sh = ih * s
       const at = (want, size, view) => (size <= view ? (view - size) / 2 : Math.min(0, Math.max(view - size, want)))
-      const left = at(W / 2 - (r.x + r.width / 2) * s, sw, W)
-      const top = at(H / 2 - (r.y + r.height / 2) * s, sh, H)
+      const mx = view ? view.x * iw : r.x + r.width / 2
+      const my = view ? view.y * ih : r.y + r.height / 2
+      const left = at(W / 2 - mx * s, sw, W)
+      const top = at(H / 2 - my * s, sh, H)
       place({ left, top, width: sw, height: sh })
       part = { x: Math.max(0, -left / sw), y: Math.max(0, -top / sh), w: Math.min(1, W / sw), h: Math.min(1, H / sh) }
       placeDim()
     }
+    /** The part shown moves towards the pointer (0..1 of the picture), a little each frame. */
+    function followPointer(x, y) {
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) return
+      viewTarget = { x, y }
+      // (still shown while it moves)
+      if (idleTimer) idle(AFTER_DRAW)
+      if (!viewFrame) {
+        viewAt = performance.now()
+        viewFrame = requestAnimationFrame(followStep)
+      }
+    }
+    function followStep(now) {
+      viewFrame = 0
+      if (state !== 'focus' || layout !== 'zoom' || !viewTarget || !shown) return
+      const { width: iw, height: ih } = shown.image
+      if (!view) {
+        const r = zoomRegion()
+        view = { x: (r.x + r.width / 2) / iw, y: (r.y + r.height / 2) / ih }
+      }
+      const k = 1 - Math.exp(-Math.max(0, now - viewAt) / 140)
+      viewAt = now
+      view = { x: view.x + (viewTarget.x - view.x) * k, y: view.y + (viewTarget.y - view.y) * k }
+      layoutZoom()
+      // (there: rests – within half a pixel of the picture)
+      if (Math.abs(viewTarget.x - view.x) * iw > 0.5 || Math.abs(viewTarget.y - view.y) * ih > 0.5) viewFrame = requestAnimationFrame(followStep)
+    }
+
     /** The drawing's part of the picture (image pixels). */
     function zoomRegion() {
       const { width: iw, height: ih } = shown.image
@@ -421,9 +461,11 @@
     })
 
     function place(box) {
+      // (only moved – following a pointer, each frame: the drawings move with it)
+      const resized = !stageBox || Math.abs(stageBox.width - box.width) > 0.5 || Math.abs(stageBox.height - box.height) > 0.5
       stageBox = box
       Object.assign($('stage').style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
-      ann.resize()
+      if (resized) ann.resize()
     }
 
     function showWho(id) {
@@ -511,7 +553,11 @@
       onDemand,
       park,
       // (tests: it stays where it is until parked – a slow test would miss it)
-      hold: () => clearTimeout(idleTimer),
+      hold: () => {
+        clearTimeout(idleTimer)
+        idleTimer = null
+      },
+      get view() { return view },
     }
 
     // ---------------------------------------------------------------- connected to the share page

@@ -374,6 +374,13 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.equal(zoomed.layout, 'zoom', JSON.stringify(zoomed))
     assert.ok(zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
     assert.ok(zoomed.part.x < 0.25 && 0.25 < zoomed.part.x + zoomed.part.w && zoomed.part.y < 0.72 && 0.72 < zoomed.part.y + zoomed.part.h, `the drawing in the part shown: ${JSON.stringify(zoomed.part)}`)
+    // Anna moves her mouse: the part shown follows it softly, her pointer in its middle
+    await tab(V)
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.75)), String(Math.round(r.t + r.h * 0.3)))
+    await tab(P)
+    await waitFor("(()=>{const h=document.querySelector('#spot').contentWindow.pvHelper;return h.view && Math.abs(h.view.x - 0.75) < 0.03 && Math.abs(h.view.y - 0.3) < 0.03})()")
+    const followed = await evaluate("document.querySelector('#spot').contentWindow.pvHelper.part")
+    assert.ok(followed.x < 0.75 && 0.75 < followed.x + followed.w && followed.y < 0.3 && 0.3 < followed.y + followed.h, `the pointer in the part shown: ${JSON.stringify(followed)}`)
     await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
 
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
@@ -504,6 +511,12 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     }
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#link-label').parentElement).display"), 'none', 'the controls make room')
+    // Anna moves her mouse: the preview follows it softly, her pointer in its middle (within the picture)
+    await tab(V)
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.45)))
+    await tab(P)
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointer)return false;const want=(v,size,max)=>Math.max(0,Math.min(max-size,v*max-size/2));return Math.abs(p.crop.x-want(p.pointer[0],p.crop.w,p.image.width))<2&&Math.abs(p.crop.y-want(p.pointer[1],p.crop.h,p.image.height))<2})()")
+    assert.ok(Math.abs((await evaluate('pvLight.preview.pointer'))[0] - 0.6) < 0.05)
 
     // "Am Fenster zeigen": the drawing over the very spot, in a window of its own that closes again;
     // the controls back
