@@ -226,6 +226,8 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill extra" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
+      <!-- (Firefox, private window on a second screen: its numbers for the screen made up – nothing moves) -->
+      <p class="keep" id="stuck-note" style="margin:0" hidden>Firefox lässt dieses Fenster hier nicht verschieben (im privaten Fenster schützt es so vor Fingerprinting). Zeichnungen erscheinen deshalb hier im Fenster statt an ihrer Stelle. In einem normalen Firefox-Fenster oder in Chrome springt es dorthin.</p>
       <div class="step problem" id="place-problem" role="alert" hidden>
         <span class="step-icon" data-icon="window"></span>
         <div class="step-body">
@@ -902,6 +904,7 @@
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
       if (!host) return
+      $('stuck-note').hidden = !panel || movesWindows(screen)
       const requests = host.requestList
       const fresh = requests.some((r) => !knownRequests.has(r.peer))
       knownRequests = new Set(requests.map((r) => r.peer))
