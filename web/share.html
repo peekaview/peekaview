@@ -13,6 +13,12 @@
     main { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(500px, calc(100% - 32px)); margin: 7vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 8px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: #fafafa; text-decoration: none; }
     .brand i { display: flex; }
+    /* inside the start page's dialog (share.html?embed): the dialog brings its own frame */
+    :root:has(body.embed), body.embed { background: #18181b; }
+    body.embed main { width: 100%; margin: 0; padding: 4px 22px 22px; border: 0; border-radius: 0; box-shadow: none; }
+    body.embed main > .brand, body.embed .pv-footer, body.embed #setup h1 { display: none; }
+    /* the help for the browser's dialog (and Firefox's warning) right in the dialog, below the button */
+    body.embed .screen-help { position: relative; inset: auto; width: auto; max-width: none; box-shadow: none; animation: none; }
     .light-tag { padding: 3px 9px; border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 11.5px; font-weight: 650; }
     h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.015em; }
     .lead { margin: -10px 0 0; color: #a1a1aa; font-size: 15px; }
@@ -370,6 +376,7 @@
     let panelWindow = null
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
+    document.body.classList.toggle('embed', params.has('embed') && window.parent !== window)
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null

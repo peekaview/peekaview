@@ -20,6 +20,14 @@
     #contacts-close:hover { background: #3f3f46; }
     #contacts-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     #contacts-content { min-height: 0; overflow-y: auto; padding: 20px; }
+    /* sharing from the browser: share.html in a dialog over the start page */
+    #share-dialog { box-sizing: border-box; width: min(540px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3f3f46; border-radius: 18px; background: #18181b; color: #fafafa; box-shadow: 0 24px 80px #0009; overflow: hidden; }
+    #share-dialog[open] { display: flex; flex-direction: column; }
+    #share-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }
+    #share-dialog iframe { display: block; width: 100%; height: 560px; max-height: calc(100dvh - 32px - 72px); border: 0; background: #18181b; }
+    #share-close { flex: none; display: grid; place-items: center; width: 38px; height: 38px; margin-left: auto; padding: 0; border: 1px solid #3f3f46; border-radius: 50%; background: #27272a; color: #fafafa; cursor: pointer; }
+    #share-close:hover { background: #3f3f46; }
+    #share-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 560px; margin: 0; padding: 28px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     /* the trust badge always top right (next to the profile, when signed in); shorter on phones */
@@ -138,6 +146,10 @@
     .hero-word.in { animation: word-in .38s cubic-bezier(.3,.7,.4,1); }
     @keyframes word-out { to { opacity: 0; transform: translateY(-.35em); filter: blur(4px); } }
     @keyframes word-in { from { opacity: 0; transform: translateY(.35em); filter: blur(4px); } }
+    .platforms { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
+    .platforms a, .platforms span { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(24,24,27,.8); color: #e4e4e7; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .platforms svg { width: 18px; height: 18px; color: #ef4444; }
+    .platforms a:hover { border-color: rgba(255,255,255,.25); color: #fafafa; }
     .hero-lead { max-width: 30em; margin: 14px auto 0; color: #a1a1aa; font-size: 16px; line-height: 1.55; }
     #features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
     #features li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: rgba(24,24,27,.72); backdrop-filter: blur(8px); }
@@ -149,12 +161,13 @@
     .hero-lead, .hero-title { text-shadow: 0 2px 18px #09090b, 0 0 4px #09090b; }
     @media (max-width: 1039px) { #landing { margin-top: 20px; gap: 20px; } #stage { margin-top: 64px; } }
     /* phones: the card close to the top – the reasons follow below it */
-    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } }
+    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } .platforms { gap: 5px; margin-top: 12px; } .platforms a, .platforms span { gap: 5px; padding: 4px 9px 4px 7px; font-size: 12px; } .platforms svg { width: 15px; height: 15px; } }
     /* wide screens: headline and reasons left, the card right */
     @media (min-width: 1040px) {
       #landing { grid-template-columns: minmax(0, 1fr) 540px; grid-template-areas: "hero home" "stage home" "features features"; align-items: start; justify-items: stretch; column-gap: 64px; row-gap: 28px; margin-top: 5vh; }
       #hero { grid-area: hero; max-width: none; text-align: left; }
       .hero-lead { margin-left: 0; }
+      .platforms { justify-content: flex-start; }
       #stage { grid-area: stage; max-width: none; margin-top: 70px; }
       #features { grid-area: features; max-width: none; margin-top: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
       #home { grid-area: home; }
@@ -185,6 +198,7 @@
   <div id="landing">
   <section id="hero" aria-labelledby="hero-title">
     <h2 class="hero-title" id="hero-title">Mal eben schnell<br><span class="hero-word" id="hero-word">was zeigen.</span></h2>
+    <ul class="platforms" id="platforms" aria-label="Läuft auf"></ul>
     <p class="hero-lead">Schick Oma, deiner Kollegin oder einem Kunden einen Link – ein Klick, und ihr schaut gemeinsam auf denselben Bildschirm. Mit PeekaView Desktop hilft dir jemand auch direkt mit Maus und Tastatur. Ende-zu-Ende verschlüsselt, ohne Konto, kostenlos.</p>
   </section>
   <main id="home">
@@ -230,6 +244,9 @@
     <header class="contacts-head"><h2 id="contacts-title">Kontakte</h2><button id="contacts-close" type="button" aria-label="Kontakte schließen" autofocus></button></header>
     <div id="contacts-content"></div>
   </dialog>
+  <dialog id="share-dialog" aria-labelledby="share-dialog-title">
+    <header class="contacts-head"><h2 id="share-dialog-title">Bildschirmfreigabe light</h2><button id="share-close" class="dialog-close" type="button" aria-label="Schließen"></button></header>
+  </dialog>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
@@ -251,6 +268,22 @@
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
+    // where it runs: the desktop apps lead to their download
+    for (const [name, label, title, href] of [
+      ['globe', 'Browser', 'Zuschauen und einfach teilen – ohne Installation', ''],
+      ['android', 'Android', 'App zum Zuschauen und um den Bildschirm des Handys zu teilen', ''],
+      ['winlogo', 'Windows', 'PeekaView Desktop: teilen und fernsteuern lassen', 'download.html'],
+      ['apple', 'macOS', 'PeekaView Desktop: teilen und fernsteuern lassen', 'download.html'],
+    ]) {
+      const li = document.createElement('li')
+      const item = document.createElement(href ? 'a' : 'span')
+      if (href) Object.assign(item, { href, target: '_blank', rel: 'noopener' })
+      item.title = title
+      item.innerHTML = icon(name, 18)
+      item.append(label)
+      li.append(item)
+      $('platforms').append(li)
+    }
     // why PeekaView: the reasons beside the card
     for (const [name, title, text] of [
       ['screen', 'Mal eben schnell was zeigen', 'Link schicken, fertig.'],
@@ -279,6 +312,37 @@
         $('host-note').append(limits)
       }
     }
+    // "im Browser teilen": share.html in a dialog over this page. Kept once loaded – the share
+    // runs in its own small window, but what was picked belongs to this frame: closing the dialog
+    // only hides it, opening it again shows "Freigabe läuft".
+    $('share-close').innerHTML = icon('close', 18)
+    $('share-close').addEventListener('click', () => $('share-dialog').close())
+    $('share-dialog').addEventListener('click', (e) => { if (e.target === $('share-dialog')) $('share-dialog').close() })
+    function openShare() {
+      let frame = $('share-dialog').querySelector('iframe')
+      if (!frame) {
+        frame = Object.assign(document.createElement('iframe'), { src: 'share.html?embed', title: 'Im Browser teilen' })
+        // the screen picker, the shared clipboard
+        frame.allow = 'display-capture; clipboard-read; clipboard-write'
+        // as tall as its content (up to the window)
+        frame.addEventListener('load', () => {
+          const doc = frame.contentDocument
+          if (!doc) return
+          const fit = () => { frame.style.height = `${Math.ceil(doc.querySelector('main')?.getBoundingClientRect().height ?? 560) + 2}px` }
+          new ResizeObserver(fit).observe(doc.body)
+          fit()
+        })
+        $('share-dialog').append(frame)
+      }
+      $('share-dialog').showModal()
+      frame.focus()
+    }
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest?.('#light-offer')
+      if (!link || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      e.preventDefault()
+      openShare()
+    })
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
       const notice = document.createElement('button')
       notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`
