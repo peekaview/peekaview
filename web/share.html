@@ -682,6 +682,15 @@
     $('elsewhere-show').addEventListener('click', () => {
       try { panelWindow?.focus() } catch {}
     })
+    // the share ended in the small window (which closes): said here, "Noch einmal teilen" here
+    window.pvLightEnded = (why) => {
+      panelWindow = null
+      $('elsewhere').hidden = true
+      $('setup').hidden = true
+      $('ended').hidden = false
+      $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
+      document.title = 'Im Browser teilen – PeekaView light'
+    }
     // the small window closed: back to the start
     setInterval(() => {
       if (!panelWindow?.closed) return
@@ -831,6 +840,12 @@
       document.title = 'Im Browser teilen – PeekaView light'
       closePip()
       dock()
+      // the small window: closes by itself – "Freigabe beendet" shows in the tab (if it is still there;
+      // else nothing is left to show). (It stays only where the browser does not let it close.)
+      if (panel) {
+        try { window.opener?.pvLightEnded?.(why) } catch {}
+        setTimeout(() => window.close(), 0)
+      }
     }
 
     // ---------------------------------------------------------------- the small window's place

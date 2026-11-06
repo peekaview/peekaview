@@ -450,8 +450,12 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
 
     await tab(P)
     assert.equal(await evaluate('!!pvLight.host && pvLight.status().viewers.length'), 1)
-    await browser('click', '#stop')
-    await waitFor("!document.querySelector('#ended').hidden")
+    // stopped: the small window closes by itself – "Freigabe beendet" in the tab, to share again from there
+    await evaluate("setTimeout(() => document.querySelector('#stop').click(), 50); true")
+    await tab('t1')
+    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#elsewhere').hidden && !!document.querySelector('#again')")
+    await waitFor('1')
+    assert.doesNotMatch(await browser('tab', 'list'), /panel/)
   } finally {
     try {
       await browser('close')
@@ -564,12 +568,15 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await waitFor("!!document.querySelector('#running #stop') && !document.body.classList.contains('pip-spotting') && document.querySelector('#pip-spot').hidden")
 
     // stopping there ends it, and the always-on-top window closes
+    // (… and the small window, too: "Freigabe beendet" in the tab)
     await tab(P)
-    await browser('click', '#stop')
-    await tab(S)
-    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#in-pip').hidden").catch(async (e) => {
-      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, inPip: document.querySelector('#in-pip').hidden, host: !!pvLight.host})"))}\n${await tabs()}`)
+    await evaluate("setTimeout(() => document.querySelector('#stop').click(), 50); true")
+    await tab('t1')
+    await waitFor("!document.querySelector('#ended').hidden && document.querySelector('#elsewhere').hidden").catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({ended: document.querySelector('#ended').hidden, elsewhere: document.querySelector('#elsewhere').hidden})"))}\n${await tabs()}`)
     })
+    await waitFor('1')
+    assert.doesNotMatch(await tabs(), /panel|about:blank/)
   } finally {
     try {
       await browser('close')
