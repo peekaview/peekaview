@@ -214,26 +214,63 @@ export function centerOn(cur, points, { width, height }) {
   return { ...cur, x: Math.max(0, Math.min(width - cur.w, cx - cur.w / 2)), y: Math.max(0, Math.min(height - cur.h, cy - cur.h / 2)) }
 }
 
+// how calmly the part shown follows the viewers' pointers (calmFollow)
+export const CALM = {
+  inner: 0.8, // still while the pointer is in this middle part …
+  push: 0.72, // … moved on, once it leaves it, so far that it is this far in (not again at once)
+  tremble: 0.015, // a pointer moved less than this (of the part's width) has not moved
+  handover: 1000, // ms: another pointer is followed only once the one followed has rested this long
+  rest: 1500, // ms: after being moved on, it glides to the middle only once the pointer rests this long …
+  glide: 2600, // ms: … slowly
+}
+
 /**
- * Where the part shown goes, a step at a time (calmly): still while the points move in its inner
- * part; on, just enough, when one comes near its edge – and from then on gliding slowly on until they
- * are in its middle (even when they rest). `state` keeps {goal, centering, points} between steps.
+ * Where the part shown goes, a step at a time (calmly). It follows one pointer – the one moved last;
+ * another takes over only once that one has rested a moment – and keeps its size. Still while that
+ * pointer is in its inner part or only trembles; on, just enough (and a little more), when it leaves
+ * that; and once it has rested a while after that, a slow glide until it is in the middle.
+ * `state` keeps {goal, lead, anchors, centering, gliding} between steps.
+ * @param points [{id, x, y}] in picture pixels (the pointers moved lately)
  * @param dt ms since the last step
  */
-export function calmFollow(state, cur, points, dt, opts, glide = 1100) {
-  if (points.length) state.points = points
+export function calmFollow(state, cur, points, dt, { width, height }, calm = CALM) {
+  const now = (state.now = (state.now ?? 0) + dt)
   const goal = state.goal ?? cur
-  if (points.length) {
-    const next = keepInView(goal, points, opts)
-    if (Math.abs(next.x - goal.x) > 0.5 || Math.abs(next.y - goal.y) > 0.5 || Math.abs(next.w - goal.w) > 0.5) state.centering = true
-    state.goal = next
+  const anchors = (state.anchors ??= new Map())
+  // (trembling is no moving: a pointer counts where it was last moved to, by more than a little)
+  const tremble = goal.w * calm.tremble
+  for (const [i, p] of points.entries()) {
+    const id = p.id ?? i
+    const a = anchors.get(id)
+    if (!a || Math.hypot(p.x - a.x, p.y - a.y) > tremble) anchors.set(id, { x: p.x, y: p.y, moved: now })
   }
-  if (state.centering && state.points) {
-    const g = state.goal ?? cur
-    const c = centerOn(g, state.points, opts)
-    const k = 1 - Math.exp(-dt / glide)
-    state.goal = { ...g, x: g.x + (c.x - g.x) * k, y: g.y + (c.y - g.y) * k }
-    if (Math.abs(c.x - state.goal.x) < 0.5 && Math.abs(c.y - state.goal.y) < 0.5) state.centering = false
+  const here = new Set(points.map((p, i) => p.id ?? i))
+  // (the one followed: kept while it moves; gone or resting – the one moved last)
+  const lead = anchors.get(state.lead)
+  if (!here.has(state.lead) || now - lead.moved > calm.handover) {
+    let best = null
+    for (const id of here) if (!best || anchors.get(id).moved > anchors.get(best).moved) best = id
+    if (best != null && (!here.has(state.lead) || anchors.get(best).moved > lead.moved)) state.lead = best
   }
-  return state.goal ?? cur
+  for (const id of anchors.keys()) if (!here.has(id) && id !== state.lead) anchors.delete(id)
+  const p = anchors.get(state.lead)
+  if (!p) return goal
+  const opts = { minW: goal.w, minH: goal.h, width, height }
+  let next = goal
+  if (here.has(state.lead)) {
+    next = keepInView(goal, [p], { ...opts, inner: calm.inner })
+    if (next !== goal && (Math.abs(next.x - goal.x) > 0.5 || Math.abs(next.y - goal.y) > 0.5)) {
+      next = keepInView(goal, [p], { ...opts, inner: calm.push })
+      state.centering = true
+    } else next = goal
+  }
+  // resting a while after being moved on: slowly to the middle (stopped while it moves again)
+  state.gliding = !!state.centering && now - p.moved >= calm.rest
+  if (state.gliding) {
+    const c = centerOn(next, [p], opts)
+    const k = 1 - Math.exp(-dt / calm.glide)
+    next = { ...next, x: next.x + (c.x - next.x) * k, y: next.y + (c.y - next.y) * k }
+    if (Math.abs(c.x - next.x) < 0.5 && Math.abs(c.y - next.y) < 0.5) state.centering = state.gliding = false
+  }
+  return (state.goal = next)
 }

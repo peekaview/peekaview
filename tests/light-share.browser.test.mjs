@@ -392,7 +392,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.75)), String(Math.round(r.t + r.h * 0.3)))
     await tab(P)
-    await waitFor("(()=>{const p=document.querySelector('#spot').contentWindow.pvHelper.part;return p.x + p.w * 0.15 < 0.75 && 0.75 < p.x + p.w * 0.85 && p.y + p.h * 0.15 < 0.3 && 0.3 < p.y + p.h * 0.85})()")
+    await waitFor("(()=>{const p=document.querySelector('#spot').contentWindow.pvHelper.part;return p.x + p.w * 0.12 < 0.75 && 0.75 < p.x + p.w * 0.88 && p.y + p.h * 0.12 < 0.3 && 0.3 < p.y + p.h * 0.88})()")
     await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
 
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
@@ -536,7 +536,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.9)), String(Math.round(r.t + r.h * 0.45)))
     await tab(P)
-    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const px=x*p.image.width,py=y*p.image.height,c=p.crop;return px>c.x+c.w*0.15&&px<c.x+c.w*0.85&&py>c.y+c.h*0.15&&py<c.y+c.h*0.85})()")
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const px=x*p.image.width,py=y*p.image.height,c=p.crop;return px>c.x+c.w*0.12&&px<c.x+c.w*0.88&&py>c.y+c.h*0.12&&py<c.y+c.h*0.88})()")
     assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.9) < 0.05)
     // … and when it rests, its pointer goes (no longer followed)
     await waitFor('pvLight.preview && pvLight.preview.pointers.length === 0')

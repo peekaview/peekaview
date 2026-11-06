@@ -108,19 +108,37 @@ test('keepInView: still while the points lie inside, on just enough when one nea
   assert.deepEqual(edge, { x: 600, y: 350, w: 400, h: 250 })
 })
 
-test('calmFollow: still inside; moved on at the edge, then gliding slowly to the middle – also when the points rest', async () => {
-  const { calmFollow } = await import('../web/light-geometry.js')
-  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
+test('calmFollow: one pointer, the same size; still inside the middle 80 % and while it trembles; on at the edge; to the middle only after resting', async () => {
+  const { calmFollow, CALM } = await import('../web/light-geometry.js')
+  const opts = { width: 1000, height: 600 }
   const cur = { x: 100, y: 100, w: 400, h: 250 }
   const state = {}
-  assert.deepEqual(calmFollow(state, cur, [{ x: 300, y: 225 }], 16, opts), cur)
-  assert.equal(!!state.centering, false)
-  // near the edge: moved just enough …
-  const pushed = calmFollow(state, cur, [{ x: 480, y: 225 }], 16, opts)
-  assert.ok(pushed.x > 100 && pushed.x + 200 < 470, JSON.stringify(pushed))
-  assert.equal(state.centering, true)
-  // … then on, slowly (no points coming any more), until 480 is its middle
-  let g = pushed
-  for (let i = 0; i < 500; i++) g = calmFollow(state, cur, [], 16, opts)
-  assert.ok(Math.abs(g.x + 200 - 480) < 1 && state.centering === false, JSON.stringify(g))
+  const step = (points, ms = 16) => calmFollow(state, cur, points, ms, opts)
+  // inside the middle 80 % (140..460): still
+  assert.deepEqual(step([{ id: 'a', x: 160, y: 225 }]), cur)
+  assert.deepEqual(step([{ id: 'a', x: 440, y: 130 }]), cur)
+  // past it: moved on (so far that it is a bit inside), the size kept
+  let g = step([{ id: 'a', x: 480, y: 225 }])
+  assert.ok(Math.abs(g.x + 400 * (0.5 + CALM.push / 2) - 480) < 1e-6 && g.w === 400 && g.h === 250, JSON.stringify(g))
+  // trembling there: nothing moves, not even towards the middle – a rest counts from the last real move
+  const pushed = g
+  for (let t = 0; t < CALM.rest - 100; t += 100) g = step([{ id: 'a', x: 480 + (t % 200 ? 2 : -2), y: 226 }], 100)
+  assert.deepEqual(g, pushed, 'still while it rests (not yet long)')
+  // resting long enough: slowly to the middle – a while, not at once
+  g = step([{ id: 'a', x: 480, y: 225 }], 300)
+  assert.ok(g.x > pushed.x && g.x - pushed.x < 20, JSON.stringify(g))
+  for (let i = 0; i < 1000; i++) g = step([], 16)
+  assert.ok(Math.abs(g.x + 200 - 480) < 1 && !state.centering, JSON.stringify(g))
+
+  // a second pointer moving while the first one moves, too: still the first one followed
+  const s2 = {}
+  const cur2 = { x: 300, y: 175, w: 400, h: 250 }
+  let h = calmFollow(s2, cur2, [{ id: 'a', x: 500, y: 300 }], 16, opts)
+  for (let i = 0; i < 5; i++) h = calmFollow(s2, cur2, [{ id: 'a', x: 600 + i * 30, y: 300 }, { id: 'b', x: 50, y: 50 }], 100, opts)
+  assert.equal(s2.lead, 'a')
+  assert.ok(h.x > 300, 'on with a')
+  // the first resting: the other one, moving, taken over
+  for (let i = 0; i < 12; i++) h = calmFollow(s2, cur2, [{ id: 'a', x: 720, y: 300 }, { id: 'b', x: 50 + i * 10, y: 50 + i * 5 }], 100, opts)
+  assert.equal(s2.lead, 'b')
+  assert.equal(h.w, 400, 'never larger or smaller')
 })
