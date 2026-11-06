@@ -25,6 +25,7 @@ export const HOST_ID = 0
 export const HOST_COLOR = '#0ea5e9'
 const MAX_VIEWERS = 12
 const REQUEST_TIMEOUT = 25000
+const LOST_AFTER = 5000 // ms a viewer's connection may be gone before it counts as left
 const ANNOTATIONS = ['ptr', 'ping', 'draw', 'clear', 'hide']
 
 const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -279,8 +280,17 @@ export class LightHost {
         v.connected = true
         v.connectedAt = Date.now()
         this.changed()
+        clearTimeout(v.lost)
+      } else if (pc.connectionState === 'connected') {
+        // (back after a short gap)
+        clearTimeout(v.lost)
       } else if (['failed', 'closed'].includes(pc.connectionState) && this.viewers.get(peer) === v) {
         this.remove(v)
+      } else if (pc.connectionState === 'disconnected' && v.connected) {
+        // gone without a word (the browser closed, the computer asleep, the network away): it does not
+        // answer any more – gone in a few seconds, unless it is back by then
+        clearTimeout(v.lost)
+        v.lost = setTimeout(() => pc.connectionState !== 'connected' && this.remove(v), LOST_AFTER)
       }
     }
     // the picture as slot 0 (the viewer finds the window by the stream id "w<slot>", 0 without)
@@ -288,6 +298,8 @@ export class LightHost {
     preferH264(pc, sender)
     v.dc = pc.createDataChannel('pv', { ordered: true })
     v.dc.onopen = () => this.opened(v)
+    // (closed from the other side – the page closed: at once)
+    v.dc.onclose = () => this.remove(v)
     v.dc.onmessage = (e) => {
       if (typeof e.data !== 'string' || e.data.length > 65536) return
       try {
@@ -308,6 +320,7 @@ export class LightHost {
 
   remove(v) {
     if (this.viewers.get(v.peer) !== v) return
+    clearTimeout(v.lost)
     this.viewers.delete(v.peer)
     try {
       v.pc.close()

@@ -1213,17 +1213,35 @@
     }
     // (while pictures are held – something of ours shown over the window – the last one without it:
     // else the preview would show itself)
-    const capture = () =>
+    // A still picture is never black or empty (a frame not there yet, not painted, a capture that
+    // failed): taken again a few times – else the last good one. While pictures are held (something
+    // of ours shown over the window) the last good one right away: else the preview would show itself.
+    const blackPicture = (image) => {
+      if (!image?.width || !image?.height) return true
+      try {
+        return scaledGray(image, 48, 27).px.every((v) => v < 6)
+      } catch {
+        return false
+      }
+    }
+    const takeOne = () =>
       cropper
-        ? cropper.paused && cleanCapture
-          ? Promise.resolve(cleanCapture)
-          : track()
-              .then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos(), frame: cropper?.snapshot() }))
-              .then((c) => {
-                if (c?.image && cropper && !cropper.paused) cleanCapture = c
-                return c
-              })
+        ? track().then(() => takeCapture({ stream: screenStream, crop: cropper?.rect ?? null, surface: host.surface, videos: sourceVideos(), frame: cropper?.snapshot() }))
         : takeCapture({ stream: host.stream, locator, surface: host.surface, videos: sourceVideos() })
+    async function capture() {
+      if (cropper?.paused && cleanCapture) return cleanCapture
+      for (let tries = 0; ; tries++) {
+        const c = await takeOne()
+        if (!host) return c
+        if (!blackPicture(c?.image)) {
+          if (!cropper?.paused) cleanCapture = c
+          return c
+        }
+        if (tries >= 3) return cleanCapture ?? c
+        await new Promise((done) => setTimeout(done, 120))
+        if (cropper?.paused && cleanCapture) return cleanCapture
+      }
+    }
 
     // a point right away; a stroke when it is finished – with the picture from its start
     function watch(m) {

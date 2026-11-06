@@ -701,6 +701,13 @@ export function mountViewer(el, options) {
   // in a background tab nothing needs to be encoded for us
   const onVisibility = () => wm.reportSizes()
   document.addEventListener('visibilitychange', onVisibility)
+  // the page closed (tab, browser): said right away – the presenter's list would keep us otherwise
+  const onPageHide = () => {
+    if (!pc) return
+    signaling?.send({ type: 'bye', from: peerId })
+    closePeer()
+  }
+  window.addEventListener('pagehide', onPageHide)
 
   q('[data-tile]').addEventListener('click', () => {
     wm.tile()
@@ -1210,6 +1217,7 @@ export function mountViewer(el, options) {
       document.removeEventListener('webkitfullscreenchange', syncFullscreen)
       if (fullscreenElement() === el) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', onPageHide)
       clearTimeout(viewportTimer)
       dockObserver.disconnect()
       cancelAnimationFrame(dockFrame)
