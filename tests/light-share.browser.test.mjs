@@ -203,15 +203,16 @@ test('only the whole screen is taken: a single window or tab picked in the brows
     await evaluate("localStorage.setItem('qaNoPip', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '900')
-    await evaluate("const open = window.open; window.open = (url, ...rest) => (String(url).includes('panel') ? null : open.call(window, url, ...rest)); qaSurfaces.push('window', 'monitor'); document.querySelector('#name').value = 'Patrick'; true")
-    // a window picked in the browser's dialog: not taken – said what to pick, nothing shared
-    // (clicked from here: the small window opens and closes right away, the tool would wait for it)
+    await evaluate("const open = window.open; window.qaOpened = []; window.open = (url, ...rest) => (qaOpened.push(String(url)), String(url).includes('panel') ? null : open.call(window, url, ...rest)); qaSurfaces.push('window', 'monitor'); document.querySelector('#name').value = 'Patrick'; true")
+    // a window picked in the browser's dialog: not taken – said what to pick, here in the tab;
+    // nothing shared, no small window opened at all
     await evaluate("document.querySelector('#start').click(); true")
     await waitFor("!document.querySelector('#start-error').hidden")
     assert.match(await evaluate("document.querySelector('#start-error').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du danach hier aus/)
     assert.equal(await evaluate("document.querySelector('#pick').hidden && document.querySelector('#running').hidden && !pvLight.host && !document.querySelector('#start').disabled"), true)
     await waitFor('1')
-    assert.doesNotMatch(await tabs(), /share-helper/, 'the small window closed again')
+    assert.deepEqual(await evaluate('qaOpened'), [], 'no window opened')
+    assert.doesNotMatch(await tabs(), /share-helper|panel/)
     // the whole screen: the window is picked here
     await browser('click', '#start')
     await tab('t1')
@@ -243,8 +244,14 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
-    // the screen is picked in the tab's click and handed to the small window; the tab stays open
+    // the screen is picked in the tab's click, checked there and handed to the small window; the
+    // tab stays open. (The click spent while the browser asked, as after 5 s: one more,
+    // "Freigabe starten" – the small window not even tried before)
+    await evaluate("Object.defineProperty(navigator, 'userActivation', { value: { isActive: false }, configurable: true }); true")
     await browser('click', '#start')
+    await waitFor("!document.querySelector('#start-ready').hidden && document.querySelector('#start').hidden")
+    assert.doesNotMatch(await browser('tab', 'list'), /panel/)
+    await browser('click', '#start-open')
     await tab('t1')
     await waitFor("!document.querySelector('#elsewhere').hidden")
     assert.match(await evaluate("document.querySelector('#elsewhere').innerText"), /Freigabe läuft[\s\S]*Lass diesen Tab bitte offen/)
