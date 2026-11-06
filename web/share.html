@@ -1321,8 +1321,16 @@
       // the one in front: else it would open behind the others, and only confuse – then a preview in
       // the window "Freigabe läuft", and "Am Fenster zeigen" brings it there
       const front = ownFocus()
+      waiting = null
+      // (Chrome: the helper opens only in a click – one just made in our window in front will do)
+      const clicked = front && !panel && !helperOpen() ? [pip, window].find((w) => focused(w) && activated(w)) : null
+      if (clicked) return jumpHelper(clicked)
+      // (the PeekaView tab in front: the small window comes before it – it is the helper)
+      if (panel && front) showPanel()
       emit({ kind: 'reveal', reveal: lastReveal, jump: front })
       if (pip || (panel && !front)) showSpot(lastReveal)
+      // not at its place: it goes there once a window of ours comes to the front (see jumpByItself)
+      if (!front || !(panel || helperOpen())) waiting = lastReveal
       if (!pip && !front) notify(lastReveal)
     }
 
@@ -1393,6 +1401,9 @@
       }
       win.addEventListener('pagehide', () => pipGone?.())
       win.addEventListener('resize', fitSpot)
+      // (in front: a drawing waiting goes to its place – see jumpByItself)
+      win.addEventListener('focus', () => onOwnFocus(win))
+      win.document.addEventListener('click', (e) => onOwnClick(e, win), true)
       renderAll()
     }
     let pipGone = null
@@ -1604,8 +1615,13 @@
 
     /** The helper over the spot of the last drawing – from a click (notification). */
     let jumps = 0
+    let jumped = { reveal: null, at: 0 }
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
+      waiting = null
+      // (once: a click that also brought the window forward – or a notification's – jumps by itself, too)
+      if (jumped.reveal === lastReveal && performance.now() - jumped.at < 1000) return
+      jumped = { reveal: lastReveal, at: performance.now() }
       // (the preview makes room)
       miniView?.clear()
       endSpot()
@@ -1715,14 +1731,99 @@
     // a window of ours is the one in front (this page – the small window or the tab –, the always-on-top
     // one, the helper)
     function ownFocus() {
-      const has = (w) => {
-        try {
-          return !!w && !w.closed && !w.document.hidden && w.document.hasFocus()
-        } catch {
-          return false
-        }
+      return focused(window) || focused(pip) || focused(helper) || peekaviewWindows().some(focused)
+    }
+    function focused(w) {
+      try {
+        return !!w && !w.closed && !w.document.hidden && w.document.hasFocus()
+      } catch {
+        return false
       }
-      return has(window) || has(pip) || has(helper)
+    }
+    // a click just made in it (Chrome: a window may open only then)
+    function activated(w) {
+      try {
+        return !!w?.navigator.userActivation?.isActive
+      } catch {
+        return false
+      }
+    }
+    const helperOpen = () => !!helper && !helper.closed
+    // the PeekaView tab: the one that opened the small window (in the start page's dialog: that page,
+    // too) – or, in the dialog, the start page around this one
+    function peekaviewWindows() {
+      const list = []
+      const add = (get) => {
+        try {
+          const w = get()
+          if (w && w !== window && !w.closed && !list.includes(w)) list.push(w)
+        } catch {}
+      }
+      if (panel) {
+        add(() => window.opener)
+        add(() => window.opener.top)
+      }
+      add(() => window.top)
+      return list
+    }
+    // the small window in front (the PeekaView tab may focus it: it opened it)
+    function showPanel() {
+      try { window.focus() } catch {}
+      try { window.opener?.pvLightShowPanel?.() } catch {}
+    }
+
+    // ---------------------------------------------------------------- at its place by itself
+    // A drawing that came while none of our windows was in front waits as a preview (and a
+    // notification). Once one of them comes to the front – the window "Freigabe läuft", the
+    // always-on-top one, the PeekaView tab – it goes to its place by itself, while it is fresh.
+    // (Chrome opens the helper only in a click: there it is the click that brings the window
+    // forward, or one on the preview.)
+    const WAIT_FOR = 60000
+    let waiting = null // the drawing not shown at its place yet
+    let focusedAt = -Infinity
+    const waitingFresh = () => !!waiting && waiting === lastReveal && !!host && Date.now() - waiting.at < WAIT_FOR
+    /** At its place now, where it may be without a click: true when it went there. */
+    function jumpByItself(from) {
+      if (!waitingFresh()) return false
+      if (panel) {
+        showPanel()
+        jumpHelper(window)
+        return true
+      }
+      if (helperOpen()) {
+        waiting = null
+        miniView?.clear()
+        endSpot()
+        emit({ kind: 'jump' })
+        return true
+      }
+      if (focused(from) && activated(from)) {
+        jumpHelper(from)
+        return true
+      }
+      return false
+    }
+    function onOwnFocus(from) {
+      focusedAt = performance.now()
+      // (a moment later: in front then)
+      setTimeout(() => jumpByItself(from), 50)
+    }
+    // the click that brought the window forward, or one on the preview (not on a button or so)
+    function onOwnClick(e, from) {
+      if (!waitingFresh() || e.target.closest?.('button, a, input, select, textarea, label, summary')) return
+      if (!e.target.closest?.('#pip-spot') && performance.now() - focusedAt > 1500) return
+      // (nothing else for this click: the window "Freigabe läuft" would grow under it)
+      e.stopPropagation()
+      jumpHelper(from)
+    }
+    window.addEventListener('focus', () => onOwnFocus(window))
+    document.addEventListener('click', (e) => onOwnClick(e, window), true)
+    for (const w of peekaviewWindows()) {
+      try { w.addEventListener('focus', () => onOwnFocus(w)) } catch {}
+    }
+    // (the tab that opened the small window: brings it to the front)
+    window.pvLightShowPanel = () => {
+      try { panelWindow?.focus() } catch {}
     }
 
     /** The result of a search: found (null) or a problem – said only when the window could be seen. */
