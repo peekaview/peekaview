@@ -108,6 +108,8 @@ export class Signaling {
     this.pubkey = hex(schnorr.getPublicKey(this.secretKey))
     this.sockets = new Map()
     this.seen = new Set()
+    // ids of the events we sent (2 minutes – older ones are ignored anyway)
+    this.mine = new Map()
     this.closed = false
     // recent events, re-sent to relays that connect later (nothing is lost while connecting)
     this.recent = []
@@ -146,10 +148,10 @@ export class Signaling {
   }
 
   async receive(event) {
-    // (our own events come back from the relays: their ids are in "seen" since sending)
     if (!event || this.seen.has(event.id)) return
+    // (our own events come back from the relays: never taken for a twin's)
     const twin = event.pubkey === this.pubkey
-    if (twin && !this.onTwin) return
+    if (twin && (!this.onTwin || this.mine.has(event.id))) return
     this.seen.add(event.id)
     if (this.seen.size > 2000) this.seen = new Set([...this.seen].slice(-1000))
     if (Math.abs(Date.now() / 1000 - event.created_at) > 120) return
@@ -180,7 +182,8 @@ export class Signaling {
     const id = await sha256(JSON.stringify([0, this.pubkey, created_at, KIND, tags, content]))
     const event = { id: hex(id), pubkey: this.pubkey, created_at, kind: KIND, tags, content, sig: hex(schnorr.sign(id, this.secretKey)) }
     const frame = JSON.stringify(['EVENT', event])
-    this.seen.add(event.id)
+    for (const [id, at] of this.mine) if (Date.now() - at > 130000) this.mine.delete(id)
+    this.mine.set(event.id, Date.now())
     this.recent = [...this.recent.filter((r) => Date.now() - r.at < 10000), { at: Date.now(), frame }]
     for (const ws of this.sockets.values()) if (ws.readyState === WebSocket.OPEN) ws.send(frame)
   }
