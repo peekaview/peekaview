@@ -200,7 +200,8 @@ export class MiniView {
     const label = `${name} zeigt hier`
     ctx.font = `600 22px ${FONT}`
     const lw = ctx.measureText(label).width
-    box(ctx, 14, 14, lw + 54, 40, 'rgba(24,24,27,.88)')
+    // opaque: nothing of the picture below shows through
+    box(ctx, 14, 14, lw + 54, 40, '#18181b')
     dot(ctx, 36, 34, 7, color)
     text(ctx, label, 52, 42, 22, '#fafafa', 600)
     // could not be placed on the screen: "Zur Stelle" shows it in the middle
