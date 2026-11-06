@@ -40,7 +40,7 @@ test('home gives usable entry points, remembers the choice and requests identity
       const layout=await evaluate("({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,footer:document.querySelector('#footer').getBoundingClientRect().bottom})")
       assert.deepEqual([layout.width,layout.height],[width,Math.max(height,Math.round(layout.footer))],'the home page only scrolls when its content exceeds the viewport')
     }
-    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Impressum','Datenschutz','Sicherheit'])
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Warum machen wir das?','Impressum','Datenschutz','Sicherheit'])
     assert.equal(await evaluate("document.querySelector('#trust').textContent"),'P2P · Ende-zu-Ende verschlüsselt')
     // the legal pages open over the start page, which stays where it is
     await browser('click','#footer a[href="impressum.html"]')

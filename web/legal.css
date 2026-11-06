@@ -31,5 +31,11 @@ body.legal-page main { box-sizing: border-box; width: min(720px, calc(100% - 32p
 .pv-legal-close:hover { background: #3f3f46; }
 .pv-legal-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
 .pv-legal-dialog .pv-legal { overflow-y: auto; padding: 4px 26px 26px; }
+/* the scrollbar in the dialog's colours, not the system's light one */
+.pv-legal-dialog { color-scheme: dark; }
+.pv-legal-dialog .pv-legal { scrollbar-width: thin; scrollbar-color: #3f3f46 #09090b; }
+.pv-legal-dialog .pv-legal::-webkit-scrollbar { width: 10px; }
+.pv-legal-dialog .pv-legal::-webkit-scrollbar-track { background: #09090b; }
+.pv-legal-dialog .pv-legal::-webkit-scrollbar-thumb { border: 2px solid #09090b; border-radius: 999px; background: #3f3f46; }
 .pv-legal-dialog .pv-legal h1 { font-size: 26px; }
 @media (max-width: 520px) { .pv-legal-dialog .pv-legal { padding: 0 16px 20px; } }

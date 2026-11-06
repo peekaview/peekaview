@@ -99,6 +99,7 @@
 .pv-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin: 36px auto 0; padding: 0 16px 32px; font: 500 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .pv-footer a { padding: 6px 2px; color: #a1a1aa; text-decoration: none; }
 .pv-footer a:hover, .pv-footer a[aria-current="page"] { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+.pv-footer-owner { padding: 6px 2px; color: #71717a; }
 .fr-device-choice a { color: #fafafa; font-weight: 600; text-underline-offset: 3px; }
 .fr-or { text-align: center; }
 .fixed-rooms .fr-push { align-self: flex-start; }

@@ -13,6 +13,25 @@
     main { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(500px, calc(100% - 32px)); margin: 7vh auto 0; padding: 26px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 8px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; color: #fafafa; text-decoration: none; }
     .brand i { display: flex; }
+    /* inside the start page's dialog (share.html?embed): the dialog brings its own frame */
+    :root:has(body.embed), body.embed { background: #18181b; }
+    body.embed main { width: 100%; margin: 0; padding: 4px 22px 22px; border: 0; border-radius: 0; box-shadow: none; }
+    body.embed main > .brand, body.embed .pv-footer, body.embed #setup h1 { display: none; }
+    /* the help for the browser's dialog (and Firefox's warning) right in the dialog, below the button */
+    body.embed .screen-help { position: relative; inset: auto; width: auto; max-width: none; box-shadow: none; animation: none;
+      display: grid; grid-template-columns: minmax(0, 1fr) 210px; column-gap: 16px; align-items: start; padding: 12px 14px; }
+    body.embed .screen-help[hidden] { display: none; }
+    body.embed .screen-help-warn { grid-column: 1 / -1; margin-right: 24px; }
+    body.embed .screen-help-title { grid-column: 1; margin-bottom: 6px; }
+    body.embed .screen-help-arrow, body.embed .screen-help-note { display: none; }
+    body.embed .screen-help-steps { grid-column: 1; margin-top: 0; font-size: 12.5px; }
+    body.embed .screen-help-figure { grid-column: 2; grid-row: span 3; }
+    body.embed .screen-help:not([data-kind=firefox]) .screen-help-figure { grid-row: 1 / span 2; }
+    /* while the card says it, the hint below the button need not */
+    body.embed main:has(#screen-help:not([hidden])) #start-hint { display: none; }
+    /* the dialog's title says what this is: tighter, without the first line */
+    body.embed main, body.embed #setup { gap: 14px !important; }
+    body.embed #setup > .lead { display: none; }
     .light-tag { padding: 3px 9px; border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 11.5px; font-weight: 650; }
     h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.015em; }
     .lead { margin: -10px 0 0; color: #a1a1aa; font-size: 15px; }
@@ -29,6 +48,13 @@
     input[type=text]:focus { border-color: #ef4444; }
     input.invalid { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.2); }
     .error { margin: 6px 0 0; color: #fca5a5; font-size: 13px; font-weight: 600; }
+    /* the share did not start: a box that cannot be missed */
+    #start-error { display: flex; gap: 12px; align-items: flex-start; margin: 0; padding: 14px 16px; border: 1px solid rgba(239,68,68,.65); border-radius: 14px; background: rgba(239,68,68,.16); color: #fecaca; font-size: 13.5px; font-weight: 500; line-height: 1.45; box-shadow: 0 0 0 4px rgba(239,68,68,.1); animation: start-error-in .45s ease-out; }
+    #start-error[hidden] { display: none; }
+    #start-error .error-icon { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #ef4444; color: #fff; font-size: 16px; font-weight: 800; }
+    #start-error strong { display: block; margin-bottom: 3px; color: #fff; font-size: 15px; font-weight: 750; }
+    main:has(#start-error:not([hidden])) #start-hint { display: none; }
+    @keyframes start-error-in { 0% { opacity: 0; transform: translateX(0); } 20% { opacity: 1; transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } 100% { transform: none; } }
     .modes-title { margin: 0 0 7px; font-size: 14px; font-weight: 600; }
     .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 12px; background: #09090b; }
     .modes button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 10px 6px; border: 0; border-radius: 9px; background: transparent; color: #a1a1aa; font: 600 13px/1.2 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
@@ -423,14 +449,14 @@
     <section id="in-pip" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
       <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
-      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.</p>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!</p>
     </section>
 
     <!-- the tab, once the share runs in its own small window -->
     <section id="elsewhere" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span>Freigabe läuft</span></div>
       <div class="stay"><span class="stay-icon" data-icon="lock"></span><div><strong>Lass diesen Tab bitte offen.</strong><p>Schließt du ihn, endet die Freigabe.</p></div></div>
-      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“.</p>
+      <p class="lead" style="margin:0">Alles andere machst du im kleinen Fenster „Freigabe läuft“. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!</p>
       <button class="pill" id="elsewhere-show" type="button">Fenster „Freigabe läuft“ zeigen</button>
     </section>
 
@@ -447,7 +473,7 @@
         <pre id="debug" style="margin:0;color:#a1a1aa;font-size:11px;white-space:pre-wrap"></pre>
       </div>
   </main>
-  <footer class="pv-footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
+  <footer class="pv-footer"><a href="warum.html">Warum machen wir das?</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
   <div class="toast" id="toast" role="status" hidden></div>
   <!-- what is shared, for still pictures where the browser has no ImageCapture -->
   <video id="src-video" class="offscreen" muted playsinline autoplay></video>
@@ -505,6 +531,7 @@
     let panelWindow = null
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
+    document.body.classList.toggle('embed', params.has('embed') && window.parent !== window)
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null
@@ -760,12 +787,20 @@
     }
 
     function showStartError(err) {
-      $('start-error').textContent = err?.name === 'NotWholeScreen'
-        ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab). Keine Sorge: Danach kannst du das Teilen trotzdem auf ein einzelnes Fenster beschränken – PeekaView braucht den ganzen Bildschirm nur, um zu erkennen, wo dein Fenster liegt. Klicke noch einmal auf den Knopf.'
+      const [title, text] = err?.name === 'NotWholeScreen'
+        ? ['Bitte „Gesamter Bildschirm“ wählen', 'Nicht ein einzelnes Fenster oder einen Tab. Keine Sorge: Danach kannst du das Teilen trotzdem auf ein einzelnes Fenster beschränken – PeekaView braucht den ganzen Bildschirm nur, um zu erkennen, wo dein Fenster liegt. Klicke noch einmal auf den Knopf.']
         : err?.name === 'NotAllowedError'
-          ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf den Knopf.'
-          : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
-      $('start-error').hidden = false
+          ? ['Nichts zum Teilen ausgewählt', 'Oder der Browser hat es nicht erlaubt. Klicke noch einmal auf den Knopf.']
+          : ['Das Teilen hat nicht geklappt', String(err?.message || err)]
+      const box = $('start-error')
+      box.replaceChildren()
+      const mark = Object.assign(document.createElement('span'), { className: 'error-icon', textContent: '!' })
+      const body = document.createElement('div')
+      body.append(Object.assign(document.createElement('strong'), { textContent: title }), text)
+      box.append(mark, body)
+      // shown again: shake again
+      box.hidden = true; void box.offsetWidth; box.hidden = false
+      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
 
     // (share.html?debug: to the local test server's log)
@@ -1333,7 +1368,7 @@
       if (panel) {
         $('in-pip').querySelector('strong').textContent = 'Lass dieses Fenster bitte offen.'
         $('in-pip').querySelector('.stay p').textContent = 'Schließt du es, endet die Freigabe.'
-        $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen.'
+        $('in-pip').querySelector('.lead').textContent = 'Alles andere machst du im Fenster „Freigabe läuft“ – es liegt immer vorne, über allen Programmen. Am besten minimierst du dieses Fenster, damit es nicht ablenkt!'
       }
       setTimeout(dock, 0)
       // (where the browser put it is known a moment later; it may be moved or made larger)

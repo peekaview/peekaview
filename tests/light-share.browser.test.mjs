@@ -24,9 +24,9 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     await browser('open', base + '/')
     await browser('set', 'viewport', '1280', '900')
     await browser('wait', '#light-offer')
-    assert.match(await evaluate("document.querySelector('#light-offer').textContent"), /einfache Variante, ohne Steuern/)
-    assert.equal(await evaluate("document.querySelector('#light-offer').previousElementSibling.classList.contains('pv-download')"), true, 'below the desktop download')
-    assert.equal(await evaluate("new URL(document.querySelector('#light-offer a').href).pathname"), '/share.html')
+    assert.match(await evaluate("document.querySelector('#light-limits').textContent"), /einfache Variante, ohne Steuern/)
+    assert.equal(await evaluate("!!(document.querySelector('#host-note .pv-download').compareDocumentPosition(document.querySelector('#light-offer')) & Node.DOCUMENT_POSITION_FOLLOWING)"), true, 'below the desktop download')
+    assert.equal(await evaluate("new URL(document.querySelector('#light-offer').href).pathname"), '/share.html')
     // as in Firefox: no Picture-in-Picture window a page can open
     await browser('open', base + '/share.html?browser=firefox')
     await browser('wait', '#start')
