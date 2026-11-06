@@ -40,8 +40,6 @@
     #focus { position: fixed; inset: 0; overflow: hidden; background: #09090b; cursor: crosshair; touch-action: none; }
     #stage, #backdrop { position: absolute; }
     #shot { position: absolute; inset: 0; width: 100%; height: 100%; }
-    /* (a window that cannot jump: the part around the drawing bright, the rest of the picture dimmed) */
-    #dim { position: absolute; border-radius: 4px; box-shadow: 0 0 0 100vmax rgba(9,9,11,.62); pointer-events: none; }
     #focus-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
     #focus-bar > * { pointer-events: auto; }
     .chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; height: 28px; padding: 0 11px; border-radius: 999px; background: rgba(24,24,27,.85); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -68,7 +66,7 @@
 
   <div id="focus" hidden>
     <canvas id="backdrop" hidden></canvas>
-    <div id="stage"><canvas id="shot"></canvas><div id="dim" hidden></div></div>
+    <div id="stage"><canvas id="shot"></canvas></div>
     <div id="focus-bar"><span class="chip" id="focus-who"></span><span class="spacer"></span><button class="icon" id="focus-close" title="Zurück in die Ecke" aria-label="Zurück in die Ecke"></button></div>
     <span class="chip" id="focus-hint">Standbild – du kannst hier auch selbst zeigen und malen.</span>
   </div>
@@ -345,7 +343,7 @@
       // the next stroke in the part shown already: no need to move
       if (stay && layout === 'zoom') {
         zoom = { center, extent }
-        return placeDim()
+        return
       }
       if (stay) return layoutSpot()
       const c = chrome()
@@ -387,7 +385,6 @@
 
     function layoutSpot() {
       layout = 'spot'
-      $('dim').hidden = true
       const c = chrome()
       const content = { left: win.screenX + c.x / 2, top: win.screenY + c.y - c.x / 2, width: win.innerWidth, height: win.innerHeight }
       place(stageInContent(content, shown.picture))
@@ -398,7 +395,6 @@
 
     function layoutWhole() {
       layout = 'whole'
-      $('dim').hidden = true
       place(fit(shown.image, { width: window.innerWidth, height: window.innerHeight }))
       part = { x: 0, y: 0, w: 1, h: 1 }
     }
@@ -423,7 +419,6 @@
       const top = at(H / 2 - my * s, sh, H)
       place({ left, top, width: sw, height: sh })
       part = { x: Math.max(0, -left / sw), y: Math.max(0, -top / sh), w: Math.min(1, W / sw), h: Math.min(1, H / sh) }
-      placeDim()
     }
     /** Pointers moved: the part shown follows (a little each frame), and stays shown meanwhile. */
     function follow() {
@@ -477,12 +472,6 @@
       const x = Math.min(iw - width, Math.max(0, zoom.center.x * iw - width / 2))
       const y = Math.min(ih - height, Math.max(0, zoom.center.y * ih - height / 2))
       return { x, y, width, height }
-    }
-    function placeDim() {
-      const r = zoomRegion()
-      const s = stageBox.width / shown.image.width
-      Object.assign($('dim').style, { left: `${r.x * s}px`, top: `${r.y * s}px`, width: `${r.width * s}px`, height: `${r.height * s}px` })
-      $('dim').hidden = false
     }
 
     window.addEventListener('resize', () => {

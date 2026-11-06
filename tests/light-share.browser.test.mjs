@@ -374,7 +374,7 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
 
     // a small window that cannot be moved (Firefox on a second screen: its numbers counted from that
     // screen's corner): no 1:1 picture under it – that would be its own old picture – but the part
-    // around the drawing, fitted, the rest dimmed; it is never moved
+    // around the drawing, fitted (nothing dimmed); it is never moved
     await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
     await evaluate("for (const [k, v] of Object.entries({ left: screen.width, availLeft: 0 })) Object.defineProperty(screen, k, { value: v, configurable: true }); window.qaMoves = 0; window.qaMoveTo = window.moveTo; window.moveTo = () => qaMoves++; true")
     await tab(V)
@@ -384,9 +384,9 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await browser('mouse', 'up')
     await tab(P)
     await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
-    const zoomed = await evaluate("(()=>{const f=document.querySelector('#spot').contentWindow;const d=f.document;return {layout:f.pvHelper.layout,part:f.pvHelper.part,dim:!d.querySelector('#dim').hidden,backdrop:!d.querySelector('#backdrop').hidden,moves:qaMoves}})()")
+    const zoomed = await evaluate("(()=>{const f=document.querySelector('#spot').contentWindow;const d=f.document;return {layout:f.pvHelper.layout,part:f.pvHelper.part,dim:!!d.querySelector('#dim'),backdrop:!d.querySelector('#backdrop').hidden,moves:qaMoves}})()")
     assert.equal(zoomed.layout, 'zoom', JSON.stringify(zoomed))
-    assert.ok(zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
+    assert.ok(!zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
     assert.ok(zoomed.part.x < 0.25 && 0.25 < zoomed.part.x + zoomed.part.w && zoomed.part.y < 0.72 && 0.72 < zoomed.part.y + zoomed.part.h, `the drawing in the part shown: ${JSON.stringify(zoomed.part)}`)
     // Anna moves her mouse: the part shown follows it softly, her pointer in its middle
     await tab(V)
@@ -438,9 +438,8 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     // (once the small window shows its panel again)
     await waitFor("!document.body.classList.contains('spotting')")
     await waitFor('!pvLight.frames.paused')
-    // (under "Mehr" in the small window)
-    await browser('click', '#more')
-    await browser('click', '#repick')
+    // (in the small window: a link)
+    await browser('click', '#repick-link')
     await waitFor("!document.querySelector('#pick').hidden")
     await browser('click', '#pick-screen')
     await waitFor("!document.querySelector('#running').hidden && pvLight.host.surface === 'monitor'")

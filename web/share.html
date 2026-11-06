@@ -207,14 +207,14 @@
     .run-modes, .run-mode-note { display: none !important; }
     /* (as in the desktop app's toolbar: a segmented switch, the one chosen light) */
     body.panel .run-modes { display: flex !important; gap: 2px; padding: 2px; border-radius: 10px; background: #09090b; }
-    body.panel .run-modes button { flex: 1 1 auto; flex-direction: row; justify-content: center; gap: 5px; height: 28px; padding: 0 7px; border-radius: 8px; color: #a1a1aa; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
+    body.panel .run-modes button { flex: 1 1 auto; flex-direction: row; justify-content: center; gap: 4px; height: 28px; padding: 0 6px; border-radius: 8px; color: #a1a1aa; font-size: 11.5px; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
     body.panel .run-modes button:hover { color: #fafafa; }
     body.panel .run-modes button[aria-pressed="true"] { background: #fafafa; color: #09090b; }
-    body.panel .run-modes button svg { display: none; }
+    body.panel .run-modes button svg { flex: none; width: 14px; height: 14px; }
     body.panel .run-modes button small { display: none; }
     /* "Steuern": plainly only with the desktop app */
     body.panel .run-modes button.unavailable { color: #71717a; }
-    body.panel .run-modes button.unavailable small { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #27272a; color: #d4d4d8; font-size: 10px; font-weight: 650; }
+    body.panel .run-modes button.unavailable small { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #27272a; color: #d4d4d8; font-size: 9.5px; font-weight: 650; }
     /* the buttons as in the desktop app's toolbar: quiet with a fine edge, "Beenden" reddish */
     body.panel .pill { min-height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: #18181b; font-size: 12.5px; transition: background .15s; }
     body.panel .pill:hover:not(:disabled) { background: #27272a; }
@@ -235,9 +235,10 @@
     .stay strong { display: block; font-size: 19px; }
     .stay p { margin: 4px 0 0; color: #d4d4d8; font-size: 15px; }
     /* small windows: the essentials, the rest under "Mehr" */
-    #more { display: none; align-self: center; }
-    body.pip #more, body.panel #more { display: inline; }
-    body.pip #running:not(.more) .extra, body.panel #running:not(.more) .extra { display: none !important; }
+    /* small windows: only the essentials – another window by a link, who watches in the line on top */
+    #repick-link { display: none; align-self: center; }
+    body.pip #repick-link:not([hidden]), body.panel #repick-link:not([hidden]) { display: inline; }
+    body.pip #running .extra, body.panel #running .extra { display: none !important; }
     /* the always-on-top window (Picture-in-Picture): the running controls, compact; a drawing as a
        preview on top – and "Ansehen": as large as it gets, nothing else */
     body.pip { box-sizing: border-box; min-height: 100vh; margin: 0; padding: 14px; overflow-y: auto; background: #18181b; }
@@ -336,8 +337,6 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill extra" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
-      <!-- (Firefox on a second screen, its fingerprinting protection on: its numbers for the screen made up – nothing moves) -->
-      <p class="keep" id="stuck-note" style="margin:0" hidden>Firefox lässt dieses Fenster auf diesem Bildschirm nicht verschieben. Zeichnungen erscheinen deshalb hier im Fenster statt an ihrer Stelle. Teilst du deinen Hauptbildschirm oder nutzt du Chrome, springt das Fenster dorthin.</p>
       <div class="step problem" id="place-problem" role="alert" hidden>
         <span class="step-icon" data-icon="window"></span>
         <div class="step-body">
@@ -383,7 +382,7 @@
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
       <div class="clip-box" id="clip-box" hidden></div>
-      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, anderes Fenster</button>
+      <button class="text-button" id="repick-link" type="button" hidden>Anderes Fenster wählen</button>
       <!-- (small windows: the room between, so that the footer stays at the bottom) -->
       <div class="run-gap" id="run-gap" aria-hidden="true"></div>
       <!-- what is always there, always in the same place -->
@@ -531,14 +530,15 @@
       $('name').classList.remove('invalid')
     })
 
-    function renderModes(box, note) {
+    /** @param compact the footer's switch (small windows): "Steuern" marked "Desktop" */
+    function renderModes(box, note, compact = false) {
       box.replaceChildren(...MODES.map((m) => {
         const b = document.createElement('button')
         b.type = 'button'
         b.dataset.mode = m.id
         b.innerHTML = icon(m.id, 18) + '<span></span><small></small>'
         b.querySelector('span').textContent = m.name
-        b.querySelector('small').textContent = m.note
+        b.querySelector('small').textContent = compact && m.id === 'control' ? 'Desktop' : m.note
         b.setAttribute('aria-pressed', String(mode === m.id))
         if (m.id === 'control') {
           b.classList.add('unavailable')
@@ -1036,9 +1036,8 @@
     function renderAll() {
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
-      renderModes($('footer-modes'), $('footer-mode-note'))
+      renderModes($('footer-modes'), $('footer-mode-note'), true)
       if (!host) return
-      $('stuck-note').hidden = !panel || movesWindows(screen)
       const requests = host.requestList
       const fresh = requests.some((r) => !knownRequests.has(r.peer))
       knownRequests = new Set(requests.map((r) => r.peer))
@@ -1101,11 +1100,15 @@
       $('pip-step').hidden = !(documentPip && host && !pip)
       $('helper').hidden = documentPip && !panel
       if (host) {
-        const watching = host.viewerList.length
+        // (small windows: who watches, by name – there is no list there)
+        const names = host.viewerList.map((v) => v.name)
+        const who = names.length === 0 ? 'noch niemand schaut zu' : names.length === 1 ? `${names[0]} schaut zu` : names.length === 2 ? `${names[0]} und ${names[1]} schauen zu` : `${names[0]}, ${names[1]} und ${names.length - 2} weitere schauen zu`
         $('live-title').textContent = panel || pip
-          ? `Freigabe läuft · ${watching === 0 ? 'noch niemand schaut zu' : watching === 1 ? `${host.viewerList[0].name} schaut zu` : `${watching} schauen zu`}`
+          ? `Freigabe läuft · ${who}`
           : host.surface === 'monitor' ? 'Dein Bildschirm wird geteilt' : host.surface === 'browser' ? 'Dein Tab wird geteilt' : 'Dein Fenster wird geteilt'
+        $('live-title').title = panel || pip ? names.join(', ') : ''
         $('repick').hidden = !cropper
+        $('repick-link').hidden = !cropper
       }
       const open = panel || (!!helper && !helper.closed)
       // (a window cut out here: its place is known – nothing to look for)
@@ -1251,13 +1254,8 @@
     }
     $('pip-open').addEventListener('click', () => openPipWindow())
 
-    // small windows: the rest of the controls on demand
-    $('more').addEventListener('click', () => {
-      const open = $('running').classList.toggle('more')
-      $('more').setAttribute('aria-expanded', String(open))
-      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, anderes Fenster'
-      dock()
-    })
+    // small windows: another window, by a link
+    $('repick-link').addEventListener('click', repick)
 
     function showInPip(r) {
       if (!miniView) {
