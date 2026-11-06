@@ -126,6 +126,10 @@
     .clip-count { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11.5px; line-height: 16px; }
     .clip-box { height: 320px; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
+    /* while sharing: what is always there (link, clipboard, stop) in a footer of its own */
+    .run-gap { display: none; }
+    .run-footer { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
+    .run-footer .keep { margin: -4px 0 0; }
     /* the share's own small window (share.html?panel): everything compact, in the corner */
     body.panel main { width: 100%; margin: 0; padding: 14px 14px 12px; gap: 12px; border: 0; border-radius: 0; box-shadow: none; }
     body.panel .pv-footer, body.panel .lead, body.panel #limits, body.panel #setup .modes-title, body.panel #setup-modes, body.panel #setup-mode-note,
@@ -151,6 +155,23 @@
     body.panel .linkbox { margin: 0; }
     body.panel .linkbox .pill { flex: 1; }
     body.panel .keep { margin: 0; }
+    /* small windows: the footer at the window's bottom, always in the same place – link and
+       clipboard side by side, the rest above it (scrolling when there is more) */
+    body.panel #running { min-height: calc(100vh - 26px); }
+    body.pip #running { min-height: calc(100vh - 28px); }
+    body.panel .run-gap { display: block; flex: 1 0 0; margin-top: -12px; }
+    body.panel .run-footer { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 -14px -12px; padding: 10px 14px 12px; background: #18181b; }
+    body.pip .run-footer { margin: 0 -14px -14px; padding-bottom: 14px; }
+    body.panel .run-footer > * { grid-column: 1 / -1; }
+    body.panel .run-footer > .run-link { grid-column: 1; }
+    body.panel .run-footer > .clip-open { grid-column: 2; }
+    body.panel .run-footer .clip-long { display: none; }
+    body.panel .run-footer .pill { min-height: 36px; padding: 0 10px; }
+    body.panel .run-footer .stop { justify-self: stretch; }
+    body.panel .run-footer .keep { margin: 0; font-size: 12px; }
+    body.panel .toast { bottom: 136px; }
+    /* (scrolled to: never under the footer) */
+    html:has(body.panel), body.pip { scroll-padding-bottom: 150px; }
     .stay { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; background: #27272a; }
     .stay-icon { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fafafa; color: #18181b; }
     .stay strong { display: block; font-size: 19px; }
@@ -174,7 +195,7 @@
     /* someone drew: the window shows the spot instead of its panel */
     #spot { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 10; background: #09090b; }
     body.spotting main { visibility: hidden; }
-    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+    .toast { position: fixed; z-index: 5; pointer-events: none; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: #27272a; border: 1px solid #3f3f46; color: #fafafa; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
   </style>
 </head>
 <body>
@@ -265,10 +286,6 @@
           <div class="step-actions"><button class="pill primary" id="locate" type="button"></button><button class="text-button" id="locate-skip" type="button">Später</button></div>
         </div>
       </div>
-      <div>
-        <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
-        <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
-      </div>
       <div id="requests-box" hidden>
         <p class="section-title">Möchte zusehen</p>
         <div class="requests" id="requests"></div>
@@ -284,12 +301,20 @@
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
-      <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span>Gemeinsame Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
       <div class="clip-box" id="clip-box" hidden></div>
       <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster</button>
-
-      <button class="pill stop" id="stop" type="button"></button>
-      <p class="keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+      <!-- (small windows: the room between, so that the footer stays at the bottom) -->
+      <div class="run-gap" id="run-gap" aria-hidden="true"></div>
+      <!-- what is always there, always in the same place -->
+      <footer class="run-footer" id="run-footer">
+        <div class="run-link">
+          <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
+          <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
+        </div>
+        <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span><span class="clip-long">Gemeinsame </span>Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
+        <button class="pill stop" id="stop" type="button"></button>
+        <p class="keep" id="run-keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
+      </footer>
     </section>
 
     <!-- the tab, while the controls are in the always-on-top window (Chrome, Edge) -->
@@ -407,7 +432,7 @@
       $('name').parentElement.hidden = !!$('name').value.trim()
       $('panel-close').hidden = false
       $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
-      document.querySelector('#running .keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
+      $('run-keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
       // what was picked in the tab's click, handed over (else the button below asks here)
       let handed = null
       try { handed = window.opener?.pvLightPicking ?? null } catch {}
@@ -745,7 +770,7 @@
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
-      let height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
+      let height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(naturalHeight(document.querySelector('main'))) + cy)
       const area = usableArea(screen)
       // (not to be moved – Firefox on a second screen: its top stays where it opened; down to the
       // bottom of the screen all the same, never floating above it)
@@ -754,6 +779,11 @@
       const top = Math.round(area.top + area.height - height - 16)
       const moved = movesWindows(screen) && (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2)
       if (moved || Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) placeWindow(window, { left, top, width, height })
+    }
+    // how tall it is by its content (small windows: without the room kept between it and the footer)
+    function naturalHeight(el) {
+      const gap = $('run-gap')
+      return el.scrollHeight - (el.contains(gap) ? gap.offsetHeight : 0)
     }
     function roomy() {
       if (!panel || (window.outerWidth >= PICKER_ROOM.width && window.outerHeight >= PICKER_ROOM.height)) return
@@ -875,7 +905,7 @@
       shareStyles(box.ownerDocument)
       clipPanel.setItems(clipItems())
       clipPanel.focus()
-      if (pip && win === pip && !pipLarge) resizePip(pip, { width: PIP_SMALL.width, height: Math.min(720, Math.ceil(pip.document.body.scrollHeight) + 8) })
+      if (pip && win === pip && !pipLarge) resizePip(pip, { width: PIP_SMALL.width, height: Math.min(720, Math.ceil(naturalHeight(pip.document.body)) + 8) })
       dock()
     }
     function closeClip() {
@@ -1171,7 +1201,7 @@
     $('pip-small').addEventListener('click', async () => {
       miniView?.clear()
       endSpot()
-      const height = Math.min(600, Math.max(200, Math.ceil($('running').scrollHeight) + 28))
+      const height = Math.min(600, Math.max(200, Math.ceil(naturalHeight($('running'))) + 28))
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })

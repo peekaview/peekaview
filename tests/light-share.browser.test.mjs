@@ -295,6 +295,8 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await browser('tab', 'new', `${base}/?name=Anna#${room}`)
     await tab(P)
     await browser('wait', '#requests [data-allow]')
+    // (the headless browser keeps the small window at its first size: the request scrolled up, clear of the footer)
+    await evaluate("document.querySelector('#requests [data-allow]').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#requests [data-allow]')
     // asked once: notifications (a fake one here – the browser's own asks the user)
     await waitFor("!document.querySelector('#notify-step').hidden")
@@ -510,7 +512,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
       await waitFor("!document.querySelector('#pip-spot').hidden && document.body.classList.contains('pip-spotting')")
     }
     await stroke(0.3, 0.5)
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('#link-label').parentElement).display"), 'none', 'the controls make room')
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
     // Anna moves her mouse: the preview follows it softly, her pointer in its middle (within the picture)
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.45)))
