@@ -1,7 +1,7 @@
 // Serves web/ for "Bildschirmfreigabe light" tests and previews, isolated from the outside:
 //   - Nostr relays are replaced by a BroadcastChannel between the tabs of one browser – with the
 //     same identity rules (presenter messages only from the room key, the presenter only takes
-//     "from" = signing key)
+//     "from" = signing key; the same key in another tab is a "twin", as after a hand-over)
 //   - getDisplayMedia returns animated canvases: a fake "whole screen" or a fake window on it
 //   - no TURN request leaves the page
 //   - share.html?browser=firefox: as in Firefox, no Picture-in-Picture window a page can open
@@ -19,13 +19,14 @@ import { fileURLToPath } from 'node:url'
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '../web')
 
 const fakeRelay = `
-Signaling.open = async ({ hostKey = null, secretKey, strictFrom = false, onMessage }) => {
+Signaling.open = async ({ hostKey = null, secretKey, strictFrom = false, onMessage, onTwin = null }) => {
   const key = secretKey ?? schnorr.utils.randomSecretKey()
   const pubkey = hex(schnorr.getPublicKey(key))
   const channel = new BroadcastChannel('pv-fake-relay')
   window.qaRelay ??= { sent: [] }
   channel.onmessage = ({ data }) => {
-    if (data.pubkey === pubkey) return
+    // (signed with our key in another tab: the stand-in for PeekaView Desktop after a hand-over)
+    if (data.pubkey === pubkey) return onTwin?.(structuredClone(data.msg))
     const msg = data.msg
     if (hostKey && msg.from === 'host' && data.pubkey !== hostKey) return
     if (strictFrom && msg.from !== data.pubkey) return

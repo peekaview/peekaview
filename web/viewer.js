@@ -240,6 +240,9 @@ export function mountViewer(el, options) {
   // the room has a PIN: {salt, rounds, nonce} of the latest challenge
   let pinChallenge = null
   let busy = false
+  // the share moves from the presenter's browser to PeekaView Desktop: its offer comes by itself
+  let moving = false
+  let movingTimer
   // who we are on the signaling channel: the public half of our signing key – the presenter only
   // takes messages from us signed by it (the offer comes addressed to it); kept for this tab and
   // room, so a reload does not have to be let in again
@@ -316,6 +319,7 @@ export function mountViewer(el, options) {
     }
     if (m.type !== 'offer') return
     offered = true
+    moving = false
     admission = false
     busy = false
     pinChallenge = null
@@ -533,6 +537,15 @@ export function mountViewer(el, options) {
         wm.handle(m)
         break
       case 'end':
+        // (from the browser to PeekaView Desktop: same room, same link – nothing to do here)
+        if (m.next === 'desktop') {
+          moving = true
+          clearTimeout(movingTimer)
+          movingTimer = setTimeout(() => {
+            moving = false
+            update()
+          }, 30000)
+        }
         lost()
         return
       case 'clip':
@@ -720,6 +733,8 @@ export function mountViewer(el, options) {
           : !me
             ? offered
               ? 'connecting'
+              : moving
+                ? 'moving'
               : admission
                 ? 'admission'
                 : busy
@@ -741,6 +756,7 @@ export function mountViewer(el, options) {
       blocked: 'Die Verbindung kommt gerade nicht zustande – PeekaView versucht es weiter … Teilt jemand von einem Mac, muss PeekaView dort das lokale Netzwerk nutzen dürfen (Systemeinstellungen → Datenschutz & Sicherheit → Lokales Netzwerk).',
       error,
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
+      moving: 'Die Freigabe wechselt in PeekaView Desktop – gleich geht es weiter …',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
       busy: 'Gerade nicht verfügbar – auf diesem Computer läuft schon eine andere Freigabe.',
       pick: 'Fernzugriff: Starte oben in der Leiste ein Programm oder den ganzen Desktop.',
@@ -1200,6 +1216,7 @@ export function mountViewer(el, options) {
       voice.setEnabled(false)
       clearTimeout(helloTimer)
       clearTimeout(blockTimer)
+      clearTimeout(movingTimer)
       if (pc) signaling?.send({ type: 'bye', from: peerId })
       closePeer()
       signaling?.close()

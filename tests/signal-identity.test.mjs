@@ -20,3 +20,30 @@ test('the viewer id is the key that signs its events and survives a reload', asy
   assert.equal(event.pubkey, signaling.pubkey)
   signaling.close()
 })
+
+// Hand-over to PeekaView Desktop: the app presents with the browser's key. The browser hears it as
+// a "twin" (signed with its own key, not sent by itself) – never its own events coming back.
+test('another holder of the presenter key is heard as a twin, our own echo is not', async () => {
+  const key = schnorr.utils.randomSecretKey()
+  const twins = []
+  const browser = await Signaling.open({ secret: 'handover-test-room-1', relays: [], secretKey: key, onMessage() {}, onTwin: (m) => twins.push(m) })
+  const desktop = await Signaling.open({ secret: 'handover-test-room-1', relays: [], secretKey: key, onMessage() {} })
+  const event = async (signaling, msg) => {
+    await signaling.send(msg)
+    return JSON.parse(signaling.recent.at(-1).frame)[1]
+  }
+  // our own beacon, back from a relay: nothing
+  await browser.receive(await event(browser, { type: 'host', from: 'host' }))
+  assert.deepEqual(twins, [])
+  // the app's beacon: a twin
+  await browser.receive(await event(desktop, { type: 'host' }))
+  assert.deepEqual(twins, [{ type: 'host' }])
+  // with our key but not signed by it: nothing
+  const forged = await event(desktop, { type: 'host', forged: true })
+  await browser.receive({ ...forged, sig: '00'.repeat(64) })
+  assert.equal(twins.length, 1)
+  // without onTwin (viewers, older pages) the own key is simply ignored
+  const viewer = await Signaling.open({ secret: 'handover-test-room-1', relays: [], secretKey: key, onMessage: () => assert.fail('own key') })
+  await viewer.receive(await event(desktop, { type: 'host' }))
+  for (const s of [browser, desktop, viewer]) s.close()
+})

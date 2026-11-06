@@ -333,14 +333,23 @@ async function start() {
       name,
       sources: selected,
       room: invite?.room || kept.room || null,
-      signingKey: kept.key || null,
+      signingKey: invite?.signingKey || kept.key || null,
       color: invite?.color ?? null,
       relays: invite?.relays ?? settings.relays ?? [],
       ice: invite?.ice ?? null,
       turnUrls: settings.turn_urls ?? [],
       turnSecret: settings.turn_secret || null,
       fixedCall,
+      // a share continued from the browser: who was let in there, what they may
+      admitted: invite?.admitted ?? null,
+      mode: invite?.mode ?? null,
     })
+    // (taken over: its key is the running share's now, not one for the next share)
+    if (invite?.handover) {
+      invite = null
+      $('invite').hidden = true
+      saveUi()
+    }
     if (keep) {
       store.set('pv-keep-room', hosted.secret)
       store.set('pv-keep-key', hosted.signingKey)
@@ -378,6 +387,8 @@ async function switchSource() {
 }
 
 // ------------------------------------------------------------------ invitations (peekaview://share?…)
+// … and a share from the browser to go on with here (peekaview://continue?…): the same room and
+// link, the viewers let in there stay let in; the browser tab steps down once this share is live
 
 function applyInvite(data) {
   invite = data
@@ -386,9 +397,15 @@ function applyInvite(data) {
   $('invite').hidden = !invite
   if (!invite) return
   if (invite.name) $('name').value = invite.name
-  $('invite-room').textContent = 'Einladung zu einer Bildschirmfreigabe'
-  // always show where the viewers will watch
-  $('invite-server').textContent = 'Zuschauer-Website: peekaview.de'
+  if (invite.handover) {
+    const n = invite.admitted?.length ?? 0
+    $('invite-room').textContent = 'Freigabe aus dem Browser weiterführen'
+    $('invite-server').textContent = `${n === 1 ? 'Dein Zuschauer wechselt' : n ? `Deine ${n} Zuschauer wechseln` : 'Wer zusieht, wechselt'} von selbst mit – mit demselben Link. Danach kannst du in der Leiste „Steuern“ erlauben.`
+  } else {
+    $('invite-room').textContent = 'Einladung zu einer Bildschirmfreigabe'
+    // always show where the viewers will watch
+    $('invite-server').textContent = 'Zuschauer-Website: peekaview.de'
+  }
   loadSources()
 }
 

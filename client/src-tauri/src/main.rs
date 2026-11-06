@@ -67,8 +67,14 @@ async fn start_share(
     turn_secret: Option<String>,
     signing_key: Option<String>,
     fixed_call: Option<String>,
+    // a share continued from the browser (peekaview://continue): who was let in there, and
+    // what they were allowed (only "view" or "draw" – remote control is switched on here)
+    admitted: Option<Vec<String>>,
+    mode: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let room = room.filter(|r| !r.trim().is_empty());
+    let admitted: Vec<String> = admitted.unwrap_or_default().into_iter().filter(|p| p.len() == 64 && p.bytes().all(|b| b.is_ascii_hexdigit())).take(12).collect();
+    let mode = mode.as_deref().and_then(session::Mode::parse).filter(|m| *m != session::Mode::Control);
     let clean = |l: Option<Vec<String>>| l.unwrap_or_default().into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
     let opts = session::StartOptions {
         site,
@@ -81,11 +87,15 @@ async fn start_share(
         turn_urls: clean(turn_urls),
         turn_secret: turn_secret.filter(|s| !s.is_empty()),
         signing_key: signing_key.filter(|k| !k.is_empty()),
-        admitted: vec![],
+        admitted,
         remote: None,
         fixed_call,
     };
-    let hosted = session::start(app.clone(), opts).await.inspect_err(|e| log(&format!("start_share: {e}")))?;
+    let mut hosted = session::start(app.clone(), opts).await.inspect_err(|e| log(&format!("start_share: {e}")))?;
+    if let Some(mode) = mode {
+        session::set_mode(&app, mode);
+        hosted["mode"] = serde_json::json!(mode.as_str());
+    }
     // the link is ready to paste right away (the toolbar says so)
     if let Some(link) = hosted["link"].as_str() {
         if clip::os::write(Some(link.to_string()), None, None, &[]).is_ok() {

@@ -12,6 +12,10 @@
 // Viewers only accept presenter messages carrying a valid signature of exactly that key – so
 // somebody who merely knows the room secret cannot pose as the presenter.
 //
+// Hand-over: the presenter key may be handed to PeekaView Desktop, which then presents in the same
+// room (a browser share continued there). The browser hears it as a "twin": signed with its own
+// key, but not sent by itself (onTwin) – and steps down.
+//
 // The other way round, a viewer *is* its key: its id on the channel ("from") is its public key,
 // and the presenter only takes messages signed by the key they name. Somebody else who knows the
 // link cannot speak for a viewer who was let in.
@@ -82,13 +86,15 @@ export class Signaling {
    *   hostKey: the presenter's public key (hex); when given, presenter messages must be signed by it
    *   secretKey: our own signing key (see viewerKey); a throw-away one without
    *   strictFrom: as presenter – only take messages whose "from" is the key that signed them
+   *   onTwin: messages signed with our own key that we did not send (another holder of the key)
    */
-  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, secretKey, strictFrom = false, onMessage }) {
+  static async open({ secret, hostKey = null, relays = DEFAULT_RELAYS, secretKey, strictFrom = false, onMessage, onTwin = null }) {
     const topic = hex(await sha256(`peekaview/topic/v1:${secret}`))
     const key = await crypto.subtle.importKey('raw', await sha256(`peekaview/key/v1:${secret}`), 'AES-GCM', false, ['encrypt', 'decrypt'])
     const signaling = new Signaling(topic, key, relays, onMessage, secretKey)
     signaling.hostKey = hostKey
     signaling.strictFrom = strictFrom
+    signaling.onTwin = onTwin
     signaling.connectAll()
     return signaling
   }
@@ -102,6 +108,8 @@ export class Signaling {
     this.pubkey = hex(schnorr.getPublicKey(this.secretKey))
     this.sockets = new Map()
     this.seen = new Set()
+    // ids of the events we sent (2 minutes – older ones are ignored anyway)
+    this.mine = new Map()
     this.closed = false
     // recent events, re-sent to relays that connect later (nothing is lost while connecting)
     this.recent = []
@@ -140,7 +148,10 @@ export class Signaling {
   }
 
   async receive(event) {
-    if (!event || this.seen.has(event.id) || event.pubkey === this.pubkey) return
+    if (!event || this.seen.has(event.id)) return
+    // (our own events come back from the relays: never taken for a twin's)
+    const twin = event.pubkey === this.pubkey
+    if (twin && (!this.onTwin || this.mine.has(event.id))) return
     this.seen.add(event.id)
     if (this.seen.size > 2000) this.seen = new Set([...this.seen].slice(-1000))
     if (Math.abs(Date.now() / 1000 - event.created_at) > 120) return
@@ -148,6 +159,10 @@ export class Signaling {
       const raw = unb64(event.content)
       const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, this.key, raw.slice(12))
       const msg = JSON.parse(dec.decode(plain))
+      if (twin) {
+        if (await verifyEvent(event)) this.onTwin(msg)
+        return
+      }
       // presenter messages only from the pinned presenter key
       if (this.hostKey && msg.from === 'host' && !(event.pubkey === this.hostKey && (await verifyEvent(event)))) return
       // (the presenter) only from whom it says it is from
@@ -167,6 +182,8 @@ export class Signaling {
     const id = await sha256(JSON.stringify([0, this.pubkey, created_at, KIND, tags, content]))
     const event = { id: hex(id), pubkey: this.pubkey, created_at, kind: KIND, tags, content, sig: hex(schnorr.sign(id, this.secretKey)) }
     const frame = JSON.stringify(['EVENT', event])
+    for (const [id, at] of this.mine) if (Date.now() - at > 130000) this.mine.delete(id)
+    this.mine.set(event.id, Date.now())
     this.recent = [...this.recent.filter((r) => Date.now() - r.at < 10000), { at: Date.now(), frame }]
     for (const ws of this.sockets.values()) if (ws.readyState === WebSocket.OPEN) ws.send(frame)
   }

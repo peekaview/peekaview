@@ -12,8 +12,15 @@
 // What a browser cannot do, this host does not offer: no remote control (browsers cannot inject
 // input), no recording, a single source. The state says `light: true`, so viewers can explain
 // that instead of offering "Steuern"; `clipboard: true`: the shared clipboard is there.
+//
+// On to PeekaView Desktop (for "Steuern"): handoverLink() opens the app with this room's secret,
+// the presenter key and who was let in. The app presents in the same room with the same key – the
+// link stays the same, nobody is asked again. As soon as it is live (its presence beacon, signed
+// with our key but not sent by us – Signaling's onTwin), this share steps down: every viewer gets
+// `{t: 'end', next: 'desktop'}` and says hello again, which the app answers with its own offer.
+// The shared clipboard lives in this tab: it is emptied (the app starts its own).
 
-import { Signaling, newRoomSecret } from './signal.js'
+import { Signaling, newRoomSecret, hex } from './signal.js'
 import { schnorr } from './vendor/noble-schnorr.js'
 import { LightClip } from './light-clip.js'
 
@@ -37,8 +44,10 @@ export class LightHost {
    *          surface?: () => string|undefined, size?: () => {width, height}, sources?: MediaStreamTrack[]}} options
    *   surface, size: what is shared and how large, when `stream` is made from another picture (a
    *   window cut out of the whole screen); sources: tracks behind it, stopped with the share
+   *   room: continue a room another host started – {secret, secretKey, admitted} (what the desktop
+   *   app gets from handoverLink(); the tests' stand-in for the app)
    */
-  constructor({ stream, name, mode = 'draw', relays, site = new URL('./', location.href).href, turnService = TURN_SERVICE, onChange, onAnnotation, onEnded, surface, size, sources = [] }) {
+  constructor({ stream, name, mode = 'draw', relays, site = new URL('./', location.href).href, turnService = TURN_SERVICE, onChange, onAnnotation, onEnded, surface, size, sources = [], room = null }) {
     this.stream = stream
     this.track = stream.getVideoTracks()[0]
     this.name = cleanName(name)
@@ -52,8 +61,8 @@ export class LightHost {
     this.surfaceOf = surface
     this.sizeOf = size
     this.sources = sources
-    this.secret = newRoomSecret()
-    this.secretKey = schnorr.utils.randomSecretKey()
+    this.secret = room?.secret ?? newRoomSecret()
+    this.secretKey = room?.secretKey ?? schnorr.utils.randomSecretKey()
     this.room = `${this.secret}.${b64url(schnorr.getPublicKey(this.secretKey))}`
     this.link = `${this.site.replace(/#.*$/, '')}#${this.room}`
     this.viewers = new Map() // peer key -> viewer
@@ -66,7 +75,9 @@ export class LightHost {
     })
     this.onClip = null
     this.requests = new Map() // peer key -> {peer, name, color, seen}
-    this.admitted = new Set()
+    this.admitted = new Set(room?.admitted ?? [])
+    // handoverLink() was opened: PeekaView Desktop may take over
+    this.handingOver = false
     this.denied = new Set()
     this.nextId = 1
     this.ice = [{ urls: STUN }]
@@ -99,7 +110,7 @@ export class LightHost {
 
   async start() {
     this.fetchTurn()
-    this.signaling = await Signaling.open({ secret: this.secret, relays: this.relays, secretKey: this.secretKey, strictFrom: true, onMessage: (m) => this.signal(m) })
+    this.signaling = await Signaling.open({ secret: this.secret, relays: this.relays, secretKey: this.secretKey, strictFrom: true, onMessage: (m) => this.signal(m), onTwin: (m) => this.twin(m) })
     // presence beacon: viewers waiting for this room say hello right away
     const beacon = () => this.signaling.send({ type: 'host', from: 'host' })
     beacon()
@@ -129,23 +140,47 @@ export class LightHost {
     }
   }
 
-  stop(why) {
+  /**
+   * @param {string} [why] what the presenter's page says
+   * @param {{moved?: boolean}} [how] moved: PeekaView Desktop goes on in this room – viewers wait
+   *   for its offer (and the room is not said goodbye to)
+   */
+  stop(why, { moved = false } = {}) {
     if (this.stopped) return
     this.stopped = true
     for (const t of this.timers) clearInterval(t)
     for (const v of this.viewers.values()) {
-      this.send(v, { t: 'end' })
+      this.send(v, moved ? { t: 'end', next: 'desktop' } : { t: 'end' })
       setTimeout(() => v.pc.close(), 200)
     }
     this.viewers.clear()
     this.requests.clear()
     this.clip.clear()
-    this.signaling?.send({ type: 'bye', from: 'host' })
+    if (!moved) this.signaling?.send({ type: 'bye', from: 'host' })
     setTimeout(() => this.signaling?.close(), 300)
     for (const t of [this.track, ...this.sources]) t.removeEventListener('ended', this.onTrackEnded)
     for (const t of [...this.stream.getTracks(), ...this.sources]) t.stop()
     this.onChange()
-    this.onEnded(why)
+    this.onEnded(why, { moved })
+  }
+
+  // ------------------------------------------------------------ on to PeekaView Desktop
+
+  /**
+   * `peekaview://continue?…` – opens PeekaView Desktop to go on with this share: the room, its
+   * presenter key (hex) and the viewers let in. Only for the presenter's own computer: whoever has
+   * the key can present in this room.
+   */
+  handoverLink() {
+    this.handingOver = true
+    const q = new URLSearchParams({ room: this.secret, key: hex(this.secretKey), admitted: [...this.admitted].join(','), name: this.name, mode: this.mode })
+    return `peekaview://continue?${q}`
+  }
+
+  // a message signed with our key, not sent by us: PeekaView Desktop, live in this room
+  twin(m) {
+    if (this.stopped || !this.handingOver || m?.type !== 'host') return
+    this.stop('Die Freigabe läuft jetzt in PeekaView Desktop weiter.', { moved: true })
   }
 
   // ------------------------------------------------------------ for the UI
