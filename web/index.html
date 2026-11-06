@@ -357,6 +357,8 @@
     const MAX = 10
     $('logo').innerHTML = owl(32)
     $('top-logo').innerHTML = owl(34)
+    // the same on every tab (what holds for calls over contacts: sicherheit.html)
+    $('trust').innerHTML = icon('lock', 12) + '<span class="p2p">P2P · </span><span class="long">Ende-zu-Ende </span>verschlüsselt'
     $('contacts-close').innerHTML = icon('close',18)
     $('contacts-close').addEventListener('click',()=>$('contacts-dialog').close())
     $('contacts-dialog').addEventListener('close',()=>{
@@ -405,8 +407,7 @@
       $('fixed-room-entry').hidden=homeView!=='contacts'
       $('host-note').hidden=inApp || homeView==='contacts' || !!linkRoom
       for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
-      // calls over contacts get their keys from the contacts server: not end-to-end in the strict sense
-      $('trust').innerHTML=icon('lock',12)+'<span class="p2p">P2P · </span>'+(homeView==='contacts'?'':'<span class="long">Ende-zu-Ende </span>')+'verschlüsselt'
+
     }
     for(const button of document.querySelectorAll('[data-home]')){
       button.innerHTML=icon(button.dataset.home==='link'?'link':'users',16)+button.textContent
