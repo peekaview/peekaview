@@ -120,6 +120,11 @@
     .text-button:hover { color: #fafafa; }
     .offscreen { position: fixed; left: -10000px; top: 0; width: 400px; }
     .stop { align-self: center; }
+    /* the shared clipboard (clipboard.js ClipPanel, filling its box) */
+    .clip-open { align-self: stretch; }
+    .clip-open[aria-expanded="true"] { background: #52525b; }
+    .clip-count { min-width: 20px; padding: 2px 6px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11.5px; line-height: 16px; }
+    .clip-box { height: 320px; }
     .keep { margin: -8px 0 0; color: #71717a; font-size: 12.5px; text-align: center; }
     /* the share's own small window (share.html?panel): everything compact, in the corner */
     body.panel main { width: 100%; margin: 0; padding: 14px 14px 12px; gap: 12px; border: 0; border-radius: 0; box-shadow: none; }
@@ -271,6 +276,8 @@
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span>Gemeinsame Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
+      <div class="clip-box" id="clip-box" hidden></div>
       <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster</button>
 
       <button class="pill stop" id="stop" type="button"></button>
@@ -320,7 +327,7 @@
     //     active app: a browser window in the background cannot come to the front by itself (a
     //     click on a notification can bring it, where they are allowed).
     // The helper reaches this page through window.parent / window.opener .pvLight.
-    import { LightHost, TURN_SERVICE } from './light-host.js'
+    import { HOST_COLOR, LightHost, TURN_SERVICE } from './light-host.js'
     import { cropCanvas, frameCanvas, takeCapture } from './light-capture.js'
     import { cropSupported, makeCropper } from './light-crop.js'
     import { scaledGray } from './light-locate.js'
@@ -332,6 +339,7 @@
     import { documentPip, openPip, resizePip } from './light-pip.js'
     import { MiniView } from './light-mini.js'
     import { showScreenHelp } from './light-help.js'
+    import { ClipPanel, browserCopyable, filesFromClipboard, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
 
@@ -608,6 +616,7 @@
       })
       await host.start()
       window.pvLight.host = host
+      host.onClip = renderClip
       $('src-video').srcObject = stream
       // where the browser lets a page bring a window forward
       try { helper?.focus() } catch {}
@@ -626,6 +635,8 @@
 
     function ended(why) {
       host = null
+      closeClip()
+      renderClip()
       cropper = null
       screenStream = null
       windowLost = false
@@ -737,6 +748,93 @@
       return el
     }
     let knownRequests = new Set()
+
+    // ---------------------------------------------------------------- the shared clipboard
+    // As in the desktop app: files, pictures, text put in by anybody, copied or saved by everybody
+    // else. Held in this tab (light-clip.js) until the share ends.
+    let clipPanel = null
+    const clipItems = () => host?.clip.all().map((it) => ({ ...host.clip.meta(it), preview: it.preview })) ?? []
+    // where the panel is (the window "Freigabe läuft" may be a Picture-in-Picture one)
+    const clipWindow = () => $('clip-box').ownerDocument.defaultView ?? window
+    function renderClip() {
+      const n = host?.clip.all().length ?? 0
+      $('clip-count').hidden = !n
+      $('clip-count').textContent = String(n)
+      clipPanel?.setItems(clipItems())
+    }
+    function clipNotice(err) {
+      clipPanel?.toast(String(err?.message ?? err), { error: true })
+    }
+    function clipAdd(files) {
+      for (const f of files) host?.clip.addFile(f).catch(clipNotice)
+    }
+    function openClip() {
+      if (!host) return
+      if (clipPanel) return clipPanel.focus()
+      const box = $('clip-box')
+      box.hidden = false
+      $('clip-open').setAttribute('aria-expanded', 'true')
+      const win = clipWindow()
+      clipPanel = new ClipPanel(box, {
+        fill: true,
+        peer: (id) => (id === 0 ? { name: `${host.name} (du)`, color: HOST_COLOR } : host.viewerList.find((v) => v.id === id) ?? {}),
+        mine: () => true,
+        canCopy: browserCopyable,
+        onClose: closeClip,
+        actions: {
+          add: clipAdd,
+          addFromPaste: (data) => clipAdd(filesFromClipboard(data)),
+          paste: () =>
+            readSystemClipboard()
+              .then((list) => (list.length ? clipAdd(list) : clipNotice('Die Zwischenablage ist leer.')))
+              .catch(() => clipNotice(`Bitte hier ${/Mac/.test(navigator.platform) ? '⌘V' : 'Strg+V'} drücken.`)),
+          copy: (item) => {
+            const blob = host?.clip.blobOf(item.id)
+            if (!blob) return clipNotice('Nicht mehr vorhanden.')
+            const image = item.mime.startsWith('image/')
+            const data = image ? asPng(blob) : Promise.resolve(new Blob([blob], { type: 'text/plain' }))
+            // (the window clicked in writes: the always-on-top one, if the panel is there)
+            const w = clipWindow()
+            w.navigator.clipboard
+              .write([new w.ClipboardItem({ [image ? 'image/png' : 'text/plain']: data })])
+              .then(() => clipPanel?.toast('In die Zwischenablage kopiert'))
+              .catch(() => clipNotice('Kopieren nicht möglich – bitte speichern.'))
+          },
+          save: (item) => {
+            const blob = host?.clip.blobOf(item.id)
+            if (blob) saveBlob(blob, item.name)
+            else clipNotice('Nicht mehr vorhanden.')
+          },
+          remove: (item) => host?.clip.remove(item.id, 0),
+        },
+      })
+      shareStyles(box.ownerDocument)
+      clipPanel.setItems(clipItems())
+      clipPanel.focus()
+      if (pip && win === pip && !pipLarge) resizePip(pip, { width: PIP_SMALL.width, height: Math.min(720, Math.ceil(pip.document.body.scrollHeight) + 8) })
+      dock()
+    }
+    function closeClip() {
+      clipPanel?.destroy()
+      clipPanel = null
+      $('clip-box').hidden = true
+      $('clip-open').setAttribute('aria-expanded', 'false')
+      dock()
+    }
+    $('clip-open').addEventListener('click', () => (clipPanel ? closeClip() : openClip()))
+    // styles made by scripts (adopted sheets) in another document too: the always-on-top window
+    function shareStyles(doc) {
+      if (doc === document) return
+      for (const sheet of document.adoptedStyleSheets ?? []) {
+        const text = [...sheet.cssRules].map((r) => r.cssText).join('\n')
+        const key = String(text.length) + text.slice(0, 40)
+        if ([...doc.querySelectorAll('style[data-shared]')].some((st) => st.dataset.shared === key)) continue
+        const style = doc.createElement('style')
+        style.dataset.shared = key
+        style.textContent = text
+        doc.head.append(style)
+      }
+    }
 
     function renderAll() {
       renderModes($('setup-modes'), $('setup-mode-note'))
@@ -909,6 +1007,7 @@
       const running = $('running')
       const toastBox = $('toast')
       win.document.body.classList.add('panel', 'pip')
+      shareStyles(win.document)
       win.document.body.append(running, toastBox)
       $('in-pip').hidden = false
       // (the small window itself: it stays, small – the always-on-top one belongs to it)
@@ -1453,21 +1552,18 @@
     let tracking = null
     let fixedPart = false // a part drawn by hand: not followed
     // a drawing shown over the screen (the helper at its spot, the window "Freigabe läuft" large): it
-    // may lie over the shared window – not looked for meanwhile, and a moment after
+    // may lie over the shared window – followed where it is found, but not missed meanwhile (and a
+    // moment after): no blurred picture, no "not in its place"
     let overlayUntil = 0
     const overlaid = () => spotting || cropper?.paused || pipLarge || performance.now() < overlayUntil
     function track() {
       if (!host || !cropper?.rect || picker || fixedPart) return Promise.resolve()
-      if (overlaid()) {
-        trackMisses = 0
-        return Promise.resolve()
-      }
       return (tracking ??= followWindow().catch((err) => console.warn('peekaview light: follow', err)).finally(() => (tracking = null)))
     }
     async function followWindow() {
       const full = await frameCanvas(screenStream, sourceVideos())
       const r = cropper?.rect
-      if (!full || !r || picker || overlaid()) return
+      if (!full || !r || picker) return
       const grab = grabberOf(full)
       const scale = full.width / screen.width
       const before = trackImage ?? cropCanvas(full, r)
@@ -1490,6 +1586,10 @@
       const front = inFront()
       if (found && front && found.by === 'frame' && found.how !== 'same') found = null
       trackInfo = { how: found?.how ?? 'nicht gefunden', by: found?.by ?? null, score: found ? +found.score.toFixed(3) : null, ms: Math.round(performance.now() - t0), vorne: front, titel: !!trackTitle, titeltexte: titleTexts }
+      if (!found && overlaid()) {
+        trackMisses = 0
+        return
+      }
       if (!found) {
         findByTitle(full, scale)
         if (!cropper.blank) {

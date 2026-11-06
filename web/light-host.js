@@ -5,15 +5,17 @@
 //   - Nostr signaling, AES-256-GCM with the room secret, the presenter signs with the room key
 //     from the link ("#secret.key"); viewers are their keys (only "from" = signing key counts)
 //   - every viewer has to be let in ("Zulassen" / "Ablehnen")
-//   - one WebRTC connection per viewer: the picture of getDisplayMedia as slot 0 and the "pv"
-//     data channel (welcome, state, participants, pointers, drawings)
+//   - one WebRTC connection per viewer: the picture of getDisplayMedia as slot 0, the "pv"
+//     data channel (welcome, state, participants, pointers, drawings) and "pvfile" (the shared
+//     clipboard's files, light-clip.js)
 //
 // What a browser cannot do, this host does not offer: no remote control (browsers cannot inject
-// input), no shared clipboard, no recording, a single source. The state says `light: true`, so
-// viewers can explain that instead of offering "Steuern".
+// input), no recording, a single source. The state says `light: true`, so viewers can explain
+// that instead of offering "Steuern"; `clipboard: true`: the shared clipboard is there.
 
 import { Signaling, newRoomSecret } from './signal.js'
 import { schnorr } from './vendor/noble-schnorr.js'
+import { LightClip } from './light-clip.js'
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899']
 const STUN = ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478']
@@ -55,6 +57,14 @@ export class LightHost {
     this.room = `${this.secret}.${b64url(schnorr.getPublicKey(this.secretKey))}`
     this.link = `${this.site.replace(/#.*$/, '')}#${this.room}`
     this.viewers = new Map() // peer key -> viewer
+    // the shared clipboard (onChange: the presenter's page shows it anew)
+    this.clip = new LightClip({
+      broadcast: (m) => this.broadcast(m),
+      send: (v, m) => this.send(v, m),
+      viewers: () => [...this.viewers.values()].filter((v) => v.dc?.readyState === 'open'),
+      onChange: () => this.onClip?.(),
+    })
+    this.onClip = null
     this.requests = new Map() // peer key -> {peer, name, color, seen}
     this.admitted = new Set()
     this.denied = new Set()
@@ -129,6 +139,7 @@ export class LightHost {
     }
     this.viewers.clear()
     this.requests.clear()
+    this.clip.clear()
     this.signaling?.send({ type: 'bye', from: 'host' })
     setTimeout(() => this.signaling?.close(), 300)
     for (const t of [this.track, ...this.sources]) t.removeEventListener('ended', this.onTrackEnded)
@@ -283,6 +294,8 @@ export class LightHost {
         this.message(v, JSON.parse(e.data))
       } catch {}
     }
+    // the shared clipboard's files
+    this.clip.attach(v, pc.createDataChannel('pvfile', { ordered: true }))
     try {
       await pc.setLocalDescription(await pc.createOffer())
       limitSender(sender)
@@ -309,6 +322,7 @@ export class LightHost {
   opened(v) {
     this.send(v, { t: 'welcome', id: v.id, name: v.name, color: v.color, ice: this.ice })
     this.send(v, this.state())
+    this.clip.welcome(v)
     this.announcePeers()
     this.changed()
   }
@@ -350,8 +364,9 @@ export class LightHost {
     return {
       t: 'state',
       mode: this.mode,
-      // shared from a browser: no remote control, clipboard, recording, voice
+      // shared from a browser: no remote control, recording, voice – the shared clipboard, yes
       light: true,
+      clipboard: true,
       windows: [{ w: 0, kind: screen ? 'screen' : 'window', title, app: title, pw: w, ph: h, paused: false, reachable: true, z: 0, rect }],
       screens: [rect],
       kind: screen ? 'screen' : 'window',
@@ -381,6 +396,10 @@ export class LightHost {
         if (this.mode === 'view') return
         this.broadcast(m, v)
         this.onAnnotation(m)
+        return
+      // a viewer removes its own item from the shared clipboard
+      case 'clip-del':
+        this.clip.remove(String(m.id), v.id)
         return
       case 'level':
         this.broadcast({ ...m, v: Math.min(1, Math.max(0, Number(m.v) || 0)) }, v)

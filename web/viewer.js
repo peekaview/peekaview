@@ -788,8 +788,8 @@ export function mountViewer(el, options) {
     q('.pv-tools-sep').hidden = !allowed.length || !me
     q('[data-voice]').hidden = !voiceEnabled || state.voice_enabled !== true || !me
     const clipButton = q('[data-clip]')
-    // (a browser share has no shared clipboard)
-    clipButton.hidden = !me || !hostPresent || lightShare
+    // (a browser share has a shared clipboard only from newer pages: `clipboard: true`)
+    clipButton.hidden = !me || !hostPresent || (lightShare && state.clipboard !== true)
     if (clipItems.length) clipButton.dataset.count = String(clipItems.length)
     else delete clipButton.dataset.count
     clipButton.classList.toggle('open', !!clipPanel)

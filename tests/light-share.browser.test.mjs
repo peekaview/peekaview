@@ -73,12 +73,35 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     await browser('click', '#requests [data-allow]')
     await waitFor("document.querySelector('#viewers').innerText.includes('Anna')")
 
-    // the viewer sees the picture; remote control is shown as not possible, no clipboard
+    // the viewer sees the picture; remote control is shown as not possible
     await tab('t3')
     await waitFor("document.querySelector('video')?.videoWidth > 0")
     assert.equal(await evaluate("document.querySelector('.pv-notice').hidden"), true)
     assert.equal(await evaluate("[...document.querySelectorAll('.pv-dock [data-tool]')].filter(b=>!b.hidden).map(b=>b.dataset.tool+(b.classList.contains('unavailable')?'!':'')).join()"), 'point,draw,control!')
-    assert.equal(await evaluate("document.querySelector('[data-clip]').hidden"), true)
+
+    // the shared clipboard, as with the desktop app: the presenter puts a text in, the viewer sees it
+    // and gets its bytes; the viewer pastes one, the presenter has it
+    assert.equal(await evaluate("document.querySelector('[data-clip]').hidden"), false, 'the clipboard is offered')
+    await tab('t1')
+    await browser('click', '#clip-open')
+    await waitFor("!!document.querySelector('#clip-box .pv-clip')")
+    await evaluate("pvLight.host.clip.addFile(new File(['Hallo von Patrick'], 'Notiz.txt', { type: 'text/plain' })); true")
+    await waitFor("document.querySelector('#clip-count').textContent === '1' && document.querySelector('#clip-box').innerText.includes('Notiz.txt')")
+    await tab('t3')
+    await waitFor("document.querySelector('[data-clip]').dataset.count === '1'")
+    await browser('click', '[data-clip]')
+    await waitFor("document.querySelector('.pv-clip')?.innerText.includes('Notiz.txt')")
+    const paste = "(() => { const d = new DataTransfer(); d.setData('text/plain', 'Hallo von Anna'); document.querySelector('.pv-clip').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true })); return true })()"
+    await evaluate(paste)
+    await waitFor("document.querySelector('[data-clip]').dataset.count === '2'")
+    await tab('t1')
+    await waitFor("document.querySelector('#clip-count').textContent === '2'")
+    const items = await evaluate("Promise.all(pvLight.host.clip.all().map(async (it) => [it.name, it.from, await it.blob.text()]))")
+    assert.deepEqual(items.map((i) => i[2]).sort(), ['Hallo von Anna', 'Hallo von Patrick'])
+    assert.ok(items.some((i) => i[1] !== 0), 'one is the viewer\'s')
+    await browser('click', '#clip-open')
+    await tab('t3')
+    await browser('click', '[data-clip]')
     assert.match(await evaluate("document.querySelector('.pv-toast span').textContent"), /im Browser.*Steuern nicht/)
     await browser('click', '.pv-dock [data-tool=control]')
     assert.match(await evaluate("document.querySelector('.pv-toast span').textContent"), /PeekaView Desktop/)
