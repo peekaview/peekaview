@@ -22,7 +22,16 @@
     #contacts-content { min-height: 0; overflow-y: auto; padding: 20px; }
     #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(560px, calc(100% - 32px)); margin: 9vh auto 0; padding: 28px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
-    .brand { flex-wrap: wrap; row-gap: 8px; }
+    /* the trust badge always top right (next to the profile, when signed in); shorter on phones */
+    .brand #trust { margin-left: auto; }
+    .brand .fr-profile-slot { margin-left: 0; }
+    .brand { min-width: 0; }
+    @media (max-width: 440px) {
+      .pv-trust .long { display: none; }
+      /* signed in: the profile beside it, the badge down to the lock and "verschlüsselt" */
+      .brand:has(#profile:not([hidden])) .pv-trust .p2p { display: none; }
+    }
+    @media (max-width: 360px) { #home { padding: 20px; } .brand { gap: 8px; } }
     .brand i { display: flex; color: #fafafa; }
     .pv-trust { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; background: rgba(34,197,94,.12); color: #86efac; font-size: 11.5px; font-weight: 650; letter-spacing: 0; text-decoration: none; white-space: nowrap; }
     .pv-trust:hover { background: rgba(34,197,94,.2); }
@@ -50,7 +59,8 @@
     #paste-open { padding:14px 18px;border:0;border-radius:10px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
     #link-error { margin:8px 0 0;color:#fca5a5;font-size:12px; }
     #recent-links { display:flex;flex-direction:column;gap:10px; }
-    #new-link { margin-top: 0; }
+    #new-link { margin-top: 0; text-decoration: none; }
+    #new-link span { color: #e4e4e7; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
     #start label { display: block; color: #a1a1aa; font-size: 12px; }
     #start input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
     #start input:focus { border-color: #ef4444; }
@@ -96,11 +106,12 @@
     #host-note { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 18px; border-top: 1px solid #27272a; text-align: center; }
     .host-title { margin: 0; color: #a1a1aa; font-size: 13px; }
     .host-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-    #host-note .pv-download, .light-button { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: #09090b; color: #fafafa; font-size: 13.5px; font-weight: 650; text-decoration: none; }
-    .light-button:hover { border-color: rgba(255,255,255,.25); background: #18181b; }
-    .light-button:focus-visible { outline: 2px solid #fafafa; outline-offset: 3px; }
+    #host-note .pv-download { display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border: 0; border-radius: 10px; background: #3f3f46; color: #fafafa; font-size: 14px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+    #host-note .pv-download:hover { background: #52525b; }
     #host-note svg { width: 16px; height: 16px; }
     .host-limits { margin: 0; color: #71717a; font-size: 12.5px; }
+    .host-limits a { color: #d4d4d8; font-weight: 600; text-underline-offset: 3px; }
+    .host-limits a:hover { color: #fafafa; }
     /* a known name: one quiet line with a pencil instead of the field */
     .name-show { display: flex; align-items: center; gap: 6px; margin: 0; color: #a1a1aa; font-size: 13px; }
     .name-show strong { color: #fafafa; font-weight: 650; }
@@ -128,7 +139,7 @@
     </div>
     <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span></div>
     <ul class="rooms" id="rooms"></ul>
-    <button class="other-link" id="new-link" type="button">Neuen Link einfügen</button></div>
+    <button class="other-link" id="new-link" type="button">Du hast einen neuen Link bekommen? <span>Hier einfügen</span></button></div>
     <div id="name-box" hidden>
       <p class="name-show" id="name-show" hidden>Du schaust zu als <strong id="name-current"></strong><button id="name-edit" type="button" aria-label="Namen ändern" title="Namen ändern"></button></p>
       <div id="name-field">
@@ -175,15 +186,14 @@
       const title = Object.assign(document.createElement('p'), { className: 'host-title', textContent: 'Selbst den Bildschirm zeigen?' })
       const actions = Object.assign(document.createElement('div'), { className: 'host-actions' })
       const download = Object.assign(document.createElement('a'), { className: 'pv-download', href: 'download.html', target: '_blank', rel: 'noopener' })
-      download.innerHTML = icon('download', 16) + 'PeekaView Desktop'
+      download.innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen'
       actions.append(download)
       $('host-note').append(title, actions)
       // sharing from the browser: only where browsers can (not on phones), and only as the second choice
       if (navigator.mediaDevices?.getDisplayMedia) {
-        const light = Object.assign(document.createElement('a'), { className: 'light-button', id: 'light-offer', href: 'share.html' })
-        light.innerHTML = icon('screen', 16) + 'Im Browser teilen'
-        actions.append(light)
-        $('host-note').append(Object.assign(document.createElement('p'), { className: 'host-limits', id: 'light-limits', textContent: 'Im Browser die einfache Variante, ohne Steuern – alles andere kann PeekaView Desktop.' }))
+        const limits = Object.assign(document.createElement('p'), { className: 'host-limits', id: 'light-limits' })
+        limits.innerHTML = 'Ohne Installation <a id="light-offer" href="share.html">im Browser teilen</a> – die einfache Variante, ohne Steuern.'
+        $('host-note').append(limits)
       }
     }
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
@@ -245,7 +255,7 @@
       $('host-note').hidden=inApp || homeView==='contacts' || !!linkRoom
       for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
       // calls over contacts get their keys from the contacts server: not end-to-end in the strict sense
-      $('trust').innerHTML=icon('lock',12)+(homeView==='contacts'?'P2P · verschlüsselt':'P2P · Ende-zu-Ende verschlüsselt')
+      $('trust').innerHTML=icon('lock',12)+'<span class="p2p">P2P · </span>'+(homeView==='contacts'?'':'<span class="long">Ende-zu-Ende </span>')+'verschlüsselt'
     }
     for(const button of document.querySelectorAll('[data-home]')){
       button.innerHTML=icon(button.dataset.home==='link'?'link':'users',16)+button.textContent
@@ -253,6 +263,7 @@
         homeView=button.dataset.home
         try{localStorage.setItem('pv-start-view',homeView)}catch{}
         showHome()
+        focusLinkField()
       })
     }
     function openPastedLink(){
@@ -277,6 +288,11 @@
     $('share-url').addEventListener('paste',()=>setTimeout(()=>{if(/^\s*https?:/i.test($('share-url').value))openPastedLink()}))
     $('other-link').addEventListener('click',()=>{location.hash=''})
     let pasteOpen=false,nameEdit=false
+    // no remembered rooms: the link field is the one thing to do – the cursor already in it
+    // (not on touch screens, where it would pop up the keyboard unasked)
+    function focusLinkField(){
+      if(homeView==='link' && !linkRoom && !load().length && !matchMedia('(pointer: coarse)').matches)$('share-url').focus()
+    }
     $('name-edit').innerHTML=icon('draw',15)
     $('name-edit').addEventListener('click',()=>{nameEdit=true;render();$('name').focus();$('name').select()})
     $('new-link').addEventListener('click',()=>{pasteOpen=true;render();$('share-url').focus()})
@@ -400,7 +416,7 @@
             ? 'Prüfe, ob der Raum online ist …'
             : st?.online
               ? ''
-              : 'Gerade offline – nach dem Klick wartet PeekaView bis zu 30 Sekunden.'
+              : ''
     }
 
     // ---------------------------------------------------------------- online check
@@ -533,7 +549,7 @@
       if (!room) {
         linkRoom='';selected=load()[0]?.room || ''
         if(viewer)leave()
-        render();return
+        render();focusLinkField();return
       }
       if (room === joined) return
       homeView='link'
@@ -611,6 +627,7 @@
     else {
       probeAll()
       if (linkRoom && !$('name').value) $('name').focus()
+      focusLinkField()
       if (linkRoom && !inApp) openInApp(linkRoom, false)
     }
   </script>
