@@ -2,8 +2,10 @@
 // läuft" (a Picture-in-Picture document window, light-pip.js): that spot of the still picture,
 // enlarged, with the stroke drawn again, plus a small map of the whole screen marking where that
 // is. Then back to rest – unless it is kept (shown large, until made smaller). While viewers move
-// their mice, the part shown follows them right away: one pointer in its middle, several within it
-// (it grows to hold them all). A pointer at rest fades out and is no longer followed.
+// their mice, the part shown follows them calmly: it stays put while they move in its inner part,
+// moves on, softly and just enough, when one comes near its edge, and then glides slowly on until it
+// is in its middle; it grows to hold several. A pointer at rest fades out and is no longer followed.
+import { calmFollow } from './light-geometry.js'
 //
 // It renders from a worker's clock: the share page sits in a background tab, where browsers slow
 // down timers and stop requestAnimationFrame.
@@ -12,9 +14,8 @@ const W = 640
 const H = 400
 const SHOW = 6500 // ms a spot stays
 const DRAW = 1000 // ms to draw a stroke again
-const FOLLOW = 45 // ms: how softly the part shown follows the pointers (just enough not to jitter)
+const FOLLOW = 160 // ms: how softly the part shown moves on
 const IDLE = 2000 // ms: a pointer not moved this long fades out, no longer followed
-const MARGIN = 90 // image pixels around the pointers
 const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 
 export class MiniView {
@@ -135,7 +136,7 @@ export class MiniView {
   render() {
     const { ctx } = this
     // (kept: drawn on while pointers move or fade)
-    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW) && !(this.keep && this.pointers.size)) {
+    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW) && !(this.keep && (this.pointers.size || this.spot.follow?.centering))) {
       if (this.keep) {
         // (kept: the stroke stays drawn – the clock may stop)
         this.spot.at = performance.now() - DRAW - 600
@@ -285,36 +286,21 @@ export class MiniView {
 }
 
 /**
- * The part shown, a step nearer to holding the pointers (within the picture): one in its middle,
- * several within it – larger when they lie further apart, never smaller than at first.
+ * The part shown, a step on towards holding the pointers in its inner part (keepInView: it moves only
+ * when one comes near its edge) – larger for several far apart, never smaller than at first.
  */
 function follow(spot, pointers) {
   const now = performance.now()
   const dt = now - (spot.followed ?? now)
   spot.followed = now
-  if (!pointers.length) return
   const img = spot.capture.image
   const c = spot.crop
   spot.base ??= { w: c.w, h: c.h }
-  const t = span(img, pointers, spot.base)
+  spot.follow ??= {}
+  const points = pointers.map((p) => ({ x: p.x * img.width, y: p.y * img.height }))
+  const t = calmFollow(spot.follow, c, points, dt, { minW: spot.base.w, minH: spot.base.h, width: img.width, height: img.height, aspect: W / H })
   const k = 1 - Math.exp(-dt / FOLLOW)
   spot.crop = { x: c.x + (t.x - c.x) * k, y: c.y + (t.y - c.y) * k, w: c.w + (t.w - c.w) * k, h: c.h + (t.h - c.h) * k }
-}
-
-/** The part (image pixels, in the window's shape) holding all pointers, with a margin. */
-export function span(img, pointers, base) {
-  const xs = pointers.map((p) => p.x * img.width)
-  const ys = pointers.map((p) => p.y * img.height)
-  const x0 = Math.min(...xs)
-  const x1 = Math.max(...xs)
-  const y0 = Math.min(...ys)
-  const y1 = Math.max(...ys)
-  let w = Math.max(base.w, x1 - x0 + 2 * MARGIN, ((y1 - y0 + 2 * MARGIN) * W) / H)
-  w = Math.min(w, img.width, (img.height * W) / H)
-  const h = (w * H) / W
-  const cx = (x0 + x1) / 2
-  const cy = (y0 + y1) / 2
-  return { x: Math.max(0, Math.min(img.width - w, cx - w / 2)), y: Math.max(0, Math.min(img.height - h, cy - h / 2)), w, h }
 }
 
 // a mouse pointer, as viewers see it

@@ -88,3 +88,39 @@ test('placeWindow: moved and sized – on Firefox\'s second screen only sized, w
   placeWindow(fake(second, 4500, 600), { left: 3000, top: 200, width: 1100, height: 1200 })
   assert.deepEqual(calls.splice(0), [['size', 612, 832]])
 })
+
+test('keepInView: still while the points lie inside, on just enough when one nears the edge, larger for several, within the picture', async () => {
+  const { keepInView } = await import('../web/light-geometry.js')
+  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
+  const cur = { x: 100, y: 100, w: 400, h: 250 }
+  // inside the middle 65 %: unchanged
+  assert.deepEqual(keepInView(cur, [{ x: 300, y: 225 }, { x: 380, y: 270 }], opts), cur)
+  // past the right edge of the inner part (100 + 400 * .825 = 430): moved so it lies on that edge
+  const moved = keepInView(cur, [{ x: 480, y: 225 }], opts)
+  assert.deepEqual([moved.w, moved.h, moved.y], [400, 250, 100])
+  assert.ok(Math.abs(moved.x + 400 * 0.825 - 480) < 1e-9, JSON.stringify(moved))
+  // two far apart: larger, both inside, the shape kept
+  const both = keepInView(cur, [{ x: 100, y: 100 }, { x: 800, y: 500 }], opts)
+  assert.ok(both.w > 700 && Math.abs(both.w / both.h - 1.6) < 1e-9 && both.x <= 100 && both.x + both.w >= 800, JSON.stringify(both))
+  assert.ok(both.w <= 1000 && both.h <= 600 && both.x >= 0 && both.y >= 0)
+  // at the picture's edge: within it
+  const edge = keepInView(cur, [{ x: 999, y: 599 }], opts)
+  assert.deepEqual(edge, { x: 600, y: 350, w: 400, h: 250 })
+})
+
+test('calmFollow: still inside; moved on at the edge, then gliding slowly to the middle – also when the points rest', async () => {
+  const { calmFollow } = await import('../web/light-geometry.js')
+  const opts = { minW: 400, minH: 250, width: 1000, height: 600, aspect: 400 / 250 }
+  const cur = { x: 100, y: 100, w: 400, h: 250 }
+  const state = {}
+  assert.deepEqual(calmFollow(state, cur, [{ x: 300, y: 225 }], 16, opts), cur)
+  assert.equal(!!state.centering, false)
+  // near the edge: moved just enough …
+  const pushed = calmFollow(state, cur, [{ x: 480, y: 225 }], 16, opts)
+  assert.ok(pushed.x > 100 && pushed.x + 200 < 470, JSON.stringify(pushed))
+  assert.equal(state.centering, true)
+  // … then on, slowly (no points coming any more), until 480 is its middle
+  let g = pushed
+  for (let i = 0; i < 500; i++) g = calmFollow(state, cur, [], 16, opts)
+  assert.ok(Math.abs(g.x + 200 - 480) < 1 && state.centering === false, JSON.stringify(g))
+})
