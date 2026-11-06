@@ -72,7 +72,6 @@
     #start label { display: block; color: #a1a1aa; font-size: 12px; }
     #start input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
     #start input:focus { border-color: #ef4444; }
-    .rooms-title { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: -10px; color: #a1a1aa; font-size: 12px; }
     .rooms { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
     .room { position: relative; display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.07); cursor: pointer; transition: border-color .15s, background .15s; }
     .room:hover { border-color: rgba(255,255,255,.18); }
@@ -216,7 +215,7 @@
       </label>
       <p id="link-error" role="alert" hidden></p>
     </div>
-    <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span></div>
+    <div id="recent-links" hidden>
     <ul class="rooms" id="rooms"></ul>
     <button class="other-link" id="new-link" type="button">Du hast einen neuen Link bekommen? <span>Hier einfügen</span></button></div>
     <div id="name-box" hidden>
