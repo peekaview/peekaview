@@ -68,10 +68,12 @@ const safeColor = (c) => (/^#[0-9a-f]{6}$/i.test(c) ? c : '#888888')
 
 export class Annotations {
   /** @param {{voice?: boolean}} [options] voice: show the voice state in labels (off when the host app has its own audio) */
-  constructor(root, { voice = true } = {}) {
+  /** @param idle ms until a resting cursor fades out */
+  constructor(root, { voice = true, idle = IDLE } = {}) {
     injectStyle('pv-annotate-style', CSS)
     this.root = root
     this.voice = voice
+    this.idle = idle
     this.levels = new Map()
     this.peers = new Map()
     this.cursors = new Map()
@@ -175,7 +177,7 @@ export class Annotations {
     el.style.top = `${clamp(y) * 100}%`
     el.classList.remove('idle')
     clearTimeout(el.idleTimer)
-    el.idleTimer = setTimeout(() => el.classList.add('idle'), IDLE)
+    el.idleTimer = setTimeout(() => el.classList.add('idle'), this.idle)
   }
 
   paintCursor(id, el) {

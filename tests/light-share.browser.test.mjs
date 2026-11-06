@@ -513,12 +513,14 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     }
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
-    // Anna moves her mouse: the preview follows it softly, her pointer in its middle (within the picture)
+    // Anna moves her mouse: the preview follows it right away, her pointer in its middle (within the picture)
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.45)))
     await tab(P)
-    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointer)return false;const want=(v,size,max)=>Math.max(0,Math.min(max-size,v*max-size/2));return Math.abs(p.crop.x-want(p.pointer[0],p.crop.w,p.image.width))<2&&Math.abs(p.crop.y-want(p.pointer[1],p.crop.h,p.image.height))<2})()")
-    assert.ok(Math.abs((await evaluate('pvLight.preview.pointer'))[0] - 0.6) < 0.05)
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const want=(v,size,max)=>Math.max(0,Math.min(max-size,v*max-size/2));return Math.abs(p.crop.x-want(x,p.crop.w,p.image.width))<2&&Math.abs(p.crop.y-want(y,p.crop.h,p.image.height))<2})()")
+    assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.6) < 0.05)
+    // … and when it rests, its pointer goes (no longer followed)
+    await waitFor('pvLight.preview && pvLight.preview.pointers.length === 0')
 
     // "Am Fenster zeigen": the drawing over the very spot, in a window of its own that closes again;
     // the controls back

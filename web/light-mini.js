@@ -1,8 +1,9 @@
 // What somebody points at or drew, drawn on a canvas – in the always-on-top window "Freigabe
 // läuft" (a Picture-in-Picture document window, light-pip.js): that spot of the still picture,
 // enlarged, with the stroke drawn again, plus a small map of the whole screen marking where that
-// is. Then back to rest – unless it is kept (shown large, until made smaller). While the one who
-// drew moves the mouse, the part shown follows it softly, the pointer in its middle.
+// is. Then back to rest – unless it is kept (shown large, until made smaller). While viewers move
+// their mice, the part shown follows them right away: one pointer in its middle, several within it
+// (it grows to hold them all). A pointer at rest fades out and is no longer followed.
 //
 // It renders from a worker's clock: the share page sits in a background tab, where browsers slow
 // down timers and stop requestAnimationFrame.
@@ -11,7 +12,9 @@ const W = 640
 const H = 400
 const SHOW = 6500 // ms a spot stays
 const DRAW = 1000 // ms to draw a stroke again
-const FOLLOW = 140 // ms: how softly the part shown follows the pointer
+const FOLLOW = 45 // ms: how softly the part shown follows the pointers (just enough not to jitter)
+const IDLE = 2000 // ms: a pointer not moved this long fades out, no longer followed
+const MARGIN = 90 // image pixels around the pointers
 const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 
 export class MiniView {
@@ -24,6 +27,7 @@ export class MiniView {
     this.requestsOnCanvas = requestsOnCanvas
     this.state = { viewers: [], requests: [], busy: [], problem: '' }
     this.spot = null
+    this.pointers = new Map() // viewer id -> {x, y (0..1 of the picture), color, at}
     this.ticker = null
     this.k = 1 // pixels per unit of the 640 × 400 layout (sharp when shown large)
     this.keep = false // the spot stays (shown large)
@@ -75,16 +79,35 @@ export class MiniView {
     return !!this.spot
   }
 
-  /** The pointer of somebody (0..1 of the picture): the one shown is followed, in the middle. */
-  pointer(from, x, y) {
-    const spot = this.spot
-    if (!spot || spot.from !== from || !Number.isFinite(x) || !Number.isFinite(y)) return
-    if (x < 0 || x > 1 || y < 0 || y > 1) return
-    spot.pointer = [x, y]
+  /** A viewer's pointer moved (0..1 of the picture): while something is shown, it is followed. */
+  pointer(from, x, y, color = '#ef4444') {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) return
     const now = performance.now()
+    this.pointers.set(from, { x, y, color, at: now })
+    const spot = this.spot
+    if (!spot) return
     // (still shown while it moves: as just drawn)
     if (now - spot.at > DRAW) spot.at = now - DRAW
     this.start()
+  }
+
+  /** A viewer's pointer left the picture (or the viewer left). */
+  hidePointer(from) {
+    this.pointers.delete(from)
+  }
+
+  /** The pointers moved lately: [x, y, color, alpha]. */
+  activePointers(now = performance.now()) {
+    const list = []
+    for (const [id, p] of this.pointers) {
+      const age = now - p.at
+      if (age > IDLE) {
+        this.pointers.delete(id)
+        continue
+      }
+      list.push({ ...p, alpha: age < IDLE - 400 ? 1 : (IDLE - age) / 400 })
+    }
+    return list
   }
 
   start() {
@@ -111,7 +134,8 @@ export class MiniView {
 
   render() {
     const { ctx } = this
-    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW)) {
+    // (kept: drawn on while pointers move or fade)
+    if (this.spot && performance.now() - this.spot.at > (this.keep ? DRAW + 1500 : SHOW) && !(this.keep && this.pointers.size)) {
       if (this.keep) {
         // (kept: the stroke stays drawn – the clock may stop)
         this.spot.at = performance.now() - DRAW - 600
@@ -176,7 +200,8 @@ export class MiniView {
 
   renderSpot() {
     const { ctx, spot } = this
-    follow(spot)
+    const pointers = this.activePointers()
+    follow(spot, pointers)
     const { capture, crop: c, points, color, name, ping } = spot
     const t = performance.now() - spot.at
     const img = capture.image
@@ -210,17 +235,11 @@ export class MiniView {
       ctx.stroke()
       ctx.shadowBlur = 0
     }
-    // the pointer, followed
-    if (spot.pointer) {
-      const [x, y] = map(spot.pointer)
-      ctx.globalAlpha = fade
-      ctx.fillStyle = color
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
-      ctx.beginPath()
-      ctx.arc(x, y, 9, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.stroke()
+    // the pointers, followed (fading out at rest)
+    for (const p of pointers) {
+      const [x, y] = map([p.x, p.y])
+      ctx.globalAlpha = fade * p.alpha
+      arrow(ctx, x, y, p.color)
     }
     ctx.globalAlpha = 1
     // who
@@ -264,18 +283,62 @@ export class MiniView {
   }
 }
 
-/** The part shown, a step nearer to the pointer in its middle (within the picture). */
-function follow(spot) {
+/**
+ * The part shown, a step nearer to holding the pointers (within the picture): one in its middle,
+ * several within it – larger when they lie further apart, never smaller than at first.
+ */
+function follow(spot, pointers) {
   const now = performance.now()
   const dt = now - (spot.followed ?? now)
   spot.followed = now
-  if (!spot.pointer) return
+  if (!pointers.length) return
   const img = spot.capture.image
   const c = spot.crop
-  const tx = Math.max(0, Math.min(img.width - c.w, spot.pointer[0] * img.width - c.w / 2))
-  const ty = Math.max(0, Math.min(img.height - c.h, spot.pointer[1] * img.height - c.h / 2))
+  spot.base ??= { w: c.w, h: c.h }
+  const t = span(img, pointers, spot.base)
   const k = 1 - Math.exp(-dt / FOLLOW)
-  spot.crop = { ...c, x: c.x + (tx - c.x) * k, y: c.y + (ty - c.y) * k }
+  spot.crop = { x: c.x + (t.x - c.x) * k, y: c.y + (t.y - c.y) * k, w: c.w + (t.w - c.w) * k, h: c.h + (t.h - c.h) * k }
+}
+
+/** The part (image pixels, in the window's shape) holding all pointers, with a margin. */
+export function span(img, pointers, base) {
+  const xs = pointers.map((p) => p.x * img.width)
+  const ys = pointers.map((p) => p.y * img.height)
+  const x0 = Math.min(...xs)
+  const x1 = Math.max(...xs)
+  const y0 = Math.min(...ys)
+  const y1 = Math.max(...ys)
+  let w = Math.max(base.w, x1 - x0 + 2 * MARGIN, ((y1 - y0 + 2 * MARGIN) * W) / H)
+  w = Math.min(w, img.width, (img.height * W) / H)
+  const h = (w * H) / W
+  const cx = (x0 + x1) / 2
+  const cy = (y0 + y1) / 2
+  return { x: Math.max(0, Math.min(img.width - w, cx - w / 2)), y: Math.max(0, Math.min(img.height - h, cy - h / 2)), w, h }
+}
+
+// a mouse pointer, as viewers see it
+function arrow(ctx, x, y, color) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(1.6, 1.6)
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(0, 12.5)
+  ctx.lineTo(3.4, 9.4)
+  ctx.lineTo(5.8, 14.7)
+  ctx.lineTo(7.9, 13.8)
+  ctx.lineTo(5.5, 8.6)
+  ctx.lineTo(10.4, 8.6)
+  ctx.closePath()
+  ctx.fillStyle = color
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1.2
+  ctx.lineJoin = 'round'
+  ctx.shadowColor = 'rgba(0,0,0,.45)'
+  ctx.shadowBlur = 2
+  ctx.fill()
+  ctx.stroke()
+  ctx.restore()
 }
 
 /** The part of the picture (image pixels) shown: around the stroke, enlarged, in the window's shape. */

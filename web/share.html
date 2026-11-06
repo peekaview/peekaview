@@ -111,8 +111,25 @@
       100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(255,255,255,0); }
     }
     @media (prefers-reduced-motion: reduce) { .pick-preview.glow { animation: none; outline: 3px solid #ef4444; } }
-    body.panel .pick-steps { font-size: 14px; }
-    .pick-steps { margin: 0; padding-left: 24px; font-size: 16px; line-height: 1.7; }
+    .pick-steps { display: flex; flex-direction: column; gap: 6px; }
+    .pick-steps p { margin: 0; color: #d4d4d8; font-size: 14px; line-height: 1.45; text-align: center; }
+    body.panel .pick-steps p { font-size: 13px; }
+    /* the window dragged over (6 s, again and again), clicked into: it lights up, its picture here */
+    .pick-anim { display: block; width: 100%; max-width: 380px; height: auto; margin: 0 auto; }
+    .pick-anim .pa-win { animation: pa-win 6s ease-in-out infinite; }
+    .pick-anim .pa-cursor { transform: translate(200px, 72px); animation: pa-cursor 6s ease-in-out infinite; }
+    .pick-anim .pa-ring { opacity: 0; transform-origin: 200px 72px; animation: pa-ring 6s ease-out infinite; }
+    .pick-anim .pa-glow { animation: pa-glow 6s ease-in-out infinite; }
+    .pick-anim .pa-thumb { animation: pa-thumb 6s ease-in-out infinite; }
+    .pick-anim .pa-check { transform-origin: 304px 60px; animation: pa-check 6s ease-out infinite; }
+    @keyframes pa-win { 0% { transform: translate(-134px, -18px); opacity: 0; } 5%, 12% { transform: translate(-134px, -18px); opacity: 1; } 42%, 92% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(0, 0); opacity: 0; } }
+    @keyframes pa-cursor { 0% { transform: translate(56px, 27px); opacity: 0; } 5%, 12% { transform: translate(56px, 27px); opacity: 1; } 42% { transform: translate(190px, 45px); } 50%, 92% { transform: translate(200px, 72px); opacity: 1; } 100% { transform: translate(200px, 72px); opacity: 0; } }
+    @keyframes pa-ring { 0%, 51% { opacity: 0; transform: scale(.4); } 53% { opacity: .9; transform: scale(.6); } 66%, 100% { opacity: 0; transform: scale(2.2); } }
+    @keyframes pa-glow { 0%, 53% { opacity: 0; } 58%, 92% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes pa-thumb { 0%, 58% { opacity: 0; } 64%, 92% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes pa-check { 0%, 64% { opacity: 0; transform: scale(.4); } 70%, 92% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+    /* (no motion wanted: the end, still) */
+    @media (prefers-reduced-motion: reduce) { .pick-anim * { animation: none !important; } }
     .pick-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: -6px; }
     .live { flex-wrap: wrap; }
     .live .pill { margin-left: auto; font-size: 12.5px; min-height: 32px; }
@@ -234,7 +251,33 @@
     <!-- the whole screen is shared: which window of it? -->
     <section id="pick" style="display:flex;flex-direction:column;gap:14px" hidden>
       <h1>Welches Fenster möchtest du zeigen?</h1>
-      <ol class="pick-steps" id="pick-steps"><li>Klicke einmal in das Fenster, das du zeigen möchtest – es erscheint dann hier.</li></ol>
+      <!-- what to do, shown: the window dragged onto the shared screen, clicked into, here it is -->
+      <div class="pick-steps" id="pick-steps">
+        <svg class="pick-anim" viewBox="0 0 320 132" role="img" aria-label="Das Fenster auf den geteilten Bildschirm ziehen, einmal hineinklicken – es erscheint im kleinen Fenster">
+          <rect x="6" y="8" width="120" height="82" rx="6" fill="#27272a" stroke="#3f3f46"/>
+          <rect x="56" y="91" width="20" height="9" fill="#3f3f46"/><rect x="42" y="100" width="48" height="4" rx="2" fill="#3f3f46"/>
+          <rect x="140" y="8" width="174" height="104" rx="6" fill="#27272a" stroke="#ef4444" stroke-width="2"/>
+          <rect x="217" y="113" width="20" height="9" fill="#3f3f46"/><rect x="203" y="122" width="48" height="4" rx="2" fill="#3f3f46"/>
+          <rect x="146" y="14" width="46" height="14" rx="7" fill="#ef4444"/><text x="169" y="24.5" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">geteilt</text>
+          <!-- the small window, its picture, the check -->
+          <rect x="252" y="58" width="56" height="48" rx="4" fill="#18181b" stroke="#52525b"/>
+          <circle cx="258" cy="64" r="1.6" fill="#ef4444"/><rect x="263" y="63" width="26" height="2.4" rx="1" fill="#52525b"/>
+          <rect x="258" y="71" width="44" height="28" rx="2" fill="#09090b"/>
+          <g class="pa-thumb"><rect x="260" y="73" width="40" height="24" rx="1.5" fill="#e4e4e7"/><rect x="260" y="73" width="40" height="5" rx="1.5" fill="#71717a"/><rect x="263" y="82" width="22" height="2" fill="#a1a1aa"/><rect x="263" y="87" width="30" height="2" fill="#a1a1aa"/></g>
+          <g class="pa-check"><circle cx="304" cy="60" r="7.5" fill="#22c55e"/><path d="M300.5 60.2l2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+          <!-- the window to show (drawn where it ends up) -->
+          <g class="pa-win">
+            <rect class="pa-glow" x="157" y="37" width="84" height="60" rx="5" fill="none" stroke="#ef4444" stroke-width="2.5"/>
+            <rect x="160" y="40" width="78" height="54" rx="3" fill="#e4e4e7"/>
+            <rect x="160" y="40" width="78" height="10" rx="3" fill="#71717a"/>
+            <circle cx="165" cy="45" r="1.6" fill="#ff5f57"/><circle cx="170" cy="45" r="1.6" fill="#febc2e"/><circle cx="175" cy="45" r="1.6" fill="#28c840"/>
+            <rect x="166" y="57" width="40" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="64" width="58" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="71" width="50" height="3" rx="1" fill="#a1a1aa"/><rect x="166" y="78" width="30" height="3" rx="1" fill="#a1a1aa"/>
+          </g>
+          <circle class="pa-ring" cx="200" cy="72" r="6" fill="none" stroke="#fafafa" stroke-width="2"/>
+          <g class="pa-cursor"><path d="M0 0v13l3.4-3.1 2.4 5.3 2.1-.9-2.4-5.2h4.9z" fill="#fafafa" stroke="#09090b" stroke-width="1" stroke-linejoin="round"/></g>
+        </svg>
+        <p>Liegt das Fenster, das du zeigen möchtest, auf einem anderen Bildschirm? Zieh es auf den geteilten. Dann klicke einmal hinein – es erscheint hier.</p>
+      </div>
       <p class="lead" id="pick-lead" style="margin:0"></p>
       <canvas id="pick-preview" class="pick-preview" hidden></canvas>
       <canvas id="pick-view" class="pick-view"></canvas>
@@ -1043,8 +1086,10 @@
     function watch(m) {
       if (!host) return
       // (the preview follows the pointer of the one shown)
-      if (m.t === 'ptr') return miniView?.pointer(m.from, m.x, m.y)
+      if (m.t === 'ptr') return miniView?.pointer(m.from, m.x, m.y, host.peers().list.find((p) => p.id === m.from)?.color)
+      if (m.t === 'hide') return miniView?.hidePointer(m.from)
       if (m.t === 'left') {
+        miniView?.hidePointer(m.id)
         if (strokes.delete(m.id)) busyChanged()
         return
       }
@@ -1892,8 +1937,8 @@
       get crop() { return cropper?.rect ?? null },
       get tracked() { return trackInfo },
       get frames() { return cropper ? { ...cropper.counts, paused: cropper.paused, pausedFrames: cropper.counts.paused } : null },
-      // the preview's part of the still picture (image pixels), and the pointer it follows
-      get preview() { return miniView?.spot ? { crop: miniView.spot.crop, pointer: miniView.spot.pointer ?? null, image: { width: miniView.spot.capture.image.width, height: miniView.spot.capture.image.height } } : null },
+      // the preview's part of the still picture (image pixels), and the pointers it follows
+      get preview() { return miniView?.spot ? { crop: miniView.spot.crop, pointers: miniView.activePointers().map((p) => [p.x, p.y]), image: { width: miniView.spot.capture.image.width, height: miniView.spot.capture.image.height } } : null },
       capture: () => (host ? capture() : null),
       // is the shared window to be seen on the screen? (says so on the page)
       check: () => checkPlace(),
