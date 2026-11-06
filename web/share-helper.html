@@ -301,7 +301,8 @@
     }
 
     $('stop').addEventListener('click', () => api.stop())
-    $('copy').addEventListener('click', () => api.copyLink())
+    // (written here, where it is clicked)
+    $('copy').addEventListener('click', () => api.copyLink(window))
     // the presenter wants to show something: the whole picture, now
     $('show').addEventListener('click', () => {
       enqueue(async () => {

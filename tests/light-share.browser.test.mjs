@@ -501,6 +501,12 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     let P = await idOf('about:blank')
     await tab(P)
     assert.equal(await evaluate("document.body.classList.contains('pip') && !!document.querySelector('#running #requests')"), true)
+    // "Link kopieren" there writes there – the window clicked in (another one's clipboard: Chrome
+    // refuses, or asks behind this window)
+    await evaluate("window.qaCopied = null; navigator.clipboard.writeText = (t) => { qaCopied = t; return Promise.resolve() }; true")
+    await browser('click', '#copy')
+    await waitFor('!!window.qaCopied')
+    assert.match(await evaluate('qaCopied'), /#[A-Za-z0-9_-]{22}\./)
 
     // let in from there
     const room = (await evaluate("document.querySelector('#link').value")).split('#')[1]
