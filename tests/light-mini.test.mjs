@@ -19,52 +19,45 @@ async function frames(view, n = 25) {
     view.render()
   }
 }
-// in the part's inner 88 % (moved on, the pointer lies at 72 %, then softly)
-const inner = (c, px, py) => px >= c.x + c.w * 0.06 - 1 && px <= c.x + c.w * 0.94 + 1 && py >= c.y + c.h * 0.06 - 1 && py <= c.y + c.h * 0.94 + 1
 const middle = (c) => [c.x + c.w / 2, c.y + c.h / 2]
+const within = (c, px, py) => c.x <= px && px <= c.x + c.w && c.y <= py && py <= c.y + c.h
 
-test('the preview follows the viewers\' pointers calmly: one, at the same size; still inside and while it trembles; on at the edge; to the middle only after resting', async () => {
+test('the preview follows the viewers\' pointers calmly: one, at the same size; still in the middle 90 %; past it once to a new part, then still', async () => {
   const view = new MiniView(fakeCanvas())
   try {
     view.reveal({ from: 'anna', points: [[0.2, 0.25], [0.25, 0.3]], capture: { image }, color: '#f00', name: 'Anna' })
     const first = { ...view.spot.crop }
 
     // inside: nothing moves
-    view.pointer('anna', (first.x + first.w * 0.15) / 1000, (first.y + first.h / 2) / 600)
+    view.pointer('anna', (first.x + first.w * 0.08) / 1000, (first.y + first.h / 2) / 600)
     await frames(view, 6)
-    view.pointer('anna', (first.x + first.w * 0.85) / 1000, (first.y + first.h * 0.2) / 600)
+    view.pointer('anna', (first.x + first.w * 0.92) / 1000, (first.y + first.h * 0.1) / 600)
     await frames(view, 6)
     assert.deepEqual(view.spot.crop, first, 'still while the pointer moves inside')
 
-    // far off to the right: the part moves on, so far that the pointer is inside again (not to the middle)
+    // far off to the right: once, softly, to a new part with the pointer in its middle – then still
     view.pointer('anna', 0.7, 0.4)
-    await frames(view, 8)
-    // (trembling there: where it is going stays the same)
-    const pushed = { ...view.spot.follow.goal }
-    for (let i = 0; i < 6; i++) {
-      view.pointer('anna', 0.7 + (i % 2 ? 0.002 : -0.002), 0.4)
-      await frames(view, 2)
-    }
-    assert.deepEqual(view.spot.follow.goal, pushed, 'still while it trembles')
-    await frames(view, 20)
+    await frames(view, 4)
     let c = view.spot.crop
-    assert.ok(inner(c, 700, 240), `the pointer inside: ${JSON.stringify(c)}`)
-    assert.ok(Math.abs(middle(c)[0] - 700) > 40, 'not centered on it at once')
-    assert.deepEqual([c.w, c.h], [first.w, first.h], 'the same size')
-    // resting a while: slowly towards the middle
-    await frames(view, 60)
+    assert.ok(c.x > first.x && Math.abs(middle(c)[0] - 700) > 50, `on the way: ${JSON.stringify(c)}`)
+    await frames(view, 25)
     c = view.spot.crop
-    assert.ok(Math.abs(middle(c)[0] - 700) < Math.abs(middle(pushed)[0] - 700) - 10, `towards the middle: ${JSON.stringify(c)}`)
+    assert.ok(Math.abs(middle(c)[0] - 700) < 1 && within(c, 700, 240) && c.y === first.y, `there – moved sideways only, as it went out sideways: ${JSON.stringify(c)}`)
+    assert.deepEqual([c.w, c.h], [first.w, first.h], 'the same size')
+    const there = { ...c }
+    for (let i = 0; i < 6; i++) {
+      view.pointer('anna', 0.7 + (i % 2 ? 0.1 : -0.1), 0.4 + (i % 2 ? 0.01 : 0))
+      await frames(view, 3)
+    }
+    assert.deepEqual(view.spot.crop, there, 'still while it moves about inside')
 
     // Ben moves, too, while Anna moves on: still Anna followed, at the same size
     for (let i = 0; i < 5; i++) {
-      view.pointer('anna', 0.7, 0.4 + (i + 1) * 0.012)
+      view.pointer('anna', 0.7 - (i + 1) * 0.012, 0.4)
       view.pointer('ben', 0.05 + i * 0.02, 0.9)
       await frames(view, 3)
     }
-    c = view.spot.crop
-    assert.ok(inner(c, 700, 276), JSON.stringify(c))
-    assert.deepEqual([c.w, c.h], [first.w, first.h], 'not larger for two')
+    assert.deepEqual(view.spot.crop, there)
     assert.equal(view.spot.follow.lead, 'anna')
     // Anna rests, Ben goes on: then Ben is followed
     for (let i = 0; i < 20; i++) {
@@ -72,9 +65,10 @@ test('the preview follows the viewers\' pointers calmly: one, at the same size; 
       await frames(view, 2)
     }
     assert.equal(view.spot.follow.lead, 'ben')
-    await frames(view, 20)
+    await frames(view, 25)
     c = view.spot.crop
-    assert.ok(inner(c, 190, 426), `Ben inside: ${JSON.stringify(c)}`)
+    assert.ok(within(c, 188, 426), `Ben inside: ${JSON.stringify(c)}`)
+    assert.deepEqual([c.w, c.h], [first.w, first.h], 'not larger for two')
 
     // resting pointers fade and go
     await wait(2100)

@@ -530,6 +530,29 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
       await tab(P)
       await waitFor("!document.querySelector('#pip-spot').hidden && document.body.classList.contains('pip-spotting')")
     }
+    // the window with the preview lying over the shared one: no new pictures meanwhile (viewers – and
+    // the preview itself – would see it); moved off it: going on
+    const shared = { left: win.x, top: win.y, width: win.width, height: win.height }
+    const placePip = (left, top) => evaluate(`Object.defineProperties(window, { screenX: { get: () => ${left}, configurable: true }, screenY: { get: () => ${top}, configurable: true }, outerWidth: { get: () => 360, configurable: true }, outerHeight: { get: () => 420, configurable: true } }); true`)
+    await tab(P)
+    await placePip(Math.round(shared.left + shared.width / 2), Math.round(shared.top + shared.height / 2))
+    await stroke(0.2, 0.3)
+    await tab(S)
+    await waitFor('pvLight.frames.paused')
+    const held = await evaluate('pvLight.frames.pausedFrames')
+    await waitFor(`pvLight.frames.pausedFrames > ${held}`)
+    // (another stroke meanwhile: shown on the last picture without the window over it)
+    await evaluate('window.qaClean = pvLight.lastReveal.capture; window.qaAt = pvLight.lastReveal.at; true')
+    await stroke(0.25, 0.35)
+    await tab(S)
+    await waitFor('pvLight.lastReveal.at > qaAt')
+    assert.equal(await evaluate('pvLight.lastReveal.capture === qaClean && pvLight.frames.paused'), true)
+    await tab(P)
+    await placePip(Math.round(shared.left + shared.width + 400), Math.round(shared.top))
+    await tab(S)
+    await waitFor('!pvLight.frames.paused')
+    await tab(P)
+
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
     // Anna moves her mouse: the preview follows it calmly – her pointer inside the part shown

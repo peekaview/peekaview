@@ -155,87 +155,25 @@ export function fit(video, box) {
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5)
 const clampTo = (v, min, max) => Math.max(min, Math.min(max, v))
 
-/**
- * The part of a picture to show (pixels {x, y, w, h}) so that the points lie in its inner part:
- * it stays put while they move there, and moves – just enough – when one comes near its edge. Large
- * enough for all of them (never smaller than min), in the given shape, within the picture.
- * @param cur the part shown now
- * @param points [{x, y}] in picture pixels
- */
-export function keepInView(cur, points, { minW, minH, width, height, aspect = null, inner = 0.65 }) {
-  if (!points.length) return cur
-  const xs = points.map((p) => p.x)
-  const ys = points.map((p) => p.y)
-  const x0 = Math.min(...xs)
-  const x1 = Math.max(...xs)
-  const y0 = Math.min(...ys)
-  const y1 = Math.max(...ys)
-  let w = Math.max(minW, (x1 - x0) / inner)
-  let h = Math.max(minH, (y1 - y0) / inner)
-  const shape = () => {
-    if (!aspect) return
-    if (w / h > aspect) h = w / aspect
-    else w = h * aspect
-  }
-  shape()
-  if (w > width || h > height) {
-    const k = Math.min(width / w, height / h)
-    w *= k
-    h *= k
-  }
-  // (about the same size: kept, no breathing)
-  if (Math.abs(w - cur.w) < cur.w * 0.05 && Math.abs(h - cur.h) < cur.h * 0.05) {
-    w = cur.w
-    h = cur.h
-  }
-  let cx = cur.x + cur.w / 2
-  let cy = cur.y + cur.h / 2
-  const hx = (w * inner) / 2
-  const hy = (h * inner) / 2
-  if (x1 > cx + hx) cx = x1 - hx
-  if (x0 < cx - hx) cx = x0 + hx
-  if (y1 > cy + hy) cy = y1 - hy
-  if (y0 < cy - hy) cy = y0 + hy
-  return {
-    x: Math.max(0, Math.min(width - w, cx - w / 2)),
-    y: Math.max(0, Math.min(height - h, cy - h / 2)),
-    w,
-    h,
-  }
-}
-
-/** The part (same size) with the points' middle in its middle, within the picture. */
-export function centerOn(cur, points, { width, height }) {
-  if (!points.length) return cur
-  const xs = points.map((p) => p.x)
-  const ys = points.map((p) => p.y)
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2
-  const cy = (Math.min(...ys) + Math.max(...ys)) / 2
-  return { ...cur, x: Math.max(0, Math.min(width - cur.w, cx - cur.w / 2)), y: Math.max(0, Math.min(height - cur.h, cy - cur.h / 2)) }
-}
-
-// how calmly the part shown follows the viewers' pointers (calmFollow)
+// how calmly the part shown follows the viewers' pointers (calmFollow, softMove)
 export const CALM = {
-  inner: 0.8, // still while the pointer is in this middle part …
-  push: 0.72, // … moved on, once it leaves it, so far that it is this far in (not again at once)
+  inner: 0.9, // still while the pointer is in this middle part; once it leaves it: a new part, the pointer in its middle
   tremble: 0.015, // a pointer moved less than this (of the part's width) has not moved
   handover: 1000, // ms: another pointer is followed only once the one followed has rested this long
-  rest: 1500, // ms: after being moved on, it glides to the middle only once the pointer rests this long …
-  glide: 2600, // ms: … slowly
+  move: 900, // ms: the way to a new part (eased in and out)
 }
 
 /**
- * Where the part shown goes, a step at a time (calmly). It follows one pointer – the one moved last;
- * another takes over only once that one has rested a moment – and keeps its size. Still while that
- * pointer is in its inner part or only trembles; on, just enough (and a little more), when it leaves
- * that; and once it has rested a while after that, a slow glide until it is in the middle.
- * `state` keeps {goal, lead, anchors, centering, gliding} between steps.
+ * Where the part shown goes (calmly): it follows one pointer – the one moved last; another takes over
+ * only once that one has rested a moment – and keeps its size. Still while that pointer is in its
+ * middle part (or only trembles); when it leaves that: a new part with the pointer in its middle (on
+ * that side), and still there again. `state` keeps {goal, lead, anchors} between steps.
  * @param points [{id, x, y}] in picture pixels (the pointers moved lately)
  * @param dt ms since the last step
  */
 export function calmFollow(state, cur, points, dt, { width, height }, calm = CALM) {
   const now = (state.now = (state.now ?? 0) + dt)
-  const goal = state.goal ?? cur
+  const goal = (state.goal ??= { x: cur.x, y: cur.y, w: cur.w, h: cur.h })
   const anchors = (state.anchors ??= new Map())
   // (trembling is no moving: a pointer counts where it was last moved to, by more than a little)
   const tremble = goal.w * calm.tremble
@@ -245,32 +183,30 @@ export function calmFollow(state, cur, points, dt, { width, height }, calm = CAL
     if (!a || Math.hypot(p.x - a.x, p.y - a.y) > tremble) anchors.set(id, { x: p.x, y: p.y, moved: now })
   }
   const here = new Set(points.map((p, i) => p.id ?? i))
+  for (const id of anchors.keys()) if (!here.has(id)) anchors.delete(id)
   // (the one followed: kept while it moves; gone or resting – the one moved last)
   const lead = anchors.get(state.lead)
-  if (!here.has(state.lead) || now - lead.moved > calm.handover) {
-    let best = null
-    for (const id of here) if (!best || anchors.get(id).moved > anchors.get(best).moved) best = id
-    if (best != null && (!here.has(state.lead) || anchors.get(best).moved > lead.moved)) state.lead = best
+  if (!lead || now - lead.moved > calm.handover) {
+    for (const id of here) if (!anchors.get(state.lead) || anchors.get(id).moved > anchors.get(state.lead).moved) state.lead = id
   }
-  for (const id of anchors.keys()) if (!here.has(id) && id !== state.lead) anchors.delete(id)
   const p = anchors.get(state.lead)
   if (!p) return goal
-  const opts = { minW: goal.w, minH: goal.h, width, height }
   let next = goal
-  if (here.has(state.lead)) {
-    next = keepInView(goal, [p], { ...opts, inner: calm.inner })
-    if (next !== goal && (Math.abs(next.x - goal.x) > 0.5 || Math.abs(next.y - goal.y) > 0.5)) {
-      next = keepInView(goal, [p], { ...opts, inner: calm.push })
-      state.centering = true
-    } else next = goal
-  }
-  // resting a while after being moved on: slowly to the middle (stopped while it moves again)
-  state.gliding = !!state.centering && now - p.moved >= calm.rest
-  if (state.gliding) {
-    const c = centerOn(next, [p], opts)
-    const k = 1 - Math.exp(-dt / calm.glide)
-    next = { ...next, x: next.x + (c.x - next.x) * k, y: next.y + (c.y - next.y) * k }
-    if (Math.abs(c.x - next.x) < 0.5 && Math.abs(c.y - next.y) < 0.5) state.centering = state.gliding = false
-  }
+  if (Math.abs(p.x - (goal.x + goal.w / 2)) > (goal.w * calm.inner) / 2) next = { ...next, x: clampTo(p.x - goal.w / 2, 0, Math.max(0, width - goal.w)) }
+  if (Math.abs(p.y - (goal.y + goal.h / 2)) > (goal.h * calm.inner) / 2) next = { ...next, y: clampTo(p.y - goal.h / 2, 0, Math.max(0, height - goal.h)) }
   return (state.goal = next)
+}
+
+/**
+ * A soft way (eased in and out) from where the part shown is towards `to` – anew each time `to`
+ * changes. `anim` keeps {from, to, at, done}.
+ */
+export function softMove(anim, cur, to, now, ms = CALM.move) {
+  const same = (a, b) => a && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h
+  if (!same(anim.to, to)) Object.assign(anim, { from: { ...cur }, to: { ...to }, at: now })
+  const t = Math.min(1, Math.max(0, (now - anim.at) / ms))
+  anim.done = t >= 1
+  const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+  const f = anim.from
+  return { ...cur, x: f.x + (to.x - f.x) * e, y: f.y + (to.y - f.y) * e, w: f.w + (to.w - f.w) * e, h: f.h + (to.h - f.h) * e }
 }
