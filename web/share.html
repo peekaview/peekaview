@@ -18,7 +18,20 @@
     body.embed main { width: 100%; margin: 0; padding: 4px 22px 22px; border: 0; border-radius: 0; box-shadow: none; }
     body.embed main > .brand, body.embed .pv-footer, body.embed #setup h1 { display: none; }
     /* the help for the browser's dialog (and Firefox's warning) right in the dialog, below the button */
-    body.embed .screen-help { position: relative; inset: auto; width: auto; max-width: none; box-shadow: none; animation: none; }
+    body.embed .screen-help { position: relative; inset: auto; width: auto; max-width: none; box-shadow: none; animation: none;
+      display: grid; grid-template-columns: minmax(0, 1fr) 210px; column-gap: 16px; align-items: start; padding: 12px 14px; }
+    body.embed .screen-help[hidden] { display: none; }
+    body.embed .screen-help-warn { grid-column: 1 / -1; margin-right: 24px; }
+    body.embed .screen-help-title { grid-column: 1; margin-bottom: 6px; }
+    body.embed .screen-help-arrow, body.embed .screen-help-note { display: none; }
+    body.embed .screen-help-steps { grid-column: 1; margin-top: 0; font-size: 12.5px; }
+    body.embed .screen-help-figure { grid-column: 2; grid-row: span 3; }
+    body.embed .screen-help:not([data-kind=firefox]) .screen-help-figure { grid-row: 1 / span 2; }
+    /* while the card says it, the hint below the button need not */
+    body.embed main:has(#screen-help:not([hidden])) #start-hint { display: none; }
+    /* the dialog's title says what this is: tighter, without the first line */
+    body.embed main, body.embed #setup { gap: 14px !important; }
+    body.embed #setup > .lead { display: none; }
     .light-tag { padding: 3px 9px; border-radius: 999px; background: #27272a; color: #a1a1aa; font-size: 11.5px; font-weight: 650; }
     h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.25; letter-spacing: -.015em; }
     .lead { margin: -10px 0 0; color: #a1a1aa; font-size: 15px; }
