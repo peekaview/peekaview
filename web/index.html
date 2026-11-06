@@ -50,6 +50,7 @@
     #paste-open { padding:14px 18px;border:0;border-radius:10px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
     #link-error { margin:8px 0 0;color:#fca5a5;font-size:12px; }
     #recent-links { display:flex;flex-direction:column;gap:10px; }
+    #new-link { margin-top: 0; }
     #start label { display: block; color: #a1a1aa; font-size: 12px; }
     #start input { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #09090b; color: inherit; font: inherit; outline: none; transition: border-color .15s; }
     #start input:focus { border-color: #ef4444; }
@@ -71,17 +72,14 @@
     .room .tags { display: flex; gap: 6px; }
     .room .tags:empty { display: none; }
     .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.07); color: #a1a1aa; font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
-    .tag.permanent { background: rgba(59,130,246,.15); color: #93c5fd; }
-    .tag.pin { background: rgba(234,179,8,.14); color: #fde68a; }
-    .tag.remote { background: rgba(239,68,68,.14); color: #fca5a5; }
-    .tag svg { width: 10px; height: 10px; }
+        .tag svg { width: 10px; height: 10px; }
     .room.online em { color: #86efac; }
     .room .forget { position: absolute; top: 6px; right: 6px; display: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #71717a; font-size: 14px; line-height: 1; cursor: pointer; }
     .room:hover .forget { display: block; }
     .room:hover em { visibility: hidden; }
     .room .forget:hover { background: rgba(255,255,255,.1); color: #fafafa; }
     .empty { margin: 0; padding: 14px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.12); color: #71717a; text-align: center; font-size: 13px; }
-    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: stretch; height: 52px; margin-top: 4px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); transition: background .15s, transform .1s, opacity .15s; }
+    .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: stretch; height: 52px; margin-top: 4px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; transition: background .15s, transform .1s, opacity .15s; }
     .connect:hover:not(:disabled) { background: #dc2626; }
     .connect:active:not(:disabled) { transform: scale(.98); }
     .connect:disabled { opacity: .35; cursor: default; box-shadow: none; }
@@ -95,9 +93,13 @@
     .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app:hover { color: #fafafa; }
     /* "Bildschirmfreigabe light": secondary to the desktop app, its limits said right away */
-    #host-note { display: flex; flex-direction: column; gap: 10px; }
-    .light-offer { margin: 0; padding: 0 4px; color: #a1a1aa; font-size: 13px; text-align: center; }
-    .light-offer a { color: #fafafa; font-weight: 650; text-underline-offset: 3px; }
+    #host-note { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 18px; border-top: 1px solid #27272a; text-align: center; }
+    .host-title { margin: 0; color: #a1a1aa; font-size: 13px; }
+    #host-note .pv-download { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 10px; font-size: 13.5px; font-weight: 650; }
+    #host-note .pv-download svg { width: 16px; height: 16px; }
+    .light-offer { margin: 0; color: #71717a; font-size: 12.5px; }
+    .light-offer a { color: #a1a1aa; text-underline-offset: 3px; }
+    .light-offer a:hover { color: #fafafa; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -117,14 +119,15 @@
       </label>
       <p id="link-error" role="alert" hidden></p>
     </div>
+    <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span></div>
+    <ul class="rooms" id="rooms"></ul>
+    <button class="other-link" id="new-link" type="button">Neuen Link einfügen</button></div>
     <div id="name-box" hidden>
       <label id="name-label" for="name">Wie heißt du?</label>
       <input id="name" maxlength="32" autocomplete="name" placeholder="z. B. Anna" aria-describedby="name-note name-error">
       <p id="name-error" role="alert" hidden>Bitte gib zuerst deinen Namen ein.</p>
       <p id="name-note">Diesen Namen sieht die teilende Person.</p>
     </div>
-    <div id="recent-links" hidden><div class="rooms-title"><span>Zuletzt geöffnet</span><span id="count"></span></div>
-    <ul class="rooms" id="rooms"></ul></div>
     <button class="connect" id="connect" hidden disabled>Freigabe ansehen</button>
     <button class="share-phone" id="share-phone" type="button" hidden>Bildschirm dieses Geräts teilen</button>
     <p class="connect-hint" id="hint"></p>
@@ -152,17 +155,22 @@
     // it is online right now – asked over the room's encrypted signaling ("ping"), which creates
     // no join request.
     import { mountViewer } from './viewer.js'
-    import { downloadCard, mountRooms, openRoom } from './fixed-rooms.js'
+    import { mountRooms, openRoom } from './fixed-rooms.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
-    $('host-note').append(downloadCard())
+    {
+      const title = Object.assign(document.createElement('p'), { className: 'host-title', textContent: 'Selbst den Bildschirm zeigen?' })
+      const download = Object.assign(document.createElement('a'), { className: 'pv-download', href: 'download.html', target: '_blank', rel: 'noopener' })
+      download.innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen'
+      $('host-note').append(title, download)
+    }
     // sharing from the browser: only where browsers can (not on phones), and only as the small extra
     if (navigator.mediaDevices?.getDisplayMedia) {
       const light = Object.assign(document.createElement('p'), { className: 'light-offer', id: 'light-offer' })
-      light.innerHTML = 'Ohne Installation? <a href="share.html">Im Browser teilen</a> – die einfache Variante, ohne Steuern.'
+      light.innerHTML = 'Oder ohne Installation <a href="share.html">im Browser teilen</a> – die einfache Variante, ohne Steuern.'
       $('host-note').append(light)
     }
     mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
@@ -255,6 +263,8 @@
     // a pasted link opens right away – no need to find the button
     $('share-url').addEventListener('paste',()=>setTimeout(()=>{if(/^\s*https?:/i.test($('share-url').value))openPastedLink()}))
     $('other-link').addEventListener('click',()=>{location.hash=''})
+    let pasteOpen=false
+    $('new-link').addEventListener('click',()=>{pasteOpen=true;render();$('share-url').focus()})
     $('share-url').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();openPastedLink()}})
     const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
     $('name').value = params.get('name') ?? savedName ?? ''
@@ -298,11 +308,16 @@
       const list = rooms()
       $('name-box').hidden=!selected
       $('connect').hidden=!selected
-      $('paste-link').hidden=!!linkRoom
+      // remembered rooms: the link field only on request
+      $('paste-link').hidden=!!linkRoom || (list.length>0 && !pasteOpen)
+      $('new-link').hidden=!list.length || pasteOpen
+      // the field opens where it was asked for: below the rooms
+      if(list.length)$('recent-links').after($('paste-link'));else $('recent-links').before($('paste-link'))
+      // the name is known: no need to say who sees it
+      $('name-note').hidden=!!$('name').value.trim()
       $('paste-open').classList.toggle('quiet',!!selected)
       $('other-link').hidden=!linkRoom
       $('recent-links').hidden=!list.length || !!linkRoom
-      $('count').textContent = load().length ? `${load().length} gemerkt` : ''
       if (!list.length) {
         $('rooms').innerHTML = '<li class="empty">Öffne den Link, den du von der teilenden Person bekommen hast.</li>'
       } else {
@@ -321,12 +336,12 @@
             const pin = st.pin ?? r.pin
             const remote = st.remote ?? r.remote
             const tag = (cls, html, title) => strong.lastChild.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
-            if (permanent === true) tag('permanent', 'fester Link', 'Fester Link – bleibt immer gleich')
-            else if (permanent === false) tag('', 'einmalig', 'Link nur für diese eine Freigabe')
+            // remembered rooms are all permanent – only the exception is worth a word
+            if (permanent === false) tag('', 'einmalig', 'Link nur für diese eine Freigabe')
             if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')
             if (remote) tag('remote', 'Fernzugriff', 'Fernzugriff: Programme selbst starten')
             const who = st.who ?? r.who
-            const last = r.link ? 'neu' : `Zuletzt: ${ago(r.last)}`
+            const last = r.link ? 'neu' : `zuletzt ${ago(r.last)}`
             li.querySelector('.sub').textContent = [who, last].filter(Boolean).join(' · ')
             li.querySelector('em').textContent = st.checking ? '' : st.online ? (st.busy ? 'belegt' : 'online') : 'offline'
             if (!r.link) {
@@ -353,9 +368,10 @@
       $('lead').textContent = linkRoom
         ? 'Gib deinen Namen ein und klicke auf „Freigabe ansehen“. Keine Anmeldung, nichts zu installieren.'
         : selected
-          ? 'Wähle unten einen Raum – oder füge einen neuen Link ein.'
+          ? ''
           : 'Du hast einen Link bekommen? Füge ihn hier ein.'
       $('connect').disabled = !selected
+      $('lead').hidden = !$('lead').textContent
       $('hint').textContent = !selected
         ? ''
         : openedInApp && selected === linkRoom
@@ -366,7 +382,7 @@
             ? 'Prüfe, ob der Raum online ist …'
             : st?.online
               ? ''
-              : 'Die teilende Person ist gerade nicht online. Nach dem Klick wartet PeekaView bis zu 30 Sekunden.'
+              : 'Gerade offline – nach dem Klick wartet PeekaView bis zu 30 Sekunden.'
     }
 
     // ---------------------------------------------------------------- online check
