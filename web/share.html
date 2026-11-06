@@ -46,7 +46,12 @@
     .screen-help { position: fixed; z-index: 60; box-sizing: border-box; width: 320px; max-width: calc(100vw - 32px); padding: 14px 14px 12px; border-radius: 16px; background: #fafafa; color: #18181b; box-shadow: 0 18px 50px rgba(0,0,0,.5); font-size: 13px; animation: in .2s ease-out; }
     .screen-help[data-kind=firefox] { top: 12px; left: 430px; }
     .screen-help[data-kind=chrome], .screen-help[data-kind=edge] { top: 12px; left: calc(50% + 340px); }
-    .screen-help-title { margin: 0 24px 10px 0; font-size: 14.5px; font-weight: 750; }
+    .screen-help-title { margin: 0 24px 10px 0; color: #dc2626; font-size: 18px; font-weight: 800; line-height: 1.25; }
+    .screen-help-after { margin: 8px 0 0; color: #27272a; font-size: 12.5px; font-weight: 600; }
+    /* "Gesamter Bildschirm" in the drawn dialog: marked, pulsing */
+    .screen-help-pulse { transform-box: fill-box; transform-origin: center; animation: help-pulse 1.6s ease-out infinite; }
+    @keyframes help-pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12, 1.6); } }
+    @media (prefers-reduced-motion: reduce) { .screen-help-pulse { animation: none; opacity: 0; } }
     .screen-help-arrow { color: #ef4444; }
     .screen-help-warn { margin: 0 28px 10px 0; padding: 8px 10px; border-radius: 10px; background: #fee2e2; color: #991b1b; font-size: 12.5px; font-weight: 650; line-height: 1.35; }
     .screen-help-figure { display: block; width: 100%; height: auto; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -278,7 +283,7 @@
         <p class="notify-note" id="notify-text" hidden></p>
       </div>
       <button class="connect" id="start" type="button"></button>
-      <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
+      <p class="hint" id="start-hint" hidden></p>
       <p class="error" id="start-error" role="alert" hidden></p>
       <!-- the screen is picked, the small window could not open in that click: one more -->
       <div id="start-ready" style="display:flex;flex-direction:column;gap:10px;align-items:center" hidden>
@@ -450,7 +455,7 @@
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
     import { MiniView } from './light-mini.js'
-    import { showScreenHelp } from './light-help.js'
+    import { dialogKind, showScreenHelp } from './light-help.js'
     import { ClipPanel, browserCopyable, filesFromClipboard, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
     import { icon, owl } from './icons.js'
     import './legal.js'
@@ -555,9 +560,11 @@
 
     // ---------------------------------------------------------------- start
     const supported = !!navigator.mediaDevices?.getDisplayMedia && typeof RTCPeerConnection !== 'undefined'
-    if (cropSupported) $('start-hint').textContent = 'Dein Browser fragt gleich, was du teilen möchtest: Wähle „Gesamter Bildschirm“. Danach suchst du hier aus, welches Fenster deine Zuschauer sehen.'
+    // (what to pick is said beside the browser's dialog – light-help.js; where there is no card, Safari: one line)
+    if (cropSupported && !dialogKind()) Object.assign($('start-hint'), { textContent: 'Wähle im Browser gleich den ganzen Bildschirm, nicht ein einzelnes Fenster.', hidden: false })
     if (!supported) {
       $('start').disabled = true
+      $('start-hint').hidden = false
       $('start-hint').textContent = 'Dieser Browser kann den Bildschirm nicht teilen (auf Handys und Tablets geht das nicht). Bitte am Computer Chrome, Edge, Firefox oder Safari verwenden – oder PeekaView Desktop.'
     }
 
@@ -624,7 +631,7 @@
     function startUnready() {
       readyStream = null
       $('start').hidden = false
-      $('start-hint').hidden = false
+      $('start-hint').hidden = !$('start-hint').textContent
       $('start-ready').hidden = true
     }
     $('start-open').addEventListener('click', () => {

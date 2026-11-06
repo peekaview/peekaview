@@ -241,7 +241,8 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     await evaluate("localStorage.setItem('qaFirefox', '1'); true")
     await browser('open', base + '/share.html')
     await browser('set', 'viewport', '1280', '1000')
-    assert.match(await evaluate("document.querySelector('#start-hint').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du hier aus/)
+    // (what to pick is said beside the browser's dialog – no line under the button)
+    assert.equal(await evaluate("document.querySelector('#start-hint').hidden"), true)
     await evaluate("document.querySelector('#name').value='Patrick';true")
     const win = await evaluate('qaWindowAt')
     // the screen is picked in the tab's click, checked there and handed to the small window; the
