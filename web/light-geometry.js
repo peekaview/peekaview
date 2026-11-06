@@ -154,3 +154,52 @@ export function fit(video, box) {
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5)
 const clampTo = (v, min, max) => Math.max(min, Math.min(max, v))
+
+/**
+ * The part of a picture to show (pixels {x, y, w, h}) so that the points lie in its inner part:
+ * it stays put while they move there, and moves – just enough – when one comes near its edge. Large
+ * enough for all of them (never smaller than min), in the given shape, within the picture.
+ * @param cur the part shown now
+ * @param points [{x, y}] in picture pixels
+ */
+export function keepInView(cur, points, { minW, minH, width, height, aspect = null, inner = 0.65 }) {
+  if (!points.length) return cur
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const x0 = Math.min(...xs)
+  const x1 = Math.max(...xs)
+  const y0 = Math.min(...ys)
+  const y1 = Math.max(...ys)
+  let w = Math.max(minW, (x1 - x0) / inner)
+  let h = Math.max(minH, (y1 - y0) / inner)
+  const shape = () => {
+    if (!aspect) return
+    if (w / h > aspect) h = w / aspect
+    else w = h * aspect
+  }
+  shape()
+  if (w > width || h > height) {
+    const k = Math.min(width / w, height / h)
+    w *= k
+    h *= k
+  }
+  // (about the same size: kept, no breathing)
+  if (Math.abs(w - cur.w) < cur.w * 0.05 && Math.abs(h - cur.h) < cur.h * 0.05) {
+    w = cur.w
+    h = cur.h
+  }
+  let cx = cur.x + cur.w / 2
+  let cy = cur.y + cur.h / 2
+  const hx = (w * inner) / 2
+  const hy = (h * inner) / 2
+  if (x1 > cx + hx) cx = x1 - hx
+  if (x0 < cx - hx) cx = x0 + hx
+  if (y1 > cy + hy) cy = y1 - hy
+  if (y0 < cy - hy) cy = y0 + hy
+  return {
+    x: Math.max(0, Math.min(width - w, cx - w / 2)),
+    y: Math.max(0, Math.min(height - h, cy - h / 2)),
+    w,
+    h,
+  }
+}

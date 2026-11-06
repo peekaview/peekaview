@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MiniView, crop, span } from '../web/light-mini.js'
+import { MiniView, crop } from '../web/light-mini.js'
 
 // a canvas that draws nothing
 function fakeCanvas() {
@@ -13,46 +13,50 @@ function fakeCanvas() {
 
 const wait = (ms) => new Promise((done) => setTimeout(done, ms))
 const image = { width: 1000, height: 600 }
-const middle = (c) => [(c.x + c.w / 2) / image.width, (c.y + c.h / 2) / image.height]
-async function frames(view, n = 8) {
+async function frames(view, n = 25) {
   for (let i = 0; i < n; i++) {
-    await wait(30)
+    await wait(40)
     view.render()
   }
 }
+// in the part's inner 65 %
+const inner = (c, px, py) => px >= c.x + c.w * 0.175 - 1 && px <= c.x + c.w * 0.825 + 1 && py >= c.y + c.h * 0.175 - 1 && py <= c.y + c.h * 0.825 + 1
 
-test('the preview follows the viewers\' pointers right away: one in its middle, several within it; one at rest goes', async () => {
+test('the preview follows the viewers\' pointers calmly: still while they move inside, on when one nears the edge; several held; one at rest goes', async () => {
   const view = new MiniView(fakeCanvas())
   try {
     view.reveal({ from: 'anna', points: [[0.2, 0.25], [0.25, 0.3]], capture: { image }, color: '#f00', name: 'Anna' })
     const first = { ...view.spot.crop }
-    assert.ok(Math.abs(middle(first)[0] - 0.225) < 0.01, 'around the stroke first')
 
-    // Anna's pointer: there within a few frames, in the middle
-    view.pointer('anna', 0.6, 0.5)
-    await frames(view)
-    let [x, y] = middle(view.spot.crop)
-    assert.ok(Math.abs(x - 0.6) < 0.01 && Math.abs(y - 0.5) < 0.01, `the pointer in the middle: ${x}, ${y}`)
-    assert.deepEqual([view.spot.crop.w, view.spot.crop.h].map(Math.round), [first.w, first.h].map(Math.round), 'the same size')
+    // inside: nothing moves
+    view.pointer('anna', (first.x + first.w / 2) / 1000, (first.y + first.h / 2) / 600)
+    await frames(view, 6)
+    assert.deepEqual(view.spot.crop, first, 'still while the pointer moves inside')
 
-    // Ben's, too, far away: the part grows to hold both
-    view.pointer('anna', 0.3, 0.3)
-    view.pointer('ben', 0.8, 0.7)
+    // far off to the right: the part moves on, just so far that the pointer is inside again (not to the middle)
+    view.pointer('anna', 0.7, 0.4)
     await frames(view)
-    const c = view.spot.crop
-    for (const [px, py] of [[300, 180], [800, 420]]) assert.ok(c.x < px && px < c.x + c.w && c.y < py && py < c.y + c.h, `${px},${py} within ${JSON.stringify(c)}`)
+    let c = view.spot.crop
+    assert.ok(inner(c, 700, 240), `the pointer inside: ${JSON.stringify(c)}`)
+    assert.ok(c.x + c.w / 2 < 690, 'not centered on it')
+    assert.deepEqual([c.w, c.h].map(Math.round), [first.w, first.h].map(Math.round), 'the same size')
+
+    // Ben, too, far away: the part grows to hold both
+    view.pointer('ben', 0.2, 0.75)
+    await frames(view)
+    c = view.spot.crop
+    for (const [px, py] of [[700, 240], [200, 450]]) assert.ok(c.x <= px && px <= c.x + c.w && c.y <= py && py <= c.y + c.h, `${px},${py} within ${JSON.stringify(c)}`)
     assert.ok(c.w > first.w + 50, 'larger')
 
-    // Ben rests (Anna goes on moving): his pointer fades and goes, the part follows Anna alone again
+    // Ben rests (Anna goes on moving): his pointer fades and goes, the part shrinks back
     for (let i = 0; i < 9; i++) {
-      view.pointer('anna', 0.4, 0.4)
+      view.pointer('anna', 0.7, 0.4)
       await wait(250)
       view.render()
     }
-    assert.deepEqual(view.activePointers().map((p) => p.x), [0.4], 'Ben no longer followed')
+    assert.deepEqual(view.activePointers().map((p) => p.x), [0.7], 'Ben no longer followed')
     await frames(view)
-    ;[x, y] = middle(view.spot.crop)
-    assert.ok(Math.abs(x - 0.4) < 0.02 && Math.abs(y - 0.4) < 0.02 && Math.abs(view.spot.crop.w - first.w) < 3, JSON.stringify(view.spot.crop))
+    assert.ok(Math.abs(view.spot.crop.w - first.w) < 3, JSON.stringify(view.spot.crop))
 
     // a pointer that left the picture: gone at once
     view.hidePointer('anna')
@@ -60,15 +64,6 @@ test('the preview follows the viewers\' pointers right away: one in its middle, 
   } finally {
     view.destroy()
   }
-})
-
-test('the part holding the pointers: in the window shape, at the picture\'s edge within it, never smaller than at first', () => {
-  const base = { w: 400, h: 250 }
-  const one = span(image, [{ x: 0.99, y: 0.99 }], base)
-  assert.deepEqual([one.w, one.h], [400, 250])
-  assert.ok(Math.abs(one.x + one.w - 1000) < 1e-9 && Math.abs(one.y + one.h - 600) < 1e-9)
-  const all = span(image, [{ x: 0, y: 0 }, { x: 1, y: 1 }], base)
-  assert.ok(all.w <= 1000 && all.h <= 600 && Math.abs(all.w / all.h - 640 / 400) < 1e-9)
 })
 
 test('the part shown: around the stroke, in the window shape, within the picture', () => {

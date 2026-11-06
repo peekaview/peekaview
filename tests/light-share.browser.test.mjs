@@ -388,13 +388,11 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     assert.equal(zoomed.layout, 'zoom', JSON.stringify(zoomed))
     assert.ok(!zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
     assert.ok(zoomed.part.x < 0.25 && 0.25 < zoomed.part.x + zoomed.part.w && zoomed.part.y < 0.72 && 0.72 < zoomed.part.y + zoomed.part.h, `the drawing in the part shown: ${JSON.stringify(zoomed.part)}`)
-    // Anna moves her mouse: the part shown follows it softly, her pointer in its middle
+    // Anna moves her mouse far off: the part shown moves on, calmly, until her pointer is inside again
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.75)), String(Math.round(r.t + r.h * 0.3)))
     await tab(P)
-    await waitFor("(()=>{const h=document.querySelector('#spot').contentWindow.pvHelper;return h.view && Math.abs(h.view.x - 0.75) < 0.03 && Math.abs(h.view.y - 0.3) < 0.03})()")
-    const followed = await evaluate("document.querySelector('#spot').contentWindow.pvHelper.part")
-    assert.ok(followed.x < 0.75 && 0.75 < followed.x + followed.w && followed.y < 0.3 && 0.3 < followed.y + followed.h, `the pointer in the part shown: ${JSON.stringify(followed)}`)
+    await waitFor("(()=>{const p=document.querySelector('#spot').contentWindow.pvHelper.part;return p.x + p.w * 0.15 < 0.75 && 0.75 < p.x + p.w * 0.85 && p.y + p.h * 0.15 < 0.3 && 0.3 < p.y + p.h * 0.85})()")
     await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
 
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
@@ -528,12 +526,12 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     }
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
-    // Anna moves her mouse: the preview follows it right away, her pointer in its middle (within the picture)
+    // Anna moves her mouse: the preview follows it calmly – her pointer inside the part shown
     await tab(V)
-    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.6)), String(Math.round(r.t + r.h * 0.45)))
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.9)), String(Math.round(r.t + r.h * 0.45)))
     await tab(P)
-    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const want=(v,size,max)=>Math.max(0,Math.min(max-size,v*max-size/2));return Math.abs(p.crop.x-want(x,p.crop.w,p.image.width))<2&&Math.abs(p.crop.y-want(y,p.crop.h,p.image.height))<2})()")
-    assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.6) < 0.05)
+    await waitFor("(()=>{const p=pvLight.preview;if(!p?.pointers.length)return false;const [x,y]=p.pointers[0];const px=x*p.image.width,py=y*p.image.height,c=p.crop;return px>c.x+c.w*0.15&&px<c.x+c.w*0.85&&py>c.y+c.h*0.15&&py<c.y+c.h*0.85})()")
+    assert.ok(Math.abs((await evaluate('pvLight.preview.pointers[0]'))[0] - 0.9) < 0.05)
     // … and when it rests, its pointer goes (no longer followed)
     await waitFor('pvLight.preview && pvLight.preview.pointers.length === 0')
 
