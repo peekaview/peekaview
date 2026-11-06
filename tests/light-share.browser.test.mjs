@@ -358,6 +358,24 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     const after = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(after.width - size.width) <= 2 && Math.abs(after.height - size.height) <= 2, JSON.stringify(after))
 
+    // a small window that cannot be moved (Firefox on a second screen: its numbers counted from that
+    // screen's corner): no 1:1 picture under it – that would be its own old picture – but the part
+    // around the drawing, fitted, the rest dimmed; it is never moved
+    await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
+    await evaluate("for (const [k, v] of Object.entries({ left: screen.width, availLeft: 0 })) Object.defineProperty(screen, k, { value: v, configurable: true }); window.qaMoves = 0; window.qaMoveTo = window.moveTo; window.moveTo = () => qaMoves++; true")
+    await tab(V)
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.2)), String(Math.round(r.t + r.h * 0.7)))
+    await browser('mouse', 'down')
+    await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.3)), String(Math.round(r.t + r.h * 0.75)))
+    await browser('mouse', 'up')
+    await tab(P)
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
+    const zoomed = await evaluate("(()=>{const f=document.querySelector('#spot').contentWindow;const d=f.document;return {layout:f.pvHelper.layout,part:f.pvHelper.part,dim:!d.querySelector('#dim').hidden,backdrop:!d.querySelector('#backdrop').hidden,moves:qaMoves}})()")
+    assert.equal(zoomed.layout, 'zoom', JSON.stringify(zoomed))
+    assert.ok(zoomed.dim && !zoomed.backdrop && zoomed.moves === 0, JSON.stringify(zoomed))
+    assert.ok(zoomed.part.x < 0.25 && 0.25 < zoomed.part.x + zoomed.part.w && zoomed.part.y < 0.72 && 0.72 < zoomed.part.y + zoomed.part.h, `the drawing in the part shown: ${JSON.stringify(zoomed.part)}`)
+    await evaluate("document.querySelector('#spot').contentWindow.pvHelper.park(); delete screen.left; delete screen.availLeft; window.moveTo = qaMoveTo; true")
+
     // the window gone from the screen: viewers see its last picture blurred with a note, never what
     // lies there now
     const dark = "(()=>{const v=document.querySelector('video');const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.drawImage(v,0,0);const d=x.getImageData(0,0,c.width,c.height).data;let s=0;for(let i=0;i<d.length;i+=4)s+=d[i];return s/(d.length/4)})()"

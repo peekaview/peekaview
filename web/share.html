@@ -252,6 +252,8 @@
     <!-- while sharing -->
     <section id="running" style="display:flex;flex-direction:column;gap:18px" hidden>
       <div class="live"><i class="dot"></i><span id="live-title">Dein Bildschirm wird geteilt</span><button class="pill extra" id="repick" type="button" hidden>Anderes Fenster wählen</button></div>
+      <!-- (Firefox, private window on a second screen: its numbers for the screen made up – nothing moves) -->
+      <p class="keep" id="stuck-note" style="margin:0" hidden>Firefox lässt dieses Fenster hier nicht verschieben (im privaten Fenster schützt es so vor Fingerprinting). Zeichnungen erscheinen deshalb hier im Fenster statt an ihrer Stelle. In einem normalen Firefox-Fenster oder in Chrome springt es dorthin.</p>
       <div class="step problem" id="place-problem" role="alert" hidden>
         <span class="step-icon" data-icon="window"></span>
         <div class="step-body">
@@ -562,7 +564,8 @@
       const height = 320
       // right where it stays: in the bottom right corner of this screen (usableArea: Firefox's numbers
       // for a second screen made whole). Where it cannot be moved later – Firefox on a second
-      // screen – it can only grow downwards: room for the window picker below it.
+      // screen – it can only grow downwards: as high as it gets while sharing (about 630 px with
+      // who watches), reaching down to the bottom (dock) while it shows less.
       const area = usableArea(screen)
       const left = Math.round(area.left + area.width - width - 16)
       // (height: the page's; the window is taller by its title and address bar, about 75 px)
@@ -777,8 +780,11 @@
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
       const width = PANEL_WIDTH + cx
-      const height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
+      let height = Math.min(Math.round(screen.availHeight * 0.9), Math.ceil(document.querySelector('main').scrollHeight) + cy)
       const area = usableArea(screen)
+      // (not to be moved – Firefox on a second screen: its top stays where it opened; down to the
+      // bottom of the screen all the same, never floating above it)
+      if (!movesWindows(screen)) height = Math.max(height, area.top + area.height - window.screenY - 16)
       const left = Math.round(area.left + area.width - width - 16)
       const top = Math.round(area.top + area.height - height - 16)
       const moved = movesWindows(screen) && (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2)
@@ -933,6 +939,7 @@
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
       if (!host) return
+      $('stuck-note').hidden = !panel || movesWindows(screen)
       const requests = host.requestList
       const fresh = requests.some((r) => !knownRequests.has(r.peer))
       knownRequests = new Set(requests.map((r) => r.peer))
