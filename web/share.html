@@ -640,6 +640,8 @@
       }
       $('start').disabled = !supported
       if (params.has('debug')) qaLog({ tab: 'Bildschirm gewählt', klickNochAktiv: navigator.userActivation?.isActive ?? null })
+      // (answered before the small window opens – the tab has the focus now, the question shows there)
+      await askClipboardEarly()
       // (the click spent: not even tried – the browser would only show "popup blocked")
       if (navigator.userActivation && !navigator.userActivation.isActive) return startReady(stream)
       openPanel(stream)
@@ -947,14 +949,31 @@
     })
 
     // ---------------------------------------------------------------- link
-    async function copyLink(quiet, from = window) {
+    // Written by the window clicked in (the always-on-top one, the small one, the helper): another
+    // window's clipboard is not focused – Chrome refuses, or asks where it cannot be seen.
+    async function copyLink(quiet, from = $('copy').ownerDocument.defaultView ?? window) {
       if (!host) return
       try {
         await from.navigator.clipboard.writeText(host.link)
         toast(quiet ? 'Der Link ist schon in deiner Zwischenablage – füge ihn z. B. in eine E-Mail oder einen Chat ein.' : 'Link kopiert.')
       } catch {
+        // (the old way, in that window: a hidden field copied)
+        if (!quiet && copyOldWay(from.document, host.link)) return toast('Link kopiert.')
         $('link').select()
         if (!quiet) toast('Bitte den Link markieren und kopieren.')
+      }
+    }
+    function copyOldWay(doc, text) {
+      try {
+        const field = Object.assign(doc.createElement('textarea'), { value: text, readOnly: true })
+        field.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0'
+        doc.body.append(field)
+        field.select()
+        const ok = doc.execCommand('copy')
+        field.remove()
+        return ok
+      } catch {
+        return false
       }
     }
     $('copy').addEventListener('click', () => copyLink(false))
@@ -986,6 +1005,21 @@
     const clipItems = () => host?.clip.all().map((it) => ({ ...host.clip.meta(it), preview: it.preview })) ?? []
     // where the panel is (the window "Freigabe läuft" may be a Picture-in-Picture one)
     const clipWindow = () => $('clip-box').ownerDocument.defaultView ?? window
+    async function clipboardReadState(w = window) {
+      try {
+        return (await w.navigator.permissions.query({ name: 'clipboard-read' })).state
+      } catch {
+        return 'unknown'
+      }
+    }
+    // Chrome, Edge: reading the clipboard ("Einfügen" in the shared clipboard) is asked for right after
+    // the screen is picked, here in the tab – later its question would hide behind the always-on-top
+    // window. (Firefox, Safari ask differently, each time: not here.)
+    async function askClipboardEarly() {
+      if (!documentPip || (await clipboardReadState()) !== 'prompt') return
+      // (not answered: the share goes on all the same)
+      await Promise.race([navigator.clipboard.readText().catch(() => {}), new Promise((done) => setTimeout(done, 20000))])
+    }
     function renderClip() {
       const n = host?.clip.all().length ?? 0
       $('clip-count').hidden = !n
@@ -1014,10 +1048,16 @@
         actions: {
           add: clipAdd,
           addFromPaste: (data) => clipAdd(filesFromClipboard(data)),
-          paste: () =>
-            readSystemClipboard()
+          // (read by the window clicked in – the always-on-top one: asked there, never hidden behind it;
+          // not allowed yet there: pasting with the keys needs no asking)
+          paste: async () => {
+            const w = clipWindow()
+            const keys = () => clipNotice(`Bitte hier ${/Mac/.test(navigator.platform) ? '⌘V' : 'Strg+V'} drücken.`)
+            if (w !== window && (await clipboardReadState(w)) !== 'granted') return keys()
+            readSystemClipboard(w.navigator)
               .then((list) => (list.length ? clipAdd(list) : clipNotice('Die Zwischenablage ist leer.')))
-              .catch(() => clipNotice(`Bitte hier ${/Mac/.test(navigator.platform) ? '⌘V' : 'Strg+V'} drücken.`)),
+              .catch(keys)
+          },
           copy: (item) => {
             const blob = host?.clip.blobOf(item.id)
             if (!blob) return clipNotice('Nicht mehr vorhanden.')
@@ -1229,7 +1269,9 @@
     // click (the one that picks the window, or its own): the running controls move into it. A
     // drawing shows there as a preview; "Ansehen" makes the window as large as it gets (only a
     // click may), "Zur Stelle" lays it over the very spot, "Kleiner" shrinks it again.
-    const PIP_SMALL = { width: 360, height: 300 }
+    // (tall enough for the controls, the footer and a join request or two without a scrollbar – it may
+    // grow only in a click in it)
+    const PIP_SMALL = { width: 360, height: 420 }
     const PIP_LARGE = { width: 4000, height: 3000 }
     let pipLarge = false
     let miniView = null
@@ -1249,6 +1291,12 @@
       win.document.body.classList.add('panel', 'pip')
       shareStyles(win.document)
       win.document.body.append(running, toastBox)
+      // more to show than room (requests, viewers): grows with the next click in it – the only time it may
+      win.document.addEventListener('pointerdown', () => {
+        if (pipLarge || win.document.body.classList.contains('pip-spotting')) return
+        const want = Math.ceil(naturalHeight(win.document.body))
+        if (want > win.innerHeight + 2) resizePip(win, { width: win.innerWidth, height: Math.min(720, want) })
+      }, true)
       $('in-pip').hidden = false
       // (the small window itself: it stays, small – the always-on-top one belongs to it)
       if (panel) {
@@ -1339,7 +1387,7 @@
     $('pip-small').addEventListener('click', async () => {
       miniView?.clear()
       endSpot()
-      const height = Math.min(600, Math.max(200, Math.ceil(naturalHeight($('running'))) + 28))
+      const height = Math.min(600, Math.max(PIP_SMALL.height, Math.ceil(naturalHeight($('running'))) + 28))
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
@@ -2045,7 +2093,7 @@
       admit: (peer, allow) => host?.admit(peer, allow),
       admitAll: () => host?.admitAll(),
       annotate: (m) => host?.annotate(m),
-      copyLink: () => copyLink(false),
+      copyLink: (from) => copyLink(false, from),
       stop: () => host?.stop(),
       // the helper shows a drawing over its spot, and is done: meanwhile no new pictures go out –
       // the helper is part of the screen's picture, viewers would see the drawing twice. (Inside the

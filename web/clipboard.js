@@ -159,9 +159,10 @@ export function filesFromClipboard(data) {
   return text ? [new File([text], 'Text.txt', { type: 'text/plain' })] : []
 }
 
-export async function readSystemClipboard() {
+/** @param nav the navigator of the window clicked in (another window's would ask in the wrong place) */
+export async function readSystemClipboard(nav = navigator) {
   const out = []
-  for (const item of await navigator.clipboard.read()) {
+  for (const item of await nav.clipboard.read()) {
     const image = item.types.find((t) => t.startsWith('image/'))
     if (image) {
       out.push(new File([await item.getType(image)], `Bild.${image.split('/')[1]}`, { type: image }))
