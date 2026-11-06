@@ -91,10 +91,13 @@
     .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.07); color: #a1a1aa; font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
         .tag svg { width: 10px; height: 10px; }
     .room.online em { color: #86efac; }
-    .room .forget { position: absolute; top: 6px; right: 6px; display: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #71717a; font-size: 14px; line-height: 1; cursor: pointer; }
-    .room:hover .forget { display: block; }
-    .room:hover em { visibility: hidden; }
-    .room .forget:hover { background: rgba(255,255,255,.1); color: #fafafa; }
+    /* remove a remembered room: a bin where its status is, while the pointer is on it */
+    .room .forget { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: none; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,.1); border-radius: 9px; background: #18181b; color: #a1a1aa; cursor: pointer; }
+    .room:hover .forget, .room:focus-within .forget { display: grid; }
+    .room:hover em, .room:focus-within em { visibility: hidden; }
+    .room .forget:hover, .room .forget:focus-visible { border-color: rgba(239,68,68,.6); background: rgba(239,68,68,.15); color: #fca5a5; outline: none; }
+    /* touch screens: no hover – always there, the status beside it */
+    @media (hover: none) { .room .forget { display: grid; } .room em, .room:hover em { visibility: visible; margin-right: 40px; } }
     .empty { margin: 0; padding: 14px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.12); color: #71717a; text-align: center; font-size: 13px; }
     .connect { display: flex; align-items: center; justify-content: center; gap: 10px; align-self: stretch; height: 52px; margin-top: 4px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .01em; cursor: pointer; transition: background .15s, transform .1s, opacity .15s; }
     .connect:hover:not(:disabled) { background: #dc2626; }
@@ -527,7 +530,8 @@
             li.querySelector('.sub').textContent = [who, last].filter(Boolean).join(' · ')
             li.querySelector('em').textContent = st.checking ? '' : st.online ? (st.busy ? 'belegt' : 'online') : 'offline'
             if (!r.link) {
-              const forget = Object.assign(document.createElement('button'), { type: 'button', className: 'forget', title: 'Vergessen', textContent: '×' })
+              const forget = Object.assign(document.createElement('button'), { type: 'button', className: 'forget', title: 'Raum entfernen', innerHTML: icon('trash', 16) })
+              forget.setAttribute('aria-label', `Raum „${strong.querySelector('b').textContent}“ entfernen`)
               forget.addEventListener('click', (e) => {
                 e.stopPropagation()
                 store(load().filter((x) => x.room !== r.room))
