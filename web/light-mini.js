@@ -12,7 +12,8 @@ import { calmFollow, softMove } from './light-geometry.js'
 // down timers and stop requestAnimationFrame.
 
 const W = 640
-const H = 400
+// (its height follows the room it is shown in – fit(); one preview per page)
+let H = 400
 const SHOW = 6500 // ms a spot stays
 const DRAW = 1000 // ms to draw a stroke again
 const IDLE = 2000 // ms: a pointer not moved this long fades out, no longer followed
@@ -41,6 +42,38 @@ export class MiniView {
     this.k = Math.max(1, k)
     this.canvas.width = Math.round(W * this.k)
     this.canvas.height = Math.round(H * this.k)
+    if (this.spot && !this.ticker) this.renderKept()
+    else this.render()
+  }
+
+  /**
+   * Shaped like the room it is shown in (CSS px): the part shown, too – so that it fills it, with no
+   * empty bands. Between 1:1 and 2:1 (wider or taller rooms: bands after all).
+   */
+  fit(width, height) {
+    if (!(width > 0 && height > 0)) return
+    const h = Math.round(Math.min(W, Math.max(W / 2, (W * height) / width)))
+    if (h === H) return
+    H = h
+    this.canvas.width = Math.round(W * this.k)
+    this.canvas.height = Math.round(H * this.k)
+    const spot = this.spot
+    if (spot) {
+      // (the same middle, the same width – as tall as the new shape wants, within the picture)
+      const img = spot.capture.image
+      const c = spot.crop
+      let w = c.w
+      let ch = (w * H) / W
+      if (ch > img.height) {
+        ch = img.height
+        w = (ch * W) / H
+      }
+      const cx = c.x + c.w / 2
+      const cy = c.y + c.h / 2
+      spot.crop = { x: Math.max(0, Math.min(img.width - w, cx - w / 2)), y: Math.max(0, Math.min(img.height - ch, cy - ch / 2)), w, h: ch }
+      spot.follow = {}
+      spot.move = { done: true }
+    }
     if (this.spot && !this.ticker) this.renderKept()
     else this.render()
   }

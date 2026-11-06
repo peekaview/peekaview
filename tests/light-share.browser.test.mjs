@@ -591,7 +591,14 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await waitFor("document.querySelector('#live-note').hidden || document.body.classList.contains('pip-spotting')")
 
     await stroke(0.3, 0.5)
-    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')
+    // the drawing in the place of the controls – the footer stays where it is; the preview shaped like
+    // its room (no empty bands), with the very picture (not black)
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display !== 'none' && getComputedStyle(document.querySelector('#requests-box')).display === 'none'"), true, 'the controls make room, the footer stays')
+    const shape = await evaluate("(()=>{const c=document.querySelector('#pip-canvas');const r=c.getBoundingClientRect();return {canvas: c.width / c.height, room: r.width / r.height, top: r.top, footer: document.querySelector('#run-footer').getBoundingClientRect().top}})()")
+    assert.ok(Math.abs(shape.canvas - Math.min(2, Math.max(1, shape.room))) < 0.03 && shape.top < shape.footer, JSON.stringify(shape))
+    await tab(S)
+    assert.equal(await evaluate("(()=>{const i=pvLight.lastReveal.capture.image;const d=i.getContext('2d').getImageData(0,0,i.width,i.height).data;let s=0;for(let k=0;k<d.length;k+=16)s+=d[k]+d[k+1]+d[k+2];return s>0})()"), true, 'not black')
+    await tab(P)
     // Anna moves her mouse: the preview follows it calmly – her pointer inside the part shown
     await tab(V)
     await browser('mouse', 'move', String(Math.round(r.l + r.w * 0.9)), String(Math.round(r.t + r.h * 0.45)))
