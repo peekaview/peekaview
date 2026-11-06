@@ -192,12 +192,35 @@
     body.panel .run-footer > .run-link { grid-column: 1; }
     body.panel .run-footer > .clip-open { grid-column: 2; }
     body.panel .run-footer .clip-long { display: none; }
-    body.panel .run-footer .pill { min-height: 36px; padding: 0 10px; }
     body.panel .run-footer .stop { justify-self: stretch; }
     body.panel .run-footer .keep { margin: 0; font-size: 12px; }
-    body.panel .toast { bottom: 136px; }
+    /* what viewers may: in the tab above; in small windows a compact switch in the footer (only there) */
+    .run-modes, .run-mode-note { display: none !important; }
+    /* (as in the desktop app's toolbar: a segmented switch, the one chosen light) */
+    body.panel .run-modes { display: flex !important; gap: 2px; padding: 2px; border-radius: 10px; background: #09090b; }
+    body.panel .run-modes button { flex: 1 1 auto; flex-direction: row; justify-content: center; gap: 5px; height: 28px; padding: 0 7px; border-radius: 8px; color: #a1a1aa; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
+    body.panel .run-modes button:hover { color: #fafafa; }
+    body.panel .run-modes button[aria-pressed="true"] { background: #fafafa; color: #09090b; }
+    body.panel .run-modes button svg { display: none; }
+    body.panel .run-modes button small { display: none; }
+    /* "Steuern": plainly only with the desktop app */
+    body.panel .run-modes button.unavailable { color: #71717a; }
+    body.panel .run-modes button.unavailable small { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #27272a; color: #d4d4d8; font-size: 10px; font-weight: 650; }
+    /* the buttons as in the desktop app's toolbar: quiet with a fine edge, "Beenden" reddish */
+    body.panel .pill { min-height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: #18181b; font-size: 12.5px; transition: background .15s; }
+    body.panel .pill:hover:not(:disabled) { background: #27272a; }
+    body.panel .pill.primary { border-color: transparent; background: #ef4444; }
+    body.panel .pill.primary:hover:not(:disabled) { background: #dc2626; }
+    body.panel .run-footer #copy { border-color: rgba(255,255,255,.08); background: #18181b; }
+    body.panel .run-footer #copy:hover { background: #27272a; }
+    body.panel .run-footer .stop { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); color: #fca5a5; }
+    body.panel .run-footer .stop:hover { background: rgba(239,68,68,.22); }
+    body.panel .run-mode-note { display: block !important; margin: -2px 0 0; font-size: 12px; }
+    body.panel .run-mode-note:empty { display: none !important; }
+    body.panel #running .extra:has(#running-modes) { display: none !important; }
+    body.panel .toast { top: 12px; bottom: auto; left: 12px; right: 12px; max-width: none; transform: none; }
     /* (scrolled to: never under the footer) */
-    html:has(body.panel), body.pip { scroll-padding-bottom: 150px; }
+    html:has(body.panel), body.pip { scroll-padding-bottom: 196px; }
     .stay { display: flex; align-items: center; gap: 16px; padding: 18px; border-radius: 16px; background: #27272a; }
     .stay-icon { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fafafa; color: #18181b; }
     .stay strong { display: block; font-size: 19px; }
@@ -354,11 +377,14 @@
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
       <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
       <div class="clip-box" id="clip-box" hidden></div>
-      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster</button>
+      <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, anderes Fenster</button>
       <!-- (small windows: the room between, so that the footer stays at the bottom) -->
       <div class="run-gap" id="run-gap" aria-hidden="true"></div>
       <!-- what is always there, always in the same place -->
       <footer class="run-footer" id="run-footer">
+        <!-- (small windows: what viewers may, switched right here) -->
+        <div class="modes run-modes" id="footer-modes" role="group" aria-label="Was dürfen die Zuschauer?"></div>
+        <p class="mode-note run-mode-note" id="footer-mode-note" role="status"></p>
         <div class="run-link">
           <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
           <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
@@ -455,6 +481,8 @@
     let panelWindow = null
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
+    // (small windows: "Beenden", as in the desktop app's toolbar)
+    if (panel) Object.assign($('stop'), { innerHTML: icon('stop', 15) + 'Beenden', title: 'Freigabe beenden' })
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null
@@ -985,6 +1013,7 @@
     function renderAll() {
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
+      renderModes($('footer-modes'), $('footer-mode-note'))
       if (!host) return
       $('stuck-note').hidden = !panel || movesWindows(screen)
       const requests = host.requestList
@@ -1203,7 +1232,7 @@
     $('more').addEventListener('click', () => {
       const open = $('running').classList.toggle('more')
       $('more').setAttribute('aria-expanded', String(open))
-      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, was Zuschauer dürfen, anderes Fenster'
+      $('more').textContent = open ? 'Weniger' : 'Mehr: wer zusieht, anderes Fenster'
       dock()
     })
 
