@@ -41,6 +41,7 @@
     .mode-note:empty { display: none; }
     /* on to PeekaView Desktop: the way there right in the note */
     .mode-note .pill, .note .pill { margin-top: 8px; }
+    .mode-note a { color: #fafafa; font-weight: 650; }
     .note .note-link { flex: none; padding: 0; border: 0; background: none; color: #fafafa; font: inherit; font-weight: 650; cursor: pointer; text-align: right; }
     .note .note-link:hover { text-decoration: underline; text-underline-offset: 3px; }
     .note .desktop-wait { display: block; margin-top: 6px; color: #a1a1aa; font-size: 12.5px; }
@@ -938,9 +939,15 @@
         setTimeout(() => (openingApp = false), 1000)
         window.pvLight.openApp(url)
       }
-      for (const id of ['running-mode-note', 'footer-mode-note']) if ($(id)?.textContent) desktopNote($(id))
+      let said = false
+      for (const id of ['running-mode-note', 'footer-mode-note']) {
+        if (!$(id)?.textContent) continue
+        desktopNote($(id))
+        said = true
+      }
+      // (said once: under "Steuern", if it was clicked – else in the note)
       $('desktop-wait').innerHTML = DESKTOP_WAIT
-      $('desktop-wait').hidden = false
+      $('desktop-wait').hidden = said
       $('desktop-continue').textContent = 'Noch einmal öffnen'
     }
     $('desktop-continue').addEventListener('click', continueInDesktop)
