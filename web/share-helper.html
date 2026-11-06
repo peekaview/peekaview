@@ -32,6 +32,8 @@
     #focus { position: fixed; inset: 0; overflow: hidden; background: #09090b; cursor: crosshair; touch-action: none; }
     #stage, #backdrop { position: absolute; }
     #shot { position: absolute; inset: 0; width: 100%; height: 100%; }
+    /* (a window that cannot jump: the part around the drawing bright, the rest of the picture dimmed) */
+    #dim { position: absolute; border-radius: 4px; box-shadow: 0 0 0 100vmax rgba(9,9,11,.62); pointer-events: none; }
     #focus-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
     #focus-bar > * { pointer-events: auto; }
     .chip { display: inline-flex; align-items: center; gap: 7px; min-width: 0; height: 28px; padding: 0 11px; border-radius: 999px; background: rgba(24,24,27,.85); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -58,7 +60,7 @@
 
   <div id="focus" hidden>
     <canvas id="backdrop" hidden></canvas>
-    <div id="stage"><canvas id="shot"></canvas></div>
+    <div id="stage"><canvas id="shot"></canvas><div id="dim" hidden></div></div>
     <div id="focus-bar"><span class="chip" id="focus-who"></span><span class="spacer"></span><button class="icon" id="focus-close" title="Zurück in die Ecke" aria-label="Zurück in die Ecke"></button></div>
     <span class="chip" id="focus-hint">Standbild – du kannst hier auch selbst zeigen und malen.</span>
   </div>
@@ -121,7 +123,10 @@
     let shown = null // the capture shown: {image, picture, monitor, screenImage} (picture: where it lies on the screen, null: unknown)
     let part = null // the part of the picture (0..1) the focus shows
     let stageBox = null // where the whole picture lies in the window (CSS px)
-    let spotLayout = false
+    // how the picture lies in the focus: 'spot' (1:1 over its place on the screen), 'zoom' (the part
+    // around the drawing, fitted – where the window cannot jump there), 'whole'
+    let layout = null
+    let zoom = null // 'zoom': {center, extent} of the drawing
     let idleTimer
     // one jump after the other
     let queue = Promise.resolve()
@@ -288,18 +293,19 @@
 
     // ---------------------------------------------------------------- jumping to a spot
 
-    const insideShown = (p) => state === 'focus' && part && inside(p, part, spotLayout ? 0.08 : 0)
+    const insideShown = (p) => state === 'focus' && part && inside(p, part, layout === 'spot' ? 0.08 : 0)
 
     /** Shows a capture: 1:1 over `center` (0..1 of the picture), large enough for `extent`. */
     async function show(capture, center, extent = { w: 0, h: 0 }) {
-      const stay = shown?.picture && capture.picture && center && insideShown(center) && Math.abs(shown.picture.left - capture.picture.left) < 2 && Math.abs(shown.picture.top - capture.picture.top) < 2
+      const stay = layout !== 'whole' && shown?.picture && capture.picture && center && insideShown(center) && Math.abs(shown.picture.left - capture.picture.left) < 2 && Math.abs(shown.picture.top - capture.picture.top) < 2
       shown = capture
       const shot = $('shot')
       shot.width = capture.image.width
       shot.height = capture.image.height
       shot.getContext('2d').drawImage(capture.image, 0, 0)
       const backdrop = $('backdrop')
-      backdrop.hidden = !capture.screenImage || !center
+      // (only 1:1 over its place: around a window that cannot jump it would be its own old picture)
+      backdrop.hidden = !capture.screenImage || !center || !movesWindows(win.screen)
       if (!backdrop.hidden) {
         backdrop.width = capture.screenImage.width
         backdrop.height = capture.screenImage.height
@@ -315,6 +321,10 @@
       $('focus').hidden = false
       try { win.focus() } catch {}
       // the next stroke in the part shown already: no need to move
+      if (stay && layout === 'zoom') {
+        zoom = { center, extent }
+        return placeDim()
+      }
       if (stay) return layoutSpot()
       const c = chrome()
       const { picture, monitor } = capture
@@ -332,6 +342,15 @@
         // where the browser actually put it (it keeps windows on the screen)
         await new Promise((done) => setTimeout(done, 150))
         if (shown === capture) layoutSpot()
+      } else if (center && !movesWindows(win.screen)) {
+        // (a window that cannot be moved – Firefox on a second screen: 1:1 it would show its own old
+        // picture) the part around the drawing, fitted into it – as large as it may get where it is
+        zoom = { center, extent }
+        // (never smaller: it reaches down to the bottom)
+        moveWindow(win.screenX, win.screenY, Math.max(win.outerWidth, SPOT.width + c.x), Math.max(win.outerHeight, SPOT.height + c.y))
+        layoutZoom()
+        await new Promise((done) => setTimeout(done, 150))
+        if (shown === capture) layoutZoom()
       } else {
         const box = { width: screen.availWidth * 0.6, height: screen.availHeight * 0.6 }
         const f = fit(capture.image, box)
@@ -344,7 +363,8 @@
     }
 
     function layoutSpot() {
-      spotLayout = true
+      layout = 'spot'
+      $('dim').hidden = true
       const c = chrome()
       const content = { left: win.screenX + c.x / 2, top: win.screenY + c.y - c.x / 2, width: win.innerWidth, height: win.innerHeight }
       place(stageInContent(content, shown.picture))
@@ -354,12 +374,51 @@
     }
 
     function layoutWhole() {
-      spotLayout = false
+      layout = 'whole'
+      $('dim').hidden = true
       place(fit(shown.image, { width: window.innerWidth, height: window.innerHeight }))
       part = { x: 0, y: 0, w: 1, h: 1 }
     }
 
-    window.addEventListener('resize', () => state === 'focus' && !spotLayout && shown && layoutWhole())
+    // the drawing (with a margin, at least a quarter of the picture) as large as fits, in the middle
+    // where the picture's edges allow; part shown: all of the window
+    function layoutZoom() {
+      layout = 'zoom'
+      const W = window.innerWidth
+      const H = window.innerHeight
+      const { width: iw, height: ih } = shown.image
+      const r = zoomRegion()
+      const s = Math.min(W / r.width, H / r.height, 1)
+      const sw = iw * s
+      const sh = ih * s
+      const at = (want, size, view) => (size <= view ? (view - size) / 2 : Math.min(0, Math.max(view - size, want)))
+      const left = at(W / 2 - (r.x + r.width / 2) * s, sw, W)
+      const top = at(H / 2 - (r.y + r.height / 2) * s, sh, H)
+      place({ left, top, width: sw, height: sh })
+      part = { x: Math.max(0, -left / sw), y: Math.max(0, -top / sh), w: Math.min(1, W / sw), h: Math.min(1, H / sh) }
+      placeDim()
+    }
+    /** The drawing's part of the picture (image pixels). */
+    function zoomRegion() {
+      const { width: iw, height: ih } = shown.image
+      const width = Math.min(iw, Math.max(zoom.extent.w * iw + 160, iw / 4))
+      const height = Math.min(ih, Math.max(zoom.extent.h * ih + 160, ih / 4))
+      const x = Math.min(iw - width, Math.max(0, zoom.center.x * iw - width / 2))
+      const y = Math.min(ih - height, Math.max(0, zoom.center.y * ih - height / 2))
+      return { x, y, width, height }
+    }
+    function placeDim() {
+      const r = zoomRegion()
+      const s = stageBox.width / shown.image.width
+      Object.assign($('dim').style, { left: `${r.x * s}px`, top: `${r.y * s}px`, width: `${r.width * s}px`, height: `${r.height * s}px` })
+      $('dim').hidden = false
+    }
+
+    window.addEventListener('resize', () => {
+      if (state !== 'focus' || !shown) return
+      if (layout === 'whole') layoutWhole()
+      else if (layout === 'zoom') layoutZoom()
+    })
 
     function place(box) {
       stageBox = box
@@ -445,6 +504,7 @@
       get state() { return state },
       get part() { return part },
       get stage() { return stageBox },
+      get layout() { return layout },
       get picture() { return shown?.picture ?? null },
       get found() { return shown?.found ?? null },
       get busy() { return $('busy').hidden ? '' : $('busy').textContent },
