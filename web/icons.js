@@ -34,7 +34,13 @@ const paths = {
   restore: '<rect x="4.5" y="8.5" width="11" height="11" rx="2"/><path d="M8.5 8.5V6.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"/>',
   minimize: '<path d="M5.5 17.5h13"/>',
   tile: '<rect x="3.5" y="4.5" width="7.5" height="15" rx="1.5"/><rect x="13" y="4.5" width="7.5" height="15" rx="1.5"/>',
+  // platforms on the start page
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5Z"/>',
+  android: '<path d="M4.5 17.5a7.5 7.5 0 0 1 15 0Z"/><path d="m7.6 11.2-1.8-2.9"/><path d="m16.4 11.2 1.8-2.9"/><circle cx="9.2" cy="14.4" r=".6" fill="currentColor"/><circle cx="14.8" cy="14.4" r=".6" fill="currentColor"/>',
+  winlogo: '<rect x="4" y="4" width="7" height="7" rx=".8"/><rect x="13" y="4" width="7" height="7" rx=".8"/><rect x="4" y="13" width="7" height="7" rx=".8"/><rect x="13" y="13" width="7" height="7" rx=".8"/>',
+  apple: '<path d="M12 7.6c-.9-.8-2-1.3-3.2-1.1C6.3 6.9 5 9.2 5.4 12.4c.5 3.6 2.6 7.1 4.4 7.1.8 0 1.3-.5 2.2-.5s1.4.5 2.2.5c1.5 0 3-2.3 3.9-4.6-1.7-.8-2.6-2.3-2.6-4.1 0-1.4.7-2.6 1.8-3.4-.8-1-2-1.5-3.2-1.4-.9.1-1.5.6-2.1 1.2Z"/><path d="M12 7.4c-.1-2 1-3.6 3-4"/>',
   windows: '<rect x="3.5" y="7.5" width="12" height="10" rx="1.5"/><path d="M8.5 7.5V5.5A1.5 1.5 0 0 1 10 4h8.5A1.5 1.5 0 0 1 20 5.5v8a1.5 1.5 0 0 1-1.5 1.5h-3"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>',
   grip: '<circle cx="9" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.1" fill="currentColor" stroke="none"/>',
   collapse: '<path d="m14.5 6-6 6 6 6"/>',

@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "viewer",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "-d", "web", "8090"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tests/light-fixture.mjs", "8090", "--real"],
       "port": 8090
     },
     {
