@@ -221,6 +221,15 @@
     body.panel #running { min-height: calc(100vh - 26px); }
     body.pip #running { min-height: calc(100vh - 28px); }
     body.panel .run-gap { display: block; flex: 1 0 0; margin-top: -12px; }
+    /* the live preview: the room left above the footer (none left: not shown) */
+    .live-view { display: none; }
+    body.panel .live-view:not([hidden]) { display: block; position: relative; flex: 1 1 0; min-height: 0; container-type: size; }
+    body.panel #running:has(.live-view:not([hidden])) .run-gap { display: none; }
+    .live-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+    .live-view canvas[hidden] { display: none; }
+    .live-note { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 10px 14px; border-radius: 10px; background: #09090b; color: #a1a1aa; font-size: 12.5px; text-align: center; overflow: hidden; }
+    .live-note[hidden] { display: none; }
+    @container (max-height: 56px) { .live-view canvas, .live-view .live-note { display: none; } }
     body.panel .run-footer { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 -14px -12px; padding: 10px 14px 12px; background: #18181b; }
     body.pip .run-footer { margin: 0 -14px -14px; padding-bottom: 14px; }
     body.panel .run-footer > * { grid-column: 1 / -1; }
@@ -369,6 +378,11 @@
           <p id="problem-text"></p>
           <div class="step-actions"><button class="pill primary" id="problem-check" type="button">Noch einmal prüfen</button><button class="pill" id="problem-screen" type="button">Anderen Bildschirm wählen</button></div>
         </div>
+      </div>
+      <!-- (small windows: what viewers see now, live – in the room above the footer) -->
+      <div class="live-view" id="live-view" hidden>
+        <canvas id="live-canvas" width="480" height="300" aria-label="Was deine Zuschauer gerade sehen"></canvas>
+        <p class="live-note" id="live-note" hidden>Dieses Fenster liegt über dem, was du teilst – deine Zuschauer sehen es mit. Schieb es zur Seite.</p>
       </div>
       <div class="pip-spot" id="pip-spot" hidden>
         <canvas id="pip-canvas"></canvas>
@@ -859,6 +873,7 @@
       renderClip()
       cropper = null
       cleanCapture = null
+      renderLive()
       screenStream = null
       windowLost = false
       for (const t of locator?.getTracks() ?? []) t.stop()
@@ -906,7 +921,8 @@
     let spotting = false
     function dock() {
       // (before the share: as large as the browser's screen picker needs)
-      if (!panel || spotting || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
+      // (a drawing as a preview: the size it has – the preview fills it)
+      if (!panel || spotting || document.body.classList.contains('pip-spotting') || (!$('pick').hidden && pickDrawing) || (!host && $('ended').hidden && $('pick').hidden)) return
       if (pip && !pip.closed) return tuck()
       const cx = Math.max(0, window.outerWidth - window.innerWidth)
       const cy = Math.max(0, window.outerHeight - window.innerHeight)
@@ -921,10 +937,15 @@
       const moved = movesWindows(screen) && (Math.abs(window.screenX - left) > 2 || Math.abs(window.screenY - top) > 2)
       if (moved || Math.abs(window.outerWidth - width) > 2 || Math.abs(window.outerHeight - height) > 2) placeWindow(window, { left, top, width, height })
     }
-    // how tall it is by its content (small windows: without the room kept between it and the footer)
+    // how tall it is by its content (small windows: without the room kept between it and the footer;
+    // the live preview as tall as it would like to be)
+    const LIVE_ROOM = 150
     function naturalHeight(el) {
       const gap = $('run-gap')
-      return el.scrollHeight - (el.contains(gap) ? gap.offsetHeight : 0)
+      const live = $('live-view')
+      let height = el.scrollHeight - (el.contains(gap) ? gap.offsetHeight : 0)
+      if (el.contains(live) && !live.hidden) height += LIVE_ROOM - live.offsetHeight
+      return height
     }
     function roomy() {
       if (!panel || (window.outerWidth >= PICKER_ROOM.width && window.outerHeight >= PICKER_ROOM.height)) return
@@ -1110,6 +1131,7 @@
     }
 
     function renderAll() {
+      renderLive()
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
       renderModes($('footer-modes'), $('footer-mode-note'))
@@ -1271,9 +1293,13 @@
       placed(problem)
       const peer = host.peers().list.find((p) => p.id === r.from)
       lastReveal = { ...r, capture, name: peer?.name ?? 'Jemand', color: peer?.color ?? '#ef4444', at: Date.now(), note: problem === 'not-found' ? 'Dein Fenster ist nicht zu finden' : problem ? 'Anderer Bildschirm' : '' }
-      emit({ kind: 'reveal', reveal: lastReveal })
-      if (pip) showInPip(lastReveal)
-      else notify(lastReveal)
+      // at its place (the helper, or the small window jumping there) only while a window of ours is
+      // the one in front: else it would open behind the others, and only confuse – then a preview in
+      // the window "Freigabe läuft", and "Am Fenster zeigen" brings it there
+      const front = ownFocus()
+      emit({ kind: 'reveal', reveal: lastReveal, jump: front })
+      if (pip || (panel && !front)) showSpot(lastReveal)
+      if (!pip && !front) notify(lastReveal)
     }
 
     // ---------------------------------------------------------------- the always-on-top window
@@ -1303,12 +1329,16 @@
       win.document.body.classList.add('panel', 'pip')
       shareStyles(win.document)
       win.document.body.append(running, toastBox)
-      // more to show than room (requests, viewers): grows with the next click in it – the only time it may
-      win.document.addEventListener('pointerdown', () => {
-        if (pipLarge || win.document.body.classList.contains('pip-spotting')) return
-        const want = Math.ceil(naturalHeight(win.document.body))
-        if (want > win.innerHeight + 2) resizePip(win, { width: win.innerWidth, height: Math.min(720, want) })
-      }, true)
+      // more to show than room (requests, viewers, the live picture): grows with the next click in it –
+      // the only time it may; right after the click (grown under the pointer first, the click would hit
+      // something else)
+      win.document.addEventListener('click', () => {
+        setTimeout(() => {
+          if (pip !== win || pipLarge || win.document.body.classList.contains('pip-spotting')) return
+          const want = Math.ceil(naturalHeight(win.document.body))
+          if (want > win.innerHeight + 2) resizePip(win, { width: win.innerWidth, height: Math.min(720, want) })
+        }, 0)
+      })
       $('in-pip').hidden = false
       // (the small window itself: it stays, small – the always-on-top one belongs to it)
       if (panel) {
@@ -1350,7 +1380,11 @@
     // small windows: another window, by a link
     $('repick-link').addEventListener('click', repick)
 
-    function showInPip(r) {
+    // the window "Freigabe läuft" itself: the always-on-top one, or the small one (Firefox) – and its document
+    const liveWindow = () => (pip && !pip.closed ? pip : panel ? window : null)
+    const spotDoc = () => (pip && !pip.closed ? pip.document : document)
+    /** A drawing as a preview in the window "Freigabe läuft" (the always-on-top one, or the small one). */
+    function showSpot(r) {
       if (!miniView) {
         miniView = new MiniView($('pip-canvas'))
         miniView.onDone = () => {
@@ -1358,7 +1392,7 @@
         }
       }
       $('pip-spot').hidden = false
-      pip.document.body.classList.add('pip-spotting')
+      spotDoc().body.classList.add('pip-spotting')
       // (before it is drawn: no picture with it goes out)
       holdPictures()
       miniView.reveal(r)
@@ -1386,14 +1420,15 @@
       renderPipButtons()
     }
     function renderPipButtons() {
-      $('pip-look').hidden = pipLarge
+      // ("Groß anzeigen": only the always-on-top window – the small one cannot lie over everything)
+      $('pip-look').hidden = pipLarge || !pip
       $('pip-jump').hidden = pipLarge
       $('pip-small').hidden = !pipLarge
     }
     // the controls again in place of the drawing
     function endSpot() {
       $('pip-spot').hidden = true
-      pip?.document.body.classList.remove('pip-spotting')
+      spotDoc().body.classList.remove('pip-spotting')
       holdPictures()
     }
 
@@ -1402,7 +1437,7 @@
     // keep the last one (else they would see it, and the preview itself, in the picture). Going on a
     // moment after it is gone (moving a window away takes a moment).
     let unholdTimer = null
-    const previewOver = () => !!pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && overShared(pip)
+    const previewOver = () => !!liveWindow() && spotDoc().body.classList.contains('pip-spotting') && overShared(liveWindow())
     function holdPictures() {
       if (!cropper) return
       if (spotting || pipLarge || previewOver()) {
@@ -1419,14 +1454,62 @@
         }, 300)
       }
     }
+    // ---------------------------------------------------------------- live, in the small windows
+    // What viewers see now – the very picture that goes out (held while it is held, the note while the
+    // window is not to be seen) – a few times a second, in the room above the footer. Not where this
+    // window is in that picture itself (it would show itself, again and again): a note to move it
+    // aside; not at all when the whole screen is shared (it always is).
+    let liveTicker = null
+    const outgoing = () => (cropper ? cropper.picture() : $('src-video').videoWidth ? $('src-video') : null)
+    const liveWanted = () => !!host && !!(panel || pip) && (cropper ? !!cropper.rect : host.surface !== 'monitor')
+    function renderLive() {
+      const small = !!host && !!(panel || pip)
+      $('live-view').hidden = !liveWanted()
+      if (small && !liveTicker) {
+        try {
+          liveTicker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 333)'], { type: 'text/javascript' })))
+          liveTicker.onmessage = drawLive
+        } catch {
+          const id = setInterval(drawLive, 333)
+          liveTicker = { terminate: () => clearInterval(id) }
+        }
+        drawLive()
+      } else if (!small && liveTicker) {
+        liveTicker.terminate()
+        liveTicker = null
+      }
+    }
+    function drawLive() {
+      const view = $('live-view')
+      // (the whole screen picked instead, or a window again: the room for it changes – dock sees it)
+      if (view.hidden === liveWanted()) view.hidden = !liveWanted()
+      if (view.hidden || !host || view.ownerDocument.body.classList.contains('pip-spotting') || document.body.classList.contains('spotting')) return
+      const own = pip && !pip.closed ? pip : panel ? window : null
+      const over = !!own && overShared(own)
+      $('live-note').hidden = !over
+      $('live-canvas').hidden = over
+      if (over) return
+      const src = outgoing()
+      const w = src?.displayWidth ?? src?.videoWidth ?? src?.width
+      const h = src?.displayHeight ?? src?.videoHeight ?? src?.height
+      if (!w || !h) return
+      const canvas = $('live-canvas')
+      const width = 480
+      const height = Math.max(1, Math.round((width * h) / w))
+      if (canvas.width !== width || canvas.height !== height) Object.assign(canvas, { width, height })
+      try {
+        canvas.getContext('2d').drawImage(src, 0, 0, width, height)
+      } catch {}
+    }
+
     // (the window may be moved over it, or away, meanwhile)
-    setInterval(() => pip && !pip.closed && pip.document.body.classList.contains('pip-spotting') && holdPictures(), 250)
+    setInterval(() => liveWindow() && spotDoc().body.classList.contains('pip-spotting') && holdPictures(), 250)
     /** Whether a window of ours lies over the shared one (unknown where: yes). */
     function overShared(w) {
-      const r = cropper?.rect
-      const full = cropper?.full
-      const mon = (lastReveal?.capture ?? cleanCapture)?.monitor
-      if (!r) return false
+      if (!cropper) return false
+      const full = cropper.full
+      const r = cropper.rect ?? { x: 0, y: 0, width: full?.width, height: full?.height }
+      const mon = (lastReveal?.capture ?? cleanCapture)?.monitor ?? monitorRect(screen, { mac: /Mac/.test(navigator.platform) })
       if (!mon || !full?.width || !full?.height) return true
       try {
         const a = { left: w.screenX, top: w.screenY, width: w.outerWidth, height: w.outerHeight }
@@ -1447,11 +1530,7 @@
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
-    $('pip-jump').addEventListener('click', () => {
-      miniView?.clear()
-      endSpot()
-      jumpHelper(pip)
-    })
+    $('pip-jump').addEventListener('click', () => jumpHelper(pip && !pip.closed ? pip : window))
 
     // Firefox, Safari: a notification – its click brings the browser forward, and the helper with it
     // (not while the presenter is in this window anyway: then it shows by itself, in front)
@@ -1492,6 +1571,9 @@
     let jumps = 0
     function jumpHelper(from = window) {
       if (!lastReveal || !host) return
+      // (the preview makes room)
+      miniView?.clear()
+      endSpot()
       // the small window is the helper: in front now (the click made the browser the active
       // program), it shows the drawing again. (From the always-on-top window: a helper of its own,
       // opened in that click – the small window would not come to the front from there.)
@@ -1595,6 +1677,18 @@
 
     // this page in front – then the browser may well lie over the shared window
     const inFront = () => !document.hidden && document.hasFocus()
+    // a window of ours is the one in front (this page – the small window or the tab –, the always-on-top
+    // one, the helper)
+    function ownFocus() {
+      const has = (w) => {
+        try {
+          return !!w && !w.closed && !w.document.hidden && w.document.hasFocus()
+        } catch {
+          return false
+        }
+      }
+      return has(window) || has(pip) || has(helper)
+    }
 
     /** The result of a search: found (null) or a problem – said only when the window could be seen. */
     function placed(problem) {

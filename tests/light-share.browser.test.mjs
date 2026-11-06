@@ -320,6 +320,14 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     const video = await evaluate("[document.querySelector('video').videoWidth, document.querySelector('video').videoHeight]")
     assert.ok(Math.abs(video[0] - win.width) <= 4 && Math.abs(video[1] - win.height) <= 4, `${video}`)
     assert.equal(await evaluate("document.querySelector('.pv-title').textContent"), 'Fenster')
+    // the small window shows, live, what goes out (the very picture: from the canvas cut out) – or,
+    // lying over the shared window, a note to move it aside
+    await tab(P)
+    await evaluate(`Object.defineProperties(window, { screenX: { get: () => ${win.x + win.width + 400}, configurable: true }, screenY: { get: () => ${win.y}, configurable: true } }); true`)
+    await waitFor("(()=>{const c=document.querySelector('#live-canvas');if(document.querySelector('#live-view').hidden||c.hidden)return false;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let s=0;for(let i=0;i<d.length;i+=16)s+=d[i]+d[i+1]+d[i+2];return s>0&&Math.abs(c.width/c.height-" + win.width / win.height + ")<0.02})()")
+    await evaluate(`Object.defineProperties(window, { screenX: { get: () => ${win.x + 20}, configurable: true }, screenY: { get: () => ${win.y + 20}, configurable: true } }); true`)
+    await waitFor("!document.querySelector('#live-note').hidden && document.querySelector('#live-canvas').hidden")
+    await tab(V)
 
     // a stroke: its place on the screen is the window's – no search
     await browser('click', '.pv-dock [data-tool=draw]')
@@ -360,10 +368,15 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
       throw new Error(`${e.message}\n${JSON.stringify(await evaluate('({crop: pvLight.crop, tracked: pvLight.tracked, picture: pvLight.lastReveal?.capture?.picture, at: pvLight.lastReveal?.at, now: Date.now()})'))}`)
     })
     const there = await evaluate('pvLight.lastReveal.capture.picture')
-    // a notification – its click brings the small window with the drawing to the front
+    // not in front: it does not jump (it would land behind the other programs) – a preview in the
+    // small window instead, with "Am Fenster zeigen" (no "Groß anzeigen": it cannot lie over everything)
+    await waitFor("document.body.classList.contains('pip-spotting') && !document.querySelector('#pip-spot').hidden")
+    assert.equal(await evaluate("!document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus' && document.querySelector('#pip-look').hidden && !document.querySelector('#pip-jump').hidden"), true)
+    // … and a notification – its click brings the small window with the drawing to the front, at its place
     assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
     await evaluate('delete document.hasFocus; qaNotes[0].onclick(); true')
     await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'")
+    assert.equal(await evaluate("document.body.classList.contains('pip-spotting')"), false, 'the preview made room')
     // (the move was noticed – in the video's way, pictures held back until it was found, or by the
     // search itself first: on a canvas only every third picture is checked)
     assert.ok((await evaluate('pvLight.frames')).held > still.held || (await evaluate('pvLight.tracked?.how')) !== 'nicht gefunden', 'noticed')
@@ -514,9 +527,21 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     const V = await idOf('name=Anna')
     await tab(P)
     await browser('wait', '#requests [data-allow]')
+    // (the headless browser does not grow the window: scrolled into view above the footer)
+    await evaluate("document.querySelector('#requests [data-allow]').scrollIntoView({ block: 'center' }); true")
     await browser('click', '#requests [data-allow]')
     await tab(V)
     await waitFor("document.querySelector('video')?.videoWidth > 0")
+    // the always-on-top window shows, live, what goes out (above the footer) – where it does not lie
+    // over the shared window
+    const shared = { left: win.x, top: win.y, width: win.width, height: win.height }
+    const placePip = (left, top) => evaluate(`Object.defineProperties(window, { screenX: { get: () => ${left}, configurable: true }, screenY: { get: () => ${top}, configurable: true }, outerWidth: { get: () => 360, configurable: true }, outerHeight: { get: () => 420, configurable: true } }); true`)
+    await tab(P)
+    await placePip(Math.round(shared.left + shared.width + 400), Math.round(shared.top))
+    const lit = "(()=>{const c=document.querySelector('#live-canvas');if(document.querySelector('#live-view').hidden||c.hidden)return false;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let s=0;for(let i=0;i<d.length;i+=16)s+=d[i]+d[i+1]+d[i+2];return s>0})()"
+    await waitFor(lit)
+    assert.equal(await evaluate("document.querySelector('#live-view').compareDocumentPosition(document.querySelector('#run-footer')) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false"), true)
+    await tab(V)
 
     // a stroke: a preview in the always-on-top window, in place of the controls (its size stays)
     await browser('click', '.pv-dock [data-tool=draw]')
@@ -532,13 +557,24 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     }
     // the window with the preview lying over the shared one: no new pictures meanwhile (viewers – and
     // the preview itself – would see it); moved off it: going on
-    const shared = { left: win.x, top: win.y, width: win.width, height: win.height }
-    const placePip = (left, top) => evaluate(`Object.defineProperties(window, { screenX: { get: () => ${left}, configurable: true }, screenY: { get: () => ${top}, configurable: true }, outerWidth: { get: () => 360, configurable: true }, outerHeight: { get: () => 420, configurable: true } }); true`)
     await tab(P)
     await placePip(Math.round(shared.left + shared.width / 2), Math.round(shared.top + shared.height / 2))
+    // (lying over it, it does not show itself live: a note to move it aside)
+    await waitFor("!document.querySelector('#live-note').hidden && document.querySelector('#live-canvas').hidden")
+    // (the presenter in another program: none of its windows in front – nothing jumps to the spot, the
+    // preview only)
+    await evaluate('document.hasFocus = () => false; true')
+    await tab(S)
+    await evaluate('document.hasFocus = () => false; true')
+    await tab(P)
     await stroke(0.2, 0.3)
     await tab(S)
     await waitFor('pvLight.frames.paused')
+    assert.equal(await evaluate("!document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus'"), true, 'the small window did not jump')
+    await evaluate('delete document.hasFocus; true')
+    await tab(P)
+    await evaluate('delete document.hasFocus; true')
+    await tab(S)
     const held = await evaluate('pvLight.frames.pausedFrames')
     await waitFor(`pvLight.frames.pausedFrames > ${held}`)
     // (another stroke meanwhile: shown on the last picture without the window over it)
@@ -552,6 +588,7 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await tab(S)
     await waitFor('!pvLight.frames.paused')
     await tab(P)
+    await waitFor("document.querySelector('#live-note').hidden || document.body.classList.contains('pip-spotting')")
 
     await stroke(0.3, 0.5)
     assert.equal(await evaluate("getComputedStyle(document.querySelector('#run-footer')).display"), 'none', 'the controls make room')

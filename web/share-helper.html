@@ -588,7 +588,8 @@
     const unsubscribe = api.subscribe((e) => {
       if (e.kind === 'status') onStatus(e)
       else if (e.kind === 'ann') onAnnotation(e.m)
-      else if (e.kind === 'reveal') onReveal(e.reveal)
+      // (not while none of the share's windows is in front: it would open behind the others)
+      else if (e.kind === 'reveal' && e.jump !== false) onReveal(e.reveal)
       else if (e.kind === 'jump') onJump()
     })
     window.addEventListener('pagehide', () => {

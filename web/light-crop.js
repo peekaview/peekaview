@@ -123,6 +123,11 @@ export class Cropper {
     }
   }
 
+  /** What goes out now (drawable – for the live preview): the last picture, or the note on black. */
+  picture() {
+    return this.blank && this.canvas ? this.canvas : this.last
+  }
+
   /** The part to share (source pixels), or null for the whole screen. */
   setRect(rect) {
     this.rect = rect ? { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) } : null
@@ -235,6 +240,11 @@ export class CanvasCropper {
 
   setBlank(note) {
     this.blank = note || null
+  }
+
+  /** What goes out now (drawable – for the live preview). */
+  picture() {
+    return this.shown ? this.canvas : null
   }
 
   setRect(rect) {
