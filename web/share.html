@@ -220,6 +220,12 @@
       <button class="connect" id="start" type="button"></button>
       <p class="hint" id="start-hint">Dein Browser fragt gleich, was du teilen möchtest. Am besten „Gesamter Bildschirm“ wählen.</p>
       <p class="error" id="start-error" role="alert" hidden></p>
+      <!-- the screen is picked, the small window could not open in that click: one more -->
+      <div id="start-ready" style="display:flex;flex-direction:column;gap:10px;align-items:center" hidden>
+        <p class="lead" style="margin:0;text-align:center">Dein Bildschirm ist ausgewählt. Klicke auf „Freigabe starten“ – dann öffnet sich das kleine Fenster „Freigabe läuft“.</p>
+        <button class="connect" id="start-open" type="button" style="align-self:stretch">Freigabe starten</button>
+        <button class="text-button" id="start-cancel" type="button">Abbrechen</button>
+      </div>
     </section>
     <aside class="screen-help" id="screen-help" role="note" aria-label="So teilst du deinen Bildschirm" hidden></aside>
 
@@ -489,13 +495,61 @@
     // in the tab: the small window takes over (it asks for the screen itself – the tab may be
     // closed, and with it everything it captured)
     // The browser's screen picker comes right in the click, here in the tab (it would not in a
-    // window opened by it, without a click there) – and in the same click the small window opens,
-    // which gets what was picked and does the rest. The capture belongs to this tab: it stays open.
-    function start() {
+    // window opened by it, without a click there). What was picked is checked here – a single
+    // window or tab is turned away in this tab, the small window does not even open. Then the small
+    // window opens, gets what was picked and does the rest. The capture belongs to this tab: it
+    // stays open. (The click is spent by then – after about 5 s, or in Safari at once: one more
+    // click, "Freigabe starten".)
+    let readyStream = null
+    async function start() {
       if (panel || !supported || !nameOrAsk()) return startHere()
+      $('start-error').hidden = true
+      $('start').disabled = true
       const picking = askScreen()
       helpWhile(picking)
-      picking.catch(() => {})
+      let stream
+      try {
+        stream = await picking
+        if (cropSupported && surfaceOf(stream.getVideoTracks()[0]) !== 'monitor') {
+          for (const t of stream.getTracks()) t.stop()
+          throw Object.assign(new Error('not the whole screen'), { name: 'NotWholeScreen' })
+        }
+      } catch (err) {
+        $('start').disabled = !supported
+        return showStartError(err)
+      }
+      $('start').disabled = !supported
+      if (params.has('debug')) qaLog({ tab: 'Bildschirm gewählt', klickNochAktiv: navigator.userActivation?.isActive ?? null })
+      // (the click spent: not even tried – the browser would only show "popup blocked")
+      if (navigator.userActivation && !navigator.userActivation.isActive) return startReady(stream)
+      openPanel(stream)
+    }
+    function startReady(stream) {
+      readyStream = stream
+      $('start').hidden = true
+      $('start-hint').hidden = true
+      $('start-ready').hidden = false
+      $('start-open').focus()
+      // (stopped in the browser's bar meanwhile: back to the start)
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => readyStream === stream && startUnready())
+    }
+    function startUnready() {
+      readyStream = null
+      $('start').hidden = false
+      $('start-hint').hidden = false
+      $('start-ready').hidden = true
+    }
+    $('start-open').addEventListener('click', () => {
+      const stream = readyStream
+      startUnready()
+      if (stream?.getVideoTracks()[0]?.readyState === 'live') openPanel(stream)
+    })
+    $('start-cancel').addEventListener('click', () => {
+      for (const t of readyStream?.getTracks() ?? []) t.stop()
+      startUnready()
+    })
+    function openPanel(stream) {
+      const picking = Promise.resolve(stream)
       window.pvLightPicking = picking
       const width = PANEL_WIDTH
       const height = 320
@@ -573,14 +627,18 @@
       }).catch((err) => {
         $('start').disabled = !supported
         closeHelper()
-        $('start-error').textContent = err?.name === 'NotWholeScreen'
-          ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab) – welches Fenster deine Zuschauer sehen, suchst du danach hier aus. Klicke noch einmal auf den Knopf.'
-          : err?.name === 'NotAllowedError'
-            ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf den Knopf.'
-            : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
-        $('start-error').hidden = false
+        showStartError(err)
         dock()
       })
+    }
+
+    function showStartError(err) {
+      $('start-error').textContent = err?.name === 'NotWholeScreen'
+        ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab). Keine Sorge: Danach kannst du das Teilen trotzdem auf ein einzelnes Fenster beschränken – PeekaView braucht den ganzen Bildschirm nur, um zu erkennen, wo dein Fenster liegt. Klicke noch einmal auf den Knopf.'
+        : err?.name === 'NotAllowedError'
+          ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf den Knopf.'
+          : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)
+      $('start-error').hidden = false
     }
 
     // (share.html?debug: to the local test server's log)
