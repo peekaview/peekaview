@@ -1234,7 +1234,9 @@
     // click (the one that picks the window, or its own): the running controls move into it. A
     // drawing shows there as a preview; "Ansehen" makes the window as large as it gets (only a
     // click may), "Zur Stelle" lays it over the very spot, "Kleiner" shrinks it again.
-    const PIP_SMALL = { width: 360, height: 300 }
+    // (tall enough for the controls, the footer and a join request or two without a scrollbar – it may
+    // grow only in a click in it)
+    const PIP_SMALL = { width: 360, height: 420 }
     const PIP_LARGE = { width: 4000, height: 3000 }
     let pipLarge = false
     let miniView = null
@@ -1254,6 +1256,12 @@
       win.document.body.classList.add('panel', 'pip')
       shareStyles(win.document)
       win.document.body.append(running, toastBox)
+      // more to show than room (requests, viewers): grows with the next click in it – the only time it may
+      win.document.addEventListener('pointerdown', () => {
+        if (pipLarge || win.document.body.classList.contains('pip-spotting')) return
+        const want = Math.ceil(naturalHeight(win.document.body))
+        if (want > win.innerHeight + 2) resizePip(win, { width: win.innerWidth, height: Math.min(720, want) })
+      }, true)
       $('in-pip').hidden = false
       // (the small window itself: it stays, small – the always-on-top one belongs to it)
       if (panel) {
@@ -1344,7 +1352,7 @@
     $('pip-small').addEventListener('click', async () => {
       miniView?.clear()
       endSpot()
-      const height = Math.min(600, Math.max(200, Math.ceil(naturalHeight($('running'))) + 28))
+      const height = Math.min(600, Math.max(PIP_SMALL.height, Math.ceil(naturalHeight($('running'))) + 28))
       closePip()
       await openPipWindow({ initial: true, size: { width: PIP_SMALL.width, height } })
     })
