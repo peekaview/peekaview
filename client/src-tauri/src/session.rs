@@ -339,7 +339,7 @@ pub fn parse_key(hex: &str) -> Option<[u8; 32]> {
     bytes.try_into().ok()
 }
 
-fn valid_secret(s: &str) -> bool {
+pub fn valid_secret(s: &str) -> bool {
     (16..=64).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_".contains(c))
 }
 

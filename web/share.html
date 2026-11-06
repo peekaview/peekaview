@@ -39,6 +39,12 @@
     .modes button.unavailable small { color: #71717a; }
     .mode-note { margin: 7px 0 0; color: #a1a1aa; font-size: 13px; }
     .mode-note:empty { display: none; }
+    /* on to PeekaView Desktop: the way there right in the note */
+    .mode-note .pill, .note .pill { margin-top: 8px; }
+    .note .note-link { flex: none; padding: 0; border: 0; background: none; color: #fafafa; font: inherit; font-weight: 650; cursor: pointer; text-align: right; }
+    .note .note-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .note .desktop-wait { display: block; margin-top: 6px; color: #a1a1aa; font-size: 12.5px; }
+    .note .desktop-wait a { color: #fafafa; white-space: normal; }
     .connect { display: flex; align-items: center; justify-content: center; gap: 10px; height: 52px; border: 0; border-radius: 14px; background: #ef4444; color: #fff; font: 700 16px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 10px 30px rgba(239,68,68,.35); }
     .connect:hover:not(:disabled) { background: #dc2626; }
     .connect:disabled { opacity: .45; cursor: default; box-shadow: none; }
@@ -376,7 +382,7 @@
         <p class="mode-note" id="running-mode-note" role="status"></p>
       </div>
       <div class="helper" id="helper"><span id="helper-text"></span><button class="pill" id="helper-open" type="button" hidden>Hilfsfenster öffnen</button><button class="pill" id="helper-locate" type="button" hidden>Bildschirm auswählen</button></div>
-      <div class="note extra"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <div class="note extra" id="desktop-note"><span class="note-icon" data-icon="screen"></span><p>Steuern, Sprache und mehr gehen nur mit PeekaView Desktop.<span class="desktop-wait" id="desktop-wait" hidden></span></p><button class="note-link" id="desktop-continue" type="button">In PeekaView Desktop weiterführen</button></div>
       <div class="clip-box" id="clip-box" hidden></div>
       <button class="text-button" id="more" type="button" aria-expanded="false">Mehr: wer zusieht, anderes Fenster</button>
       <!-- (small windows: the room between, so that the footer stays at the bottom) -->
@@ -413,11 +419,11 @@
 
     <!-- afterwards -->
     <section id="ended" style="display:flex;flex-direction:column;gap:18px" hidden>
-      <h1>Freigabe beendet</h1>
+      <h1 id="ended-title">Freigabe beendet</h1>
       <p class="lead" id="ended-why" style="margin:0">Niemand sieht deinen Bildschirm mehr.</p>
       <button class="connect" id="again" type="button">Noch einmal teilen</button>
       <button class="pill" id="panel-close" type="button" hidden>Fenster schließen</button>
-      <div class="note"><span class="note-icon" data-icon="screen"></span><p>Öfter teilen? Mit PeekaView Desktop geht viel mehr.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
+      <div class="note" id="ended-note"><span class="note-icon" data-icon="screen"></span><p>Öfter teilen? Mit PeekaView Desktop geht viel mehr.</p><a href="download.html" target="_blank" rel="noopener">Desktop-App holen</a></div>
     </section>
     <div id="debug-box" hidden style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:10px;background:#09090b">
         <canvas id="debug-view" style="width:100%;border-radius:6px"></canvas>
@@ -541,6 +547,8 @@
         }
         b.addEventListener('click', () => {
           if (m.id === 'control') {
+            // sharing: the share can go on in the desktop app, where viewers may control
+            if (host) return desktopNote(note)
             note.innerHTML = 'Steuern lassen geht nur mit <a href="download.html" target="_blank" rel="noopener" style="color:#fafafa">PeekaView Desktop</a>.'
             return
           }
@@ -779,7 +787,7 @@
           emit({ kind: 'ann', m })
           watch(m)
         },
-        onEnded: (why) => ended(why),
+        onEnded: (why, how) => ended(why, how),
       })
       await host.start()
       window.pvLight.host = host
@@ -800,8 +808,16 @@
       if (host.surface === 'monitor') setTimeout(checkPlace, 500)
     }
 
-    function ended(why) {
+    function ended(why, { moved = false } = {}) {
       host = null
+      handingOver = false
+      for (const id of ['running-mode-note', 'footer-mode-note']) if ($(id)) $(id).textContent = ''
+      $('desktop-wait').hidden = true
+      $('desktop-continue').textContent = 'In PeekaView Desktop weiterführen'
+      // went on in PeekaView Desktop: nothing ended for the viewers
+      $('ended-title').textContent = moved ? 'Läuft jetzt in PeekaView Desktop' : 'Freigabe beendet'
+      $('again').hidden = moved
+      $('ended-note').hidden = moved
       closeClip()
       renderClip()
       cropper = null
@@ -820,7 +836,9 @@
       closeHelper()
       $('running').hidden = true
       $('ended').hidden = false
-      $('ended-why').textContent = why || 'Niemand sieht deinen Bildschirm mehr.'
+      $('ended-why').textContent = moved
+        ? 'Deine Zuschauer sind mitgewechselt – mit demselben Link. Steuern lassen: in der Leiste von PeekaView Desktop auf „Steuern“. Die gemeinsame Zwischenablage fängt dort neu an. Dieses Fenster kannst du schließen.'
+        : why || 'Niemand sieht deinen Bildschirm mehr.'
       document.title = 'Im Browser teilen – PeekaView light'
       closePip()
       dock()
@@ -888,8 +906,44 @@
     $('stop').addEventListener('click', () => host?.stop())
     window.addEventListener('pagehide', () => host?.stop())
     window.addEventListener('beforeunload', (e) => {
-      if (host) e.preventDefault()
+      if (host && !openingApp) e.preventDefault()
     })
+
+    // ---------------------------------------------------------------- on to PeekaView Desktop
+    // "Steuern" needs the desktop app: the running share goes on there – the same link, viewers
+    // switch by themselves, nobody is asked again (light-host.js, handoverLink). Whether the app
+    // is installed only shows when it takes over (this share then ends: "Läuft jetzt in
+    // PeekaView Desktop"); until then the way to the download is said, too.
+    let handingOver = false
+    let openingApp = false
+    const DESKTOP_WAIT = 'PeekaView Desktop öffnet sich: Wähle dort, was du zeigen möchtest, und klicke auf „Freigabe starten“. Deine Zuschauer wechseln dann von selbst mit. Noch kein PeekaView Desktop? <a href="download.html" target="_blank" rel="noopener">Hier holen</a>, öffnen und noch einmal klicken.'
+    function desktopNote(note) {
+      note.innerHTML = handingOver
+        ? `${DESKTOP_WAIT}<br><button class="pill" type="button" data-continue>Noch einmal öffnen</button>`
+        : 'Steuern lassen geht nur mit PeekaView Desktop – deine Freigabe kann dort weiterlaufen, mit demselben Link.<br><button class="pill primary" type="button" data-continue>In PeekaView Desktop weiterführen</button>'
+      note.querySelector('[data-continue]').addEventListener('click', continueInDesktop)
+    }
+    function continueInDesktop() {
+      if (!host) return
+      const url = host.handoverLink()
+      handingOver = true
+      if (/Firefox\//.test(navigator.userAgent)) {
+        // Firefox shows an error page for a scheme without its app – in a hidden frame it fails quietly
+        const frame = Object.assign(document.createElement('iframe'), { hidden: true, src: url })
+        document.body.append(frame)
+        setTimeout(() => frame.remove(), 5000)
+      } else {
+        // (the page stays: no "Seite verlassen?" for it)
+        openingApp = true
+        setTimeout(() => (openingApp = false), 1000)
+        window.pvLight.openApp(url)
+      }
+      for (const id of ['running-mode-note', 'footer-mode-note']) if ($(id)?.textContent) desktopNote($(id))
+      $('desktop-wait').innerHTML = DESKTOP_WAIT
+      $('desktop-wait').hidden = false
+      $('desktop-continue').textContent = 'Noch einmal öffnen'
+    }
+    $('desktop-continue').addEventListener('click', continueInDesktop)
 
     // ---------------------------------------------------------------- link
     async function copyLink(quiet, from = window) {
@@ -1994,6 +2048,8 @@
       annotate: (m) => host?.annotate(m),
       copyLink: () => copyLink(false),
       stop: () => host?.stop(),
+      // opens PeekaView Desktop (peekaview://continue?…); the tests look at the link here instead
+      openApp: (url) => (location.href = url),
       // the helper shows a drawing over its spot, and is done: meanwhile no new pictures go out –
       // the helper is part of the screen's picture, viewers would see the drawing twice. (Inside the
       // small window, share-helper.html embedded: shown instead of the panel, then the panel again.)
