@@ -212,9 +212,8 @@
     body.panel .run-modes button[aria-pressed="true"] { background: #fafafa; color: #09090b; }
     body.panel .run-modes button svg { flex: none; width: 14px; height: 14px; }
     body.panel .run-modes button small { display: none; }
-    /* "Steuern": plainly only with the desktop app */
+    /* "Steuern": greyed – only with the desktop app (said by its tooltip, and when clicked) */
     body.panel .run-modes button.unavailable { color: #71717a; }
-    body.panel .run-modes button.unavailable small { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #27272a; color: #d4d4d8; font-size: 9.5px; font-weight: 650; }
     /* the buttons as in the desktop app's toolbar: quiet with a fine edge, "Beenden" reddish */
     body.panel .pill { min-height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: #18181b; font-size: 12.5px; transition: background .15s; }
     body.panel .pill:hover:not(:disabled) { background: #27272a; }
@@ -530,15 +529,14 @@
       $('name').classList.remove('invalid')
     })
 
-    /** @param compact the footer's switch (small windows): "Steuern" marked "Desktop" */
-    function renderModes(box, note, compact = false) {
+    function renderModes(box, note) {
       box.replaceChildren(...MODES.map((m) => {
         const b = document.createElement('button')
         b.type = 'button'
         b.dataset.mode = m.id
         b.innerHTML = icon(m.id, 18) + '<span></span><small></small>'
         b.querySelector('span').textContent = m.name
-        b.querySelector('small').textContent = compact && m.id === 'control' ? 'Desktop' : m.note
+        b.querySelector('small').textContent = m.note
         b.setAttribute('aria-pressed', String(mode === m.id))
         if (m.id === 'control') {
           b.classList.add('unavailable')
@@ -1036,7 +1034,7 @@
     function renderAll() {
       renderModes($('setup-modes'), $('setup-mode-note'))
       renderModes($('running-modes'), $('running-mode-note'))
-      renderModes($('footer-modes'), $('footer-mode-note'), true)
+      renderModes($('footer-modes'), $('footer-mode-note'))
       if (!host) return
       const requests = host.requestList
       const fresh = requests.some((r) => !knownRequests.has(r.peer))
