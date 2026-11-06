@@ -481,8 +481,6 @@
     let panelWindow = null
     const panel = params.has('panel')
     document.body.classList.toggle('panel', panel)
-    // (small windows: "Beenden", as in the desktop app's toolbar)
-    if (panel) Object.assign($('stop'), { innerHTML: icon('stop', 15) + 'Beenden', title: 'Freigabe beenden' })
     let mode = MODES.some((m) => m.id === params.get('mode') && m.id !== 'control') ? params.get('mode') : 'draw'
     let host = null
     let helper = null
@@ -512,6 +510,8 @@
       $('name').parentElement.hidden = !!$('name').value.trim()
       $('panel-close').hidden = false
       $('start').innerHTML = icon('share', 20) + 'Bildschirm auswählen'
+      // ("Beenden", as in the desktop app's toolbar)
+      Object.assign($('stop'), { innerHTML: icon('stop', 15) + 'Beenden', title: 'Freigabe beenden' })
       $('run-keep').textContent = 'Schließt du dieses Fenster, endet die Freigabe.'
       // what was picked in the tab's click, handed over (else the button below asks here)
       let handed = null
