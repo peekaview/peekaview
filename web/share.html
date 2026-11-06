@@ -614,7 +614,7 @@
 
     function showStartError(err) {
       $('start-error').textContent = err?.name === 'NotWholeScreen'
-        ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab) – welches Fenster deine Zuschauer sehen, suchst du danach hier aus. Klicke noch einmal auf den Knopf.'
+        ? 'Bitte wähle im Fenster deines Browsers „Gesamter Bildschirm“ (nicht ein einzelnes Fenster oder einen Tab). Keine Sorge: Danach kannst du das Teilen trotzdem auf ein einzelnes Fenster beschränken – PeekaView braucht den ganzen Bildschirm nur, um zu erkennen, wo dein Fenster liegt. Klicke noch einmal auf den Knopf.'
         : err?.name === 'NotAllowedError'
           ? 'Du hast nichts zum Teilen ausgewählt (oder der Browser hat es nicht erlaubt). Klicke noch einmal auf den Knopf.'
           : 'Das Teilen hat nicht geklappt: ' + (err?.message || err)

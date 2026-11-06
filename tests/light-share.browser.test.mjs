@@ -208,7 +208,7 @@ test('only the whole screen is taken: a single window or tab picked in the brows
     // nothing shared, no small window opened at all
     await evaluate("document.querySelector('#start').click(); true")
     await waitFor("!document.querySelector('#start-error').hidden")
-    assert.match(await evaluate("document.querySelector('#start-error').textContent"), /„Gesamter Bildschirm“[\s\S]*suchst du danach hier aus/)
+    assert.match(await evaluate("document.querySelector('#start-error').textContent"), /„Gesamter Bildschirm“[\s\S]*Keine Sorge[\s\S]*auf ein einzelnes Fenster beschränken[\s\S]*wo dein Fenster liegt/)
     assert.equal(await evaluate("document.querySelector('#pick').hidden && document.querySelector('#running').hidden && !pvLight.host && !document.querySelector('#start').disabled"), true)
     await waitFor('1')
     assert.deepEqual(await evaluate('qaOpened'), [], 'no window opened')
