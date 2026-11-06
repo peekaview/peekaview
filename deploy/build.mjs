@@ -8,9 +8,9 @@ const web = resolve(here, '../web')
 const dist = resolve(here, 'dist')
 const files = [
   'index.html', 'viewer.js', 'windows.js', 'signal.js', 'annotate.js',
-  'icons.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
+  'icons.js', 'home-scene.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
   'fixed-rooms.html', 'fixed-rooms.js', 'fixed-rooms.css', 'room-sw.js', 'download.html',
-  'impressum.html', 'datenschutz.html', 'sicherheit.html', 'legal.css', 'legal.js',
+  'impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'legal.css', 'legal.js',
   'room-pcm-worklet.js',
   // "Bildschirmfreigabe light": sharing from the browser
   'share.html', 'share-helper.html', 'light-host.js', 'light-geometry.js', 'light-locate.js',

@@ -9,7 +9,7 @@
   <style>
     html, body { margin: 0; height: 100%; background: #09090b; color: #fafafa; }
     [hidden] { display: none !important; }
-    body { display: flow-root; font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    body { display: flex; flex-direction: column; height: auto; min-height: 100%; font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
     #viewer { position: fixed; inset: 0; height: 100%; overflow: hidden; }
     #contacts-dialog { box-sizing: border-box; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3f3f46; border-radius: 18px; background: #18181b; color: #fafafa; box-shadow: 0 24px 80px #0009; }
     #contacts-dialog[open] { display: flex; flex-direction: column; }
@@ -20,7 +20,7 @@
     #contacts-close:hover { background: #3f3f46; }
     #contacts-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     #contacts-content { min-height: 0; overflow-y: auto; padding: 20px; }
-    #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: min(560px, calc(100% - 32px)); margin: 9vh auto 0; padding: 28px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 560px; margin: 0; padding: 28px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     /* the trust badge always top right (next to the profile, when signed in); shorter on phones */
     .brand #trust { margin-left: auto; }
@@ -119,11 +119,76 @@
     #name-edit:hover { background: rgba(255,255,255,.08); color: #fafafa; }
     #name-edit:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* the teaser: globe behind, headline with the owl and what PeekaView is about beside the card */
+    #viewer { z-index: 2; }
+    #landing { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 28px; width: min(1180px, calc(100% - 32px)); margin: 6vh auto 0; }
+    #hero, #features, #stage { width: 100%; max-width: 560px; }
+    /* the remote screen, the owl peeking over its top edge */
+    #stage { position: relative; margin-top: 70px; }
+    #scene { position: relative; z-index: 1; display: block; width: 100%; aspect-ratio: 8 / 5; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 60px rgba(239,68,68,.08); }
+    #stage .owl-peek { position: absolute; z-index: 0; left: 8%; bottom: calc(100% - 4px); width: clamp(84px, 11vw, 124px); aspect-ratio: 124 / 80; }
+    #stage .owl-peek > div { aspect-ratio: 1; }
+    #hero { text-align: center; }
+    .owl-peek { display: block; overflow: hidden; color: #fafafa; cursor: pointer; }
+    .owl-peek > div { width: 100%; }
+    .hero-owl { width: 100%; height: 100%; display: block; transform-origin: 50% 85%; }
+    .hero-title { margin: 6px 0 0; font-size: clamp(30px, 6.4vw, 54px); line-height: 1.05; font-weight: 800; letter-spacing: -.03em; }
+    .hero-word { display: inline-block; color: #ef4444; }
+    .hero-word.out { animation: word-out .28s ease-in forwards; }
+    .hero-word.in { animation: word-in .38s cubic-bezier(.3,.7,.4,1); }
+    @keyframes word-out { to { opacity: 0; transform: translateY(-.35em); filter: blur(4px); } }
+    @keyframes word-in { from { opacity: 0; transform: translateY(.35em); filter: blur(4px); } }
+    .hero-lead { max-width: 30em; margin: 14px auto 0; color: #a1a1aa; font-size: 16px; line-height: 1.55; }
+    #features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+    #features li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: rgba(24,24,27,.72); backdrop-filter: blur(8px); }
+    #features .feature-icon { flex: none; display: flex; color: #ef4444; }
+    #features .feature-icon svg { width: 30px; height: 30px; stroke-width: 1.9; }
+    #features strong { display: block; font-size: 14px; font-weight: 700; }
+    #features span { display: block; margin-top: 2px; color: #a1a1aa; font-size: 12.5px; line-height: 1.45; }
+    #features a { color: #d4d4d8; text-underline-offset: 3px; }
+    .hero-lead, .hero-title { text-shadow: 0 2px 18px #09090b, 0 0 4px #09090b; }
+    @media (max-width: 1039px) { #landing { margin-top: 20px; gap: 20px; } #stage { margin-top: 64px; } }
+    /* phones: the card close to the top – the reasons follow below it */
+    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } }
+    /* wide screens: headline and reasons left, the card right */
+    @media (min-width: 1040px) {
+      #landing { grid-template-columns: minmax(0, 1fr) 540px; grid-template-areas: "hero home" "stage home" "features features"; align-items: start; justify-items: stretch; column-gap: 64px; row-gap: 28px; margin-top: 5vh; }
+      #hero { grid-area: hero; max-width: none; text-align: left; }
+      .hero-lead { margin-left: 0; }
+      #stage { grid-area: stage; max-width: none; margin-top: 70px; }
+      #features { grid-area: features; max-width: none; margin-top: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      #home { grid-area: home; }
+    }
+    /* someone with a link, a share being watched, the apps: only the card */
+    body.solo #hero, body.solo #features, body.solo #stage, body.solo #topbar { display: none; }
+    /* the page's own header names PeekaView – the card need not repeat it */
+    #topbar { position: relative; display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: min(1180px, calc(100% - 32px)); margin: 22px auto 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+    #topbar i { display: flex; }
+    @media (max-width: 360px) { #topbar { font-size: 18px; gap: 7px; } #topbar svg { width: 28px; height: 28px; } }
+    /* the footer at the bottom edge of the window, quiet */
+    #footer { margin-top: auto; padding-top: 36px; padding-bottom: 14px; gap: 4px 18px; font-size: 12px; }
+    #footer a { color: #71717a; }
+    #footer a:hover { color: #d4d4d8; }
+    body:not(.solo) .brand #logo, body:not(.solo) .brand .brand-name { display: none; }
+    /* the trust badge top right of the page; the card's top row only while it holds the profile */
+    #topbar #trust { margin-left: auto; }
+    body:not(.solo) .brand:not(:has(#profile:not([hidden]))) { display: none; }
+    body:not(.solo) .brand #profile { margin-left: auto; }
+    /* the card stands out from the page: lighter, a red edge and glow */
+    body:not(.solo) #home { border-color: rgba(239,68,68,.35); background: linear-gradient(180deg, #232327 0%, #1a1a1d 100%); box-shadow: 0 0 0 4px rgba(239,68,68,.06), 0 30px 80px rgba(0,0,0,.55), 0 0 90px rgba(239,68,68,.14); }
+    body.solo #landing { grid-template-columns: minmax(0, 1fr); grid-template-areas: "home"; justify-items: center; margin-top: 9vh; }
+    body.solo #home { max-width: 560px; }
   </style>
 </head>
 <body>
+  <header id="topbar"><i id="top-logo"></i>PeekaView</header>
+  <div id="landing">
+  <section id="hero" aria-labelledby="hero-title">
+    <h2 class="hero-title" id="hero-title">Mal eben schnell<br><span class="hero-word" id="hero-word">was zeigen.</span></h2>
+    <p class="hero-lead">Schick Oma, deiner Kollegin oder einem Kunden einen Link – ein Klick, und ihr schaut gemeinsam auf denselben Bildschirm. Mit PeekaView Desktop hilft dir jemand auch direkt mit Maus und Tastatur. Ende-zu-Ende verschlüsselt, ohne Konto, kostenlos.</p>
+  </section>
   <main id="home">
-    <div class="brand"><i id="logo"></i>PeekaView<a id="trust" class="pv-trust" href="sicherheit.html" data-legal title="Wie PeekaView schützt">P2P · Ende-zu-Ende verschlüsselt</a><div id="profile" hidden></div></div>
+    <div class="brand"><i id="logo"></i><span class="brand-name">PeekaView</span><a id="trust" class="pv-trust" href="sicherheit.html" data-legal title="Wie PeekaView schützt">P2P · Ende-zu-Ende verschlüsselt</a><div id="profile" hidden></div></div>
     <nav class="home-nav" aria-label="Was möchtest du tun?">
       <button type="button" data-home="link" aria-pressed="true">Link öffnen</button>
       <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
@@ -158,6 +223,9 @@
   <section id="fixed-room-entry" hidden><div id="fixed-rooms"></div></section>
     <div id="host-note"></div>
   </main>
+  <div id="stage" aria-hidden="true"><div class="owl-peek" id="hero-owl" title="Kuckuck!"></div><canvas id="scene" hidden></canvas></div>
+  <ul id="features" aria-label="Warum PeekaView"></ul>
+  </div>
   <dialog id="contacts-dialog" aria-labelledby="contacts-title">
     <header class="contacts-head"><h2 id="contacts-title">Kontakte</h2><button id="contacts-close" type="button" aria-label="Kontakte schließen" autofocus></button></header>
     <div id="contacts-content"></div>
@@ -167,7 +235,7 @@
     <p id="opened-text"></p>
     <button id="open-web" type="button">Doch hier im Browser ansehen</button>
   </div>
-  <footer class="pv-footer" id="footer"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
+  <footer class="pv-footer" id="footer"><a href="warum.html">Warum machen wir das?</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a></footer>
   <div id="viewer" hidden></div>
 
   <script type="module">
@@ -178,12 +246,27 @@
     import { mountViewer } from './viewer.js'
     import { mountRooms, openRoom } from './fixed-rooms.js'
     import { icon, owl } from './icons.js'
+    import { mountOwl, startScene } from './home-scene.js'
     import './legal.js'
     import { Signaling, parseRoom } from './signal.js'
 
     const $ = (id) => document.getElementById(id)
+    // why PeekaView: the reasons beside the card
+    for (const [name, title, text] of [
+      ['screen', 'Mal eben schnell was zeigen', 'Link schicken, fertig.'],
+      ['control', 'Fernsteuern', 'Maus und Tastatur übergeben – mit PeekaView Desktop.'],
+      ['draw', 'Mal eben was teilen', 'Zeigen, malen, gemeinsame Zwischenablage.'],
+      ['users', 'Ohne Account-Zwang', 'Kein Konto, keine E-Mail.'],
+      ['check', 'Frei', 'Kostenlos und <a href="https://github.com/peekaview/peekaview" target="_blank" rel="noopener">Open Source</a>.'],
+      ['lock', 'P2P · Ende-zu-Ende verschlüsselt', 'Kein Server sieht mit. <a href="sicherheit.html" data-legal>Mehr</a>'],
+    ]) {
+      const li = document.createElement('li')
+      li.innerHTML = `<i class="feature-icon">${icon(name, 30)}</i><div><strong></strong><span>${text}</span></div>`
+      li.querySelector('strong').textContent = title
+      $('features').append(li)
+    }
     {
-      const title = Object.assign(document.createElement('p'), { className: 'host-title', textContent: 'Selbst den Bildschirm zeigen?' })
+      const title = Object.assign(document.createElement('p'), { className: 'host-title', textContent: 'Selbst zeigen oder fernsteuern lassen?' })
       const actions = Object.assign(document.createElement('div'), { className: 'host-actions' })
       const download = Object.assign(document.createElement('a'), { className: 'pv-download', href: 'download.html', target: '_blank', rel: 'noopener' })
       download.innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen'
@@ -207,6 +290,7 @@
     const KEY = 'pv-rooms'
     const MAX = 10
     $('logo').innerHTML = owl(32)
+    $('top-logo').innerHTML = owl(34)
     $('contacts-close').innerHTML = icon('close',18)
     $('contacts-close').addEventListener('click',()=>$('contacts-dialog').close())
     $('contacts-dialog').addEventListener('close',()=>{
@@ -246,6 +330,7 @@
     let homeView=linkRoom ? 'link' : (()=>{try{return localStorage.getItem('pv-start-view')==='contacts'?'contacts':'link'}catch{return 'link'}})()
     function showHome(){
       $('home').hidden=!!viewer || !$('opened').hidden
+      updateTeaser()
       // not inside the apps, not over a running share
       $('footer').hidden=inApp || !!viewer
       // someone who came with a link has exactly one thing to do: enter a name and join
@@ -468,6 +553,37 @@
       render()
     }
 
+    // ---------------------------------------------------------------- teaser
+    // the globe and the owl only for the start page itself – not for someone who came with a link,
+    // not inside the apps, not while a share is watched (it would cost the video its frames)
+    const params0 = new URLSearchParams(location.search)
+    const teaserWanted = !(typeof window.__PV_JOIN__ === 'string' || params0.get('app') === '1')
+    let scene = null, owlMounted = false
+    function updateTeaser() {
+      const solo = !teaserWanted || !!linkRoom || !!viewer || !$('opened').hidden
+      document.body.classList.toggle('solo', solo)
+      // the trust badge: top right of the page – in the card when only the card is shown
+      if (!solo) $('topbar').append($('trust'))
+      else if (!document.querySelector('.brand #trust')) document.querySelector('.brand .brand-name').after($('trust'))
+      if (!teaserWanted) return
+      if (viewer || !$('opened').hidden) scene?.stop()
+      else if (scene) scene.start()
+      else scene = startScene($('scene'))
+      // the owl watches the remote mouse while the visitor's own rests
+      if (!owlMounted && !solo) { owlMounted = true; mountOwl($('hero-owl'), { watch: () => scene?.cursor() }) }
+    }
+    // the headline's last words, one after the other
+    {
+      const words = ['was zeigen.', 'fernsteuern.', 'was teilen.', 'helfen lassen.']
+      let n = 0
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => {
+        const el = $('hero-word')
+        if (document.hidden || document.body.classList.contains('solo')) return
+        el.className = 'hero-word out'
+        setTimeout(() => { n = (n + 1) % words.length; el.textContent = words[n]; el.className = 'hero-word in' }, 280)
+      }, 2600)
+    }
+
     let probeTimer
     // the room joined from this page (remembered once it turns out to be permanent)
     let joined = null
@@ -528,6 +644,7 @@
           }
         },
       })
+      updateTeaser()
     }
 
     /** Back to the start page. */
@@ -592,6 +709,7 @@
           ? 'In der PeekaView-App geöffnet. Du kannst dieses Fenster schließen.'
           : 'In PeekaView Desktop geöffnet. Du kannst dieses Fenster schließen.'
         $('opened').hidden = false
+        updateTeaser()
       }
       window.addEventListener('blur', onBlur, { once: true })
       setTimeout(() => window.removeEventListener('blur', onBlur), 3000)
