@@ -125,6 +125,8 @@ struct WindowArea {
     crop: Rect,
     /// other windows of the app, left out of the picture
     excepted: Vec<u32>,
+    /// PeekaView's toolbar is in the picture (it comes up only after the capture started)
+    toolbar: bool,
     checked: Instant,
 }
 
@@ -134,13 +136,17 @@ fn display_rect(d: &SCDisplay) -> Rect {
 }
 
 /// Filter for a window: the display under its centre, only the window's app on it – without the
-/// app's other windows (`guard::foreign_windows_of_app`).
+/// app's other windows (`guard::foreign_windows_of_app`) – and PeekaView's toolbar where it lies
+/// over the window (viewers may use it, marked as the presenter's).
 fn window_filter(id: u32, rect: Rect, excepted: &[u32]) -> Result<(SCContentFilter, Rect), String> {
     let content = SCShareableContent::get().map_err(|e| e.to_string())?;
     let all = content.windows();
     let window = all.iter().find(|w| w.window_id() == id).ok_or("Fenster nicht gefunden")?;
     let except: Vec<&SCWindow> = all.iter().filter(|w| excepted.contains(&w.window_id())).collect();
     let app = window.owning_application().ok_or("Anwendung des Fensters nicht gefunden")?;
+    let me = std::process::id() as i32;
+    let toolbar = all.iter().find(|w| crate::guard::is_toolbar(w.window_id())).and_then(|w| w.owning_application()).filter(|a| a.process_id() == me);
+    let apps: Vec<&_> = std::iter::once(&app).chain(toolbar.as_ref()).collect();
     let (cx, cy) = (rect.x + rect.w / 2, rect.y + rect.h / 2);
     let displays = content.displays();
     let display = displays
@@ -148,8 +154,12 @@ fn window_filter(id: u32, rect: Rect, excepted: &[u32]) -> Result<(SCContentFilt
         .find(|d| display_rect(d).contains(cx, cy))
         .or(displays.first())
         .ok_or("Bildschirm nicht gefunden")?;
-    let filter = SCContentFilter::create().with_display(display).with_including_applications(&[&app], &except).build().map_err(|e| e.to_string())?;
+    let filter = SCContentFilter::create().with_display(display).with_including_applications(&apps, &except).build().map_err(|e| e.to_string())?;
     Ok((filter, display_rect(display)))
+}
+
+fn toolbar_known() -> bool {
+    crate::guard::TOOLBAR.lock().unwrap().0.is_some()
 }
 
 /// The window's area relative to its display (points).
@@ -206,7 +216,7 @@ impl Video {
                 let id = w.id().map_err(|e| e.to_string())?;
                 let excepted = crate::guard::foreign_windows_of_app(id);
                 let (filter, display) = window_filter(id, rect, &excepted)?;
-                area = Some(WindowArea { id, display, crop: crop(rect, display), excepted, checked: Instant::now() });
+                area = Some(WindowArea { id, display, crop: crop(rect, display), excepted, toolbar: toolbar_known(), checked: Instant::now() });
                 Ok(filter)
             }
         }
@@ -270,11 +280,13 @@ impl Video {
         if let Some(area) = self.window.as_mut().filter(|a| a.checked.elapsed() > Duration::from_secs(2)) {
             area.checked = Instant::now();
             let excepted = crate::guard::foreign_windows_of_app(area.id);
-            if excepted != area.excepted {
+            let toolbar = toolbar_known();
+            if excepted != area.excepted || toolbar != area.toolbar {
                 let rect = Rect { x: area.display.x + area.crop.x, y: area.display.y + area.crop.y, w: area.crop.w, h: area.crop.h };
                 if let Ok((filter, _)) = window_filter(area.id, rect, &excepted) {
                     if self.stream.update_content_filter(&filter).is_ok() {
                         area.excepted = excepted;
+                        area.toolbar = toolbar;
                     }
                 }
             }

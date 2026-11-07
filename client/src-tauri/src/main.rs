@@ -234,16 +234,26 @@ struct Toolbar {
     /// the grip was grabbed: moves come from the user until the next resize (our own resizes
     /// move the window too – Cocoa keeps the bottom-left corner)
     dragging: bool,
+    /// folded at the screen's right edge
+    collapsed: bool,
+    /// right edge of the bar inside the window (logical px)
+    bar_right: f64,
+    /// folded: the top edge the user moved it to along the screen's edge (physical px), and the
+    /// window's top edge when that move started
+    dock_y: Option<i32>,
+    dock_start: Option<i32>,
 }
 
-static TOOLBAR: std::sync::Mutex<Toolbar> = std::sync::Mutex::new(Toolbar { anchor: None, bar_left: 0.0, dragging: false });
+static TOOLBAR: std::sync::Mutex<Toolbar> =
+    std::sync::Mutex::new(Toolbar { anchor: None, bar_left: 0.0, dragging: false, collapsed: false, bar_right: 0.0, dock_y: None, dock_start: None });
 
 /// The toolbar of a running share reports the size it needs (bar only, or bar + join requests),
 /// where the bar starts inside it and the parts that show something (`parts`: [x, y, w, h] in CSS
 /// px – the rest is transparent margin for the shadow). Folded (`collapsed`), only the owl and the
-/// arrow stick out of the screen's left edge.
+/// grip stick out of the screen's right edge.
 #[tauri::command]
-fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>, parts: Option<Vec<[f64; 4]>>, collapsed: Option<bool>) -> Result<(), String> {
+#[allow(clippy::too_many_arguments)]
+fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>, bar_right: Option<f64>, parts: Option<Vec<[f64; 4]>>, collapsed: Option<bool>) -> Result<(), String> {
     if let Some(parts) = parts {
         // input space: macOS points (= CSS px), elsewhere physical pixels
         #[cfg(target_os = "macos")]
@@ -261,6 +271,8 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     let mut toolbar = TOOLBAR.lock().unwrap();
     toolbar.dragging = false;
     toolbar.bar_left = bar_left.unwrap_or(0.0);
+    toolbar.bar_right = bar_right.unwrap_or(width);
+    toolbar.collapsed = collapsed;
     let monitors = window.available_monitors().unwrap_or_default();
     let monitor = toolbar
         .anchor
@@ -282,8 +294,9 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
         Some((left, top)) => (left - (toolbar.bar_left * scale) as i32, top),
     };
     // keep it on the screen (a panel folding out near the bottom pushes it up for a while);
-    // folded, the bar sits right at the left edge – its shadow margin hangs over it
-    let x = if collapsed { ax - (toolbar.bar_left * scale) as i32 } else { x.min(ax + aw - w).max(ax) };
+    // folded, the bar sits right at the right edge – its shadow margin hangs over it – at the
+    // height it was moved to there
+    let (x, y) = if collapsed { (ax + aw - (toolbar.bar_right * scale) as i32, toolbar.dock_y.unwrap_or(y)) } else { (x.min(ax + aw - w).max(ax), y) };
     let y = y.min(ay + ah - h).max(ay);
     drop(toolbar);
     // size before position (Cocoa keeps the bottom-left corner when resizing)
@@ -294,6 +307,30 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     return window.with_webview(|view| unsafe { macos::show_without_focus(view.ns_window()) }).map_err(|e| e.to_string());
     #[cfg(not(target_os = "macos"))]
     window.show().map_err(|e| e.to_string())
+}
+
+/// Folded at the screen's right edge, the grip moves the bar up and down: `dy` CSS px since the
+/// grip was grabbed, `done` when it is let go.
+#[tauri::command]
+fn toolbar_dock_move(window: tauri::WebviewWindow, dy: f64, done: bool) -> Result<(), String> {
+    let mut toolbar = TOOLBAR.lock().unwrap();
+    if !toolbar.collapsed || !dy.is_finite() {
+        return Ok(());
+    }
+    let pos = window.outer_position().map_err(|e| e.to_string())?;
+    let start = *toolbar.dock_start.get_or_insert(pos.y);
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let height = window.outer_size().map(|s| s.height as i32).unwrap_or(0);
+    let monitor = window.current_monitor().ok().flatten().ok_or("kein Bildschirm")?;
+    let area = monitor.work_area();
+    let (ay, ah) = (area.position.y, area.size.height as i32);
+    let y = (start + (dy * scale).round() as i32).min(ay + ah - height).max(ay);
+    toolbar.dock_y = Some(y);
+    if done {
+        toolbar.dock_start = None;
+    }
+    drop(toolbar);
+    window.set_position(tauri::PhysicalPosition::new(pos.x, y)).map_err(|e| e.to_string())
 }
 
 /// The toolbar of a running share: a small frameless bar at the top edge of the screen, always on
@@ -820,6 +857,7 @@ fn main() {
             highlight,
             toolbar_resize,
             toolbar_drag,
+            toolbar_dock_move,
             live_info,
             show_picker,
             hide_window,

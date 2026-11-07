@@ -110,6 +110,8 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 - **Input:** lands only **inside the window** and only where it is **not covered**. The window may lie in the background.
   - A click goes through only where the shared window is the topmost window at that spot, or a dialog or menu of the same app. Clicks never land on other apps' windows or on PeekaView's own windows.
   - PeekaView's windows count only where they show something: the toolbar's transparent margin for its shadow neither blocks input nor is marked.
+  - macOS: where PeekaView's toolbar lies over the window, it is in the picture and viewers may use it (marked red as the presenter's, as on a shared screen). Windows: the window is captured on its own, so the toolbar over it stays blocked.
+  - Viewers see the parts other windows cover striped, without words over the picture.
 
 **Sharing a whole screen**
 - PeekaView's own windows are left out of the picture and take no viewer input – except the share's toolbar: it is in the picture, and with "Steuern" viewers may use it. Viewers see it tinted and framed red, named "PeekaView der teilenden Person", so nobody takes it for their own.
@@ -123,7 +125,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 ## Desktop client
 
 - **Toolbar**
-  - Can be moved with the grip on its left and folded: it then sits at the screen's left edge, only the owl and the unfold arrow sticking out (join requests still come up below it). The viewer's toolbar stays at the top and can be folded; shared windows initially fit below it and can be moved underneath it without scrolling.
+  - Can be moved with the grip on its left and folded: it then sits at the screen's right edge, only the unfold arrow and the grip sticking out; there the grip moves it up and down (join requests still come up below it). Unfolded, the grip moves it anywhere. The viewer's toolbar stays at the top and can be folded; shared windows initially fit below it and can be moved underneath it without scrolling.
   - Idle: Teilen (opens a picker with thumbnails) · settings · quit.
   - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
   - The selected source has a red frame on the desktop.
