@@ -50,6 +50,7 @@
         // messages about one window carry its slot
         if (m.w != null && m.w !== slot) return
         if (m.t === 'frame') {
+          document.body.classList.remove('off')
           live = !!m.live
           recording = !!m.recording
           paint()
@@ -62,6 +63,9 @@
           if (win?.paused || win?.reachable === false || win?.front === false) ann.reset()
           paint()
         } else if (m.t === 'reset') {
+          // the share ended: no frame, even if the window comes up once more (Windows: a show
+          // from the capture loop may come after the hide) – until the next share or picking
+          document.body.classList.add('off')
           live = false
           paint()
         }

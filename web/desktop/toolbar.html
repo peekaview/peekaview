@@ -13,10 +13,9 @@
       <i id="live-dot" class="dot" title="Freigabe läuft"></i>
 
       <div id="bar-live" class="group">
-        <button id="code-btn" class="chip" title="Link zum Zuschauen kopieren">
-          <i class="dot"></i><span id="code">Link kopieren</span><i data-icon="link"></i>
+        <button id="invite-btn" class="chip" title="Teilnehmer einladen – mit Link oder Codewort" aria-expanded="false" aria-controls="invite-card">
+          <i data-icon="plus"></i><span>Einladen</span>
         </button>
-        <button id="word-btn" class="icon-btn" title="Codewort zum Vorlesen anzeigen" aria-expanded="false" aria-controls="word-card" data-icon="phone" hidden></button>
         <button id="switch-btn" class="icon-btn" title="Andere Fenster oder anderen Bildschirm teilen" data-icon="switch"></button>
         <span class="sep"></span>
         <div class="modes" role="radiogroup" aria-label="Zuschauer dürfen">
@@ -37,12 +36,19 @@
 
     <div id="requests" class="requests" hidden></div>
 
-    <!-- the two words for the phone, whenever the presenter wants them -->
-    <div id="word-card" class="word-card glass" hidden>
-      <span class="word-label">Codewort</span>
-      <strong id="word-words"></strong>
-      <p>Zum Vorlesen, z.&nbsp;B. am Telefon: Die Person gibt es auf <b>peekaview.de</b> ein – statt den Link zu öffnen.</p>
-      <button id="word-close" class="pill secondary">Schließen</button>
+    <!-- how others get in: the link to send, or the code word to read out on the phone -->
+    <div id="invite-card" class="invite-card glass" role="dialog" aria-label="Teilnehmer einladen" hidden>
+      <div class="invite-head"><strong>Teilnehmer einladen</strong><button id="invite-close" class="icon-btn" title="Schließen" data-icon="close"></button></div>
+      <section>
+        <span class="invite-label">Link verschicken</span>
+        <div class="invite-link"><span id="invite-url"></span><button id="invite-copy" class="pill secondary">Kopieren</button></div>
+        <p id="invite-validity"></p>
+      </section>
+      <section id="invite-code" hidden>
+        <span class="invite-label">Oder am Telefon das Codewort sagen</span>
+        <strong id="invite-words"></strong>
+        <p>Die Person gibt es auf <b>peekaview.de</b> ein.</p>
+      </section>
     </div>
 
     <!-- right after the start: what to do next, until somebody knocks -->

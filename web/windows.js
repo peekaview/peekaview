@@ -74,7 +74,9 @@ const STYLE = `
    control) – tinted and framed red, so nobody takes it for their own */
 .pv-cover-mark { position: absolute; box-sizing: border-box; border: 2px solid #ef4444; border-radius: 8px; background: rgba(239, 68, 68, .16); }
 /* the name tag beside the bar – below it would cover the join requests */
-.pv-cover-mark span { position: absolute; left: calc(100% + 5px); top: 50%; transform: translateY(-50%); padding: 1px 7px; border-radius: 6px; background: #ef4444; color: #fff; font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+.pv-cover-mark span { position: absolute; left: calc(100% + 5px); top: 50%; transform: translateY(-50%); padding: 1px 7px; border-radius: 6px; background: #ef4444; color: #fff; font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+/* … only while the pointer is on the bar: always shown, it was in the way */
+.pv-cover.hover .pv-cover-mark span { opacity: 1; }
 .pv-cover-mark.flip span { left: auto; right: calc(100% + 5px); }
 .pv-viewer[data-tool="point"] .pv-win.covered .pv-view,
 .pv-viewer[data-tool="draw"] .pv-win.covered .pv-view { cursor: not-allowed; }
@@ -342,6 +344,18 @@ export class WindowManager {
       },
       true,
     )
+    // the name tag of the presenter's toolbar while the pointer is on it (the layer takes no
+    // pointer events, so no :hover)
+    const view = el.querySelector('.pv-view')
+    const cover = el.querySelector('.pv-cover')
+    view.addEventListener('pointermove', (e) => {
+      const on = !cover.hidden && [...cover.querySelectorAll('.pv-cover-mark')].some((m) => {
+        const r = m.getBoundingClientRect()
+        return e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom
+      })
+      if (on !== cover.classList.contains('hover')) cover.classList.toggle('hover', on)
+    })
+    view.addEventListener('pointerleave', () => cover.classList.remove('hover'))
     el.querySelector('[data-min]').addEventListener('click', () => this.minimize(slot))
     el.querySelector('[data-max]').addEventListener('click', () => this.toggleMax(slot))
     el.querySelector('.pv-win-bar').addEventListener('dblclick', (e) => !e.target.closest('button') && this.toggleMax(slot))

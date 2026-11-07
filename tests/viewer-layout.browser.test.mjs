@@ -153,6 +153,17 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
    await evaluate(`qa.receive(${JSON.stringify(state(1,{mode,windows:[{w:0,kind:'screen',title:'Bildschirm',pw:3200,ph:2000,cover:[[.35,0,.3,.03,2],[.4,.035,.2,.1,2]]}]}))});true`);await settle()
    assert.deepEqual(await evaluate(toolbarMark),{hidden:false,marks:2,tags:['PeekaView der teilenden Person'],fill:0,labels:0,border:'rgb(239, 68, 68)'},mode)
   }
+  // the name tag only while the pointer is on the bar – always shown, it was in the way
+  const tag="(()=>{const c=qa.wm.wins.get(0).el.querySelector('.pv-cover');return {hover:c.classList.contains('hover'),opacity:getComputedStyle(c.querySelector('.pv-cover-mark span')).opacity}})()"
+  assert.deepEqual(await evaluate(tag),{hover:false,opacity:'0'})
+  const pointAt=(sel,type='pointermove')=>`(()=>{const v=qa.wm.wins.get(0).el.querySelector('.pv-view'),r=(${sel}).getBoundingClientRect();v.dispatchEvent(new PointerEvent('${type}',{bubbles:true,clientX:r.left+r.width/2,clientY:r.top+r.height/2}));return true})()`
+  await evaluate(pointAt("qa.wm.wins.get(0).el.querySelectorAll('.pv-cover-mark')[1]"))
+  assert.equal(await evaluate(tag+'.hover'),true,'pointer on a part of the bar')
+  await evaluate(pointAt("qa.wm.wins.get(0).el.querySelector('video')"))
+  assert.equal(await evaluate(tag+'.hover'),false,'pointer elsewhere in the picture')
+  await evaluate(pointAt("qa.wm.wins.get(0).el.querySelector('.pv-cover-mark')"))
+  await evaluate(pointAt("qa.wm.wins.get(0).el.querySelector('.pv-cover-mark')",'pointerleave'))
+  assert.equal(await evaluate(tag+'.hover'),false,'pointer left the picture')
   await evaluate(`qa.receive(${JSON.stringify(foreground)});true`)
   // An explicit title-bar click can raise a background window with arrangement permission,
   // including while watching or annotating. Only a new host state unlocks annotations.
