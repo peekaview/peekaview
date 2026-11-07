@@ -8,7 +8,7 @@ const web = resolve(here, '../web')
 const dist = resolve(here, 'dist')
 const files = [
   'index.html', 'viewer.js', 'windows.js', 'signal.js', 'annotate.js',
-  'icons.js', 'home-scene.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
+  'icons.js', 'home-scene.js', 'word-code.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
   'fixed-rooms.html', 'fixed-rooms.js', 'fixed-rooms.css', 'room-sw.js', 'download.html',
   'impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'legal.css', 'legal.js',
   'room-pcm-worklet.js',

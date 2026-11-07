@@ -4,6 +4,7 @@
 import { icon, owl } from '../icons.js'
 import { Voice } from '../voice.js'
 import { renderRequests } from './requests.js'
+import { displayCode, offerCode } from '../word-code.js'
 
 const { invoke } = window.__TAURI__.core
 const { listen } = window.__TAURI__.event
@@ -18,6 +19,7 @@ const pad = (n) => String(n).padStart(2, '0')
 
 let link = ''
 let title = ''
+let linkTitle = ''
 let recording = null
 let sharing = false
 let fixedCall = false
@@ -97,7 +99,9 @@ function show(live) {
   fixedCall = !!live.fixedCall
   $('mic-btn').hidden = !!live.fixedCall || settings.voice_enabled === false
   voice.setEnabled(!live.fixedCall && settings.voice_enabled !== false)
-  $('code-btn').title = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren\n${VALIDITY[live.linkKind] ?? ''}`.trim()
+  linkTitle = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren\n${VALIDITY[live.linkKind] ?? ''}`.trim()
+  showWordCode()
+  offerWordCode()
   $('guide-validity').textContent = VALIDITY[live.linkKind] ?? ''
   voice.setSelf(0, live.ice)
   setMode(live.mode, false)
@@ -111,6 +115,32 @@ invoke('live_info').then((live) => {
   if (live.copied) markCopied()
 })
 listen('live', (e) => e.payload && show(e.payload))
+
+// two words for the phone instead of the link, as long as the share runs (word-code.js) – not for
+// a call to contacts, who have no link to type
+let wordCode = null
+let wordCodeFor = ''
+async function offerWordCode() {
+  const forLink = fixedCall ? '' : link
+  if (wordCodeFor === forLink) return
+  wordCode?.close()
+  wordCode = null
+  wordCodeFor = forLink
+  showWordCode()
+  if (!forLink) return
+  try {
+    const offer = await offerCode({ link: forLink })
+    if (wordCodeFor !== forLink || !sharing) return offer.close()
+    wordCode = offer
+    showWordCode()
+  } catch {}
+}
+function showWordCode() {
+  const words = wordCode ? displayCode(wordCode.code) : ''
+  $('guide-code-words').textContent = words
+  $('guide-code').hidden = !words
+  $('code-btn').title = linkTitle + (words ? `\nAm Telefon statt des Links: ${words}` : '')
+}
 
 // what a click on a mode changed, in words
 const MODE_TEXT = {
@@ -262,6 +292,10 @@ listen('permission-granted', (e) => e.payload !== 'screen' && toast('Super – S
 // the share ends: voice and recording stop; the window goes
 listen('ended', () => {
   sharing = false
+  wordCode?.close()
+  wordCode = null
+  wordCodeFor = ''
+  showWordCode()
   invoke('dismiss_permission', { kind: 'accessibility' })
   voice.setEnabled(false)
   endRecordingUi()

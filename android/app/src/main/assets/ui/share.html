@@ -37,6 +37,8 @@
     .share-destination button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg); }
     #group-context { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     #group-context .btn { flex: none; padding: 0 12px; }
+    .word-code { margin: 8px 0 0; font-size: 13.5px; line-height: 1.45; }
+    .word-code b { color: var(--fg); font-size: 15px; white-space: nowrap; }
     code { display: block; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font: 12.5px/1.4 ui-monospace, monospace; word-break: break-all; user-select: text; }
     .muted { color: var(--muted); font-size: 13px; }
     .modes { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--bg); }
@@ -172,6 +174,7 @@
       <div>
         <div class="muted">Link zum Zuschauen</div>
         <code id="link"></code>
+        <p id="word-code" class="muted word-code" hidden>Am Telefon? Sag einfach <b id="word-code-words"></b> – das gibt die Person auf peekaview.de ein.</p>
       </div>
       <div class="row">
         <button id="copy" class="btn">Link kopieren</button>
@@ -218,6 +221,7 @@
   <script type="module">
     import { owl } from '../web/icons.js'
     import { mountRooms } from '../web/fixed-rooms.js'
+    import { displayCode, offerCode } from '../web/word-code.js'
     document.getElementById('logo').innerHTML = owl(26)
     const host = window.PeekaViewHost
     const $ = (id) => document.getElementById(id)
@@ -380,6 +384,26 @@
     $('overlay-settings').addEventListener('click', () => host.overlaySettings())
     for (const b of document.querySelectorAll('.modes button')) b.addEventListener('click', () => host.setMode(b.dataset.mode))
 
+    // two words for the phone instead of the link, as long as the share runs (word-code.js) – not
+    // for a call to contacts, who have no link to type
+    let wordCode = null
+    let wordCodeFor = ''
+    async function offerWordCode(forLink) {
+      if (wordCodeFor === forLink) return
+      wordCode?.close()
+      wordCode = null
+      wordCodeFor = forLink
+      $('word-code').hidden = true
+      if (!forLink) return
+      try {
+        const offer = await offerCode({ link: forLink, name: $('name').value.trim() })
+        if (wordCodeFor !== forLink) return offer.close()
+        wordCode = offer
+        $('word-code-words').textContent = displayCode(offer.code)
+        $('word-code').hidden = false
+      } catch {}
+    }
+
     // called by the app with the current state
     window.pvHostUpdate = (st) => {
       $('live').hidden = !st.sharing
@@ -422,6 +446,7 @@
       $('error').hidden = !st.error
       $('error').textContent = st.error ?? ''
       $('link').textContent = st.link ?? ''
+      offerWordCode(st.sharing && !st.fixedCall ? st.link ?? '' : '')
       for (const b of document.querySelectorAll('.modes button')) b.classList.toggle('active', b.dataset.mode === st.mode)
       $('control-hint').hidden = !(st.mode === 'control' && !st.shell && !st.controlEnabled)
       $('overlay-hint').hidden = !(st.sharing && st.mode !== 'view' && !st.overlayAllowed)

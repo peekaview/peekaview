@@ -189,6 +189,18 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
     assert.ok(Date.now() - t0 < 12000, `gone after ${Date.now() - t0} ms`)
     assert.match(await evaluate("document.querySelector('#viewers').innerText"), /Anna/)
 
+    // two words for the phone: typed on the start page, they bring this very link
+    await tab('t1')
+    await waitFor("!document.querySelector('#word-code').hidden")
+    const code = await evaluate("document.querySelector('#word-code-words').textContent")
+    assert.match(code, /^[A-Z][a-z]+ [A-Z][a-z]+$/)
+    await browser('tab', 'new', '--label', 'code', `${base}/`)
+    await browser('wait', '#share-url')
+    await browser('fill', '#share-url', code.toLowerCase().replace(' ', '-'))
+    await browser('press', 'Enter')
+    await waitFor(`location.hash === '#${room}'`)
+    await browser('tab', 'close', 'code')
+
     // stopping ends it everywhere: the helper closes, the viewer waits for the next share
     await tab('t1')
     await browser('click', '#stop')
