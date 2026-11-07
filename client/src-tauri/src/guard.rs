@@ -139,8 +139,8 @@ pub struct Cover {
     pub rect: Rect,
     /// one of PeekaView's own windows (toolbar, main window) – never in the picture itself …
     pub own: bool,
-    /// … except the toolbar on a shared screen: in the picture, and viewers may use it (they see
-    /// it marked as the presenter's, so they do not take it for their own)
+    /// … except the toolbar where it is in the picture (`toolbar_in_picture`): viewers may use it
+    /// (they see it marked as the presenter's, so they do not take it for their own)
     pub open: bool,
 }
 
@@ -648,6 +648,34 @@ mod rect_tests {
         let win = Rect { x: 100, y: 100, w: 400, h: 300 };
         assert_eq!(Rect { x: 350, y: 100, w: 150, h: 100 }.within(&win), [0.625, 0.0, 0.375, 0.3333]);
         assert_eq!(win.within(&win), [0.0, 0.0, 1.0, 1.0]);
+    }
+}
+
+#[cfg(test)]
+mod cover_tests {
+    use super::{Cover, Rect, TOOLBAR};
+
+    /// The toolbar over a shared window is no cover where it is in the picture (macOS): viewers see
+    /// it as the presenter's and may use it. Windows captures the window on its own – there the
+    /// toolbar is not in the picture and stays blocked. Other PeekaView windows are never open.
+    #[test]
+    fn toolbar_over_a_shared_window_is_open_where_it_is_in_the_picture() {
+        let at = Rect { x: 100, y: 0, w: 600, h: 120 };
+        let bar = Rect { x: 20, y: 10, w: 400, h: 48 };
+        let (toolbar, other, screen) = {
+            let mut t = TOOLBAR.lock().unwrap();
+            let before = t.clone();
+            *t = (Some(7), Some(vec![bar]));
+            drop(t);
+            let out = (Cover::own(7, at, true), Cover::own(8, at, true), Cover::own(7, at, false));
+            *TOOLBAR.lock().unwrap() = before;
+            out
+        };
+        // only the bar counts, not the shadow margin around it
+        let shown = Rect { x: 120, y: 10, w: 400, h: 48 };
+        assert_eq!(toolbar, vec![Cover { rect: shown, own: true, open: cfg!(target_os = "macos") }]);
+        assert_eq!(other, vec![Cover { rect: at, own: true, open: false }]);
+        assert_eq!(screen, vec![Cover { rect: shown, own: true, open: true }]);
     }
 }
 
