@@ -97,10 +97,17 @@
     .linkbox { display: flex; gap: 8px; margin-top: 7px; }
     .linkbox input { margin: 0; flex: 1; min-width: 0; font-size: 14px; color: #d4d4d8; }
     /* the two words for the phone */
-    .word-code { margin: 9px 0 0; color: #a1a1aa; font-size: 13.5px; }
+    .word-code { display: flex; align-items: center; gap: 7px; margin: -5px 0 0; color: #a1a1aa; font-size: 13.5px; }
+    .word-code[hidden] { display: none; }
+    .word-code-icon { display: flex; color: #71717a; }
+    .word-code-icon svg { width: 15px; height: 15px; }
+    .word-code-short { display: none; }
     .word-code strong { color: #fafafa; font-size: 15px; letter-spacing: .01em; white-space: nowrap; }
-    body.panel .word-code { margin: 6px 0 0; text-align: center; font-size: 12px; line-height: 16px; }
-    body.panel .word-code strong { font-size: 13px; }
+    /* small windows: one quiet row across the footer, under link and clipboard */
+    body.panel .word-code { justify-content: center; gap: 6px; margin: 0; padding: 7px 10px; border-radius: 10px; background: rgba(255,255,255,.04); font-size: 12.5px; line-height: 16px; white-space: nowrap; }
+    body.panel .word-code-long { display: none; }
+    body.panel .word-code-short { display: inline; }
+    body.panel .word-code strong { font-size: 13.5px; }
     .pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #3f3f46; color: #fafafa; font: 650 13.5px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
     .pill:hover:not(:disabled) { background: #52525b; }
     .pill.primary { background: #ef4444; }
@@ -238,6 +245,8 @@
     body.panel .run-footer { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 -14px -12px; padding: 10px 14px 12px; background: #18181b; }
     body.pip .run-footer { margin: 0 -14px -14px; padding-bottom: 14px; }
     body.panel .run-footer > * { grid-column: 1 / -1; }
+    /* (link and clipboard side by side, the code for the phone in a row below them) */
+    body.panel .run-footer { grid-auto-flow: row dense; }
     body.panel .run-footer > .run-link { grid-column: 1; }
     body.panel .run-footer > .clip-open { grid-column: 2; }
     body.panel .run-footer .clip-long { display: none; }
@@ -447,8 +456,8 @@
         <div class="run-link">
           <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
           <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
-          <p class="word-code" id="word-code" hidden title="Wer zusehen soll, gibt diese zwei Wörter auf peekaview.de ein – praktisch am Telefon">Oder am Telefon sagen: <strong id="word-code-words"></strong></p>
         </div>
+        <p class="word-code" id="word-code" hidden title="Wer zusehen soll, gibt diese zwei Wörter auf peekaview.de ein – praktisch am Telefon"><span class="word-code-icon" data-icon="phone"></span><span class="word-code-long">Oder am Telefon sagen:</span><span class="word-code-short">Am Telefon sagen:</span><strong id="word-code-words"></strong></p>
         <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span><span class="clip-long">Gemeinsame </span>Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
         <button class="pill stop" id="stop" type="button"></button>
         <p class="keep" id="run-keep">Lass diesen Tab offen – wenn du ihn schließt, endet die Freigabe.</p>
