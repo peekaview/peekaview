@@ -143,6 +143,16 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'only remote control is affected')
   await evaluate(`qa.receive(${JSON.stringify(covering)});qa.receive(${JSON.stringify({...covering,windows:covering.windows.map(w=>({...w,cover:[]}))})});true`)
   assert.equal(await evaluate("qa.wm.wins.get(1).el.querySelector('.pv-cover').hidden"),true,'uncovered again')
+  // a shared window with the presenter's PeekaView toolbar over it (macOS: in the picture): the
+  // toolbar is framed as the presenter's, never striped or named "nicht steuerbar" – another
+  // window over it stays striped while controlling
+  const withToolbar={...covering,windows:covering.windows.map((w,i)=>i===1?{...w,cover:[[.5,.25,.5,.25,0],[.25,0,.375,.0625,2]]}:w)}
+  const toolbarOverWindow="(()=>{const c=qa.wm.wins.get(1).el.querySelector('.pv-cover');return {hidden:c.hidden,fill:[...c.querySelectorAll('.pv-cover-fill div')].map(d=>[d.style.left,d.style.top]),labels:[...c.querySelectorAll('.pv-cover-label')].map(l=>l.textContent),marks:[...c.querySelectorAll('.pv-cover-mark')].map(m=>[m.style.left,m.style.top,m.textContent])}})()"
+  for(const [mode,fill] of [['control',[['50%','25%']]],['view',[]]]){
+   await evaluate(`qa.receive(${JSON.stringify({...withToolbar,mode})});true`);await settle()
+   assert.deepEqual(await evaluate(toolbarOverWindow),{hidden:false,fill,labels:[],marks:[['25%','0%','PeekaView der teilenden Person']]},mode)
+  }
+  await evaluate(`qa.receive(${JSON.stringify({...covering,windows:covering.windows.map(w=>({...w,cover:[]}))})});true`)
   // a shared screen: the toolbar on it is marked as well
   await evaluate(`qa.receive(${JSON.stringify(state(1,{windows:[{w:0,kind:'screen',title:'Bildschirm',pw:3200,ph:2000,cover:[[.35,0,.3,.03,1]]}]}))});true`);await settle()
   assert.deepEqual(await evaluate("[...qa.wm.wins.get(0).el.querySelectorAll('.pv-cover-label')].map(l=>l.textContent)"),['PeekaViewnicht steuerbar'])

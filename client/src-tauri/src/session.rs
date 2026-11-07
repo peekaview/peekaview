@@ -97,8 +97,9 @@ impl Stream {
     }
 
     /// The covered parts for the viewers: [x, y, w, h, own] – normalized to the window (0..1),
-    /// own = 1 for one of PeekaView's own windows, 2 for the toolbar on a shared screen (in the
-    /// picture and usable – viewers see it marked as the presenter's).
+    /// own = 1 for one of PeekaView's own windows, 2 for the toolbar where it is in the picture (a
+    /// shared screen; on macOS also over a shared window) – usable, viewers see it marked as the
+    /// presenter's.
     pub fn cover(&self) -> Vec<[f64; 5]> {
         self.covers
             .iter()
