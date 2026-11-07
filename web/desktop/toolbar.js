@@ -132,7 +132,7 @@ $('guide-close').addEventListener('click', () => {
   guideDone = true
   updateGuide()
 })
-$('guide-copy').addEventListener('click', () => $('code-btn').click())
+$('guide-copy').addEventListener('click', () => copyLink())
 
 // how long a link works – people should know whether they can send it again next time
 const VALIDITY = {
@@ -148,7 +148,10 @@ function show(live) {
   fixedCall = !!live.fixedCall
   $('mic-btn').hidden = !!live.fixedCall || settings.voice_enabled === false
   voice.setEnabled(!live.fixedCall && settings.voice_enabled !== false)
-  linkTitle = `${title ? `Geteilt: ${title}\n` : ''}Klicken, um den Link zum Zuschauen zu kopieren\n${VALIDITY[live.linkKind] ?? ''}`.trim()
+  linkTitle = `${title ? `Geteilt: ${title}\n` : ''}Link oder Codewort zum Zuschauen`
+  $('invite-url').textContent = link
+  $('invite-url').title = link
+  $('invite-validity').textContent = VALIDITY[live.linkKind] ?? ''
   showWordCode()
   offerWordCode()
   $('guide-validity').textContent = VALIDITY[live.linkKind] ?? ''
@@ -188,20 +191,19 @@ function showWordCode() {
   const words = wordCode ? displayCode(wordCode.code) : ''
   $('guide-code-words').textContent = words
   $('guide-code').hidden = !words
-  $('code-btn').title = linkTitle + (words ? `\nAm Telefon statt des Links: ${words}` : '')
-  $('word-words').textContent = words
-  $('word-btn').hidden = !words
-  if (!words) showWordCard(false)
+  $('invite-btn').title = linkTitle
+  $('invite-words').textContent = words
+  $('invite-code').hidden = !words
 }
-// the words on demand: the button beside the link opens a card below the bar
-function showWordCard(open) {
-  $('word-card').hidden = !open
-  $('word-btn').classList.toggle('open', open)
-  $('word-btn').setAttribute('aria-expanded', String(open))
-  $('word-btn').title = open ? 'Codewort ausblenden' : 'Codewort zum Vorlesen anzeigen'
+// "Teilnehmer hinzufügen": a card below the bar with both ways in – the link and the code word
+function showInvite(open) {
+  $('invite-card').hidden = !open
+  $('invite-btn').classList.toggle('open', open)
+  $('invite-btn').setAttribute('aria-expanded', String(open))
 }
-$('word-btn').addEventListener('click', () => showWordCard($('word-card').hidden))
-$('word-close').addEventListener('click', () => showWordCard(false))
+$('invite-btn').addEventListener('click', () => showInvite($('invite-card').hidden))
+$('invite-close').addEventListener('click', () => showInvite(false))
+$('invite-copy').addEventListener('click', () => copyLink())
 
 // what a click on a mode changed, in words
 const MODE_TEXT = {
@@ -222,18 +224,20 @@ for (const b of document.querySelectorAll('.modes button')) b.addEventListener('
 // changed in the tray menu
 listen('mode', (e) => setMode(String(e.payload), false))
 
-$('code-btn').addEventListener('click', async () => {
+async function copyLink() {
   await invoke('copy_text', { text: link }).catch(() => navigator.clipboard.writeText(link))
   markCopied()
   toast('Link kopiert – jetzt in E-Mail oder Chat einfügen.')
-})
+}
+let copiedTimer = 0
 function markCopied() {
-  const chip = $('code-btn')
-  chip.classList.add('copied')
-  chip.lastElementChild.outerHTML = icon('check', 17)
-  setTimeout(() => {
-    chip.classList.remove('copied')
-    chip.lastElementChild.outerHTML = icon('link', 17)
+  const b = $('invite-copy')
+  b.classList.add('copied')
+  b.innerHTML = `${icon('check', 15)}Kopiert`
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => {
+    b.classList.remove('copied')
+    b.textContent = 'Kopieren'
   }, 1500)
 }
 // copied from the tray menu: the same feedback
@@ -357,6 +361,7 @@ listen('ended', () => {
   wordCode = null
   wordCodeFor = ''
   showWordCode()
+  showInvite(false)
   invoke('dismiss_permission', { kind: 'accessibility' })
   voice.setEnabled(false)
   endRecordingUi()

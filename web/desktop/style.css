@@ -84,7 +84,8 @@ body.collapsed .grip { margin: 0; cursor: ns-resize; touch-action: none; }
 .chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; transition: background .15s; }
 .chip:hover { background: var(--raised); }
 .chip > span { font-size: 11.5px; font-weight: 650; white-space: nowrap; }
-#code-btn { flex: none; gap: 6px; padding: 0 8px; }
+#invite-btn { flex: none; gap: 6px; padding: 0 9px 0 7px; }
+#invite-btn.open { background: var(--raised); }
 .chip > svg { color: var(--muted); }
 .chip.copied > svg { color: #86efac; }
 /* ------------------------------------------------ PeekaView window: picker and join requests */
@@ -144,15 +145,23 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 .guide kbd { padding: 0 4px; border-radius: 4px; background: var(--raised); color: var(--fg); font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; }
 .guide-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
 .guide-actions .pill { height: 28px; padding: 0 10px; font-size: 12px; }
-body.collapsed #guide, body.collapsed #word-card { display: none !important; }
+body.collapsed #guide, body.collapsed #invite-card { display: none !important; }
 
-/* the code word, big enough to read out */
-.word-card { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 300px; padding: 12px 14px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); text-align: center; animation: toast-in .25s ease-out; }
-.word-label { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.word-card strong { font-size: 22px; font-weight: 700; letter-spacing: -.01em; user-select: text; }
-.word-card p { margin: 2px 0 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
-.word-card b { color: var(--fg); font-weight: 650; }
-.word-card .pill { height: 28px; padding: 0 10px; font-size: 12px; }
+/* "Teilnehmer hinzufügen": the link to send and the code word to read out */
+.invite-card { display: flex; flex-direction: column; gap: 10px; width: 340px; padding: 10px 12px 12px 14px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); animation: toast-in .25s ease-out; }
+.invite-head { display: flex; align-items: center; justify-content: space-between; }
+.invite-head strong { font-size: 13px; font-weight: 650; }
+.invite-head .icon-btn { width: 26px; height: 26px; }
+.invite-card section { display: flex; flex-direction: column; gap: 5px; }
+.invite-card section + section { padding-top: 10px; border-top: 1px solid var(--line); }
+.invite-label { color: var(--muted); font-size: 11px; font-weight: 600; }
+.invite-link { display: flex; align-items: center; gap: 6px; }
+#invite-url { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; background: var(--bg); font: 500 11.5px/1.3 ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
+.invite-link .pill { flex: none; height: 28px; padding: 0 10px; font-size: 12px; gap: 5px; }
+.invite-link .pill.copied { color: #86efac; }
+#invite-words { font-size: 22px; font-weight: 700; letter-spacing: -.01em; user-select: text; }
+.invite-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.invite-card b { color: var(--fg); font-weight: 650; }
 
 /* join requests: nobody watches without the presenter's OK */
 .requests { display: flex; flex-direction: column; gap: 6px; }
@@ -206,6 +215,7 @@ body.collapsed #guide, body.collapsed #word-card { display: none !important; }
 body.overlay { background: transparent; overflow: hidden; }
 .overlay #root { position: fixed; inset: 0; border: 3px solid var(--accent); border-radius: 4px; transition: border-color .3s, border-width .3s; }
 /* not in front (partly or fully behind other windows): half transparent, still easy to see */
+.overlay.off #root, .overlay.off .badge { display: none; }
 .overlay.covered #root, .overlay.behind #root { border-color: rgba(239, 68, 68, .55); }
 .overlay.covered .badge, .overlay.behind .badge { opacity: .65; }
 .overlay .badge { position: fixed; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; max-width: 300px; height: 24px; padding: 0 4px 0 10px; border-radius: 0 0 8px 8px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 650; white-space: nowrap; }
