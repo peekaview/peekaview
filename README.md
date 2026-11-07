@@ -109,6 +109,10 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - Windows: Windows.Graphics.Capture for the window; dialogs are separate windows there and are not part of the picture yet.
 - **Input:** lands only **inside the window** and only where it is **not covered**. The window may lie in the background.
   - A click goes through only where the shared window is the topmost window at that spot, or a dialog or menu of the same app. Clicks never land on other apps' windows or on PeekaView's own windows.
+  - PeekaView's windows count only where they show something: the toolbar's transparent margin for its shadow neither blocks input nor is marked.
+
+**Sharing a whole screen**
+- PeekaView's own windows are left out of the picture and take no viewer input – except the share's toolbar: it is in the picture, and with "Steuern" viewers may use it. Viewers see it tinted and framed red, named "PeekaView der teilenden Person", so nobody takes it for their own.
   - Drags are clamped to the window.
   - Keystrokes go through only while it has the focus. A viewer's click into the window gives it the focus.
   - Shortcuts that switch apps are dropped.
@@ -119,7 +123,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 ## Desktop client
 
 - **Toolbar**
-  - Can be moved with the grip on its left and folded down to a small handle. The viewer's toolbar stays at the top and can be folded; shared windows initially fit below it and can be moved underneath it without scrolling.
+  - Can be moved with the grip on its left and folded: it then sits at the screen's left edge, only the owl and the unfold arrow sticking out (join requests still come up below it). The viewer's toolbar stays at the top and can be folded; shared windows initially fit below it and can be moved underneath it without scrolling.
   - Idle: Teilen (opens a picker with thumbnails) · settings · quit.
   - While sharing: copy link · switch source · mode · viewers · microphone · Sitzung aufzeichnen · stop.
   - The selected source has a red frame on the desktop.

@@ -189,12 +189,13 @@ impl Video {
             Source::Screen(m) => {
                 let id = m.id().map_err(|e| e.to_string())?;
                 let display = content.displays().into_iter().find(|d| d.display_id() == id).ok_or("Bildschirm nicht gefunden")?;
-                // never show our own windows (controls, overlay)
+                // never show our own windows (PeekaView window, overlay) – the toolbar aside: viewers
+                // may use it, marked as the presenter's
                 let me = std::process::id() as i32;
                 let own: Vec<SCWindow> = content
                     .windows()
                     .into_iter()
-                    .filter(|w| w.owning_application().is_some_and(|a| a.process_id() == me))
+                    .filter(|w| w.owning_application().is_some_and(|a| a.process_id() == me) && !crate::guard::is_toolbar(w.window_id()))
                     .collect();
                 SCContentFilter::create()
                     .with_display(&display)

@@ -97,13 +97,14 @@ impl Stream {
     }
 
     /// The covered parts for the viewers: [x, y, w, h, own] – normalized to the window (0..1),
-    /// own = 1 for one of PeekaView's own windows.
+    /// own = 1 for one of PeekaView's own windows, 2 for the toolbar on a shared screen (in the
+    /// picture and usable – viewers see it marked as the presenter's).
     pub fn cover(&self) -> Vec<[f64; 5]> {
         self.covers
             .iter()
             .map(|c| {
                 let [x, y, w, h] = c.rect.within(&self.rect);
-                [x, y, w, h, if c.own { 1.0 } else { 0.0 }]
+                [x, y, w, h, if c.open { 2.0 } else if c.own { 1.0 } else { 0.0 }]
             })
             .collect()
     }
@@ -674,6 +675,7 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
     if let Some(toolbar) = app.get_webview_window("toolbar") {
         let _ = toolbar.destroy();
     }
+    *crate::guard::TOOLBAR.lock().unwrap() = (None, None);
     announce_requests(app);
     // permanent rooms with remote access wait again
     lobby::sync(app, false);
