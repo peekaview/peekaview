@@ -146,6 +146,13 @@ test('viewer toolbar stays at the top; initial windows fit below it without scro
   // a shared screen: the toolbar on it is marked as well
   await evaluate(`qa.receive(${JSON.stringify(state(1,{windows:[{w:0,kind:'screen',title:'Bildschirm',pw:3200,ph:2000,cover:[[.35,0,.3,.03,1]]}]}))});true`);await settle()
   assert.deepEqual(await evaluate("[...qa.wm.wins.get(0).el.querySelectorAll('.pv-cover-label')].map(l=>l.textContent)"),['PeekaViewnicht steuerbar'])
+  // a newer host: the toolbar is in the picture and usable – framed red with one name tag, also
+  // while only watching, without the striped "nicht steuerbar" fill
+  const toolbarMark="(()=>{const c=qa.wm.wins.get(0).el.querySelector('.pv-cover');return {hidden:c.hidden,marks:c.querySelectorAll('.pv-cover-mark').length,tags:[...c.querySelectorAll('.pv-cover-mark span')].map(s=>s.textContent),fill:c.querySelectorAll('.pv-cover-fill div').length,labels:c.querySelectorAll('.pv-cover-label').length,border:getComputedStyle(c.querySelector('.pv-cover-mark')).borderTopColor}})()"
+  for(const mode of ['view','control']){
+   await evaluate(`qa.receive(${JSON.stringify(state(1,{mode,windows:[{w:0,kind:'screen',title:'Bildschirm',pw:3200,ph:2000,cover:[[.35,0,.3,.03,2],[.4,.035,.2,.1,2]]}]}))});true`);await settle()
+   assert.deepEqual(await evaluate(toolbarMark),{hidden:false,marks:2,tags:['PeekaView der teilenden Person'],fill:0,labels:0,border:'rgb(239, 68, 68)'},mode)
+  }
   await evaluate(`qa.receive(${JSON.stringify(foreground)});true`)
   // An explicit title-bar click can raise a background window with arrangement permission,
   // including while watching or annotating. Only a new host state unlocks annotations.

@@ -65,12 +65,35 @@ pub fn normal_window_ids() -> Option<std::collections::HashSet<u32>> {
 #[cfg(target_os = "macos")]
 pub static OVERLAY_WINDOWS: std::sync::Mutex<Vec<u32>> = std::sync::Mutex::new(Vec::new());
 
+/// The toolbar of a running share: its window id (macOS: CGWindowID, Windows: HWND) and the parts
+/// that show something (bar, join requests, hints) relative to the window, in input-space units.
+/// The rest of its transparent window is margin for the shadow – it neither blocks nor is marked.
+/// `None` for the parts until the toolbar reported them: then the whole window counts.
+pub static TOOLBAR: std::sync::Mutex<(Option<u32>, Option<Vec<Rect>>)> = std::sync::Mutex::new((None, None));
+
+/// Is `id` the toolbar's window?
+pub fn is_toolbar(id: u32) -> bool {
+    TOOLBAR.lock().unwrap().0 == Some(id)
+}
+
+/// Where one of PeekaView's own windows (`id` at `rect`) actually is: the toolbar's visible parts,
+/// any other window as a whole.
+pub fn own_parts(id: u32, rect: Rect) -> Vec<Rect> {
+    match &*TOOLBAR.lock().unwrap() {
+        (Some(t), Some(parts)) if *t == id => parts
+            .iter()
+            .filter_map(|p| Rect { x: rect.x + p.x, y: rect.y + p.y, w: p.w, h: p.h }.intersect(&rect))
+            .collect(),
+        _ => vec![rect],
+    }
+}
+
 /// A shared window: (window id, owning process id).
 pub type Target = Option<(u32, i32)>;
 
 /// May viewer input land at screen point (x, y)? Never on one of PeekaView's own windows
-/// (main window, helpers); with a shared window (`target`) only if that window – or a dialog / menu
-/// of its app – is topmost there.
+/// (main window, helpers) – on a shared screen the toolbar aside, which is in the picture; with a
+/// shared window (`target`) only if that window – or a dialog / menu of its app – is topmost there.
 pub fn input_allowed(target: Target, x: i32, y: i32) -> bool {
     imp::any_allowed(target, &[(x, y)])
 }
@@ -106,8 +129,20 @@ const GRID: usize = 5;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Cover {
     pub rect: Rect,
-    /// one of PeekaView's own windows (toolbar, main window) – never in the picture itself
+    /// one of PeekaView's own windows (toolbar, main window) – never in the picture itself …
     pub own: bool,
+    /// … except the toolbar on a shared screen: in the picture, and viewers may use it (they see
+    /// it marked as the presenter's, so they do not take it for their own)
+    pub open: bool,
+}
+
+impl Cover {
+    /// One of PeekaView's own windows lying over a shared window (`shared`) or screen (`None`).
+    #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+    fn own(id: u32, rect: Rect, shared: bool) -> Vec<Cover> {
+        let open = !shared && is_toolbar(id);
+        own_parts(id, rect).into_iter().map(|rect| Cover { rect, own: true, open }).collect()
+    }
 }
 
 /// The parts of a shared window or screen (`rect`) that windows lie over (screen coordinates,
@@ -116,7 +151,7 @@ pub struct Cover {
 pub fn covers(target: Target, rect: Rect) -> Vec<Cover> {
     let mut out: Vec<Cover> = imp::covers(target)
         .into_iter()
-        .filter_map(|c| Some(Cover { rect: c.rect.intersect(&rect)?, own: c.own }))
+        .filter_map(|c| Some(Cover { rect: c.rect.intersect(&rect)?, ..c }))
         .filter(|c| c.rect.w >= MIN_COVER && c.rect.h >= MIN_COVER)
         .collect();
     out.truncate(MAX_COVERS);
@@ -311,9 +346,15 @@ mod imp {
         let overlays = super::OVERLAY_WINDOWS.lock().unwrap().clone();
         let windows = list(false);
         let visible = |w: &&Info| w.alpha > 0.0 && !overlays.contains(&w.id);
-        let cover = |w: &Info| super::Cover { rect: w.rect, own: w.pid == me };
+        let cover = |w: &Info| {
+            if w.pid == me {
+                super::Cover::own(w.id, w.rect, target.is_some())
+            } else {
+                vec![super::Cover { rect: w.rect, own: false, open: false }]
+            }
+        };
         let Some((id, pid)) = target else {
-            return windows.iter().filter(visible).filter(|w| w.pid == me).map(cover).collect();
+            return windows.iter().filter(visible).filter(|w| w.pid == me).flat_map(cover).collect();
         };
         let displays = displays();
         let Some(own) = windows.iter().find(|w| w.id == id).map(|w| w.rect) else { return vec![] };
@@ -323,7 +364,7 @@ mod imp {
             .filter(visible)
             .filter(|w| !is_screen_overlay(w, &displays))
             .filter(|w| !(w.pid == pid && part_of(w, &own)))
-            .map(cover)
+            .flat_map(cover)
             .collect()
     }
 
@@ -333,9 +374,14 @@ mod imp {
         let is_overlay = |id: u32| overlays.contains(&id);
         let windows = list(false);
         let displays = if target.is_some() { displays() } else { Vec::new() };
+        // our own windows are only where they show something (the toolbar's shadow margin is
+        // transparent – clicks there go through)
+        let at = |w: &Info, x: i32, y: i32| if w.pid == me { super::own_parts(w.id, w.rect).iter().any(|r| r.contains(x, y)) } else { w.rect.contains(x, y) };
         points.iter().any(|&(x, y)| {
-            // never on one of our own windows (main window, helpers) – the overlay is click-through
-            if windows.iter().any(|w| w.pid == me && !is_overlay(w.id) && w.alpha > 0.0 && w.rect.contains(x, y)) {
+            // never on one of our own windows (main window, helpers) – the overlay is click-through;
+            // on a shared screen the toolbar is in the picture, viewers may use it
+            let blocked = |w: &&Info| !is_overlay(w.id) && !(target.is_none() && super::is_toolbar(w.id));
+            if windows.iter().filter(blocked).any(|w| w.pid == me && w.alpha > 0.0 && at(w, x, y)) {
                 return false;
             }
             let Some((id, pid)) = target else { return true };
@@ -345,7 +391,7 @@ mod imp {
             windows
                 .iter()
                 .filter(|w| w.alpha > 0.0 && !is_overlay(w.id) && !is_screen_overlay(w, &displays))
-                .find(|w| w.rect.contains(x, y))
+                .find(|w| at(w, x, y))
                 .is_some_and(|w| w.id == id || (w.pid == pid && part_of(w, &own)))
         })
     }
@@ -456,7 +502,12 @@ mod imp {
         if frame != 0 && unsafe { GetWindowRect(hwnd, &mut r) } == 0 {
             return 1;
         }
-        walk.out.push(Cover { rect: Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top }, own });
+        let rect = Rect { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top };
+        if own {
+            walk.out.extend(Cover::own(hwnd as usize as u32, rect, walk.target.is_some()));
+        } else {
+            walk.out.push(Cover { rect, own, open: false });
+        }
         1
     }
 
@@ -466,9 +517,10 @@ mod imp {
         walk.out
     }
 
-    /// PeekaView's own visible windows (overlays aside).
-    fn own_windows() -> Vec<Rect> {
-        covers(None).into_iter().map(|c| c.rect).collect()
+    /// Where PeekaView's own visible windows take no viewer input (overlays aside; on a shared
+    /// screen the toolbar is in the picture and takes input).
+    fn own_windows(target: super::Target) -> Vec<Rect> {
+        covers(None).into_iter().filter(|c| target.is_some() || !c.open).map(|c| c.rect).collect()
     }
 
     pub fn window_geometry(win: &xcap::Window) -> Option<(Rect, bool)> {
@@ -489,12 +541,16 @@ mod imp {
         }
         let mut pid = 0u32;
         unsafe { GetWindowThreadProcessId(root, &mut pid) };
-        // the shared window itself or a dialog / menu of its process
-        pid != std::process::id() && target.is_none_or(|(id, owner)| root as usize as u32 == id || pid as i32 == owner)
+        // the shared window itself or a dialog / menu of its process; on a shared screen also the
+        // toolbar
+        if pid == std::process::id() {
+            return target.is_none() && super::is_toolbar(root as usize as u32);
+        }
+        target.is_none_or(|(id, owner)| root as usize as u32 == id || pid as i32 == owner)
     }
 
     pub fn any_allowed(target: super::Target, points: &[(i32, i32)]) -> bool {
-        let own = own_windows();
+        let own = own_windows(target);
         points.iter().any(|&(x, y)| input_allowed(target, &own, x, y))
     }
 

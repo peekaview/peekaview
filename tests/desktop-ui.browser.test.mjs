@@ -168,6 +168,22 @@ test('desktop permissions, source selection and the remembered contacts destinat
     assert.equal(await evaluate("document.querySelector('#guide').hidden"),false)
     await evaluate("qa.emit('peers',[{id:1,name:'Testgast',color:'#456',host:false}]);true")
     assert.equal(await evaluate("document.querySelector('#guide').hidden"),true)
+    // the window reports where it shows something – the bar, not the shadow margin around it
+    const resized="(()=>{const a=qa.calls.findLast(c=>c.cmd==='toolbar_resize').args,b=document.querySelector('.bar').getBoundingClientRect();return {parts:a.parts,bar:[b.left,b.top,b.width,b.height].map(Math.round),barLeft:a.barLeft,collapsed:a.collapsed,width:a.width}})()"
+    await browser('wait','--fn',"qa.calls.findLast(c=>c.cmd==='toolbar_resize')?.args.parts?.length===1")
+    let size=await evaluate(resized)
+    assert.deepEqual(size.parts,[size.bar])
+    assert.equal(size.barLeft>=20 && size.collapsed===false,true)
+    // folded: owl and arrow only, at the screen's left edge
+    await browser('click','#fold-btn')
+    await browser('wait','--fn',"qa.calls.findLast(c=>c.cmd==='toolbar_resize').args.collapsed===true")
+    size=await evaluate(resized)
+    assert.deepEqual(size.parts,[size.bar])
+    assert.deepEqual(await evaluate("[...document.querySelector('.bar').children].filter(e=>e.offsetWidth>0).map(e=>e.id)"),['logo','fold-btn'])
+    assert.equal(size.bar[2]<80,true,`folded bar is ${size.bar[2]}px wide`)
+    await browser('click','#logo')
+    await browser('wait','--fn',"qa.calls.findLast(c=>c.cmd==='toolbar_resize').args.collapsed===false")
+    assert.equal(await evaluate("!!document.querySelector('#grip').offsetWidth && !document.body.classList.contains('collapsed')"),true)
     assert.equal(await evaluate("qa.calls.some(c=>c.cmd==='log_js')"),false)
   } finally {
     try { await browser('close') } finally { await new Promise(resolve => server.close(resolve)) }

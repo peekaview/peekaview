@@ -73,8 +73,11 @@ body.toolbar { background: transparent; overflow: hidden; }
 .grip:active { cursor: grabbing; }
 .fold { width: 24px; margin-left: -2px; }
 #live-dot { display: none; margin: 0 5px 0 3px; }
-body.collapsed.sharing #live-dot { display: block; }
-body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.collapsed #toast { display: none !important; }
+body.collapsed #bar-idle, body.collapsed #bar-live, body.collapsed #panel, body.collapsed #toast, body.collapsed #grip { display: none !important; }
+/* folded: a tab at the screen's left edge – owl and arrow; join requests still come up below it */
+body.collapsed #shell { align-items: flex-start; }
+body.collapsed .bar { gap: 2px; padding: 0 4px 0 8px; border-left: 0; border-radius: 0 14px 14px 0; }
+body.collapsed .logo { cursor: pointer; }
 
 .chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; transition: background .15s; }
 .chip:hover { background: var(--raised); }

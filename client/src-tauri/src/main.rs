@@ -238,10 +238,26 @@ struct Toolbar {
 
 static TOOLBAR: std::sync::Mutex<Toolbar> = std::sync::Mutex::new(Toolbar { anchor: None, bar_left: 0.0, dragging: false });
 
-/// The toolbar of a running share reports the size it needs (bar only, or bar + join requests)
-/// and where the bar starts inside it.
+/// The toolbar of a running share reports the size it needs (bar only, or bar + join requests),
+/// where the bar starts inside it and the parts that show something (`parts`: [x, y, w, h] in CSS
+/// px – the rest is transparent margin for the shadow). Folded (`collapsed`), only the owl and the
+/// arrow stick out of the screen's left edge.
 #[tauri::command]
-fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>) -> Result<(), String> {
+fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_left: Option<f64>, parts: Option<Vec<[f64; 4]>>, collapsed: Option<bool>) -> Result<(), String> {
+    if let Some(parts) = parts {
+        // input space: macOS points (= CSS px), elsewhere physical pixels
+        #[cfg(target_os = "macos")]
+        let k = 1.0;
+        #[cfg(not(target_os = "macos"))]
+        let k = window.scale_factor().unwrap_or(1.0);
+        let parts = parts
+            .iter()
+            .filter(|p| p.iter().all(|v| v.is_finite()))
+            .map(|[x, y, w, h]| guard::Rect { x: (x * k).floor() as i32, y: (y * k).floor() as i32, w: (w * k).ceil() as i32, h: (h * k).ceil() as i32 })
+            .collect();
+        guard::TOOLBAR.lock().unwrap().1 = Some(parts);
+    }
+    let collapsed = collapsed.unwrap_or(false);
     let mut toolbar = TOOLBAR.lock().unwrap();
     toolbar.dragging = false;
     toolbar.bar_left = bar_left.unwrap_or(0.0);
@@ -265,8 +281,9 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
         None => (ax + (aw - w) / 2, ay + (4.0 * scale) as i32),
         Some((left, top)) => (left - (toolbar.bar_left * scale) as i32, top),
     };
-    // keep it on the screen (a panel folding out near the bottom pushes it up for a while)
-    let x = x.min(ax + aw - w).max(ax);
+    // keep it on the screen (a panel folding out near the bottom pushes it up for a while);
+    // folded, the bar sits right at the left edge – its shadow margin hangs over it
+    let x = if collapsed { ax - (toolbar.bar_left * scale) as i32 } else { x.min(ax + aw - w).max(ax) };
     let y = y.min(ay + ah - h).max(ay);
     drop(toolbar);
     // size before position (Cocoa keeps the bottom-left corner when resizing)
@@ -300,13 +317,26 @@ pub fn open_toolbar(app: &AppHandle) {
         .theme(Some(tauri::Theme::Dark))
         .build()
     {
-        // keep it out of screen captures (macOS: the capture filter excludes our windows)
-        #[cfg(not(target_os = "macos"))]
+        // Unlike PeekaView's other windows, the toolbar is in the picture of a shared screen and
+        // viewers may use it there (they see it marked as the presenter's). The input guard
+        // knows it by its window id.
         Ok(window) => {
-            let _ = window.set_content_protected(true);
+            *guard::TOOLBAR.lock().unwrap() = (None, None);
+            #[cfg(target_os = "macos")]
+            if let Ok(ns) = window.ns_window() {
+                let ns = ns as usize;
+                let _ = app.run_on_main_thread(move || {
+                    let id = unsafe { macos::window_number(ns as *mut std::ffi::c_void) };
+                    guard::TOOLBAR.lock().unwrap().0 = Some(id);
+                });
+            }
+            #[cfg(target_os = "windows")]
+            if let Ok(hwnd) = window.hwnd() {
+                guard::TOOLBAR.lock().unwrap().0 = Some(hwnd.0 as usize as u32);
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+            let _ = window;
         }
-        #[cfg(target_os = "macos")]
-        Ok(_) => {}
         Err(e) => log(&format!("toolbar: {e}")),
     }
 }

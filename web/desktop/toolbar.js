@@ -53,23 +53,37 @@ $('logo').innerHTML = owl(24)
 
 // ------------------------------------------------------------------ window size follows the content
 
-// the bar's left edge stays where the user dragged it, also when requests fold out below
-new ResizeObserver(() => {
+// the bar's left edge stays where the user dragged it, also when requests fold out below.
+// `parts`: where the window shows something – the rest is transparent margin for the shadows;
+// viewer input is only kept off (and only marked) there.
+function reportSize() {
   const shell = $('shell')
   const barLeft = shell.querySelector('.bar').offsetLeft
-  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight), barLeft })
-}).observe($('shell'))
+  const parts = [...shell.children]
+    .map((el) => el.getBoundingClientRect())
+    .filter((r) => r.width > 0 && r.height > 0)
+    .map((r) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v)))
+  const collapsed = document.body.classList.contains('collapsed')
+  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight), barLeft, parts, collapsed })
+}
+const sizes = new ResizeObserver(reportSize)
+sizes.observe($('shell'))
+for (const el of $('shell').children) sizes.observe(el)
 
 $('grip').addEventListener('mousedown', (e) => e.button === 0 && invoke('toolbar_drag'))
 
+// folded, the bar goes to the screen's left edge: only the owl and the arrow stick out
 function setCollapsed(collapsed) {
   document.body.classList.toggle('collapsed', collapsed)
   store.set('pv-collapsed', collapsed ? '1' : '')
   const b = $('fold-btn')
   b.title = collapsed ? 'Ausklappen' : 'Einklappen'
   b.innerHTML = icon(collapsed ? 'expand' : 'collapse', 17)
+  $('logo').title = collapsed ? 'PeekaView – ausklappen' : 'PeekaView'
+  reportSize()
 }
 $('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
+$('logo').addEventListener('click', () => document.body.classList.contains('collapsed') && setCollapsed(false))
 setCollapsed(!!store.get('pv-collapsed'))
 
 // ------------------------------------------------------------------ the running share

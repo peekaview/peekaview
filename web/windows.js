@@ -70,6 +70,12 @@ const STYLE = `
 .pv-cover-label.own span { padding: 2px 8px; color: #fecaca; }
 .pv-cover-label.own b, .pv-cover-label.own small { display: inline; }
 .pv-cover-label.own small::before { content: " · "; }
+/* the presenter's PeekaView toolbar on a shared screen: in the picture and usable (with remote
+   control) – tinted and framed red, so nobody takes it for their own */
+.pv-cover-mark { position: absolute; box-sizing: border-box; border: 2px solid #ef4444; border-radius: 8px; background: rgba(239, 68, 68, .16); }
+/* the name tag beside the bar – below it would cover the join requests */
+.pv-cover-mark span { position: absolute; left: calc(100% + 5px); top: 50%; transform: translateY(-50%); padding: 1px 7px; border-radius: 6px; background: #ef4444; color: #fff; font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; }
+.pv-cover-mark.flip span { left: auto; right: calc(100% + 5px); }
 .pv-viewer[data-tool="point"] .pv-win.covered .pv-view,
 .pv-viewer[data-tool="draw"] .pv-win.covered .pv-view { cursor: not-allowed; }
 /* mirror of the presenter's screen ("Resize/Anordnen erlauben") */
@@ -184,7 +190,10 @@ export class WindowManager {
       win.el.querySelector('.pv-win-flag').textContent = covered ? 'Im Hintergrund' : ''
       win.el.querySelector('.pv-win-bar').title = covered && this.options.canActivate?.() ? 'Bei der teilenden Person in den Vordergrund holen' : ''
       if (!this.canAnnotate(win)) win.ann.reset()
-      this.showCover(win, control && !info.paused ? info.cover : [])
+      // where other windows lie over it only matters with remote control; the presenter's toolbar
+      // is marked always (it is in the picture)
+      const cover = Array.isArray(info.cover) ? info.cover : []
+      this.showCover(win, info.paused ? [] : control ? cover : cover.filter((r) => r?.[4] === 2))
       const paused = win.el.querySelector('.pv-win-paused')
       paused.hidden = !info.paused
       paused.textContent = 'Das Fenster ist bei der teilenden Person gerade nicht sichtbar (minimiert oder auf einem anderen Desktop).'
@@ -213,18 +222,21 @@ export class WindowManager {
   }
 
   /**
-   * Marks where other windows lie over this one at the presenter's (`cover`: [x, y, w, h], 0..1 of
-   * the window) – remote control clicks do not arrive there.
+   * Marks where other windows lie over this one at the presenter's (`cover`: [x, y, w, h, own], 0..1
+   * of the window) – remote control clicks do not arrive there. own = 1: one of PeekaView's own
+   * windows (not in the picture); 2: the presenter's PeekaView toolbar, in the picture and usable.
    */
   showCover(win, cover) {
-    const parts = (Array.isArray(cover) ? cover : [])
+    const all = (Array.isArray(cover) ? cover : [])
       .filter((r) => Array.isArray(r) && r.length >= 4 && r.every(Number.isFinite))
-      .map(([x, y, w, h, own]) => ({ r: [x, y, w, h], own: own === 1 }))
+      .map(([x, y, w, h, own]) => ({ r: [x, y, w, h], own: own === 1, open: own === 2 }))
+    const parts = all.filter((p) => !p.open)
+    const marks = all.filter((p) => p.open)
     const layer = win.el.querySelector('.pv-cover')
-    const key = JSON.stringify(parts)
+    const key = JSON.stringify(all)
     if (layer.dataset.key === key) return
     layer.dataset.key = key
-    layer.hidden = !parts.length
+    layer.hidden = !all.length
     const place = (el, [x, y, w, h]) => {
       el.style.left = `${x * 100}%`
       el.style.top = `${y * 100}%`
@@ -251,9 +263,22 @@ export class WindowManager {
     // they are left out of the picture, so the viewer would not know what is there
     const others = parts.filter((p) => !p.own)
     const largest = others.reduce((a, p) => (!a || p.r[2] * p.r[3] > a.r[2] * a.r[3] ? p : a), null)
+    // the toolbar (bar, join requests below it): framed, one name tag at the topmost part
+    const top = marks.reduce((a, p) => (!a || p.r[1] < a.r[1] ? p : a), null)
+    const mark = (p) => {
+      const el = place(document.createElement('div'), p.r)
+      el.className = 'pv-cover-mark'
+      if (p === top) {
+        el.title = 'Die PeekaView-Leiste der teilenden Person – nicht deine eigene'
+        el.classList.toggle('flip', p.r[0] + p.r[2] > 0.75)
+        el.append(Object.assign(document.createElement('span'), { textContent: 'PeekaView der teilenden Person' }))
+      }
+      return el
+    }
     layer.querySelector('.pv-cover-labels').replaceChildren(
       ...(largest ? [label(largest, 'Verdeckt', 'Klicks kommen hier nicht an')] : []),
       ...parts.filter((p) => p.own).map((p) => label(p, 'PeekaView', 'nicht steuerbar')),
+      ...marks.map(mark),
     )
   }
 
