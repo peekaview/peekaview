@@ -154,8 +154,8 @@ test('desktop permissions, source selection and the remembered contacts destinat
     // two words for the phone
     await browser('wait','#guide-code:not([hidden])')
     assert.match(await evaluate("document.querySelector('#guide-code-words').textContent"),/^[A-Z][a-z]+ [A-Z][a-z]+$/)
-    // "Teilnehmer hinzufügen": one card with both ways in – the link to copy and the code word
-    assert.equal(await evaluate("document.querySelector('#invite-btn').textContent.trim()"),'Teilnehmer hinzufügen')
+    // "Einladen": one card with both ways in – the link to copy and the code word
+    assert.equal(await evaluate("document.querySelector('#invite-btn').textContent.trim()"),'Einladen')
     assert.equal(await evaluate("document.querySelector('#invite-card').hidden"),true)
     await browser('click','#invite-btn')
     assert.deepEqual(await evaluate("(()=>({open:!document.querySelector('#invite-card').hidden,expanded:document.querySelector('#invite-btn').getAttribute('aria-expanded'),code:!document.querySelector('#invite-code').hidden,same:document.querySelector('#invite-words').textContent===document.querySelector('#guide-code-words').textContent}))()"),{open:true,expanded:'true',code:true,same:true})

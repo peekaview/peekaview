@@ -147,7 +147,7 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 .guide-actions .pill { height: 28px; padding: 0 10px; font-size: 12px; }
 body.collapsed #guide, body.collapsed #invite-card { display: none !important; }
 
-/* "Teilnehmer hinzufügen": the link to send and the code word to read out */
+/* "Einladen": the link to send and the code word to read out */
 .invite-card { display: flex; flex-direction: column; gap: 10px; width: 340px; padding: 10px 12px 12px 14px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); animation: toast-in .25s ease-out; }
 .invite-head { display: flex; align-items: center; justify-content: space-between; }
 .invite-head strong { font-size: 13px; font-weight: 650; }

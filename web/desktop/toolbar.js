@@ -148,7 +148,7 @@ function show(live) {
   fixedCall = !!live.fixedCall
   $('mic-btn').hidden = !!live.fixedCall || settings.voice_enabled === false
   voice.setEnabled(!live.fixedCall && settings.voice_enabled !== false)
-  linkTitle = `${title ? `Geteilt: ${title}\n` : ''}Link oder Codewort zum Zuschauen`
+  linkTitle = `${title ? `Geteilt: ${title}\n` : ''}Teilnehmer einladen – mit Link oder Codewort`
   $('invite-url').textContent = link
   $('invite-url').title = link
   $('invite-validity').textContent = VALIDITY[live.linkKind] ?? ''
@@ -195,7 +195,7 @@ function showWordCode() {
   $('invite-words').textContent = words
   $('invite-code').hidden = !words
 }
-// "Teilnehmer hinzufügen": a card below the bar with both ways in – the link and the code word
+// "Einladen": a card below the bar with both ways in – the link and the code word
 function showInvite(open) {
   $('invite-card').hidden = !open
   $('invite-btn').classList.toggle('open', open)
