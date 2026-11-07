@@ -144,7 +144,15 @@ body.app .toast { position: fixed; left: 50%; bottom: 18px; transform: translate
 .guide kbd { padding: 0 4px; border-radius: 4px; background: var(--raised); color: var(--fg); font: 600 11px/1.5 ui-sans-serif, system-ui, sans-serif; }
 .guide-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
 .guide-actions .pill { height: 28px; padding: 0 10px; font-size: 12px; }
-body.collapsed #guide { display: none !important; }
+body.collapsed #guide, body.collapsed #word-card { display: none !important; }
+
+/* the code word, big enough to read out */
+.word-card { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 300px; padding: 12px 14px; border-radius: 13px; box-shadow: 0 6px 18px rgba(0, 0, 0, .42); text-align: center; animation: toast-in .25s ease-out; }
+.word-label { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.word-card strong { font-size: 22px; font-weight: 700; letter-spacing: -.01em; user-select: text; }
+.word-card p { margin: 2px 0 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.word-card b { color: var(--fg); font-weight: 650; }
+.word-card .pill { height: 28px; padding: 0 10px; font-size: 12px; }
 
 /* join requests: nobody watches without the presenter's OK */
 .requests { display: flex; flex-direction: column; gap: 6px; }
