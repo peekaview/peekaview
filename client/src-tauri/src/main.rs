@@ -292,8 +292,12 @@ fn toolbar_resize(window: tauri::WebviewWindow, width: f64, height: f64, bar_lef
     // `show` makes the toolbar key on macOS, undoing the initial focus of the shared window.
     #[cfg(target_os = "macos")]
     return window.with_webview(|view| unsafe { macos::show_without_focus(view.ns_window()) }).map_err(|e| e.to_string());
+    // (elsewhere the same: a plain `show` would take the focus every time the bar changes size)
     #[cfg(not(target_os = "macos"))]
-    window.show().map_err(|e| e.to_string())
+    {
+        session::show_inactive(&window);
+        Ok(())
+    }
 }
 
 /// The toolbar of a running share: a small frameless bar at the top edge of the screen, always on
