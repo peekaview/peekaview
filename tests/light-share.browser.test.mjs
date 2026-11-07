@@ -402,6 +402,41 @@ test('the share in its own small window (as in Firefox: no Picture-in-Picture, c
     const after = await evaluate('pvLight.host.size')
     assert.ok(Math.abs(after.width - size.width) <= 2 && Math.abs(after.height - size.height) <= 2, JSON.stringify(after))
 
+    // "Am Fenster zeigen" by itself: a drawing while the presenter works elsewhere waits as a preview –
+    // the PeekaView tab brought to the front, the small window comes before it and goes there
+    const drawHere = async (x, y) => {
+      await tab(V)
+      await browser('mouse', 'move', String(Math.round(r.l + r.w * x)), String(Math.round(r.t + r.h * y)))
+      await browser('mouse', 'down')
+      await browser('mouse', 'move', String(Math.round(r.l + r.w * (x + 0.05))), String(Math.round(r.t + r.h * (y + 0.04))))
+      await browser('mouse', 'up')
+      await tab(P)
+    }
+    await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
+    await evaluate('window.qaFocused = 0; window.qaFocus = window.focus; window.focus = () => { qaFocused++ }; document.hasFocus = () => false; true')
+    await onScreen('document.hasFocus = () => false; true')
+    await drawHere(0.5, 0.3)
+    await waitFor("document.body.classList.contains('pip-spotting') && !document.querySelector('#pip-spot').hidden")
+    assert.equal(await evaluate("!document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus'"), true, 'not in front: a preview only')
+    await onScreen("delete document.hasFocus; window.dispatchEvent(new Event('focus')); true")
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'").catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({qaFocused, spotting: document.body.classList.contains('spotting'), pip: document.body.classList.contains('pip-spotting'), state: document.querySelector('#spot').contentWindow.pvHelper.state, at: pvLight.lastReveal?.at, now: Date.now(), opener: !!window.opener, openerUrl: window.opener?.location.href})"))}`)
+    })
+    assert.equal(await evaluate("!document.body.classList.contains('pip-spotting') && qaFocused > 0"), true, 'the preview made room, the small window in front')
+    // a drawing while the PeekaView tab is in front: there right away
+    await waitFor("!document.body.classList.contains('spotting') && !pvLight.frames.paused")
+    // (the tab in front: seen, too – the headless browser keeps it hidden behind the small window)
+    await onScreen("document.hasFocus = () => true; Object.defineProperty(document, 'hidden', { value: false, configurable: true }); true")
+    await evaluate('qaFocused = 0; true')
+    const atBefore = await evaluate('pvLight.lastReveal.at')
+    await drawHere(0.3, 0.5)
+    await waitFor("document.body.classList.contains('spotting') && document.querySelector('#spot').contentWindow.pvHelper.state === 'focus'").catch(async (e) => {
+      throw new Error(`${e.message}\n${atBefore}\n${JSON.stringify(await evaluate("({qaFocused, spotting: document.body.classList.contains('spotting'), pip: document.body.classList.contains('pip-spotting'), state: document.querySelector('#spot').contentWindow.pvHelper.state, at: pvLight.lastReveal?.at, now: Date.now(), openerFocus: window.opener.document.hasFocus()})"))}`)
+    })
+    assert.equal(await evaluate("!document.body.classList.contains('pip-spotting') && qaFocused > 0"), true)
+    await onScreen('delete document.hasFocus; delete document.hidden; true')
+    await evaluate('window.focus = qaFocus; delete document.hasFocus; true')
+
     // a small window that cannot be moved (Firefox on a second screen: its numbers counted from that
     // screen's corner): no 1:1 picture under it – that would be its own old picture – but the part
     // around the drawing, fitted (nothing dimmed); it is never moved
@@ -650,6 +685,60 @@ test('the window "Freigabe läuft" always on top (Picture-in-Picture, as in Chro
     await waitFor("window.pvHelper?.state === 'focus'")
     const picture = await evaluate('pvHelper.picture')
     assert.ok(Math.abs(picture.left - win.x) <= 3 && Math.abs(picture.top - win.y) <= 3, JSON.stringify(picture))
+
+    // a drawing while none of its windows was in front waits as a preview – and a notification (in
+    // Chrome, too: its click opens the helper there)
+    const noHelper = async () => {
+      for (let i = 0; i < 80 && (await tabs()).includes('share-helper'); i++) await new Promise((done) => setTimeout(done, 250))
+      assert.ok(!(await tabs()).includes('share-helper'), 'the helper closed again')
+    }
+    const lastHelper = async () => (await tabs()).split('\n').filter((l) => l.includes('share-helper')).map((l) => l.match(/t\d+/)?.[0]).pop()
+    const unfocused = async (x, y) => {
+      await noHelper()
+      await tab(S)
+      await waitFor('!pvLight.frames.paused')
+      await evaluate('document.hasFocus = () => false; true')
+      await tab(P)
+      await evaluate('document.hasFocus = () => false; true')
+      await stroke(x, y)
+      await tab(S)
+      assert.equal(await evaluate("document.querySelector('#spot').contentWindow.pvHelper.state !== 'focus'"), true, 'not in front: nothing jumped')
+      await evaluate('delete document.hasFocus; true')
+      await tab(P)
+      await evaluate('delete document.hasFocus; true')
+    }
+    await noHelper()
+    await tab(S)
+    await evaluate("window.qaNotes = []; window.Notification = class { static permission = 'granted'; constructor(title) { this.title = title; qaNotes.push(this) } close() {} }; true")
+    await unfocused(0.45, 0.4)
+    await tab(S)
+    assert.deepEqual(await evaluate('qaNotes.map((n) => n.title)'), ['Anna hat etwas gemalt'])
+    await tab(P)
+    // the always-on-top window brought forward without a click: the helper tried all the same – where
+    // the browser refuses the pop-up, the preview stays, with a tip how it goes without a click
+    assert.match(await evaluate("document.querySelector('#pip-hint').textContent"), /Leertaste/)
+    await evaluate("window.qaOpen = window.open; window.open = () => null; Object.defineProperty(navigator, 'userActivation', { value: { isActive: false }, configurable: true }); document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); true")
+    await waitFor("document.querySelector('#pip-hint').textContent.includes('Pop-ups')").catch(async (e) => {
+      throw new Error(`${e.message}\n${JSON.stringify(await evaluate("({waiting: pvLight.waiting, spot: document.body.classList.contains('pip-spotting'), hint: document.querySelector('#pip-hint').textContent, focus: document.hasFocus(), hidden: document.hidden, act: navigator.userActivation.isActive, at: pvLight.lastReveal?.at, now: Date.now()})"))}`)
+    })
+    assert.equal(await evaluate('pvLight.waiting'), true, 'still waiting for its place')
+    // … the space bar takes it there (a key counts as a click)
+    await evaluate('window.open = qaOpen; delete navigator.userActivation; delete document.hasFocus; document.activeElement?.blur?.(); true')
+    await browser('press', 'Space')
+    await waitFor("!document.body.classList.contains('pip-spotting')")
+    let spotHelper = await lastHelper()
+    assert.ok(spotHelper, await tabs())
+    await tab(spotHelper)
+    await waitFor("window.pvHelper?.state === 'focus' && Math.abs(pvHelper.picture.left - " + win.x + ') <= 3')
+    // … and so does a click on the preview (not on a button)
+    await unfocused(0.5, 0.45)
+    await browser('click', '#pip-canvas')
+    await waitFor("!document.body.classList.contains('pip-spotting')")
+    spotHelper = await lastHelper()
+    assert.ok(spotHelper, await tabs())
+    await tab(spotHelper)
+    await waitFor("window.pvHelper?.state === 'focus'")
+    await tab(P)
 
     // "Groß anzeigen": the window large, nothing but the drawing – and no new pictures meanwhile
     await stroke(0.4, 0.6)
