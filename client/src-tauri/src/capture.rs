@@ -46,11 +46,25 @@ pub fn geometry(source: &Source) -> Option<(Rect, bool)> {
 /// Takes over a new set of streams: pipelines of windows that stay keep running, new ones start
 /// (each with a keyframe), removed ones stop. On failure nothing changes.
 fn switch(app: &AppHandle, shared: &Arc<Shared>, videos: &mut Vec<(u8, Video)>, next: Vec<Stream>, frames: &mpsc::Sender<Vec<u8>>) -> Result<(), String> {
+    // a stream stays only as itself (session::open_streams clones it, controls included) – a new
+    // source often takes over the slot of the one it replaces (window → screen: slot 0), and then
+    // needs a pipeline of its own; keeping the old one went on sending the old picture
+    let current = shared.streams.lock().unwrap().clone();
+    let kept: Vec<u8> = next
+        .iter()
+        .filter(|s| current.iter().any(|c| c.slot == s.slot && Arc::ptr_eq(&c.ctl, &s.ctl)) && videos.iter().any(|(slot, _)| *slot == s.slot))
+        .map(|s| s.slot)
+        .collect();
     let mut started = Vec::new();
-    for s in next.iter().filter(|s| !videos.iter().any(|(slot, _)| *slot == s.slot)) {
+    for s in next.iter().filter(|s| !kept.contains(&s.slot)) {
         started.push((s.slot, Video::start(s.source.clone(), s.rect, s.ctl.clone(), frames.clone())?));
     }
-    videos.retain(|(slot, _)| next.iter().any(|s| s.slot == *slot));
+    videos.retain(|(slot, _)| kept.contains(slot));
+    // a replaced pipeline's last frames may still have gone out after the new one's first
+    // keyframe, on the same track: one more keyframe
+    for s in next.iter().filter(|s| !kept.contains(&s.slot) && current.iter().any(|c| c.slot == s.slot)) {
+        s.ctl.need_key.store(true, Ordering::Relaxed);
+    }
     videos.extend(started);
     for (slot, _) in videos.iter() {
         if let Some(s) = next.iter().find(|s| s.slot == *slot) {
