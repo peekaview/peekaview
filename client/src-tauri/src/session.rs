@@ -783,11 +783,37 @@ fn create_overlay(app: &AppHandle, slot: u8) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Shows a window without activating it. On Windows, tao shows a window with SW_SHOW once it
+/// was visible before – that takes the focus, even for `focusable(false)` windows: the picker lost
+/// it to the red frames, hid them on blur, got it back, showed them again … (flicker, no typing).
+/// Windows: posted to the window's thread, so a busy UI thread cannot block the caller.
+pub fn show_inactive(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    if let Ok(hwnd) = window.hwnd() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindowAsync, SW_SHOWNOACTIVATE};
+        unsafe { ShowWindowAsync(hwnd.0 as _, SW_SHOWNOACTIVATE) };
+        return;
+    }
+    let _ = window.show();
+}
+
+/// Hides a window shown with `show_inactive` (Windows: tao does not know it is visible, so its
+/// own `hide` would do nothing).
+fn hide_inactive(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    if let Ok(hwnd) = window.hwnd() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindowAsync, SW_HIDE};
+        unsafe { ShowWindowAsync(hwnd.0 as _, SW_HIDE) };
+        return;
+    }
+    let _ = window.hide();
+}
+
 /// Hides the overlays of windows that are not (or no longer) shared.
 fn hide_overlays(app: &AppHandle, keep: &[Stream]) {
     for (label, window) in app.webview_windows() {
         if label.starts_with("overlay-") && !keep.iter().any(|s| overlay_label(s.slot) == label) {
-            let _ = window.hide();
+            hide_inactive(&window);
         }
     }
 }
@@ -805,7 +831,7 @@ pub fn place_overlay(app: &AppHandle, slot: u8, rect: Rect, visible: bool) {
     }
     let Some(overlay) = app.get_webview_window(&overlay_label(slot)) else { return };
     if !visible || rect.w <= 0 || rect.h <= 0 {
-        let _ = overlay.hide();
+        hide_inactive(&overlay);
         return;
     }
     // Overlay coordinates use the same space as xcap / enigo: points on macOS, pixels elsewhere.
@@ -821,12 +847,12 @@ pub fn place_overlay(app: &AppHandle, slot: u8, rect: Rect, visible: bool) {
         let _ = overlay.set_size(tauri::PhysicalSize::new(rect.w as u32, rect.h as u32));
         let _ = overlay.set_position(tauri::PhysicalPosition::new(rect.x, rect.y));
     }
-    let _ = overlay.show();
+    show_inactive(&overlay);
 }
 
 pub fn hide_overlay(app: &AppHandle, slot: u8) {
     if let Some(overlay) = app.get_webview_window(&overlay_label(slot)) {
-        let _ = overlay.hide();
+        hide_inactive(&overlay);
     }
 }
 
