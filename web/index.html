@@ -66,6 +66,11 @@
     #start .paste-row input { flex:1;min-width:0;margin:0; }
     #paste-open { padding:14px 18px;border:0;border-radius:10px;background:#ef4444;color:white;font:600 13px system-ui;cursor:pointer; }
     #link-error { margin:8px 0 0;color:#fca5a5;font-size:12px; }
+    #code-wait { display:flex;align-items:center;gap:8px;margin:8px 0 0;color:#a1a1aa;font-size:12.5px; }
+    #code-wait[hidden] { display:none; }
+    #code-wait::before { content:'';width:12px;height:12px;border:2px solid #52525b;border-top-color:#fafafa;border-radius:50%;animation:code-spin .8s linear infinite; }
+    @keyframes code-spin { to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #code-wait::before { animation:none; } }
     #recent-links { display:flex;flex-direction:column;gap:10px; }
     #new-link { margin-top: 0; text-decoration: none; }
     #new-link span { color: #e4e4e7; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
@@ -211,16 +216,17 @@
     </nav>
   <form id="start">
     <h1 class="title" id="title">Bildschirm ansehen</h1>
-    <p class="lead" id="lead">Du hast einen Link bekommen? Füge ihn hier ein.</p>
+    <p class="lead" id="lead">Du hast einen Link oder Code bekommen? Gib ihn hier ein.</p>
     <div id="paste-link">
-      <label>Link einfügen
-        <span class="paste-row"><input id="share-url" type="text" inputmode="url" autocomplete="off" placeholder="https://peekaview.de/#…"><button id="paste-open" type="button">Öffnen</button></span>
+      <label>Link oder Code
+        <span class="paste-row"><input id="share-url" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Link einfügen oder z. B. Tiger Apfel"><button id="paste-open" type="button">Öffnen</button></span>
       </label>
       <p id="link-error" role="alert" hidden></p>
+      <p id="code-wait" role="status" hidden></p>
     </div>
     <div id="recent-links" hidden>
     <ul class="rooms" id="rooms"></ul>
-    <button class="other-link" id="new-link" type="button">Du hast einen neuen Link bekommen? <span>Hier einfügen</span></button></div>
+    <button class="other-link" id="new-link" type="button">Du hast einen neuen Link oder Code bekommen? <span>Hier eingeben</span></button></div>
     <div id="name-box" hidden>
       <p class="name-show" id="name-show" hidden>Du schaust zu als <strong id="name-current"></strong><button id="name-edit" type="button" aria-label="Namen ändern" title="Namen ändern"></button></p>
       <div id="name-field">
@@ -268,6 +274,7 @@
     import { mountOwl, startScene } from './home-scene.js'
     import './legal.js'
     import { Signaling, parseRoom } from './signal.js'
+    import { displayCode, findByCode, looksLikeCode, parseCode } from './word-code.js'
 
     const $ = (id) => document.getElementById(id)
     // where it runs: the desktop apps lead to their download
@@ -418,11 +425,47 @@
         focusLinkField()
       })
     }
+    // a code of two words ("Tiger Apfel", read out on the phone): ask the sharer for the link
+    let codeSearch=null
+    async function openCode(text){
+      const field=$('share-url'),error=$('link-error'),wait=$('code-wait')
+      const codes=parseCode(text)
+      error.hidden=true
+      if(!codes.length){
+        error.textContent=`„${text.trim()}“ ist kein PeekaView-Code. Ein Code besteht aus zwei Wörtern, z. B. „Tiger Apfel“ – oder füge den ganzen Link ein.`
+        error.hidden=false;field.focus();return
+      }
+      codeSearch?.abort()
+      const search=codeSearch=new AbortController()
+      wait.textContent=`Suche die Freigabe zu „${displayCode(codes[0])}“ …`;wait.hidden=false
+      $('paste-open').disabled=true
+      try{
+        const {link}=await findByCode(text,{signal:search.signal})
+        if(search!==codeSearch)return
+        field.value=''
+        openLink(link,true)
+      }catch(e){
+        if(search!==codeSearch || e.message==='aborted')return
+        error.textContent=`Zu „${displayCode(codes[0])}“ läuft gerade keine Freigabe. Stimmen die beiden Wörter? Der Code gilt nur, solange geteilt wird.`
+        error.hidden=false;field.focus()
+      }finally{
+        if(search===codeSearch){wait.hidden=true;$('paste-open').disabled=false;codeSearch=null}
+      }
+    }
+    $('share-url').addEventListener('input',()=>{codeSearch?.abort();$('link-error').hidden=true})
     function openPastedLink(){
+      const text=$('share-url').value
+      if(!text.trim())return $('share-url').focus()
+      // no link (nothing like "https://…/#…"): meant as a code
+      if(looksLikeCode(text) || !/[:/#.]/.test(text))return openCode(text)
+      openLink(text.trim())
+    }
+    // a link: pasted, or the one a code brought (which may come from this very site, when it runs elsewhere)
+    function openLink(text,fromCode=false){
       const field=$('share-url'),error=$('link-error')
       try{
-        const url=new URL(field.value.trim())
-        if(url.origin!=='https://peekaview.de' || url.username || url.password)throw new Error()
+        const url=new URL(text)
+        if(!['https://peekaview.de',...(fromCode?[location.origin]:[])].includes(url.origin) || url.username || url.password)throw new Error()
         if(['/fixed-rooms','/fixed-rooms.html'].includes(url.pathname) && new URLSearchParams(url.hash.slice(1)).has('invite')){
           location.href=new URL('fixed-rooms.html'+url.hash,location.href).href;return
         }
@@ -432,7 +475,7 @@
         if(url.searchParams.has('name'))$('name').value=url.searchParams.get('name').slice(0,32)
         location.hash=room
       }catch{
-        error.textContent='Das ist kein PeekaView-Link. Bitte den vollständigen Link einfügen.';error.hidden=false;field.focus()
+        error.textContent=fromCode?'Die Freigabe zu diesem Code lässt sich hier nicht öffnen.':'Das ist kein PeekaView-Link. Bitte den vollständigen Link einfügen – oder die zwei Wörter des Codes.';error.hidden=false;field.focus()
       }
     }
     $('paste-open').addEventListener('click',openPastedLink)
@@ -556,7 +599,7 @@
         ? 'Gib deinen Namen ein und klicke auf „Freigabe ansehen“. Keine Anmeldung, nichts zu installieren.'
         : selected
           ? ''
-          : 'Du hast einen Link bekommen? Füge ihn hier ein.'
+          : 'Du hast einen Link oder Code bekommen? Gib ihn hier ein.'
       $('connect').disabled = !selected
       $('lead').hidden = !$('lead').textContent
       $('hint').textContent = !selected

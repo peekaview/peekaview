@@ -14,6 +14,7 @@ const sources = [
   { id: 'window:2', kind: 'window', app: 'Browser', title: 'Zweiter Fenstertitel' },
 ]
 const shim = `window.qa = { calls: [], listeners: {}, emit: (name, payload) => qa.listeners[name]?.({payload}) };
+window.WebSocket = class { static OPEN = 1; send() {} close() {} };
 localStorage.setItem('pv-keep-room', 'previous-link-secret');
 localStorage.setItem('pv-keep-key', 'previous-presenter-key');
 const own={id:'0000000000000000',email:'me@example.test',name:'Mein Computer',platform:'desktop'};
@@ -150,6 +151,10 @@ test('desktop permissions, source selection and the remembered contacts destinat
     await browser('open',base+'/desktop/toolbar.html')
     await browser('wait','#guide:not([hidden])')
     assert.equal(await evaluate("document.querySelector('#guide-copied').textContent"),'Er ist schon kopiert.')
+    // two words for the phone, also in the button's tooltip
+    await browser('wait','#guide-code:not([hidden])')
+    assert.match(await evaluate("document.querySelector('#guide-code-words').textContent"),/^[A-Z][a-z]+ [A-Z][a-z]+$/)
+    assert.match(await evaluate("document.querySelector('#code-btn').title"),/Am Telefon statt des Links: [A-Z][a-z]+ [A-Z][a-z]+$/)
     assert.equal(await evaluate("document.querySelectorAll('.modes button').length"),3)
     assert.equal(await evaluate("document.querySelector('[data-mode=control]').textContent.trim()"),'Steuern')
     await evaluate("qa.emit('settings',{voice_enabled:false,transcript_enabled:false});true")
@@ -158,6 +163,7 @@ test('desktop permissions, source selection and the remembered contacts destinat
     assert.equal(await evaluate("document.querySelector('#mic-btn').hidden"),false)
     await evaluate("qa.emit('live',{link:'https://peekaview.de/#test-link',mode:'view',fixedCall:'group-test'});true")
     assert.equal(await evaluate("document.querySelector('#guide').hidden && document.querySelector('#mic-btn').hidden"),true)
+    assert.equal(await evaluate("document.querySelector('#guide-code').hidden"),true,'no code for a call to contacts')
     await evaluate("qa.emit('live',{link:'https://peekaview.de/#test-link',mode:'view'});true")
     assert.equal(await evaluate("document.querySelector('#guide').hidden"),false)
     await evaluate("qa.emit('peers',[{id:1,name:'Testgast',color:'#456',host:false}]);true")

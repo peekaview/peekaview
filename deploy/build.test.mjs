@@ -14,6 +14,7 @@ test('public build includes all viewer modules and excludes private and desktop 
   assert.ok(files.includes('index.html'))
   assert.ok(files.includes('download.html'))
   assert.ok(files.includes('home-scene.js'))
+  assert.ok(files.includes('word-code.js'))
   for (const page of ['impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'legal.css', 'legal.js']) assert.ok(files.includes(page), page)
   assert.ok(files.includes('windows.js'))
   for (const page of ['share.html', 'share-helper.html', 'light-host.js', 'light-geometry.js', 'light-locate.js', 'light-capture.js', 'light-windows.js', 'light-crop.js', 'light-pick.js', 'light-track.js', 'light-title.js', 'light-pip.js', 'light-mini.js', 'light-help.js', 'light-clip.js']) assert.ok(files.includes(page), page)

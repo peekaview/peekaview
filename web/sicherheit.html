@@ -35,6 +35,7 @@
       <li>Der Schlüssel des Raums steht nur im Link, hinter dem „#“. Diesen Teil schickt der Browser nie an einen Server – kein Server kennt den Schlüssel.</li>
       <li>Die Geräte finden sich über öffentliche Nostr-Relays. Diese Nachrichten sind mit AES-256 verschlüsselt. Die Relays sehen nur IP-Adressen und Zeitpunkte – keine Namen, keine Inhalte.</li>
       <li>Jede Nachricht ist digital signiert. Wer nur den Link kennt, kann sich weder als teilende Person ausgeben noch als jemand, den du schon hereingelassen hast.</li>
+      <li>Statt des Links geht auch ein <strong>Code aus zwei Wörtern</strong> (z. B. „Tiger Apfel“) – praktisch am Telefon. Der Code selbst wird nie verschickt: Beide Geräte machen daraus per Schlüsselaustausch (SPAKE2) einen starken Schlüssel, und nur damit kommt der Link an. Wer mithört, kann damit nichts anfangen; wer rät, hat pro Versuch genau einen Tipp, und PeekaView beantwortet höchstens 30 Versuche pro Minute. Der Code gilt nur, solange du teilst – und hereinlassen musst du trotzdem selbst.</li>
     </ul>
   </section>
 

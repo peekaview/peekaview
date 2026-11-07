@@ -96,6 +96,11 @@
     @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(239,68,68,.1); } }
     .linkbox { display: flex; gap: 8px; margin-top: 7px; }
     .linkbox input { margin: 0; flex: 1; min-width: 0; font-size: 14px; color: #d4d4d8; }
+    /* the two words for the phone */
+    .word-code { margin: 9px 0 0; color: #a1a1aa; font-size: 13.5px; }
+    .word-code strong { color: #fafafa; font-size: 15px; letter-spacing: .01em; white-space: nowrap; }
+    body.panel .word-code { margin: 6px 0 0; text-align: center; font-size: 12px; line-height: 16px; }
+    body.panel .word-code strong { font-size: 13px; }
     .pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 10px; background: #3f3f46; color: #fafafa; font: 650 13.5px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
     .pill:hover:not(:disabled) { background: #52525b; }
     .pill.primary { background: #ef4444; }
@@ -442,6 +447,7 @@
         <div class="run-link">
           <label class="field" id="link-label" for="link">Schicke diesen Link an die Person, die zusehen soll:</label>
           <div class="linkbox"><input id="link" type="text" readonly><button class="pill primary" id="copy" type="button"></button></div>
+          <p class="word-code" id="word-code" hidden title="Wer zusehen soll, gibt diese zwei Wörter auf peekaview.de ein – praktisch am Telefon">Oder am Telefon sagen: <strong id="word-code-words"></strong></p>
         </div>
         <button class="pill clip-open" id="clip-open" type="button" aria-expanded="false"><span data-icon="clipboard"></span><span><span class="clip-long">Gemeinsame </span>Zwischenablage</span><span class="clip-count" id="clip-count" hidden></span></button>
         <button class="pill stop" id="stop" type="button"></button>
@@ -502,6 +508,7 @@
     import { WindowPicker } from './light-pick.js'
     import { covered as windowCovered, follow, grabberOf, snapRect, titleOf, titleScore } from './light-track.js'
     import { documentPip, openPip, resizePip } from './light-pip.js'
+    import { displayCode, offerCode } from './word-code.js'
     import { MiniView } from './light-mini.js'
     import { dialogKind, showScreenHelp } from './light-help.js'
     import { ClipPanel, browserCopyable, filesFromClipboard, readSystemClipboard, saveBlob, asPng } from './clipboard.js'
@@ -873,12 +880,31 @@
       emit({ kind: 'status', ...status() })
       dock()
       copyLink(true)
+      offerWordCode()
       // a whole screen: is it the one this browser is on?
       if (host.surface === 'monitor') setTimeout(checkPlace, 500)
     }
 
+    // two words for the phone, as long as the share runs (word-code.js)
+    let wordCode = null
+    async function offerWordCode() {
+      const sharing = host
+      try {
+        const offer = await offerCode({ link: host.link, name: host.name })
+        if (host !== sharing) return offer.close()
+        wordCode = offer
+        $('word-code-words').textContent = displayCode(offer.code)
+        $('word-code').hidden = false
+        dock()
+      } catch {}
+    }
+
     function ended(why) {
       host = null
+      wordCode?.close()
+      wordCode = null
+      $('word-code').hidden = true
+      $('word-code-words').textContent = ''
       closeClip()
       renderClip()
       cropper = null
@@ -1346,7 +1372,7 @@
     // click may), "Zur Stelle" lays it over the very spot, "Kleiner" shrinks it again.
     // (tall enough for the controls, the footer and a join request or two without a scrollbar – it may
     // grow only in a click in it)
-    const PIP_SMALL = { width: 360, height: 420 }
+    const PIP_SMALL = { width: 360, height: 444 }
     const PIP_LARGE = { width: 4000, height: 3000 }
     let pipLarge = false
     let miniView = null

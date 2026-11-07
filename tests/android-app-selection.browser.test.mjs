@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import test from 'node:test'
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const shim = `window.qa = {
+const shim = `window.WebSocket = class { static OPEN = 1; send() {} close() {} };
+window.qa = {
   calls: [], reject: false,
   settings: { enabled:true, port:0, appsOnly:false, apps:[{id:'app.blue',name:'Blaue App',selected:true,shareable:true},{id:'app.red',name:'Rote App',selected:false,shareable:true},{id:'app.system',name:'System-App',selected:false,shareable:false}] },
   state: {sharing:false,shell:true,helperReady:true,shellSupported:true,appSharingSupported:true,notificationsAllowed:true,overlayAllowed:true,appVisible:true,mode:'view',viewers:[],requests:[],clip:[],link:'https://example.invalid/same-room'}
@@ -71,6 +72,9 @@ test('Android app choices remain editable in the live share and never restart it
   await browser('uncheck','input[value="app.blue"]')
   assert.deepEqual(await evaluate('qa.calls.at(-1)'),{method:'setSharedApps',only:true,apps:['app.red']})
   assert.equal(await evaluate("document.querySelector('#link').textContent"),'https://example.invalid/same-room')
+  // two words for the phone, while sharing; gone when it ends
+  await browser('wait','#word-code:not([hidden])')
+  assert.match(await evaluate("document.querySelector('#word-code-words').textContent"),/^[A-Z][a-z]+ [A-Z][a-z]+$/)
   await browser('uncheck','input[value="app.red"]')
   assert.deepEqual(await evaluate('qa.calls.at(-1).apps'),[])
   await evaluate('qa.state.appVisible=false;window.pvHostUpdate(qa.state);true')
@@ -84,6 +88,7 @@ test('Android app choices remain editable in the live share and never restart it
   assert.equal(await evaluate("document.querySelectorAll('#app-choices').length"),1)
   await evaluate('qa.state.sharing=false;window.pvHostUpdate(qa.state);true')
   assert.equal(await evaluate("document.querySelector('#setup-apps #shell-app-options')!==null"),true)
+  assert.equal(await evaluate("document.querySelector('#word-code').hidden"),true)
   // Disabling the helper must not turn a requested app-only share into a full-screen share.
   await browser('uncheck','#shell')
   assert.equal(await evaluate("document.querySelector('#shell-app-options').hidden"),false)
