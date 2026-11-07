@@ -76,6 +76,14 @@ pub fn is_toolbar(id: u32) -> bool {
     TOOLBAR.lock().unwrap().0 == Some(id)
 }
 
+/// Is the toolbar part of the picture – of a shared window (`shared`) or a screen? Then viewers
+/// may use it, marked as the presenter's. macOS: always (a window is captured as its area on the
+/// display, the toolbar included). Windows: only on a shared screen – a window is captured on its
+/// own there, the toolbar over it is not in the picture.
+pub fn toolbar_in_picture(shared: bool) -> bool {
+    cfg!(target_os = "macos") || !shared
+}
+
 /// Where one of PeekaView's own windows (`id` at `rect`) actually is: the toolbar's visible parts,
 /// any other window as a whole.
 pub fn own_parts(id: u32, rect: Rect) -> Vec<Rect> {
@@ -92,7 +100,7 @@ pub fn own_parts(id: u32, rect: Rect) -> Vec<Rect> {
 pub type Target = Option<(u32, i32)>;
 
 /// May viewer input land at screen point (x, y)? Never on one of PeekaView's own windows
-/// (main window, helpers) – on a shared screen the toolbar aside, which is in the picture; with a
+/// (main window, helpers) – the toolbar aside where it is in the picture; with a
 /// shared window (`target`) only if that window – or a dialog / menu of its app – is topmost there.
 pub fn input_allowed(target: Target, x: i32, y: i32) -> bool {
     imp::any_allowed(target, &[(x, y)])
@@ -140,7 +148,7 @@ impl Cover {
     /// One of PeekaView's own windows lying over a shared window (`shared`) or screen (`None`).
     #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
     fn own(id: u32, rect: Rect, shared: bool) -> Vec<Cover> {
-        let open = !shared && is_toolbar(id);
+        let open = toolbar_in_picture(shared) && is_toolbar(id);
         own_parts(id, rect).into_iter().map(|rect| Cover { rect, own: true, open }).collect()
     }
 }
@@ -164,14 +172,21 @@ const MAX_COVERS: usize = 32;
 
 /// Windows of the shared window's app that are *not* part of it (other document windows, the
 /// Finder's desktop) – they are left out of the picture. Part of it: menus and panels above the
-/// normal window level, and windows lying within it (sheets, dialogs). macOS only.
+/// normal window level, and windows lying within it (sheets, dialogs). Also PeekaView's own
+/// windows apart from the toolbar: the toolbar is in the picture where it lies over the window.
+/// macOS only.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn foreign_windows_of_app(window_id: u32) -> Vec<u32> {
     #[cfg(target_os = "macos")]
     {
+        let me = std::process::id() as i32;
         let windows = imp::list(true);
         let Some(target) = windows.iter().find(|w| w.id == window_id) else { return vec![] };
-        return windows.iter().filter(|w| w.pid == target.pid && w.id != window_id && !imp::part_of(w, &target.rect)).map(|w| w.id).collect();
+        return windows
+            .iter()
+            .filter(|w| (w.pid == target.pid && w.id != window_id && !imp::part_of(w, &target.rect)) || (w.pid == me && !is_toolbar(w.id)))
+            .map(|w| w.id)
+            .collect();
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -379,8 +394,8 @@ mod imp {
         let at = |w: &Info, x: i32, y: i32| if w.pid == me { super::own_parts(w.id, w.rect).iter().any(|r| r.contains(x, y)) } else { w.rect.contains(x, y) };
         points.iter().any(|&(x, y)| {
             // never on one of our own windows (main window, helpers) – the overlay is click-through;
-            // on a shared screen the toolbar is in the picture, viewers may use it
-            let blocked = |w: &&Info| !is_overlay(w.id) && !(target.is_none() && super::is_toolbar(w.id));
+            // the toolbar is in the picture, viewers may use it
+            let blocked = |w: &&Info| !is_overlay(w.id) && !super::is_toolbar(w.id);
             if windows.iter().filter(blocked).any(|w| w.pid == me && w.alpha > 0.0 && at(w, x, y)) {
                 return false;
             }
@@ -392,7 +407,7 @@ mod imp {
                 .iter()
                 .filter(|w| w.alpha > 0.0 && !is_overlay(w.id) && !is_screen_overlay(w, &displays))
                 .find(|w| at(w, x, y))
-                .is_some_and(|w| w.id == id || (w.pid == pid && part_of(w, &own)))
+                .is_some_and(|w| w.id == id || (w.pid == pid && part_of(w, &own)) || super::is_toolbar(w.id))
         })
     }
 

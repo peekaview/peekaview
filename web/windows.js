@@ -259,10 +259,8 @@ export class WindowManager {
         return el
       }),
     )
-    // other windows: one hint in the largest part; PeekaView's own windows (toolbar) each say so –
-    // they are left out of the picture, so the viewer would not know what is there
-    const others = parts.filter((p) => !p.own)
-    const largest = others.reduce((a, p) => (!a || p.r[2] * p.r[3] > a.r[2] * a.r[3] ? p : a), null)
+    // other windows: only the stripes, no words over the picture; PeekaView's own windows each
+    // say so – they are left out of the picture, so the viewer would not know what is there
     // the toolbar (bar, join requests below it): framed, one name tag at the topmost part
     const top = marks.reduce((a, p) => (!a || p.r[1] < a.r[1] ? p : a), null)
     const mark = (p) => {
@@ -276,7 +274,6 @@ export class WindowManager {
       return el
     }
     layer.querySelector('.pv-cover-labels').replaceChildren(
-      ...(largest ? [label(largest, 'Verdeckt', 'Klicks kommen hier nicht an')] : []),
       ...parts.filter((p) => p.own).map((p) => label(p, 'PeekaView', 'nicht steuerbar')),
       ...marks.map(mark),
     )

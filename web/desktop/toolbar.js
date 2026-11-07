@@ -58,32 +58,67 @@ $('logo').innerHTML = owl(24)
 // viewer input is only kept off (and only marked) there.
 function reportSize() {
   const shell = $('shell')
-  const barLeft = shell.querySelector('.bar').offsetLeft
+  const bar = shell.querySelector('.bar')
+  const barLeft = bar.offsetLeft
+  const barRight = bar.offsetLeft + bar.offsetWidth
   const parts = [...shell.children]
     .map((el) => el.getBoundingClientRect())
     .filter((r) => r.width > 0 && r.height > 0)
     .map((r) => [r.left, r.top, r.width, r.height].map((v) => Math.round(v)))
   const collapsed = document.body.classList.contains('collapsed')
-  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight), barLeft, parts, collapsed })
+  invoke('toolbar_resize', { width: Math.ceil(shell.offsetWidth), height: Math.ceil(shell.offsetHeight), barLeft, barRight, parts, collapsed })
 }
 const sizes = new ResizeObserver(reportSize)
 sizes.observe($('shell'))
 for (const el of $('shell').children) sizes.observe(el)
 
-$('grip').addEventListener('mousedown', (e) => e.button === 0 && invoke('toolbar_drag'))
+// unfolded, the grip moves the bar anywhere; folded, up and down along the screen's right edge
+$('grip').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return
+  if (!document.body.classList.contains('collapsed')) {
+    invoke('toolbar_drag')
+    return
+  }
+  e.preventDefault()
+  const grip = $('grip')
+  const start = e.screenY
+  let dy = 0
+  let queued = false
+  let ended = false
+  grip.setPointerCapture(e.pointerId)
+  const move = (ev) => {
+    dy = ev.screenY - start
+    if (queued) return
+    queued = true
+    requestAnimationFrame(() => {
+      queued = false
+      // a move still waiting when the grip is let go would come after the last one
+      if (!ended) invoke('toolbar_dock_move', { dy, done: false })
+    })
+  }
+  const up = () => {
+    ended = true
+    grip.removeEventListener('pointermove', move)
+    grip.removeEventListener('pointerup', up)
+    grip.removeEventListener('pointercancel', up)
+    invoke('toolbar_dock_move', { dy, done: true })
+  }
+  grip.addEventListener('pointermove', move)
+  grip.addEventListener('pointerup', up)
+  grip.addEventListener('pointercancel', up)
+})
 
-// folded, the bar goes to the screen's left edge: only the owl and the arrow stick out
+// folded, the bar goes to the screen's right edge: only the arrow and the grip stick out
 function setCollapsed(collapsed) {
   document.body.classList.toggle('collapsed', collapsed)
   store.set('pv-collapsed', collapsed ? '1' : '')
   const b = $('fold-btn')
-  b.title = collapsed ? 'Ausklappen' : 'Einklappen'
-  b.innerHTML = icon(collapsed ? 'expand' : 'collapse', 17)
-  $('logo').title = collapsed ? 'PeekaView – ausklappen' : 'PeekaView'
+  b.title = collapsed ? 'Ausklappen' : 'An den rechten Rand einklappen'
+  b.innerHTML = icon(collapsed ? 'collapse' : 'expand', 17)
+  $('grip').title = collapsed ? 'Am Rand nach oben oder unten schieben' : 'Verschieben'
   reportSize()
 }
 $('fold-btn').addEventListener('click', () => setCollapsed(!document.body.classList.contains('collapsed')))
-$('logo').addEventListener('click', () => document.body.classList.contains('collapsed') && setCollapsed(false))
 setCollapsed(!!store.get('pv-collapsed'))
 
 // ------------------------------------------------------------------ the running share
