@@ -1,5 +1,6 @@
 // Publish only the browser viewer, never desktop IPC pages or repository files.
-import { copyFile, mkdir, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -24,6 +25,21 @@ for (const file of files) {
   const target = resolve(dist, file)
   await mkdir(dirname(target), { recursive: true })
   await copyFile(resolve(web, file), target)
+}
+
+// peekaview.de keeps scripts and styles in the browser for hours (Cloudflare's browser cache TTL
+// overrides the no-cache of _headers): every page and module asks for them with this build's
+// version, so a deploy is seen at the next reload – the pages themselves are never cached.
+const hash = createHash('sha256')
+for (const file of files) hash.update(file).update(await readFile(resolve(web, file)))
+const version = hash.digest('hex').slice(0, 10)
+const local = String.raw`\.{0,2}/?[\w./-]+\.(?:js|mjs|css)`
+const versioned = (code) => code
+  .replace(new RegExp(String.raw`(\bfrom\s*|\bimport\s*)(['"])(\.{1,2}/[\w./-]+\.m?js)\2`, 'g'), `$1$2$3?v=${version}$2`)
+  .replace(new RegExp(String.raw`(<(?:script|link)\b[^>]*\s(?:src|href)=")(${local})"`, 'g'), `$1$2?v=${version}"`)
+for (const file of files.filter((f) => /\.(html|js)$/.test(f) && !f.startsWith('vendor/'))) {
+  const target = resolve(dist, file)
+  await writeFile(target, versioned(await readFile(target, 'utf8')))
 }
 await copyFile(resolve(here, '../LICENSE'), resolve(dist, 'LICENSE.txt'))
 await copyFile(resolve(here, '_headers'), resolve(dist, '_headers'))

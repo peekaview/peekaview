@@ -25,9 +25,17 @@ test('public build includes all viewer modules and excludes private and desktop 
   for (const file of files.filter(file => /\.(html|js|mjs)$/.test(file) && !file.startsWith('vendor/'))) {
     const code = await readFile(resolve(dist, file), 'utf8')
     for (const match of code.matchAll(/(?:from\s*|import\s*\()\s*['"](\.[^'"]+)['"]/g)) {
-      const dependency = resolve(dirname(resolve(dist, file)), match[1])
+      // every local module is asked for with the build's version (browser cache, build.mjs)
+      assert.match(match[1], /\?v=[0-9a-f]{10}$/, `${file}: ${match[1]} without version`)
+      const dependency = resolve(dirname(resolve(dist, file)), match[1].replace(/\?.*$/, ''))
       assert.ok(dependency.startsWith(dist + '/'), `${file}: module escapes public directory`)
       assert.ok((await stat(dependency)).isFile(), `${file}: missing ${match[1]}`)
+    }
+  }
+  for (const page of files.filter(file => file.endsWith('.html'))) {
+    const html = await readFile(resolve(dist, page), 'utf8')
+    for (const [, url] of html.matchAll(/<(?:script|link)\b[^>]*\s(?:src|href)="([^"]+\.(?:js|css)[^"]*)"/g)) {
+      assert.match(url, /\?v=[0-9a-f]{10}$/, `${page}: ${url} without version`)
     }
   }
   assert.match(await readFile(resolve(dist, '_headers'), 'utf8'), /Cache-Control: no-cache/)

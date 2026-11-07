@@ -189,7 +189,19 @@ function showWordCode() {
   $('guide-code-words').textContent = words
   $('guide-code').hidden = !words
   $('code-btn').title = linkTitle + (words ? `\nAm Telefon statt des Links: ${words}` : '')
+  $('word-words').textContent = words
+  $('word-btn').hidden = !words
+  if (!words) showWordCard(false)
 }
+// the words on demand: the button beside the link opens a card below the bar
+function showWordCard(open) {
+  $('word-card').hidden = !open
+  $('word-btn').classList.toggle('open', open)
+  $('word-btn').setAttribute('aria-expanded', String(open))
+  $('word-btn').title = open ? 'Codewort ausblenden' : 'Codewort zum Vorlesen anzeigen'
+}
+$('word-btn').addEventListener('click', () => showWordCard($('word-card').hidden))
+$('word-close').addEventListener('click', () => showWordCard(false))
 
 // what a click on a mode changed, in words
 const MODE_TEXT = {
