@@ -180,7 +180,7 @@ $('cancel-switch').addEventListener('click', () => {
 
 // red frames around the picked windows while picking (and this window is in front)
 function highlight() {
-  const picking = permissionsReady && !$('picker').hidden && document.hasFocus()
+  const picking = permissionsReady && !$('picker').hidden && document.hasFocus() && document.visibilityState === 'visible'
   invoke('highlight', { sources: picking ? selected : [] })
 }
 window.addEventListener('focus', () => {

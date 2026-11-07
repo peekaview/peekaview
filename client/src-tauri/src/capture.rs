@@ -251,6 +251,7 @@ pub fn run(app: AppHandle, shared: Arc<Shared>, mut videos: Vec<(u8, Video)>, fr
 
         thread::sleep(TICK.saturating_sub(started.elapsed()));
     }
+    session::capture_ended(&app);
 }
 
 /// Where the overlay's badge sits (overlay.html: top centre, at most 300 × 26).

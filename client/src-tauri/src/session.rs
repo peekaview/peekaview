@@ -621,6 +621,10 @@ pub fn highlight(app: &AppHandle, ids: &[String]) {
     if app.state::<SessionState>().0.lock().unwrap().is_some() {
         return;
     }
+    // only while the PeekaView window is up: a hidden one still believes it has the focus (hiding
+    // fires no blur) – after "Beenden" the picker came back hidden and framed the windows just
+    // shared again, as if the share were still running
+    let ids = if app.get_webview_window("main").is_some_and(|w| w.is_visible().unwrap_or(false)) { ids } else { &[] };
     let streams: Vec<Stream> = ids.iter().take(MAX_STREAMS).enumerate().filter_map(|(i, id)| open_stream(id, i as u8).ok()).collect();
     for s in &streams {
         if create_overlay(app, s.slot).is_ok() {
@@ -807,6 +811,14 @@ fn hide_inactive(window: &tauri::WebviewWindow) {
         return;
     }
     let _ = window.hide();
+}
+
+/// The capture of a share has ended: its frames go – unless a new share already runs. (A frame
+/// placed by the capture right while the share was stopped would stay otherwise.)
+pub fn capture_ended(app: &AppHandle) {
+    if app.state::<SessionState>().0.lock().unwrap().is_none() {
+        hide_overlays(app, &[]);
+    }
 }
 
 /// Hides the overlays of windows that are not (or no longer) shared.
