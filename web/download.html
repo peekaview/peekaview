@@ -31,14 +31,11 @@
     .others { margin-top: 24px; padding-top: 18px; border-top: 1px solid #27272a; }
     .others h2 { margin: 0 0 10px; font-size: 14px; color: #a1a1aa; }
     .others ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-    .others a, .others .soon { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: #09090b; color: #fafafa; text-decoration: none; }
+    .others a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: #09090b; color: #fafafa; text-decoration: none; }
     .others a:hover { border-color: rgba(255,255,255,.2); }
     .others svg { flex: none; width: 20px; height: 20px; color: #ef4444; }
     .others b { display: block; font-weight: 650; }
     .others small { display: block; color: #a1a1aa; font-size: 12px; }
-    .others .soon { color: #71717a; }
-    .others .soon svg { color: #71717a; }
-    .others .soon em { margin-left: auto; padding: 1px 7px; border-radius: 6px; background: rgba(255,255,255,.08); color: #a1a1aa; font-size: 11px; font-style: normal; font-weight: 650; }
     .others p { margin: 12px 0 0; color: #71717a; font-size: 12.5px; }
     .pv-footer { margin-top: auto; padding-top: 36px; }
   </style>
@@ -46,7 +43,7 @@
 <body>
 <header id="topbar"><a class="home" href="./"><i id="top-logo"></i>PeekaView</a><a class="back" href="./" data-en="← Back to the start page">← Zur Startseite</a></header>
 <main>
-  <h1>PeekaView Desktop</h1>
+  <h1 id="download-title">PeekaView Desktop</h1>
   <p data-en="Share screens and windows, get remote help and talk to each other – free of charge.">Bildschirme und Fenster teilen, fernsteuern lassen und miteinander sprechen – kostenlos.</p>
 
   <!-- the download for this computer comes first; the others stay below -->
@@ -69,8 +66,18 @@
     </ol>
   </section>
 
+  <section data-system="android" hidden>
+    <a class="download" data-icon="android" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Android.apk"><span data-en="Download the Android app">Android-App herunterladen</span></a>
+    <p class="meta" data-en="Android 8 and later · watch and share the phone's screen">Android 8 und neuer · zuschauen und den Bildschirm des Handys teilen</p>
+    <ol class="steps">
+      <li data-en-html="Open the downloaded file &lt;b&gt;PeekaView-Android.apk&lt;/b&gt;.">Die heruntergeladene Datei <b>PeekaView-Android.apk</b> öffnen.</li>
+      <li data-en="If Android asks, allow installing apps from this source (browser or file manager), then tap “Install”.">Falls Android fragt: Installation aus dieser Quelle (Browser oder Dateimanager) erlauben, dann „Installieren“ tippen.</li>
+    </ol>
+    <p class="note" data-en="To just watch you need not install anything – opening the link you were sent in the browser is enough.">Nur zum Zuschauen brauchst du nichts zu installieren – den Link, den du bekommen hast, einfach im Browser öffnen.</p>
+  </section>
+
   <section data-system="phone" hidden>
-    <p class="note" data-en="To watch on a phone you need not install anything – just open the link you were sent. PeekaView Desktop is available for Windows and Mac, an Android app follows soon.">Zum Zuschauen brauchst du auf dem Handy nichts zu installieren – öffne einfach den Link, den du bekommen hast. PeekaView Desktop gibt es für Windows und Mac, eine Android-App folgt bald.</p>
+    <p class="note" data-en="To watch on an iPhone or iPad you need not install anything – just open the link you were sent. PeekaView is available for Windows, Mac and Android.">Zum Zuschauen auf iPhone oder iPad brauchst du nichts zu installieren – öffne einfach den Link, den du bekommen hast. PeekaView gibt es für Windows, Mac und Android.</p>
   </section>
 
   <p data-from-invitation class="note" data-en="Coming from a confirmation page? After installing, go back there and choose “Open PeekaView Desktop”.">Kommst du von einer Bestätigungsseite? Nach der Installation dorthin zurückkehren und „PeekaView Desktop öffnen“ wählen.</p>
@@ -80,7 +87,7 @@
     <ul>
       <li data-other="windows"><a data-icon="winlogo" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe"><span><b>Windows</b><small data-en="Windows 10 and 11 (64-bit)">Windows 10 und 11 (64 Bit)</small></span></a></li>
       <li data-other="mac"><a data-icon="apple" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip"><span><b>macOS</b><small data-en="Mac with Apple silicon (M1 and later)">Mac mit Apple-Chip (M1 und neuer)</small></span></a></li>
-      <li><span class="soon" data-icon="android"><span><b>Android</b><small data-en="Watch and share the phone's screen">Zuschauen und den Bildschirm des Handys teilen</small></span><em data-en="soon">bald</em></span></li>
+      <li data-other="android"><a data-icon="android" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Android.apk"><span><b>Android</b><small data-en="Android 8 and later · watch and share the phone's screen">Android 8 und neuer · zuschauen und den Bildschirm des Handys teilen</small></span></a></li>
     </ul>
     <p data-en="There is no download yet for Macs with an Intel processor or for Linux.">Für Macs mit Intel-Prozessor und für Linux gibt es noch keinen Download.</p>
   </section>

@@ -19,23 +19,20 @@ mountLanguageSwitch(document.getElementById('footer'))
 mountLanguageToggle(document.getElementById('topbar'))
 
 const $ = (id) => document.getElementById(id)
-// where it runs: the browser starts right here, the desktop apps lead to their download,
-// Android is not out yet
+// where it runs: the browser starts right here, the apps lead to their download
 for (const [name, label, title, action] of [
   ['globe', 'Browser', t('Im Browser starten – ohne Installation', 'Start in the browser – no installation'), 'share'],
-  ['android', 'Android', t('Die Android-App ist bald verfügbar', 'The Android app is coming soon'), 'soon'],
+  ['android', 'Android', t('Android-App: zuschauen und den Bildschirm des Handys teilen', 'Android app: watch and share the phone\'s screen'), 'download'],
   ['winlogo', 'Windows', t('PeekaView Desktop: teilen und fernsteuern lassen', 'PeekaView Desktop: share and get remote help'), 'download'],
   ['apple', 'macOS', t('PeekaView Desktop: teilen und fernsteuern lassen', 'PeekaView Desktop: share and get remote help'), 'download'],
 ]) {
   const li = document.createElement('li')
-  const item = document.createElement(action === 'download' ? 'a' : action === 'share' ? 'button' : 'span')
+  const item = document.createElement(action === 'download' ? 'a' : 'button')
   if (action === 'download') item.href = 'download'
   if (action === 'share') { item.type = 'button'; item.addEventListener('click', () => { setHomeView('share'); $('home').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); $('share-browser').focus({ preventScroll: true }) }) }
-  if (action === 'soon') item.className = 'soon'
   item.title = title
   item.innerHTML = icon(name, 18)
   item.append(label)
-  if (action === 'soon') item.append(Object.assign(document.createElement('em'), { textContent: t('bald', 'soon') }))
   li.append(item)
   $('platforms').append(li)
 }

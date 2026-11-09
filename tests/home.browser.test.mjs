@@ -61,7 +61,7 @@ test('home gives usable entry points, remembers the choice and requests identity
     assert.equal(await evaluate("!document.querySelector('#share-entry').hidden && document.querySelector('#start').hidden"),true)
     assert.equal(await evaluate("new URL(document.querySelector('#share-browser').href).pathname+'|'+new URL(document.querySelector('#desktop-download').href).pathname+'|'+document.querySelector('#desktop-download').target"),'/share|/download|')
     assert.match(await evaluate("document.querySelector('#desktop-offer').textContent"),/Fernsteuerung/)
-    assert.equal(await evaluate("!!document.querySelector('#platforms .soon em')"),true,'Android marked as not out yet')
+    assert.equal(await evaluate("Array.from(document.querySelectorAll('#platforms a'),a=>new URL(a.href).pathname).join()"),'/download,/download,/download','Android, Windows and macOS lead to the download')
     // no account yet: contacts are no tab, one line explains them
     await browser('click','[data-home="link"]')
     assert.equal(await evaluate("document.querySelector('[data-home=contacts]').hidden && !document.querySelector('#contacts-offer').hidden"),true)

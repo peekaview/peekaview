@@ -114,6 +114,7 @@
     #share-entry { display: flex; flex-direction: column; gap: 18px; }
     #share-entry .title + .lead { margin-top: -10px; font-size: 15px; }
     a.connect { text-decoration: none; }
+    .share-unsupported a { color: #fafafa; text-underline-offset: 3px; }
     .share-unsupported { margin: 0; padding: 12px 14px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.08); color: #d4d4d8; font-size: 13px; }
     .desktop-offer { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 18px; border-top: 1px solid #27272a; }
     .desktop-offer p { margin: 0; color: #a1a1aa; font-size: 13px; }
@@ -162,13 +163,10 @@
     @keyframes word-out { to { opacity: 0; transform: translateY(-.35em); filter: blur(4px); } }
     @keyframes word-in { from { opacity: 0; transform: translateY(.35em); filter: blur(4px); } }
     .platforms { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
-    .platforms a, .platforms span, .platforms button { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(24,24,27,.8); color: #e4e4e7; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .platforms a, .platforms button { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(24,24,27,.8); color: #e4e4e7; font-size: 13px; font-weight: 600; text-decoration: none; }
     .platforms svg { width: 18px; height: 18px; color: #ef4444; }
     .platforms button { font-family: inherit; cursor: pointer; }
     .platforms a:hover, .platforms button:hover { border-color: rgba(255,255,255,.25); color: #fafafa; }
-    .platforms .soon { color: #71717a; }
-    .platforms .soon svg { color: #71717a; }
-    .platforms .soon em { padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.08); color: #a1a1aa; font-size: 10.5px; font-style: normal; font-weight: 650; letter-spacing: .02em; }
     .hero-lead { max-width: 30em; margin: 14px auto 0; color: #a1a1aa; font-size: 16px; line-height: 1.55; }
     #features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
     #features li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: rgba(24,24,27,.72); backdrop-filter: blur(8px); }
@@ -180,7 +178,7 @@
     .hero-lead, .hero-title { text-shadow: 0 2px 18px #09090b, 0 0 4px #09090b; }
     @media (max-width: 1039px) { #landing { margin-top: 20px; gap: 20px; } #stage { margin-top: 64px; } }
     /* phones: the card close to the top – the reasons follow below it */
-    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } .platforms { gap: 5px; margin-top: 12px; } .platforms a, .platforms span, .platforms button { gap: 5px; padding: 4px 9px 4px 7px; font-size: 12px; } .platforms svg { width: 15px; height: 15px; } }
+    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } .platforms { gap: 5px; margin-top: 12px; } .platforms a, .platforms button { gap: 5px; padding: 4px 9px 4px 7px; font-size: 12px; } .platforms svg { width: 15px; height: 15px; } }
     /* wide screens: headline and reasons left, the card right */
     @media (min-width: 1040px) {
       #landing { grid-template-columns: minmax(0, 1fr) 540px; grid-template-areas: "hero home" "stage home" "features features" "how how"; align-items: start; justify-items: stretch; column-gap: 64px; row-gap: 28px; margin-top: 5vh; }
@@ -268,7 +266,7 @@
     <h1 class="title" data-en="Share your screen">Bildschirm teilen</h1>
     <p class="lead" data-en="Right in the browser, no installation. You get a link and a code for the person who is to watch.">Direkt im Browser, ohne Installation. Du bekommst einen Link und einen Code für die Person, die zusehen soll.</p>
     <a class="connect" id="share-browser" href="share" data-en="Share in the browser">Im Browser teilen</a>
-    <p class="share-unsupported" id="share-unsupported" hidden data-en="This browser cannot share the screen. Phones and tablets cannot do this – please use a computer with Chrome, Edge, Firefox or Safari.">Dieser Browser kann den Bildschirm nicht teilen. Auf Smartphones und Tablets ist das nicht möglich – bitte einen Computer mit Chrome, Edge, Firefox oder Safari verwenden.</p>
+    <p class="share-unsupported" id="share-unsupported" hidden data-en-html="This browser cannot share the screen. On Android phones the &lt;a href=&quot;download&quot;&gt;PeekaView app&lt;/a&gt; does it; otherwise please use a computer with Chrome, Edge, Firefox or Safari.">Dieser Browser kann den Bildschirm nicht teilen. Auf Android-Handys geht das mit der <a href="download">PeekaView-App</a>, sonst bitte einen Computer mit Chrome, Edge, Firefox oder Safari verwenden.</p>
     <div class="desktop-offer" id="desktop-offer">
       <p data-en-html="&lt;strong&gt;Should someone help you by remote control?&lt;/strong&gt;Handing over mouse and keyboard, voice and sharing several windows only work with the desktop app for Windows and macOS."><strong>Soll dir jemand per Fernsteuerung helfen?</strong>Maus und Tastatur übergeben, Sprache und mehrere Fenster teilen gehen nur mit der Desktop-App für Windows und macOS.</p>
       <a class="pv-download" id="desktop-download" href="download" data-en="Download PeekaView Desktop">PeekaView Desktop herunterladen</a>

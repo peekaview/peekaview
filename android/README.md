@@ -26,6 +26,15 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Die Viewer-Dateien kommen beim Bauen aus `../web` (Task `copyWeb`).
+
+**Veröffentlichung:** Jeder Build auf `master` baut eine signierte Release-APK und legt sie als
+`PeekaView-Android.apk` in das Release `desktop-latest`; die Download-Seite verlinkt dorthin.
+Signiert wird immer mit demselben Schlüssel (Repository-Secrets `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`), sonst nimmt Android
+eine neue Version nicht als Update an; `versionCode` ist die Laufnummer des Workflows.
+Lokal signiert bauen: `PEEKAVIEW_KEYSTORE`, `PEEKAVIEW_KEYSTORE_PASSWORD`, `PEEKAVIEW_KEY_ALIAS`
+und `PEEKAVIEW_KEY_PASSWORD` setzen, dann `./gradlew assembleRelease`. Ohne sie bleibt die
+Release-APK unsigniert.
 Der Task `shellServer` lädt den offiziellen scrcpy-Server 5.0.1 mit festgelegter SHA-256-Prüfsumme
 von GitHub und bündelt ihn in der APK. Auf dem Handy wird kein Code heruntergeladen.
 
