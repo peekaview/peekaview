@@ -129,12 +129,14 @@ export function startServer(port = 0, { real = false } = {}) {
       console.log('saved', out)
       return response.writeHead(200).end(out)
     }
-    const file = resolve(web, path === '/' ? 'index.html' : '.' + path)
+    // as on Cloudflare Pages: "/share" is share.html
+    const page = path === '/' ? '/index.html' : extname(path) ? path : path + '.html'
+    const file = resolve(web, '.' + page)
     if (!file.startsWith(web + sep)) return response.writeHead(403).end()
     try {
       let body = await readFile(file)
-      if (path === '/signal.js' && !real) body = body.toString() + fakeRelay
-      if (path === '/share.html' && !real) body = body.toString().replace('<head>', '<head>' + fakeScreen)
+      if (page === '/signal.js' && !real) body = body.toString() + fakeRelay
+      if (page === '/share.html' && !real) body = body.toString().replace('<head>', '<head>' + fakeScreen)
       response.setHeader('Content-Type', { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' }[extname(file)] ?? 'application/octet-stream')
       response.setHeader('Cache-Control', 'no-cache')
       response.end(body)

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-en="PeekaView pricing">PeekaView Preise</title>
+  <link rel="icon" type="image/png" href="room-icon.png">
+  <link rel="stylesheet" href="fixed-rooms.css">
+  <link rel="stylesheet" href="legal.css">
+</head>
+<body class="legal-page">
+<div class="pv-page-top"></div>
+<main class="pv-legal">
+  <style>
+    /* inside <main>: the footer's dialog (legal.js) takes only <main> along */
+    .pv-legal .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0 0 30px; }
+    .pv-legal .plan { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: #18181b; }
+    .pv-legal .plan.pro { border-color: rgba(239,68,68,.4); box-shadow: 0 0 0 4px rgba(239,68,68,.06); }
+    .pv-legal .plan h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 20px; }
+    .pv-legal .plan .badge { padding: 2px 8px; border-radius: 999px; background: rgba(239,68,68,.15); color: #fca5a5; font-size: 11.5px; font-weight: 650; letter-spacing: .01em; }
+    .pv-legal .plan .price { margin: 4px 0 0; color: #fafafa; font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
+    .pv-legal .plan .price small { color: #a1a1aa; font-size: 14px; font-weight: 600; letter-spacing: 0; }
+    .pv-legal .plan p { margin: 0; color: #a1a1aa; font-size: 14px; }
+    .pv-legal .table-wrap { overflow-x: auto; margin: 0 0 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; }
+    .pv-legal table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 14px; }
+    .pv-legal th, .pv-legal td { padding: 10px 14px; border-bottom: 1px solid #27272a; text-align: left; vertical-align: top; color: #d4d4d8; }
+    .pv-legal thead th { position: sticky; top: 0; background: #18181b; color: #fafafa; font-size: 13px; }
+    .pv-legal td:not(:first-child), .pv-legal th:not(:first-child) { width: 26%; }
+    .pv-legal tbody th { padding-top: 18px; background: #09090b; color: #a1a1aa; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .pv-legal tr:last-child td { border-bottom: 0; }
+    .pv-legal .yes { color: #86efac; font-weight: 700; }
+    .pv-legal .no { color: #52525b; }
+  </style>
+  <a class="back" href="./" data-en="← Back to PeekaView">← Zurück zu PeekaView</a>
+  <h1 data-en="Pricing">Preise</h1>
+  <p class="lead" data-en="PeekaView is free – also for professional use and with remote control. Only extras that run on our servers cost money.">PeekaView ist kostenlos – auch für berufliche Nutzung und mit Fernsteuerung. Kosten entstehen nur für Zusatzfunktionen, die auf unseren Servern laufen.</p>
+
+  <div class="plans">
+    <section class="plan">
+      <h2>Basic</h2>
+      <p class="price" data-en-html="0 € &lt;small&gt;for good&lt;/small&gt;">0 € <small>dauerhaft</small></p>
+      <p data-en="Everything that runs directly between two devices: share, watch, point, remote control, talk.">Alles, was direkt zwischen zwei Geräten läuft: teilen, ansehen, zeigen, fernsteuern, sprechen.</p>
+    </section>
+    <section class="plan pro">
+      <h2>Pro <span class="badge" data-en="coming soon">kommt bald</span></h2>
+      <p class="price" data-en-html="5 € &lt;small&gt;per month, billed yearly&lt;/small&gt;">5 € <small>pro Monat, jährlich abgerechnet</small></p>
+      <p data-en="7 € when paid monthly, cancel any month. For everyone who looks after several computers or documents sessions.">7 € bei monatlicher Zahlung, monatlich kündbar. Für alle, die mehrere Rechner betreuen oder Sitzungen dokumentieren.</p>
+    </section>
+  </div>
+
+  <h2 data-en="Features compared">Funktionen im Vergleich</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col" data-en="Feature">Funktion</th><th scope="col">Basic</th><th scope="col">Pro</th></tr></thead>
+      <tbody>
+        <tr><th colspan="3" scope="colgroup" data-en="Sharing and watching">Teilen und ansehen</th></tr>
+        <tr><td data-en="Share your screen in the browser, no installation">Bildschirm im Browser teilen, ohne Installation</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Watch in the browser, no account">Ansehen im Browser, ohne Konto</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Connect by link or code">Verbinden per Link oder Code</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Point and mark with your own cursor">Zeigen und Markieren mit eigenem Mauszeiger</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Remote control with mouse and keyboard (desktop app)">Fernsteuerung mit Maus und Tastatur (Desktop-App)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Share several windows at once (desktop app)">Mehrere Fenster gleichzeitig teilen (Desktop-App)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Voice chat">Sprachchat</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Shared clipboard, files up to 100 MB">Gemeinsame Zwischenablage, Dateien bis 100 MB</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+
+        <tr><th colspan="3" scope="colgroup" data-en="Connection and security">Verbindung und Sicherheit</th></tr>
+        <tr><td data-en="End-to-end encryption, directly from device to device">Ende-zu-Ende-Verschlüsselung, direkt von Gerät zu Gerät</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Every viewer is let in individually">Jeder Zuschauer wird einzeln zugelassen</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Connections through strict firewalls (relay server)">Verbindung durch strenge Firewalls (Relay-Server)</td><td data-en="included, with a limit">inklusive, mit Obergrenze</td><td data-en="no fixed limit (fair use)">ohne feste Grenze (faire Nutzung)</td></tr>
+
+        <tr><th colspan="3" scope="colgroup" data-en="Permanent connections">Dauerhafte Verbindungen</th></tr>
+        <tr><td data-en="Permanent links with PIN">Feste Links mit PIN</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Contacts, groups and calls">Kontakte, Gruppen und Anrufe</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Unattended access">Unbeaufsichtigter Zugriff</td><td data-en="1 device">1 Gerät</td><td data-en="up to 10 devices">bis 10 Geräte</td></tr>
+
+        <tr><th colspan="3" scope="colgroup" data-en="Documentation">Dokumentation</th></tr>
+        <tr><td data-en="Session report with screenshots and transcript">Sitzungsbericht mit Screenshots und Transkript</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="On-device transcription (macOS)">Transkription auf dem Gerät (macOS)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td data-en="Cloud transcription (Windows)">Transkription über die Cloud (Windows)</td><td data-en="with your own OpenAI key">mit eigenem OpenAI-Schlüssel</td><td data-en="included, 10 hours per month">inklusive, 10 Std. pro Monat</td></tr>
+        <tr><td data-en="AI summary as a report or ticket text">KI-Zusammenfassung als Bericht oder Ticket-Text</td><td class="no">–</td><td class="yes">✓</td></tr>
+
+        <tr><th colspan="3" scope="colgroup" data-en="Use and support">Nutzung und Support</th></tr>
+        <tr><td data-en="Professional use">Berufliche Nutzung</td><td data-en="allowed">erlaubt</td><td data-en="allowed">erlaubt</td></tr>
+        <tr><td data-en="Support">Support</td><td data-en="Community on GitHub">Community auf GitHub</td><td data-en="Email, reply within 2 working days">E-Mail, Antwort innerhalb von 2 Werktagen</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 data-en="Good to know">Gut zu wissen</h2>
+  <ul>
+    <li data-en="Pro cannot be booked yet. All prices include VAT.">Pro ist noch nicht buchbar. Alle Preise verstehen sich inklusive Mehrwertsteuer.</li>
+    <li data-en="Pro can be tried for 30 days free of charge, without payment details.">Pro kann 30 Tage kostenlos getestet werden, ohne Zahlungsdaten.</li>
+    <li data-en="When Pro ends, everything in Basic stays usable. Additional devices for unattended access are only paused, not deleted.">Endet Pro, bleibt alles aus Basic nutzbar. Weitere Geräte für unbeaufsichtigten Zugriff werden nur pausiert, nicht gelöscht.</li>
+    <li data-en="Non-profit organisations, schools and students get Pro free of charge on request.">Gemeinnützige Vereine, Schulen und Studierende erhalten Pro auf Anfrage kostenlos.</li>
+  </ul>
+</main>
+<footer class="pv-footer"><a href="preise" aria-current="page" data-en="Pricing">Preise</a><a href="warum" data-en="About PeekaView">Über PeekaView</a><a href="impressum">Impressum</a><a href="datenschutz" data-en="Privacy">Datenschutz</a><a href="sicherheit" data-en="Security">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
+<script type="module" src="page.js"></script>
+</body>
+</html>

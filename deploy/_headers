@@ -1,3 +1,12 @@
+# Scripts only from files of this site (no inline scripts: the pages load web/*.js), blob workers
+# (the share's background timer) and Tesseract for reading window titles in "Bildschirmfreigabe
+# light" (light-title.js: its script, its worker, its core, WebAssembly). Report-only at first:
+# violations show in the browser console; once a preview deploy is clean, rename the header to
+# Content-Security-Policy and merge it into the one above.
 /*
   Cache-Control: no-cache
   X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'
+  Content-Security-Policy-Report-Only: script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/ https://cdn.jsdelivr.net/npm/tesseract.js@v6.0.1/ https://cdn.jsdelivr.net/npm/tesseract.js-core@v6.0.0/; worker-src 'self' blob:

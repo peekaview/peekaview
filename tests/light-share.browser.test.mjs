@@ -20,13 +20,13 @@ test('sharing from the browser (as in Firefox): limits said, viewers let in, the
   const tab = (id) => browser('tab', id)
   const tabs = async () => browser('tab', 'list')
   try {
-    // offered on the start page – with its limits, secondary to the desktop app
+    // offered first on the start page's "Teilen", on a page of its own; the desktop app below it, for remote control
     await browser('open', base + '/')
     await browser('set', 'viewport', '1280', '900')
-    await browser('wait', '#light-offer')
-    assert.match(await evaluate("document.querySelector('#light-limits').textContent"), /einfache Variante, ohne Steuern/)
-    assert.equal(await evaluate("!!(document.querySelector('#host-note .pv-download').compareDocumentPosition(document.querySelector('#light-offer')) & Node.DOCUMENT_POSITION_FOLLOWING)"), true, 'below the desktop download')
-    assert.equal(await evaluate("new URL(document.querySelector('#light-offer').href).pathname"), '/share.html')
+    await browser('click', '[data-home="share"]')
+    await browser('wait', '#share-browser')
+    assert.equal(await evaluate("!!(document.querySelector('#share-browser').compareDocumentPosition(document.querySelector('#desktop-download')) & Node.DOCUMENT_POSITION_FOLLOWING)"), true, 'the desktop download below it')
+    assert.equal(await evaluate("new URL(document.querySelector('#share-browser').href).pathname"), '/share')
     // as in Firefox: no Picture-in-Picture window a page can open
     await browser('open', base + '/share.html?browser=firefox')
     await browser('wait', '#start')

@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PeekaView</title>
+  <link rel="icon" type="image/png" href="room-icon.png">
   <link rel="stylesheet" href="fixed-rooms.css">
   <link rel="stylesheet" href="legal.css">
   <style>
@@ -20,14 +21,6 @@
     #contacts-close:hover { background: #3f3f46; }
     #contacts-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     #contacts-content { min-height: 0; overflow-y: auto; padding: 20px; }
-    /* sharing from the browser: share.html in a dialog over the start page */
-    #share-dialog { box-sizing: border-box; width: min(660px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3f3f46; border-radius: 18px; background: #18181b; color: #fafafa; box-shadow: 0 24px 80px #0009; overflow: hidden; }
-    #share-dialog[open] { display: flex; flex-direction: column; }
-    #share-dialog::backdrop { background: rgba(9,9,11,.82); -webkit-backdrop-filter: blur(12px) saturate(.7); backdrop-filter: blur(12px) saturate(.7); }
-    #share-dialog iframe { display: block; width: 100%; height: 560px; max-height: calc(100dvh - 32px - 72px); border: 0; background: #18181b; }
-    #share-close { flex: none; display: grid; place-items: center; width: 38px; height: 38px; margin-left: auto; padding: 0; border: 1px solid #3f3f46; border-radius: 50%; background: #27272a; color: #fafafa; cursor: pointer; }
-    #share-close:hover { background: #3f3f46; }
-    #share-close:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
     #home { box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 560px; margin: 0; padding: 28px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
     .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
     /* the trust badge always top right (next to the profile, when signed in); shorter on phones */
@@ -117,16 +110,31 @@
     .opened button { padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app { align-self: center; margin-top: -8px; padding: 2px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .open-app:hover { color: #fafafa; }
-    /* "Bildschirmfreigabe light": secondary to the desktop app, its limits said right away */
-    #host-note { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; padding-top: 18px; border-top: 1px solid #27272a; text-align: center; }
-    .host-title { margin: 0; color: #a1a1aa; font-size: 13px; }
-    .host-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-    #host-note .pv-download { display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border: 0; border-radius: 10px; background: #3f3f46; color: #fafafa; font-size: 14px; font-weight: 650; text-decoration: none; white-space: nowrap; }
-    #host-note .pv-download:hover { background: #52525b; }
-    #host-note svg { width: 16px; height: 16px; }
-    .host-limits { margin: 0; color: #71717a; font-size: 12.5px; }
-    .host-limits a { color: #d4d4d8; font-weight: 600; text-underline-offset: 3px; }
-    .host-limits a:hover { color: #fafafa; }
+    /* "Teilen": the browser first; the desktop app only where it is needed (remote control) */
+    #share-entry { display: flex; flex-direction: column; gap: 18px; }
+    #share-entry .title + .lead { margin-top: -10px; font-size: 15px; }
+    a.connect { text-decoration: none; }
+    .share-unsupported { margin: 0; padding: 12px 14px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.08); color: #d4d4d8; font-size: 13px; }
+    .desktop-offer { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 18px; border-top: 1px solid #27272a; }
+    .desktop-offer p { margin: 0; color: #a1a1aa; font-size: 13px; }
+    .desktop-offer strong { display: block; margin-bottom: 2px; color: #fafafa; font-size: 14px; }
+    .desktop-offer .pv-download { display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 10px; background: #3f3f46; color: #fafafa; font-size: 14px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+    .desktop-offer .pv-download:hover { background: #52525b; }
+    .desktop-offer svg { width: 16px; height: 16px; }
+    /* contacts for someone without an account yet: one quiet line instead of a tab */
+    .contacts-offer { display: flex; align-items: center; justify-content: center; gap: 6px; margin: -4px 0 0; padding: 4px 6px; border: 0; background: none; color: #a1a1aa; font: inherit; font-size: 13px; cursor: pointer; }
+    .contacts-offer span { color: #e4e4e7; text-decoration: underline; text-underline-offset: 3px; }
+    .contacts-offer:hover span { color: #fafafa; }
+    .contacts-offer svg { flex: none; width: 15px; height: 15px; }
+    .contacts-intro { margin: 0 0 12px; color: #a1a1aa; font-size: 13px; }
+    /* how it works: three steps below the reasons */
+    #how { width: 100%; max-width: 560px; }
+    #how h2 { margin: 0 0 12px; font-size: 18px; letter-spacing: -.01em; }
+    #how ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+    #how li { counter-increment: step; display: flex; gap: 12px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: rgba(24,24,27,.72); }
+    #how li::before { content: counter(step); flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(239,68,68,.15); color: #fca5a5; font-size: 13px; font-weight: 800; }
+    #how strong { display: block; font-size: 14px; font-weight: 700; }
+    #how span { display: block; margin-top: 2px; color: #a1a1aa; font-size: 12.5px; line-height: 1.45; }
     /* a known name: one quiet line with a pencil instead of the field */
     .name-show { display: flex; align-items: center; gap: 6px; margin: 0; color: #a1a1aa; font-size: 13px; }
     .name-show strong { color: #fafafa; font-weight: 650; }
@@ -154,9 +162,13 @@
     @keyframes word-out { to { opacity: 0; transform: translateY(-.35em); filter: blur(4px); } }
     @keyframes word-in { from { opacity: 0; transform: translateY(.35em); filter: blur(4px); } }
     .platforms { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; }
-    .platforms a, .platforms span { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(24,24,27,.8); color: #e4e4e7; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .platforms a, .platforms span, .platforms button { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(24,24,27,.8); color: #e4e4e7; font-size: 13px; font-weight: 600; text-decoration: none; }
     .platforms svg { width: 18px; height: 18px; color: #ef4444; }
-    .platforms a:hover { border-color: rgba(255,255,255,.25); color: #fafafa; }
+    .platforms button { font-family: inherit; cursor: pointer; }
+    .platforms a:hover, .platforms button:hover { border-color: rgba(255,255,255,.25); color: #fafafa; }
+    .platforms .soon { color: #71717a; }
+    .platforms .soon svg { color: #71717a; }
+    .platforms .soon em { padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.08); color: #a1a1aa; font-size: 10.5px; font-style: normal; font-weight: 650; letter-spacing: .02em; }
     .hero-lead { max-width: 30em; margin: 14px auto 0; color: #a1a1aa; font-size: 16px; line-height: 1.55; }
     #features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
     #features li { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: rgba(24,24,27,.72); backdrop-filter: blur(8px); }
@@ -168,23 +180,30 @@
     .hero-lead, .hero-title { text-shadow: 0 2px 18px #09090b, 0 0 4px #09090b; }
     @media (max-width: 1039px) { #landing { margin-top: 20px; gap: 20px; } #stage { margin-top: 64px; } }
     /* phones: the card close to the top – the reasons follow below it */
-    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } .platforms { gap: 5px; margin-top: 12px; } .platforms a, .platforms span { gap: 5px; padding: 4px 9px 4px 7px; font-size: 12px; } .platforms svg { width: 15px; height: 15px; } }
+    @media (max-width: 520px) { .hero-lead { display: none; } .hero-title { font-size: 32px; } .platforms { gap: 5px; margin-top: 12px; } .platforms a, .platforms span, .platforms button { gap: 5px; padding: 4px 9px 4px 7px; font-size: 12px; } .platforms svg { width: 15px; height: 15px; } }
     /* wide screens: headline and reasons left, the card right */
     @media (min-width: 1040px) {
-      #landing { grid-template-columns: minmax(0, 1fr) 540px; grid-template-areas: "hero home" "stage home" "features features"; align-items: start; justify-items: stretch; column-gap: 64px; row-gap: 28px; margin-top: 5vh; }
+      #landing { grid-template-columns: minmax(0, 1fr) 540px; grid-template-areas: "hero home" "stage home" "features features" "how how"; align-items: start; justify-items: stretch; column-gap: 64px; row-gap: 28px; margin-top: 5vh; }
       #hero { grid-area: hero; max-width: none; text-align: left; }
       .hero-lead { margin-left: 0; }
       .platforms { justify-content: flex-start; }
       #stage { grid-area: stage; max-width: none; margin-top: 70px; }
       #features { grid-area: features; max-width: none; margin-top: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
       #home { grid-area: home; }
+      #how { grid-area: how; max-width: none; }
+      #how ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     /* someone with a link, a share being watched, the apps: only the card */
-    body.solo #hero, body.solo #features, body.solo #stage, body.solo #topbar { display: none; }
+    body.solo #hero, body.solo #features, body.solo #how, body.solo #stage, body.solo #topbar { display: none; }
     /* the page's own header names PeekaView – the card need not repeat it */
     #topbar { position: relative; display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: min(1180px, calc(100% - 32px)); margin: 22px auto 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
     #topbar i { display: flex; }
-    @media (max-width: 360px) { #topbar { font-size: 18px; gap: 7px; } #topbar svg { width: 28px; height: 28px; } }
+    @media (max-width: 360px) { #topbar { font-size: 18px; gap: 7px; } #topbar > i svg { width: 28px; height: 28px; } }
+    /* the language top right, after the trust badge (which moves here once the teaser shows) */
+    #topbar .pv-lang-toggle { order: 1; }
+    /* narrow: badge and language get shorter so the header stays on one line */
+    @media (max-width: 440px) { #topbar .pv-trust .p2p { display: none; } }
+    @media (max-width: 380px) { #topbar { gap: 7px; } #topbar .pv-lang-toggle svg { display: none; } #topbar .pv-lang-toggle { padding: 4px 7px; } }
     /* the footer at the bottom edge of the window, quiet */
     #footer { margin-top: auto; padding-top: 36px; padding-bottom: 14px; gap: 4px 18px; font-size: 12px; }
     #footer a { color: #71717a; }
@@ -204,658 +223,81 @@
   <header id="topbar"><i id="top-logo"></i>PeekaView</header>
   <div id="landing">
   <section id="hero" aria-labelledby="hero-title">
-    <h2 class="hero-title" id="hero-title">Mal eben schnell<br><span class="hero-word" id="hero-word">was zeigen.</span></h2>
-    <ul class="platforms" id="platforms" aria-label="Läuft auf"></ul>
-    <p class="hero-lead">Schick Oma, deiner Kollegin oder einem Kunden einen Link – ein Klick, und ihr schaut gemeinsam auf denselben Bildschirm. Mit PeekaView Desktop hilft dir jemand auch direkt mit Maus und Tastatur. Ende-zu-Ende verschlüsselt, ohne Konto, kostenlos.</p>
+    <h2 class="hero-title" id="hero-title"><span data-en="Share your screen">Bildschirm teilen</span><br><span class="hero-word" id="hero-word" data-en="in the browser.">im Browser.</span></h2>
+    <ul class="platforms" id="platforms" aria-label="Läuft auf" data-en-aria-label="Runs on"></ul>
+    <p class="hero-lead" data-en="You send a link or code, the other person sees your screen in the browser – no installation, no account. Pointing and marking work right away, remote control with the desktop app. Free and end-to-end encrypted.">Du schickst einen Link oder Code, die andere Person sieht deinen Bildschirm im Browser – ohne Installation und ohne Konto. Zeigen und Markieren gehen sofort, Fernsteuerung mit der Desktop-App. Kostenlos und Ende-zu-Ende verschlüsselt.</p>
   </section>
   <main id="home">
-    <div class="brand"><i id="logo"></i><span class="brand-name">PeekaView</span><a id="trust" class="pv-trust" href="sicherheit.html" data-legal title="Wie PeekaView schützt">P2P · Ende-zu-Ende verschlüsselt</a><div id="profile" hidden></div></div>
-    <nav class="home-nav" aria-label="Was möchtest du tun?">
-      <button type="button" data-home="link" aria-pressed="true">Link öffnen</button>
-      <button type="button" data-home="contacts" aria-pressed="false">Kontakte</button>
+    <div class="brand"><i id="logo"></i><span class="brand-name">PeekaView</span><a id="trust" class="pv-trust" href="sicherheit" data-legal title="Wie PeekaView schützt" data-en-title="How PeekaView protects you">P2P · Ende-zu-Ende verschlüsselt</a><div id="profile" hidden></div></div>
+    <nav class="home-nav" aria-label="Was möchtest du tun?" data-en-aria-label="What would you like to do?">
+      <button type="button" data-home="link" aria-pressed="true" data-en="Watch">Ansehen</button>
+      <button type="button" data-home="share" aria-pressed="false" data-en="Share">Teilen</button>
+      <button type="button" data-home="contacts" aria-pressed="false" data-en="Contacts">Kontakte</button>
     </nav>
   <form id="start">
     <h1 class="title" id="title">Bildschirm ansehen</h1>
     <p class="lead" id="lead">Du hast einen Link oder Code bekommen? Gib ihn hier ein.</p>
     <div id="paste-link">
-      <label>Link oder Code
-        <span class="paste-row"><input id="share-url" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Link einfügen oder z. B. Tiger Apfel"><button id="paste-open" type="button">Öffnen</button></span>
+      <label><span data-en="Link or code">Link oder Code</span>
+        <span class="paste-row"><input id="share-url" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Link einfügen oder z. B. Tiger Apfel" data-en-placeholder="Paste a link or e.g. Tiger Apfel"><button id="paste-open" type="button" data-en="Open">Öffnen</button></span>
       </label>
       <p id="link-error" role="alert" hidden></p>
       <p id="code-wait" role="status" hidden></p>
     </div>
     <div id="recent-links" hidden>
     <ul class="rooms" id="rooms"></ul>
-    <button class="other-link" id="new-link" type="button">Du hast einen neuen Link oder Code bekommen? <span>Hier eingeben</span></button></div>
+    <button class="other-link" id="new-link" type="button" data-en-html="Got a new link or code? &lt;span&gt;Enter it here&lt;/span&gt;">Du hast einen neuen Link oder Code bekommen? <span>Hier eingeben</span></button></div>
     <div id="name-box" hidden>
-      <p class="name-show" id="name-show" hidden>Du schaust zu als <strong id="name-current"></strong><button id="name-edit" type="button" aria-label="Namen ändern" title="Namen ändern"></button></p>
+      <p class="name-show" id="name-show" hidden><span data-en="You are watching as">Du schaust zu als</span> <strong id="name-current"></strong><button id="name-edit" type="button" aria-label="Namen ändern" title="Namen ändern" data-en-aria-label="Change name" data-en-title="Change name"></button></p>
       <div id="name-field">
-      <label id="name-label" for="name">Wie heißt du?</label>
-      <input id="name" maxlength="32" autocomplete="name" placeholder="z. B. Anna" aria-describedby="name-note name-error">
-      <p id="name-error" role="alert" hidden>Bitte gib zuerst deinen Namen ein.</p>
-      <p id="name-note">Diesen Namen sieht die teilende Person.</p>
+      <label id="name-label" for="name" data-en="What is your name?">Wie heißt du?</label>
+      <input id="name" maxlength="32" autocomplete="name" placeholder="z. B. Anna" data-en-placeholder="e.g. Anna" aria-describedby="name-note name-error">
+      <p id="name-error" role="alert" hidden data-en="Please enter your name first.">Bitte gib zuerst deinen Namen ein.</p>
+      <p id="name-note" data-en="The person sharing sees this name.">Diesen Namen sieht die teilende Person.</p>
       </div>
     </div>
-    <button class="connect" id="connect" hidden disabled>Freigabe ansehen</button>
-    <button class="share-phone" id="share-phone" type="button" hidden>Bildschirm dieses Geräts teilen</button>
+    <button class="connect" id="connect" hidden disabled data-en="Watch the share">Freigabe ansehen</button>
+    <button class="share-phone" id="share-phone" type="button" hidden data-en="Share this device's screen">Bildschirm dieses Geräts teilen</button>
     <p class="connect-hint" id="hint"></p>
     <button class="open-app" id="open-app" type="button" hidden>In der PeekaView-App öffnen</button>
-    <button class="other-link" id="other-link" type="button" hidden>Einen anderen Link öffnen</button>
+    <button class="other-link" id="other-link" type="button" hidden data-en="Open another link">Einen anderen Link öffnen</button>
   </form>
-  <section id="fixed-room-entry" hidden><div id="fixed-rooms"></div></section>
-    <div id="host-note"></div>
+  <button class="contacts-offer" id="contacts-offer" type="button" hidden data-en-html="Contacts and permanent connections: &lt;span&gt;Learn more&lt;/span&gt;">Kontakte und feste Verbindungen: <span>Mehr erfahren</span></button>
+  <section id="fixed-room-entry" hidden><p class="contacts-intro" id="contacts-intro" data-en="Contacts are for people you share with often: connect once by email, then call each other directly – no link or code needed.">Kontakte sind für Menschen, mit denen du öfter teilst: einmal per E-Mail verbinden, danach direkt anrufen – ohne Link und Code.</p><div id="fixed-rooms"></div></section>
+  <section id="share-entry" hidden>
+    <h1 class="title" data-en="Share your screen">Bildschirm teilen</h1>
+    <p class="lead" data-en="Right in the browser, no installation. You get a link and a code for the person who is to watch.">Direkt im Browser, ohne Installation. Du bekommst einen Link und einen Code für die Person, die zusehen soll.</p>
+    <a class="connect" id="share-browser" href="share" data-en="Share in the browser">Im Browser teilen</a>
+    <p class="share-unsupported" id="share-unsupported" hidden data-en="This browser cannot share the screen. Phones and tablets cannot do this – please use a computer with Chrome, Edge, Firefox or Safari.">Dieser Browser kann den Bildschirm nicht teilen. Auf Smartphones und Tablets ist das nicht möglich – bitte einen Computer mit Chrome, Edge, Firefox oder Safari verwenden.</p>
+    <div class="desktop-offer" id="desktop-offer">
+      <p data-en-html="&lt;strong&gt;Should someone help you by remote control?&lt;/strong&gt;Handing over mouse and keyboard, voice and sharing several windows only work with the desktop app for Windows and macOS."><strong>Soll dir jemand per Fernsteuerung helfen?</strong>Maus und Tastatur übergeben, Sprache und mehrere Fenster teilen gehen nur mit der Desktop-App für Windows und macOS.</p>
+      <a class="pv-download" id="desktop-download" href="download" data-en="Download PeekaView Desktop">PeekaView Desktop herunterladen</a>
+    </div>
+  </section>
   </main>
-  <div id="stage" aria-hidden="true"><div class="owl-peek" id="hero-owl" title="Kuckuck!"></div><canvas id="scene" hidden></canvas></div>
-  <ul id="features" aria-label="Warum PeekaView"></ul>
+  <div id="stage" aria-hidden="true"><div class="owl-peek" id="hero-owl" title="Kuckuck!" data-en-title="Peekaboo!"></div><canvas id="scene" hidden></canvas></div>
+  <ul id="features" aria-label="Warum PeekaView" data-en-aria-label="Why PeekaView"></ul>
+  <section id="how" aria-labelledby="how-title">
+    <h2 id="how-title" data-en="How it works">So funktioniert es</h2>
+    <ol>
+      <li><div><strong data-en="Start sharing">Teilen starten</strong><span data-en="In the browser without installation – or with the desktop app if someone is to take control.">Im Browser ohne Installation – oder mit der Desktop-App, wenn jemand fernsteuern soll.</span></div></li>
+      <li><div><strong data-en="Pass on the link or code">Link oder Code weitergeben</strong><span data-en="Send the link by chat or email, or read out the two words of the code on the phone, e.g. “Tiger Apfel”.">Per Chat oder E-Mail den Link, am Telefon die zwei Wörter des Codes, z. B. „Tiger Apfel“.</span></div></li>
+      <li><div><strong data-en="Let viewers in">Zuschauer zulassen</strong><span data-en="You decide who watches. Then the picture goes directly and encrypted to the other person.">Du entscheidest, wer zusieht. Danach geht das Bild direkt und verschlüsselt zur anderen Person.</span></div></li>
+    </ol>
+  </section>
   </div>
   <dialog id="contacts-dialog" aria-labelledby="contacts-title">
-    <header class="contacts-head"><h2 id="contacts-title">Kontakte</h2><button id="contacts-close" type="button" aria-label="Kontakte schließen" autofocus></button></header>
+    <header class="contacts-head"><h2 id="contacts-title" data-en="Contacts">Kontakte</h2><button id="contacts-close" type="button" aria-label="Kontakte schließen" data-en-aria-label="Close contacts" autofocus></button></header>
     <div id="contacts-content"></div>
-  </dialog>
-  <dialog id="share-dialog" aria-labelledby="share-dialog-title">
-    <header class="contacts-head"><h2 id="share-dialog-title">Bildschirmfreigabe light</h2><button id="share-close" class="dialog-close" type="button" aria-label="Schließen"></button></header>
   </dialog>
   <div id="opened" class="opened" hidden>
     <i id="opened-logo"></i>
     <p id="opened-text"></p>
-    <button id="open-web" type="button">Doch hier im Browser ansehen</button>
+    <button id="open-web" type="button" data-en="Watch here in the browser instead">Doch hier im Browser ansehen</button>
   </div>
-  <footer class="pv-footer" id="footer"><a href="warum.html">Warum machen wir das?</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
+  <footer class="pv-footer" id="footer"><a href="preise" data-en="Pricing">Preise</a><a href="warum" data-en="About PeekaView">Über PeekaView</a><a href="impressum">Impressum</a><a href="datenschutz" data-en="Privacy">Datenschutz</a><a href="sicherheit" data-en="Security">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
   <div id="viewer" hidden></div>
 
-  <script type="module">
-    // Start page: the room of the opened link (preselected) and the last ten permanent rooms this
-    // browser joined, each with its presenter (user@computer), when it was last used and whether
-    // it is online right now – asked over the room's encrypted signaling ("ping"), which creates
-    // no join request.
-    import { mountViewer } from './viewer.js'
-    import { mountRooms, openRoom } from './fixed-rooms.js'
-    import { icon, owl } from './icons.js'
-    import { mountOwl, startScene } from './home-scene.js'
-    import './legal.js'
-    import { Signaling, parseRoom } from './signal.js'
-    import { displayCode, findByCode, looksLikeCode, parseCode } from './word-code.js'
-
-    const $ = (id) => document.getElementById(id)
-    // where it runs: the desktop apps lead to their download
-    for (const [name, label, title, href] of [
-      ['globe', 'Browser', 'Zuschauen und einfach teilen – ohne Installation', ''],
-      ['android', 'Android', 'App zum Zuschauen und um den Bildschirm des Handys zu teilen', ''],
-      ['winlogo', 'Windows', 'PeekaView Desktop: teilen und fernsteuern lassen', 'download.html'],
-      ['apple', 'macOS', 'PeekaView Desktop: teilen und fernsteuern lassen', 'download.html'],
-    ]) {
-      const li = document.createElement('li')
-      const item = document.createElement(href ? 'a' : 'span')
-      if (href) Object.assign(item, { href, target: '_blank', rel: 'noopener' })
-      item.title = title
-      item.innerHTML = icon(name, 18)
-      item.append(label)
-      li.append(item)
-      $('platforms').append(li)
-    }
-    // why PeekaView: the reasons beside the card
-    for (const [name, title, text] of [
-      ['screen', 'Mal eben schnell was zeigen', 'Link schicken, fertig.'],
-      ['control', 'Fernsteuern', 'Maus und Tastatur übergeben – mit PeekaView Desktop.'],
-      ['draw', 'Mal eben was teilen', 'Zeigen, malen, gemeinsame Zwischenablage.'],
-      ['users', 'Ohne Account-Zwang', 'Kein Konto, keine E-Mail.'],
-      ['check', 'Frei', 'Kostenlos und <a href="https://github.com/peekaview/peekaview" target="_blank" rel="noopener">Open Source</a>.'],
-      ['lock', 'P2P · Ende-zu-Ende verschlüsselt', 'Kein Server sieht mit. <a href="sicherheit.html" data-legal>Mehr</a>'],
-    ]) {
-      const li = document.createElement('li')
-      li.innerHTML = `<i class="feature-icon">${icon(name, 30)}</i><div><strong></strong><span>${text}</span></div>`
-      li.querySelector('strong').textContent = title
-      $('features').append(li)
-    }
-    {
-      const title = Object.assign(document.createElement('p'), { className: 'host-title', textContent: 'Selbst zeigen oder fernsteuern lassen?' })
-      const actions = Object.assign(document.createElement('div'), { className: 'host-actions' })
-      const download = Object.assign(document.createElement('a'), { className: 'pv-download', href: 'download.html', target: '_blank', rel: 'noopener' })
-      download.innerHTML = icon('download', 16) + 'PeekaView Desktop herunterladen'
-      actions.append(download)
-      $('host-note').append(title, actions)
-      // sharing from the browser: only where browsers can (not on phones), and only as the second choice
-      if (navigator.mediaDevices?.getDisplayMedia) {
-        const limits = Object.assign(document.createElement('p'), { className: 'host-limits', id: 'light-limits' })
-        limits.innerHTML = 'Ohne Installation <a id="light-offer" href="share.html">im Browser teilen</a> – die einfache Variante, ohne Steuern.'
-        $('host-note').append(limits)
-      }
-    }
-    // "im Browser teilen": share.html in a dialog over this page. Kept once loaded – the share
-    // runs in its own small window, but what was picked belongs to this frame: closing the dialog
-    // only hides it, opening it again shows "Freigabe läuft".
-    $('share-close').innerHTML = icon('close', 18)
-    $('share-close').addEventListener('click', () => $('share-dialog').close())
-    $('share-dialog').addEventListener('click', (e) => { if (e.target === $('share-dialog')) $('share-dialog').close() })
-    function openShare() {
-      let frame = $('share-dialog').querySelector('iframe')
-      if (!frame) {
-        frame = Object.assign(document.createElement('iframe'), { src: 'share.html?embed', title: 'Im Browser teilen' })
-        // the screen picker, the shared clipboard
-        frame.allow = 'display-capture; clipboard-read; clipboard-write'
-        // as tall as its content (up to the window)
-        frame.addEventListener('load', () => {
-          const doc = frame.contentDocument
-          if (!doc) return
-          const fit = () => { frame.style.height = `${Math.ceil(doc.querySelector('main')?.getBoundingClientRect().height ?? 560) + 2}px` }
-          new ResizeObserver(fit).observe(doc.body)
-          fit()
-        })
-        $('share-dialog').append(frame)
-      }
-      $('share-dialog').showModal()
-      frame.focus()
-    }
-    document.addEventListener('click', (e) => {
-      const link = e.target.closest?.('#light-offer')
-      if (!link || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-      e.preventDefault()
-      openShare()
-    })
-    mountRooms($('fixed-rooms'), {profileRoot:$('profile'),onIncoming: call => {
-      const notice = document.createElement('button')
-      notice.textContent = `${call.caller_name} ruft an – Anruf öffnen`
-      notice.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;padding:14px;border:1px solid #ef4444;border-radius:12px;background:#18181b;color:white;cursor:pointer'
-      notice.onclick = () => openRoom(call.id)
-      document.body.append(notice)
-      setTimeout(()=>notice.remove(),45000)
-    }})
-    const KEY = 'pv-rooms'
-    const MAX = 10
-    $('logo').innerHTML = owl(32)
-    $('top-logo').innerHTML = owl(34)
-    // the same on every tab (what holds for calls over contacts: sicherheit.html)
-    $('trust').innerHTML = icon('lock', 12) + '<span class="p2p">P2P · </span><span class="long">Ende-zu-Ende </span>verschlüsselt'
-    $('contacts-close').innerHTML = icon('close',18)
-    $('contacts-close').addEventListener('click',()=>$('contacts-dialog').close())
-    $('contacts-dialog').addEventListener('close',()=>{
-      $('fixed-room-entry').append($('fixed-rooms'))
-      const profile=$('profile')
-      const menu=profile.querySelector('details')
-      if(menu)menu.open=false
-      document.querySelector('.brand').append(profile)
-    })
-    function showContacts(){
-      if($('contacts-dialog').open)return
-      $('contacts-content').append($('fixed-rooms'))
-      $('contacts-close').before($('profile'))
-      $('contacts-dialog').showModal()
-    }
-
-    const load = () => {
-      try {
-        return JSON.parse(localStorage.getItem(KEY)) ?? []
-      } catch {
-        return []
-      }
-    }
-    const store = (list) => {
-      try {
-        localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)))
-      } catch {}
-    }
-
-    // the room secret travels in the "#…" part of the link – browsers never send it to a server
-    // inside the PeekaView app – a viewer window of the desktop app (room from the app) or the
-    // Android app (?app=1)
-    const params = new URLSearchParams(location.search)
-    const inApp = typeof window.__PV_JOIN__ === 'string' || params.get('app') === '1'
-    if (typeof window.__PV_JOIN__ === 'string') history.replaceState(null, '', `${location.pathname}#${window.__PV_JOIN__}`)
-    let linkRoom = decodeURIComponent(location.hash.slice(1))
-    let homeView=linkRoom ? 'link' : (()=>{try{return localStorage.getItem('pv-start-view')==='contacts'?'contacts':'link'}catch{return 'link'}})()
-    function showHome(){
-      $('home').hidden=!!viewer || !$('opened').hidden
-      updateTeaser()
-      // not inside the apps, not over a running share
-      $('footer').hidden=inApp || !!viewer
-      // someone who came with a link has exactly one thing to do: enter a name and join
-      document.querySelector('.home-nav').hidden=!!linkRoom
-      $('start').hidden=homeView!=='link'
-      $('fixed-room-entry').hidden=homeView!=='contacts'
-      $('host-note').hidden=inApp || homeView==='contacts' || !!linkRoom
-      for(const button of document.querySelectorAll('[data-home]'))button.setAttribute('aria-pressed',String(button.dataset.home===homeView))
-
-    }
-    for(const button of document.querySelectorAll('[data-home]')){
-      button.innerHTML=icon(button.dataset.home==='link'?'link':'users',16)+button.textContent
-      button.addEventListener('click',()=>{
-        homeView=button.dataset.home
-        try{localStorage.setItem('pv-start-view',homeView)}catch{}
-        showHome()
-        focusLinkField()
-      })
-    }
-    // a code of two words ("Tiger Apfel", read out on the phone): ask the sharer for the link
-    let codeSearch=null
-    async function openCode(text){
-      const field=$('share-url'),error=$('link-error'),wait=$('code-wait')
-      const codes=parseCode(text)
-      error.hidden=true
-      if(!codes.length){
-        error.textContent=`„${text.trim()}“ ist kein PeekaView-Code. Ein Code besteht aus zwei Wörtern, z. B. „Tiger Apfel“ – oder füge den ganzen Link ein.`
-        error.hidden=false;field.focus();return
-      }
-      codeSearch?.abort()
-      const search=codeSearch=new AbortController()
-      wait.textContent=`Suche die Freigabe zu „${displayCode(codes[0])}“ …`;wait.hidden=false
-      $('paste-open').disabled=true
-      try{
-        const {link}=await findByCode(text,{signal:search.signal})
-        if(search!==codeSearch)return
-        field.value=''
-        openLink(link,true)
-      }catch(e){
-        if(search!==codeSearch || e.message==='aborted')return
-        error.textContent=`Zu „${displayCode(codes[0])}“ läuft gerade keine Freigabe. Stimmen die beiden Wörter? Der Code gilt nur, solange geteilt wird.`
-        error.hidden=false;field.focus()
-      }finally{
-        if(search===codeSearch){wait.hidden=true;$('paste-open').disabled=false;codeSearch=null}
-      }
-    }
-    $('share-url').addEventListener('input',()=>{codeSearch?.abort();$('link-error').hidden=true})
-    function openPastedLink(){
-      const text=$('share-url').value
-      if(!text.trim())return $('share-url').focus()
-      // no link (nothing like "https://…/#…"): meant as a code
-      if(looksLikeCode(text) || !/[:/#.]/.test(text))return openCode(text)
-      openLink(text.trim())
-    }
-    // a link: pasted, or the one a code brought (which may come from this very site, when it runs elsewhere)
-    function openLink(text,fromCode=false){
-      const field=$('share-url'),error=$('link-error')
-      try{
-        const url=new URL(text)
-        if(!['https://peekaview.de',...(fromCode?[location.origin]:[])].includes(url.origin) || url.username || url.password)throw new Error()
-        if(['/fixed-rooms','/fixed-rooms.html'].includes(url.pathname) && new URLSearchParams(url.hash.slice(1)).has('invite')){
-          location.href=new URL('fixed-rooms.html'+url.hash,location.href).href;return
-        }
-        const room=decodeURIComponent(url.hash.slice(1))
-        if(!['/','/index.html'].includes(url.pathname) || !/^[A-Za-z0-9_-]{22}(\.[A-Za-z0-9_-]{43})?$/.test(room))throw new Error()
-        error.hidden=true;field.value=''
-        if(url.searchParams.has('name'))$('name').value=url.searchParams.get('name').slice(0,32)
-        location.hash=room
-      }catch{
-        error.textContent=fromCode?'Die Freigabe zu diesem Code lässt sich hier nicht öffnen.':'Das ist kein PeekaView-Link. Bitte den vollständigen Link einfügen – oder die zwei Wörter des Codes.';error.hidden=false;field.focus()
-      }
-    }
-    $('paste-open').addEventListener('click',openPastedLink)
-    // a pasted link opens right away – no need to find the button
-    $('share-url').addEventListener('paste',()=>setTimeout(()=>{if(/^\s*https?:/i.test($('share-url').value))openPastedLink()}))
-    $('other-link').addEventListener('click',()=>{location.hash=''})
-    let pasteOpen=false,nameEdit=false
-    // no remembered rooms: the link field is the one thing to do – the cursor already in it
-    // (not on touch screens, where it would pop up the keyboard unasked)
-    function focusLinkField(){
-      if(homeView==='link' && !linkRoom && !load().length && !matchMedia('(pointer: coarse)').matches)$('share-url').focus()
-    }
-    $('name-edit').innerHTML=icon('draw',15)
-    $('name-edit').addEventListener('click',()=>{nameEdit=true;render();$('name').focus();$('name').select()})
-    $('new-link').addEventListener('click',()=>{pasteOpen=true;render();$('share-url').focus()})
-    $('share-url').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();openPastedLink()}})
-    const savedName = (() => { try { return localStorage.getItem('pv-name') } catch { return null } })()
-    $('name').value = params.get('name') ?? savedName ?? ''
-    // remembered as typed
-    $('name').addEventListener('input', () => {
-      try { localStorage.setItem('pv-name', $('name').value.trim()) } catch {}
-      showNameError(false)
-    })
-    function showNameError(show) {
-      $('name-error').hidden = !show
-      $('name').classList.toggle('invalid', show)
-    }
-
-    // rooms on the page: the link's room first, then the remembered ones
-    const status = new Map() // room -> {online, checking, who, room, permanent, name}
-    let selected = linkRoom || load()[0]?.room || ''
-    const rooms = () => {
-      const list = load()
-      const all = linkRoom && !list.some((r) => r.room === linkRoom) ? [{ room: linkRoom, link: true }, ...list] : list
-      return all
-    }
-
-    function ago(ms) {
-      if (!ms) return 'noch nie'
-      const d = new Date(ms)
-      const now = new Date()
-      const min = Math.round((now - d) / 60000)
-      if (min < 2) return 'gerade eben'
-      if (min < 60) return `vor ${min} Min.`
-      const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-      const days = Math.round((day(now) - day(d)) / 86400000)
-      const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-      if (days === 0) return `heute, ${time}`
-      if (days === 1) return `gestern, ${time}`
-      if (days < 7) return `vor ${days} Tagen`
-      return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: days > 300 ? 'numeric' : undefined })
-    }
-
-    function render() {
-      showHome()
-      const list = rooms()
-      $('name-box').hidden=!selected
-      $('connect').hidden=!selected
-      // remembered rooms: the link field only on request
-      $('paste-link').hidden=!!linkRoom || (list.length>0 && !pasteOpen)
-      $('new-link').hidden=!list.length || pasteOpen
-      // the field opens where it was asked for: below the rooms
-      if(list.length)$('recent-links').after($('paste-link'));else $('recent-links').before($('paste-link'))
-      // a name not yet known (or being changed): the field stays until the page is left
-      if(!$('name').value.trim())nameEdit=true
-      $('name-field').hidden=!nameEdit
-      $('name-show').hidden=nameEdit
-      $('name-current').textContent=$('name').value.trim()
-      $('paste-open').classList.toggle('quiet',!!selected)
-      $('other-link').hidden=!linkRoom
-      $('recent-links').hidden=!list.length || !!linkRoom
-      if (!list.length) {
-        $('rooms').innerHTML = '<li class="empty">Öffne den Link, den du von der teilenden Person bekommen hast.</li>'
-      } else {
-        $('rooms').replaceChildren(
-          ...list.map((r) => {
-            const st = status.get(r.room) ?? {}
-            const li = document.createElement('li')
-            li.className = `room${r.room === selected ? ' selected' : ''}${st.online ? ' online' : ''}${st.checking ? ' checking' : ''}`
-            li.innerHTML = '<i class="dot"></i><div><strong></strong><span class="sub"></span></div><em></em>'
-            const strong = li.querySelector('strong')
-            // the tags stay together – on a narrow screen they move below the name as a group
-            strong.innerHTML = '<b></b><span class="tags"></span>'
-            strong.querySelector('b').textContent = st.room ?? r.name ?? (r.link ? 'Dieser Link' : 'Raum')
-            // what kind of link: permanent or temporary, PIN, remote access (known once answered)
-            const permanent = st.permanent ?? r.permanent ?? (r.link ? undefined : true)
-            const pin = st.pin ?? r.pin
-            const remote = st.remote ?? r.remote
-            const tag = (cls, html, title) => strong.lastChild.insertAdjacentHTML('beforeend', `<small class="tag ${cls}" title="${title}">${html}</small>`)
-            // remembered rooms are all permanent – only the exception is worth a word
-            if (permanent === false) tag('', 'einmalig', 'Link nur für diese eine Freigabe')
-            if (pin) tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN, ohne Bestätigung')
-            if (remote) tag('remote', 'Fernzugriff', 'Fernzugriff: Programme selbst starten')
-            const who = st.who ?? r.who
-            const last = r.link ? 'neu' : `zuletzt ${ago(r.last)}`
-            li.querySelector('.sub').textContent = [who, last].filter(Boolean).join(' · ')
-            li.querySelector('em').textContent = st.checking ? '' : st.online ? (st.busy ? 'belegt' : 'online') : 'offline'
-            if (!r.link) {
-              const forget = Object.assign(document.createElement('button'), { type: 'button', className: 'forget', title: 'Raum entfernen', innerHTML: icon('trash', 16) })
-              forget.setAttribute('aria-label', `Raum „${strong.querySelector('b').textContent}“ entfernen`)
-              forget.addEventListener('click', (e) => {
-                e.stopPropagation()
-                store(load().filter((x) => x.room !== r.room))
-                if (selected === r.room) selected = rooms()[0]?.room ?? ''
-                render()
-              })
-              li.append(forget)
-            }
-            li.addEventListener('click', () => {
-              selected = r.room
-              render()
-            })
-            li.addEventListener('dblclick', () => connect())
-            return li
-          }),
-        )
-      }
-      const st = status.get(selected)
-      $('title').textContent = linkRoom ? (st?.who ? `${st.who} möchte dir den Bildschirm zeigen` : 'Du bist zu einer Bildschirmfreigabe eingeladen') : 'Bildschirm ansehen'
-      $('lead').textContent = linkRoom
-        ? 'Gib deinen Namen ein und klicke auf „Freigabe ansehen“. Keine Anmeldung, nichts zu installieren.'
-        : selected
-          ? ''
-          : 'Du hast einen Link oder Code bekommen? Gib ihn hier ein.'
-      $('connect').disabled = !selected
-      $('lead').hidden = !$('lead').textContent
-      $('hint').textContent = !selected
-        ? ''
-        : openedInApp && selected === linkRoom
-          ? 'In der PeekaView-App geöffnet – oder hier im Browser verbinden.'
-        : gaveUp === selected && !st?.online
-          ? 'Es kam keine Verbindung zustande. Ein Link gilt meist nur, solange die Freigabe läuft – bitte die teilende Person um einen neuen Link.'
-          // (online or not, checking: the room's dot says it)
-          : ''
-    }
-
-    // ---------------------------------------------------------------- online check
-    async function probe(room) {
-      const { secret, hostKey } = parseRoom(room)
-      if (!secret) return
-      status.set(room, { ...status.get(room), checking: !status.get(room)?.seen })
-      render()
-      // the presenter answers our own key (the only "from" it takes from us)
-      let me
-      let answered = false
-      const signaling = await Signaling.open({
-        secret,
-        hostKey,
-        onMessage: (m) => {
-          if (m.type !== 'pong' || m.to !== me || answered) return
-          answered = true
-          status.set(room, { online: true, seen: true, who: m.who, room: m.room, busy: m.busy, permanent: !!m.permanent, pin: !!m.pin, remote: !!m.remote })
-          // permanent rooms are remembered with their presenter
-          if (m.permanent) {
-            const list = load()
-            const entry = list.find((x) => x.room === room)
-            if (entry) {
-              Object.assign(entry, { who: m.who, name: m.room, seen: Date.now(), permanent: true, pin: !!m.pin, remote: !!m.remote })
-              store(list)
-            } else if (room === joined) {
-              store([{ room, name: m.room, who: m.who, last: Date.now(), seen: Date.now(), permanent: true, pin: !!m.pin, remote: !!m.remote }, ...list])
-            }
-          }
-          render()
-        },
-      })
-      me = signaling.pubkey
-      // ask twice while the relays connect (public relays throttle chatty clients)
-      for (let i = 0; i < 2 && !answered; i++) {
-        signaling.send({ type: 'ping', from: me })
-        await new Promise((r) => setTimeout(r, 2500))
-      }
-      await new Promise((r) => setTimeout(r, 2000))
-      signaling.close()
-      // a single lost answer (relays) does not make a room offline
-      if (!answered) {
-        const before = status.get(room) ?? {}
-        const misses = (before.misses ?? 0) + 1
-        status.set(room, { ...before, online: before.online && misses < 2, misses, checking: false, seen: true })
-      } else {
-        status.set(room, { ...status.get(room), misses: 0 })
-      }
-      render()
-    }
-
-    // ---------------------------------------------------------------- teaser
-    // the globe and the owl only for the start page itself – not for someone who came with a link,
-    // not inside the apps, not while a share is watched (it would cost the video its frames)
-    const params0 = new URLSearchParams(location.search)
-    const teaserWanted = !(typeof window.__PV_JOIN__ === 'string' || params0.get('app') === '1')
-    let scene = null, owlMounted = false
-    function updateTeaser() {
-      const solo = !teaserWanted || !!linkRoom || !!viewer || !$('opened').hidden
-      document.body.classList.toggle('solo', solo)
-      // the trust badge: top right of the page – in the card when only the card is shown
-      if (!solo) $('topbar').append($('trust'))
-      else if (!document.querySelector('.brand #trust')) document.querySelector('.brand .brand-name').after($('trust'))
-      if (!teaserWanted) return
-      if (viewer || !$('opened').hidden) scene?.stop()
-      else if (scene) scene.start()
-      else scene = startScene($('scene'))
-      // the owl watches the remote mouse while the visitor's own rests
-      if (!owlMounted && !solo) { owlMounted = true; mountOwl($('hero-owl'), { watch: () => scene?.cursor() }) }
-    }
-    // the headline's last words, one after the other
-    {
-      const words = ['was zeigen.', 'fernsteuern.', 'was teilen.', 'helfen lassen.']
-      let n = 0
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => {
-        const el = $('hero-word')
-        if (document.hidden || document.body.classList.contains('solo')) return
-        el.className = 'hero-word out'
-        setTimeout(() => { n = (n + 1) % words.length; el.textContent = words[n]; el.className = 'hero-word in' }, 280)
-      }, 2600)
-    }
-
-    let probeTimer
-    // the room joined from this page (remembered once it turns out to be permanent)
-    let joined = null
-    let viewer = null
-    // no connection after this long: back to the start page
-    const GIVE_UP = 30000
-    let giveUpTimer
-    // the room whose connection did not come about (hint on the start page)
-    let gaveUp = null
-    // connected (or waiting for the presenter's approval – a person, not the network)
-    const CONNECTED = ['live', 'loading', 'paused', 'pick', 'locked', 'admission']
-    function probeAll() {
-      // not while the page is in the background
-      if (!document.hidden) for (const r of rooms()) probe(r.room)
-      probeTimer = setTimeout(probeAll, 60000)
-    }
-
-    // ---------------------------------------------------------------- connect
-    function connect() {
-      const room = selected
-      if (!room) return
-      const name = $('name').value.trim()
-      if (!name) {
-        showNameError(true)
-        return $('name').focus()
-      }
-      try { localStorage.setItem('pv-name', name) } catch {}
-      // remember permanent rooms (the newest first)
-      const st = status.get(room)
-      const list = load()
-      const known = list.find((x) => x.room === room)
-      if (known || st?.permanent) {
-        const entry = { ...(known ?? {}), room, name: st?.room ?? known?.name, who: st?.who ?? known?.who, last: Date.now(), permanent: true, pin: st?.pin ?? known?.pin, remote: st?.remote ?? known?.remote }
-        store([entry, ...list.filter((x) => x.room !== room)])
-      }
-      clearTimeout(probeTimer)
-      joined = room
-      if (!st) probe(room)
-      if (location.hash.slice(1) !== room) history.replaceState(null, '', `${location.pathname}${location.search}#${room}`)
-      $('home').hidden = true
-      $('footer').hidden = true
-      $('viewer').hidden = false
-      gaveUp = null
-      viewer = mountViewer($('viewer'), {
-        onRooms: showContacts,
-        room,
-        name,
-        onStatus: (status) => {
-          if (CONNECTED.includes(status)) {
-            clearTimeout(giveUpTimer)
-            giveUpTimer = undefined
-          } else if (!giveUpTimer) {
-            giveUpTimer = setTimeout(() => {
-              leave()
-              gaveUp = room
-              render()
-            }, GIVE_UP)
-          }
-        },
-      })
-      updateTeaser()
-    }
-
-    /** Back to the start page. */
-    function leave() {
-      $('contacts-dialog').close()
-      clearTimeout(giveUpTimer)
-      giveUpTimer = undefined
-      viewer?.destroy()
-      viewer = null
-      joined = null
-      $('viewer').hidden = true
-      showHome()
-      probeAll()
-    }
-
-    // another room link opened in this tab (only the "#…" changed): join that one
-    window.addEventListener('hashchange', () => {
-      const room = decodeURIComponent(location.hash.slice(1))
-      if (!room) {
-        linkRoom='';selected=load()[0]?.room || ''
-        if(viewer)leave()
-        render();focusLinkField();return
-      }
-      if (room === joined) return
-      homeView='link'
-      linkRoom = selected = room
-      if (viewer) leave()
-      if ($('name').value.trim()) connect()
-      else {
-        render()
-        $('name').focus()
-      }
-    })
-
-    $('start').addEventListener('submit', (e) => {
-      e.preventDefault()
-      if(!selected)openPastedLink();else connect()
-    })
-
-    // ---------------------------------------------------------------- open in the PeekaView app
-    // Installed, it handles "peekaview://join" and shows the share in a window of its own. Whether
-    // it is installed only shows when the page loses the focus to it – remembered from then on.
-    const APP_KEY = 'pv-app'
-    const appKnown = () => { try { return localStorage.getItem(APP_KEY) === '1' } catch { return false } }
-    let openedInApp = false
-    function openInApp(room, gesture) {
-      const st = status.get(room) ?? {}
-      const known = load().find((x) => x.room === room) ?? {}
-      const q = new URLSearchParams({ room })
-      const name = st.room ?? known.name
-      const who = st.who ?? known.who
-      if (name) q.set('name', name)
-      if (who) q.set('who', who)
-      const url = `peekaview://join?${q}`
-      // the app took over: this page has nothing more to do
-      const onBlur = () => {
-        openedInApp = true
-        try { localStorage.setItem(APP_KEY, '1') } catch {}
-        clearTimeout(probeTimer)
-        $('home').hidden = true
-        $('opened-text').textContent = /Android/i.test(navigator.userAgent)
-          ? 'In der PeekaView-App geöffnet. Du kannst dieses Fenster schließen.'
-          : 'In PeekaView Desktop geöffnet. Du kannst dieses Fenster schließen.'
-        $('opened').hidden = false
-        updateTeaser()
-      }
-      window.addEventListener('blur', onBlur, { once: true })
-      setTimeout(() => window.removeEventListener('blur', onBlur), 3000)
-      if (/Android/i.test(navigator.userAgent)) {
-        // Android: an intent – without the app, Chrome stays on this page
-        if (!gesture) return
-        location.href = `intent://join?${q}#Intent;scheme=peekaview;package=de.limtec.peekaview;S.browser_fallback_url=${encodeURIComponent(location.href)};end`
-      } else if (gesture || appKnown()) {
-        location.href = url
-      } else {
-        // a first try without a click: unknown schemes fail silently in a hidden frame
-        const frame = Object.assign(document.createElement('iframe'), { hidden: true, src: url })
-        document.body.append(frame)
-        setTimeout(() => frame.remove(), 3000)
-      }
-    }
-    $('opened-logo').innerHTML = owl(40)
-    $('open-web').addEventListener('click', () => {
-      $('opened').hidden = true
-      render()
-      probeAll()
-    })
-    $('open-app').hidden = inApp || !linkRoom
-    $('open-app').textContent = /Android/i.test(navigator.userAgent) ? 'In der PeekaView-App öffnen' : 'In PeekaView Desktop öffnen'
-    // the Android app shares the phone's screen
-    $('share-phone').hidden = !window.PeekaViewApp
-    $('share-phone').addEventListener('click', () => window.PeekaViewApp?.share())
-    $('open-app').addEventListener('click', () => openInApp(selected || linkRoom, true))
-
-    render()
-    // a link with ?name=… (integrations, tests) – or opened in the app with a known name – joins right away
-    if (linkRoom && (params.has('name') || (inApp && $('name').value.trim()))) connect()
-    else {
-      probeAll()
-      if (linkRoom && !$('name').value) $('name').focus()
-      focusLinkField()
-      if (linkRoom && !inApp) openInApp(linkRoom, false)
-    }
-  </script>
+  <script type="module" src="start.js"></script>
 </body>
 </html>

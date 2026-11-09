@@ -2,6 +2,7 @@
 // leaving it – a running sign-up or the link someone was about to open stays where it is. The
 // pages themselves stay reachable on their own address.
 import { icon } from './icons.js'
+import { t, translate } from './i18n.js'
 
 const cache = new Map()
 
@@ -15,7 +16,10 @@ async function content(href) {
   const doc = new DOMParser().parseFromString(await cache.get(href), 'text/html')
   const main = doc.querySelector('main.pv-legal')
   main.querySelector('.back')?.remove()
-  return { main: document.importNode(main, true), title: doc.querySelector('h1')?.textContent ?? '' }
+  // the pages with English beside their German (prices, about) in the website's language
+  const node = document.importNode(main, true)
+  translate(node)
+  return { main: node, title: node.querySelector('h1')?.textContent ?? '' }
 }
 
 function dialog() {
@@ -25,8 +29,8 @@ function dialog() {
   box.className = 'pv-legal-dialog'
   const bar = document.createElement('div')
   bar.className = 'pv-legal-bar'
-  const close = Object.assign(document.createElement('button'), { type: 'button', className: 'pv-legal-close', title: 'Schließen', innerHTML: icon('close', 18) })
-  close.setAttribute('aria-label', 'Schließen')
+  const close = Object.assign(document.createElement('button'), { type: 'button', className: 'pv-legal-close', title: t('Schließen', 'Close'), innerHTML: icon('close', 18) })
+  close.setAttribute('aria-label', t('Schließen', 'Close'))
   close.addEventListener('click', () => box.close())
   bar.append(close)
   box.append(bar)

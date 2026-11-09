@@ -12,12 +12,13 @@ const web=resolve(dirname(fileURLToPath(import.meta.url)),'../web')
 const room='a'.repeat(22)+'.'+'b'.repeat(43)
 const own={id:'0000000000000000',email:'own@example.test',name:'Mein Browser',platform:'browser'}
 const state={device:own,person:{id:'1111111111111111',email:own.email,name:'Ich',devices:[own]},contacts:[],rooms:[],calls:[],invitations:[]}
-const shim=`<script>window.qa={requests:[]};const pageFetch=window.fetch;window.fetch=async(url,options)=>{if(!String(url).includes('api.php'))return pageFetch(url,options);const action=new URL(url).searchParams.get('action');qa.requests.push({action,body:options.body?JSON.parse(options.body):null});return Response.json(action==='state'?${JSON.stringify(state)}:{sent:true})};</script>`
+const shim=`<script>try{if(!localStorage.getItem('pv-lang'))localStorage.setItem('pv-lang','de')}catch{};window.qa={requests:[]};const pageFetch=window.fetch;window.fetch=async(url,options)=>{if(!String(url).includes('api.php'))return pageFetch(url,options);const action=new URL(url).searchParams.get('action');qa.requests.push({action,body:options.body?JSON.parse(options.body):null});return Response.json(action==='state'?${JSON.stringify(state)}:{sent:true})};</script>`
 
 test('home gives usable entry points, remembers the choice and requests identity only for the chosen action',{timeout:90000},async()=>{
   const server=createServer(async(request,response)=>{
     const path=new URL(request.url,'http://localhost').pathname
-    const file=resolve(web,path==='/'?'index.html':'.'+path)
+    // as on Cloudflare Pages: "/impressum" is impressum.html
+    const file=resolve(web,path==='/'?'index.html':'.'+path+(extname(path)?'':'.html'))
     if(!file.startsWith(web+sep)){response.writeHead(403).end();return}
     try{
       let body=await readFile(file,'utf8')
@@ -40,22 +41,32 @@ test('home gives usable entry points, remembers the choice and requests identity
       const layout=await evaluate("({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,footer:document.querySelector('#footer').getBoundingClientRect().bottom})")
       assert.deepEqual([layout.width,layout.height],[width,Math.max(height,Math.round(layout.footer))],'the home page only scrolls when its content exceeds the viewport')
     }
-    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Warum machen wir das?','Impressum','Datenschutz','Sicherheit'])
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Preise','Über PeekaView','Impressum','Datenschutz','Sicherheit'])
     assert.equal(await evaluate("document.querySelector('#trust').textContent"),'P2P · Ende-zu-Ende verschlüsselt')
     // the legal pages open over the start page, which stays where it is
-    await browser('click','#footer a[href="impressum.html"]')
+    await browser('click','#footer a[href="impressum"]')
     await browser('wait','.pv-legal-dialog[open] h1')
     assert.equal(await evaluate("document.querySelector('.pv-legal-dialog h1').textContent+'|'+location.pathname+'|'+!!document.querySelector('.pv-legal-dialog .back')"),'Impressum|/|false')
     await browser('click','.pv-legal-close')
     assert.equal(await evaluate("document.querySelector('.pv-legal-dialog').open"),false)
-    await browser('click','#footer a[href="sicherheit.html"]')
+    await browser('click','#footer a[href="sicherheit"]')
     await browser('wait','.pv-legal-dialog[open] h1')
     assert.equal(await evaluate("document.querySelector('.pv-legal-dialog h1').textContent"),'Sicherheit')
     await browser('press','Escape')
     assert.equal(await evaluate("document.querySelector('.pv-legal-dialog').open"),false)
     assert.equal(await evaluate("document.querySelector('#name-box').hidden && document.querySelector('#connect').hidden"),true)
-    assert.equal(await evaluate("document.querySelectorAll('[data-home]').length"),2)
-    await browser('click','[data-home="contacts"]')
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('[data-home]'),b=>b.textContent)"),['Ansehen','Teilen','Kontakte'])
+    // sharing: the browser first, the desktop app only for remote control – on its own page, not in a dialog
+    await browser('click','[data-home="share"]')
+    assert.equal(await evaluate("!document.querySelector('#share-entry').hidden && document.querySelector('#start').hidden"),true)
+    assert.equal(await evaluate("new URL(document.querySelector('#share-browser').href).pathname+'|'+new URL(document.querySelector('#desktop-download').href).pathname+'|'+document.querySelector('#desktop-download').target"),'/share|/download|')
+    assert.match(await evaluate("document.querySelector('#desktop-offer').textContent"),/Fernsteuerung/)
+    assert.equal(await evaluate("!!document.querySelector('#platforms .soon em')"),true,'Android marked as not out yet')
+    // no account yet: contacts are no tab, one line explains them
+    await browser('click','[data-home="link"]')
+    assert.equal(await evaluate("document.querySelector('[data-home=contacts]').hidden && !document.querySelector('#contacts-offer').hidden"),true)
+    await browser('click','#contacts-offer')
+    assert.equal(await evaluate("!document.querySelector('[data-home=contacts]').hidden && !document.querySelector('#contacts-intro').hidden"),true)
     assert.equal(await evaluate("document.querySelector('#fixed-room-entry').hidden"),false)
     assert.equal(await evaluate("document.querySelector('input[type=email]')===null"),true)
     await browser('set','viewport','393','852')
@@ -93,7 +104,7 @@ test('home gives usable entry points, remembers the choice and requests identity
     assert.equal(await evaluate("document.querySelector('#recent-links').hidden"),true)
     assert.equal(await evaluate("document.querySelector('#link-error').hidden"),true)
     // with a link there is only one thing to do: no tabs, no second link field
-    assert.equal(await evaluate("document.querySelector('.home-nav').hidden && document.querySelector('#paste-link').hidden && document.querySelector('#host-note').hidden"),true)
+    assert.equal(await evaluate("document.querySelector('.home-nav').hidden && document.querySelector('#paste-link').hidden && document.querySelector('#share-entry').hidden"),true)
     await browser('click','#other-link')
     await browser('wait','#share-url')
     assert.equal(await evaluate("location.hash==='' && !document.querySelector('.home-nav').hidden && document.querySelector('#name-box').hidden"),true)
@@ -151,5 +162,16 @@ test('home gives usable entry points, remembers the choice and requests identity
     await browser('click','#profile summary')
     assert.equal(await evaluate("(()=>{const r=document.querySelector('.fr-profile-panel').getBoundingClientRect();return r.left>=0 && r.right<=innerWidth})()"),true)
     await browser('screenshot','/tmp/peekaview-home-profil.png')
+    // the website in English: chosen in the footer (else the browser's language decides)
+    await evaluate("localStorage.removeItem('pv-fixed-rooms-v1');localStorage.setItem('pv-lang','en');true")
+    await browser('open',base+'/')
+    await browser('wait','#share-url')
+    assert.equal(await evaluate("document.documentElement.lang"),'en')
+    assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('[data-home]:not([hidden])'),b=>b.textContent)"),['Watch','Share'],'contacts as a tab only with an account')
+    assert.equal(await evaluate("document.querySelector('#contacts-offer').hidden"),false)
+    assert.equal(await evaluate("document.querySelector('#footer .pv-lang').textContent"),'Deutsch')
+    await browser('click','#footer .pv-lang')
+    await browser('wait','--fn',"document.documentElement.lang==='de' && !!document.querySelector('#share-url')")
+    assert.equal(await evaluate("document.querySelector('[data-home=link]').textContent"),'Ansehen')
   }finally{try{await browser('close')}finally{await new Promise(resolve=>server.close(resolve))}}
 })
