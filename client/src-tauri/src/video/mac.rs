@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 use super::{
     output_size, packet,
     vt::{RetainedBuffer, VtEncoder},
-    Source, FPS, KEY_GAP,
+    Pacer, Source, FPS, KEY_GAP,
 };
 use super::StreamCtl;
 use crate::guard::Rect;
@@ -36,6 +36,8 @@ struct EncState {
     submitted: Arc<Mutex<std::collections::VecDeque<Instant>>>,
     /// fingerprint of the last picture
     fingerprint: Option<u64>,
+    /// when to encode: at the frame rate the network allows, then the still picture sharpened
+    pacer: Pacer,
 }
 
 impl EncState {
@@ -79,6 +81,7 @@ impl EncState {
             self.last_key = Instant::now();
         }
         self.last_frame = Instant::now();
+        self.pacer.encoded(self.last_frame);
     }
 }
 
@@ -102,7 +105,9 @@ impl SCStreamOutputTrait for Handler {
         let unchanged = fingerprint.is_some() && fingerprint == state.fingerprint && state.last.is_some();
         state.fingerprint = fingerprint;
         state.last = Some(unsafe { RetainedBuffer::new(pb) });
-        if !unchanged {
+        // (a change sooner than the network's frame gap waits in `last` for `tick`)
+        let interval = state.shared.frame_interval();
+        if !unchanged && state.pacer.changed(Instant::now(), interval) {
             state.encode(pb, false);
         }
     }
@@ -233,6 +238,7 @@ impl Video {
             shared: shared.clone(),
             submitted: Arc::default(),
             fingerprint: None,
+            pacer: Pacer::default(),
         }));
         let mut stream = SCStream::new(&filter, &config(size, area.as_ref().map(|a| a.crop))?).map_err(err)?;
         stream.add_output_handler(Handler(state.clone()), SCStreamOutputType::Screen).map_err(err)?;
@@ -299,6 +305,12 @@ impl Video {
         {
             if let Some(buf) = state.last.take() {
                 state.encode(buf.as_ptr(), true);
+                state.last = Some(buf);
+            }
+        } else if !crate::guard::OVERVIEW_ACTIVE.load(Ordering::Relaxed) && state.pacer.due(Instant::now(), shared.frame_interval()) {
+            // a change held back for the network, or the still picture once more to sharpen it
+            if let Some(buf) = state.last.take() {
+                state.encode(buf.as_ptr(), false);
                 state.last = Some(buf);
             }
         } else if state.last_frame.elapsed() >= HEARTBEAT && !crate::guard::OVERVIEW_ACTIVE.load(Ordering::Relaxed) {

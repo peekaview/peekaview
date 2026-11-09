@@ -35,6 +35,13 @@ const MAX_W: f64 = 2560.0;
 const MAX_H: f64 = 1600.0;
 /// minimum gap between two requested keyframes
 const KEY_GAP: std::time::Duration = std::time::Duration::from_millis(500);
+/// A slow network first costs frames per second, down to this many – each frame stays as sharp
+/// as at full speed (as VNC does it: fewer pictures, not blurrier ones). Only below it does the
+/// picture get less sharp.
+const MIN_FPS: f64 = 5.0;
+/// After a change the still picture is encoded this many times more: with nothing moving the
+/// encoder spends those frames on detail, so text comes out sharp after scrolling.
+const REFINE: u8 = 3;
 
 /// What a pipeline shares with the rest of the session: requests from the viewers (keyframe,
 /// size they display, bitrate their network takes) and counters for the statistics.
@@ -63,6 +70,7 @@ pub struct StreamCtl {
 }
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 impl StreamCtl {
     pub fn new(slot: u8, visible: bool) -> std::sync::Arc<Self> {
@@ -89,6 +97,11 @@ impl StreamCtl {
         (base_bitrate(w, h) * rate).max(250_000.0) as u32
     }
 
+    /// Gap between two encoded frames the network allows (see [`MIN_FPS`]).
+    pub fn frame_interval(&self) -> Duration {
+        frame_interval(self.rate.load(Ordering::Relaxed))
+    }
+
     /// The pipeline sent an encoded frame.
     pub fn sent(&self, bytes: usize, w: usize, h: usize) {
         self.bytes.fetch_add(bytes as u64, Ordering::Relaxed);
@@ -99,6 +112,60 @@ impl StreamCtl {
     pub fn encode_time(&self, d: std::time::Duration) {
         self.encode_us.fetch_add(d.as_micros() as u64, Ordering::Relaxed);
         self.encoded.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Frame gap for the network's share of the bitrate (per mille): frames per second fall with the
+/// bitrate, so the bits per frame stay the same – down to [`MIN_FPS`].
+pub fn frame_interval(rate: u32) -> Duration {
+    let share = rate.clamp(100, 1000) as f64 / 1000.0;
+    let fps = (FPS as f64 * share).clamp(MIN_FPS, FPS as f64);
+    Duration::from_secs_f64(1.0 / fps)
+}
+
+/// When a pipeline encodes: a change at most once per [`frame_interval`] (one coming sooner is
+/// held back and encoded as soon as its time has come), then [`REFINE`] more times the still
+/// picture.
+#[derive(Default)]
+pub struct Pacer {
+    last: Option<Instant>,
+    pending: bool,
+    refine: u8,
+}
+
+impl Pacer {
+    /// A new picture: encode it now (true) or hold it back for [`Pacer::due`].
+    pub fn changed(&mut self, now: Instant, interval: Duration) -> bool {
+        self.refine = REFINE;
+        if self.last.is_some_and(|t| now.duration_since(t) < interval) {
+            self.pending = true;
+            return false;
+        }
+        self.pending = false;
+        true
+    }
+
+    /// Asked periodically: encode the last picture again now – a change held back, or the still
+    /// picture once more to sharpen it.
+    pub fn due(&mut self, now: Instant, interval: Duration) -> bool {
+        let Some(last) = self.last else { return false };
+        if now.duration_since(last) < interval {
+            return false;
+        }
+        if self.pending {
+            self.pending = false;
+            return true;
+        }
+        if self.refine > 0 {
+            self.refine -= 1;
+            return true;
+        }
+        false
+    }
+
+    /// A frame went to the encoder (keyframes and repeats included).
+    pub fn encoded(&mut self, now: Instant) {
+        self.last = Some(now);
     }
 }
 
@@ -195,6 +262,49 @@ pub fn packet(slot: u8, annex_b: &[u8], key: bool, w: usize, h: usize) -> Vec<u8
 
 #[cfg(test)]
 mod tests {
+    use super::{frame_interval, Pacer, FPS, MIN_FPS, REFINE};
+    use std::time::{Duration, Instant};
+
+    /// The network's share of the bitrate costs frames first: the bits per frame stay the same
+    /// down to MIN_FPS.
+    #[test]
+    fn slower_network_fewer_frames() {
+        let fps = |rate| 1.0 / frame_interval(rate).as_secs_f64();
+        assert!((fps(1000) - FPS as f64).abs() < 0.01);
+        assert!((fps(500) - FPS as f64 / 2.0).abs() < 0.01);
+        assert!((fps(100) - MIN_FPS).abs() < 0.01, "never below MIN_FPS");
+        assert!((fps(5000) - FPS as f64).abs() < 0.01, "never above FPS");
+    }
+
+    /// A change sooner than the frame gap waits for it, the still picture follows REFINE times,
+    /// then nothing until the next change.
+    #[test]
+    fn pacer_holds_back_and_refines() {
+        let gap = Duration::from_millis(100);
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut p = Pacer::default();
+        assert!(!p.due(t0, gap), "nothing encoded yet: nothing to repeat");
+        assert!(p.changed(t0, gap));
+        p.encoded(t0);
+        assert!(!p.changed(at(30), gap), "too soon: held back");
+        assert!(!p.due(at(60), gap));
+        assert!(p.due(at(100), gap), "the held-back change, as soon as its time has come");
+        p.encoded(at(100));
+        let mut repeats = 0;
+        let mut t = 100;
+        for _ in 0..10 {
+            t += 100;
+            if p.due(at(t), gap) {
+                repeats += 1;
+                p.encoded(at(t));
+            }
+        }
+        assert_eq!(repeats, REFINE, "the still picture REFINE times, then rest");
+        // a new change starts over
+        assert!(p.changed(at(t + 100), gap));
+    }
+
     /// White, black, blue, yellow bars (BGRA) come out as BT.709 studio-range YCbCr – also when
     /// halved in size.
     #[test]

@@ -45,7 +45,7 @@ use windows::{
     },
 };
 
-use super::{bgra_to_nv12, fit_width, output_size, packet, Source, FPS, KEY_GAP};
+use super::{bgra_to_nv12, fit_width, output_size, packet, Pacer, Source, FPS, KEY_GAP};
 use super::StreamCtl;
 use crate::guard::Rect;
 
@@ -121,8 +121,13 @@ struct Pipeline {
     frames: mpsc::Sender<Vec<u8>>,
     dirty: bool,
     have_frame: bool,
+    /// the next encode repeats the last picture: convert it once more (the GPU path's output
+    /// ring has moved on since it was encoded)
+    repeat: bool,
     last_input: Instant,
     last_key: Instant,
+    /// at the frame rate the network allows, then the still picture sharpened
+    pacer: Pacer,
 }
 
 fn create_device() -> Result<(ID3D11Device, ID3D11DeviceContext)> {
@@ -205,14 +210,17 @@ impl Pipeline {
             frames,
             dirty: false,
             have_frame: false,
+            repeat: false,
             last_input: Instant::now(),
             last_key: Instant::now() - KEY_GAP,
+            pacer: Pacer::default(),
         })
     }
 
     fn run(&mut self, stop: &AtomicBool) -> Result<()> {
-        let frame_interval = Duration::from_millis(1000 / FPS as u64);
         while !stop.load(Ordering::Relaxed) {
+            // fewer frames on a slow network, each as sharp (StreamCtl::frame_interval)
+            let frame_interval = self.shared.frame_interval();
             // newest captured frame → NV12 (GPU)
             while let Ok(frame) = self.pool.TryGetNextFrame() {
                 let size = frame.ContentSize().map_err(err("Frame"))?;
@@ -233,18 +241,29 @@ impl Pipeline {
                 .map_err(err("Frame"))?;
                 self.convert(&texture, size)?;
                 self.dirty = true;
+                self.repeat = false;
                 self.have_frame = true;
+                // (held back by `dirty` and the frame gap below)
+                self.pacer.changed(Instant::now(), frame_interval);
             }
 
             let want_key = self.shared.need_key.load(Ordering::Relaxed) && self.last_key.elapsed() >= KEY_GAP;
             // static picture but a keyframe is wanted: encode the last frame again
             if want_key && self.have_frame && !self.dirty && self.last_input.elapsed() > Duration::from_millis(150) {
                 self.dirty = true;
+                self.repeat = true;
+            }
+            // nothing new: the still picture once more, so the encoder sharpens it
+            if self.have_frame && !self.dirty && self.pacer.due(Instant::now(), frame_interval) {
+                self.dirty = true;
+                self.repeat = true;
             }
             if self.dirty && self.last_input.elapsed() >= frame_interval {
                 if self.encode(want_key)? {
                     self.dirty = false;
+                    self.repeat = false;
                     self.last_input = Instant::now();
+                    self.pacer.encoded(self.last_input);
                     if want_key {
                         self.shared.need_key.store(false, Ordering::Relaxed);
                         self.last_key = Instant::now();
@@ -295,6 +314,11 @@ impl Pipeline {
         if self.cpu_colors && encoder.need_input > 0 {
             if let Some(cpu) = self.cpu.as_mut() {
                 cpu.convert(&self.context)?;
+            }
+        }
+        if self.repeat && !self.cpu_colors {
+            if let Some(converter) = self.converter.as_mut() {
+                converter.process()?;
             }
         }
         let input = match (&self.cpu, &self.converter) {
@@ -444,6 +468,12 @@ impl Converter {
         unsafe {
             self.context.CopySubresourceRegion(&self.staging, 0, 0, 0, 0, frame, 0, Some(&region));
         }
+        self.process()
+    }
+
+    /// The last captured frame (kept in `staging`) → NV12 in the current output texture – also
+    /// to encode it once more after the ring has moved on.
+    fn process(&mut self) -> Result<()> {
         let stream = D3D11_VIDEO_PROCESSOR_STREAM {
             Enable: true.into(),
             OutputIndex: 0,

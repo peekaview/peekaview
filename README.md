@@ -216,6 +216,8 @@ transcription. A transcript never opens a separate microphone behind the mute co
   - on loss or a growing round trip the bitrate drops by a quarter (down to 10 %);
   - otherwise it climbs back gently.
   - Windows: the Media Foundation encoder takes the new bitrate live.
+- **Fewer frames before blurrier ones** (macOS, Windows): the frame rate follows the bitrate's share (30 fps at full rate, down to 5 fps), so every frame keeps the bits it has at full speed and text stays sharp on a slow network – as VNC does it. A change that comes sooner waits and follows as soon as its time has come (`Pacer` in `video/mod.rs`).
+- **Sharpened when still:** after a change the still picture is encoded three more times; with nothing moving the encoder spends those frames on detail, so text is sharp a moment after scrolling.
 - **Low latency:** VideoToolbox runs in its low-latency rate-control mode, and the capture queue holds 3 frames. Viewers play frames as soon as they are decoded (`jitterBufferTarget = 0`).
 - **Statistics:** **Alt+Shift+S** in the viewer shows per window:
   - here: size, fps, bitrate, decode time, buffer;
