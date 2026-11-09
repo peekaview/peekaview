@@ -26,6 +26,18 @@ const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'F
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 // a share from a browser ("Bildschirmfreigabe light") cannot be controlled
 const LIGHT_CONTROL = 'Steuern geht hier nicht: Die Freigabe läuft im Browser. Dafür braucht die teilende Person PeekaView Desktop.'
+// "Sondertasten": combinations the viewer's own system would catch (sent as {t:'special', k, w})
+const SPECIAL_KEYS = {
+  windows: [['cad', 'Strg+Alt+Entf'], ['win', 'Windows-Taste'], ['alt-tab', 'Alt+Tab'], ['alt-f4', 'Alt+F4'], ['ctrl-shift-esc', 'Strg+Umschalt+Esc'], ['lock', 'Sperren']],
+  linux: [['win', 'Windows-Taste'], ['alt-tab', 'Alt+Tab'], ['alt-f4', 'Alt+F4'], ['ctrl-shift-esc', 'Strg+Umschalt+Esc'], ['lock', 'Sperren']],
+  macos: [['cmd-tab', 'Cmd+Tab'], ['cmd-space', 'Cmd+Leertaste']],
+}
+// the presenter's Windows desktop (Windows service): sign-in screen, lock screen, UAC prompt
+const DESKS = {
+  login: 'Der Rechner zeigt den Anmeldebildschirm.',
+  locked: 'Der Rechner ist gesperrt.',
+  secure: 'Windows zeigt eine Administrator-Abfrage.',
+}
 
 const CSS = `
 .pv-viewer:fullscreen { width: 100%; height: 100%; background: var(--pv-bg); }
@@ -107,6 +119,10 @@ const CSS = `
 .pv-dock .pv-task.launch:hover { border-color: var(--pv-accent); color: var(--pv-fg); }
 .pv-dock .pv-task.launch svg { flex: none; }
 .pv-spinner { flex: none; width: 14px; height: 14px; border: 2px solid rgba(255, 255, 255, .2); border-top-color: var(--pv-fg); border-radius: 50%; animation: pv-spin .8s linear infinite; }
+.pv-special { position: absolute; z-index: 100001; display: flex; flex-direction: column; gap: 2px; min-width: 190px; padding: 5px; border-radius: 12px; }
+.pv-special button { display: flex; align-items: center; height: 32px; padding: 0 11px; border: 0; border-radius: 8px; background: transparent; color: var(--pv-fg); text-align: left; white-space: nowrap; cursor: pointer; }
+.pv-special button:hover, .pv-special button:focus-visible { background: rgba(255, 255, 255, .1); outline: none; }
+.pv-desk { position: absolute; left: 50%; top: calc(var(--pv-toolbar-bottom, 0px) + 8px); transform: translateX(-50%); z-index: 99999; max-width: calc(100% - 24px); padding: 5px 11px; border-radius: 999px; color: #fde68a; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .pv-keys { position: absolute; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
 @keyframes pv-spin { to { transform: rotate(360deg); } }
 @keyframes pv-pulse { 50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, .12); } }
@@ -131,6 +147,8 @@ export function mountViewer(el, options) {
       </div>
     </div>
     <div class="pv-stats pv-glass" hidden></div>
+    <div class="pv-desk pv-glass" role="status" hidden></div>
+    <div class="pv-special pv-glass" role="menu" aria-label="Sondertasten" hidden></div>
     <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
     <div class="pv-dock pv-glass">
       <div class="pv-status">
@@ -145,6 +163,7 @@ export function mountViewer(el, options) {
       <button data-tool="point" data-tip="Zeigen">${icon('point')}</button>
       <button data-tool="draw" data-tip="Malen">${icon('draw')}</button>
       <button data-tool="control" data-tip="Steuern">${icon('control')}</button>
+      <button data-special data-tip="Sondertasten" aria-label="Sondertasten" aria-haspopup="menu" aria-expanded="false" hidden>${icon('keyboard')}</button>
       <button data-clear data-tip="Meine Zeichnungen löschen">${icon('erase')}</button>
       <span class="pv-sep pv-tools-sep"></span>
       <button data-clip data-tip="Gemeinsame Zwischenablage">${icon('clipboard')}</button>
@@ -490,6 +509,7 @@ export function mountViewer(el, options) {
     offered = false
     lightNoticed = false
     state = { mode: 'view' }
+    syncKeyboardLock()
     voice.setEnabled(false)
     resetVideo()
     wm.setWindows([])
@@ -512,6 +532,7 @@ export function mountViewer(el, options) {
         // when remote control is granted, switch straight to the control tool
         if (m.mode === 'control' && state.mode !== 'control') setTool('control')
         state = m
+        syncKeyboardLock()
         if (m.light && !lightNoticed) {
           lightNoticed = true
           toast('Diese Freigabe läuft im Browser („light“): Zusehen und Zeigen geht, Steuern nicht.', 6000)
@@ -559,6 +580,9 @@ export function mountViewer(el, options) {
         return
       case 'control-error':
         toast(m.error || 'Die Eingabe ist fehlgeschlagen.')
+        return
+      case 'special-error':
+        toast(m.error || 'Die Sondertaste ist fehlgeschlagen.', 5000)
         return
       case 'unlocked':
         unlockError(m.ok ? '' : m.error || 'Entsperren fehlgeschlagen.')
@@ -792,6 +816,11 @@ export function mountViewer(el, options) {
       b.setAttribute('aria-label', unavailable ? LIGHT_CONTROL : b.dataset.tip)
     }
     q('[data-clear]').hidden = !allowed.length
+    specialButton.hidden = !me || !hostPresent || state.mode !== 'control' || lightShare
+    if (specialButton.hidden && !specialMenu.hidden) closeSpecial()
+    const desk = q('.pv-desk')
+    desk.textContent = (hostPresent && DESKS[state.desk]) || ''
+    desk.hidden = !desk.textContent
     q('.pv-tools-sep').hidden = !allowed.length || !me
     q('[data-voice]').hidden = !voiceEnabled || state.voice_enabled !== true || !me
     const clipButton = q('[data-clip]')
@@ -860,6 +889,65 @@ export function mountViewer(el, options) {
   for (const b of el.querySelectorAll('.pv-dock [data-tool]')) b.addEventListener('click', () => (b.classList.contains('unavailable') ? toast(LIGHT_CONTROL, 6000) : setTool(b.dataset.tool)))
   q('[data-clear]').addEventListener('click', clear)
   q('[data-fixed-rooms]').addEventListener('click', () => options.onRooms?.())
+
+  // ------------------------------------------------------------ special keys ("Sondertasten")
+  const specialMenu = q('.pv-special')
+  const specialButton = q('[data-special]')
+  function openSpecial() {
+    const os = state.os === 'macos' || state.os === 'linux' ? state.os : 'windows'
+    specialMenu.replaceChildren(
+      ...SPECIAL_KEYS[os].map(([k, label]) => {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.setAttribute('role', 'menuitem')
+        b.dataset.k = k
+        b.textContent = label
+        b.addEventListener('click', () => {
+          send({ t: 'special', k, w: wm.active })
+          closeSpecial()
+        })
+        return b
+      }),
+    )
+    specialMenu.hidden = false
+    specialButton.classList.add('open')
+    specialButton.setAttribute('aria-expanded', 'true')
+    // below the button, inside the viewer
+    const v = el.getBoundingClientRect()
+    const r = specialButton.getBoundingClientRect()
+    const w = specialMenu.offsetWidth
+    specialMenu.style.left = `${Math.max(8, Math.min(v.width - w - 8, r.left - v.left + r.width / 2 - w / 2))}px`
+    specialMenu.style.top = `${r.bottom - v.top + 8}px`
+    specialMenu.querySelector('button')?.focus({ preventScroll: true })
+  }
+  function closeSpecial() {
+    if (specialMenu.hidden) return
+    specialMenu.hidden = true
+    specialButton.classList.remove('open')
+    specialButton.setAttribute('aria-expanded', 'false')
+    if (tool === 'control') keys.focus({ preventScroll: true })
+  }
+  specialButton.addEventListener('click', () => (specialMenu.hidden ? openSpecial() : closeSpecial()))
+  specialMenu.addEventListener('keydown', (e) => {
+    const items = [...specialMenu.querySelectorAll('button')]
+    const i = items.indexOf(document.activeElement)
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus()
+    }
+  })
+  // Escape or a click elsewhere closes it (Escape is not passed on to the presenter then)
+  const onSpecialKey = (e) => {
+    if (e.key !== 'Escape' || specialMenu.hidden) return
+    e.preventDefault()
+    e.stopPropagation()
+    closeSpecial()
+  }
+  const onSpecialPointer = (e) => {
+    if (!specialMenu.hidden && !specialMenu.contains(e.target) && !specialButton.contains(e.target)) closeSpecial()
+  }
+  window.addEventListener('keydown', onSpecialKey, true)
+  document.addEventListener('pointerdown', onSpecialPointer, true)
   // full screen: on a phone the whole display for the shared windows (controlling with a finger)
   const fullscreenButton = q('[data-fullscreen]')
   const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null
@@ -870,6 +958,21 @@ export function mountViewer(el, options) {
     fullscreenButton.dataset.tip = on ? 'Vollbild beenden' : 'Vollbild'
     fullscreenButton.setAttribute('aria-label', fullscreenButton.dataset.tip)
     fullscreenButton.setAttribute('aria-pressed', String(on))
+    syncKeyboardLock()
+  }
+  // Keyboard Lock (Chromium): in full screen while controlling, the viewer's own system lets
+  // Windows key, Alt+Tab and Escape through to the page – and so to the presenter
+  let keyboardLocked = false
+  function syncKeyboardLock() {
+    const want = fullscreenElement() === el && state.mode === 'control'
+    if (want === keyboardLocked) return
+    keyboardLocked = want
+    try {
+      if (want) navigator.keyboard?.lock?.()?.catch?.(() => (keyboardLocked = false))
+      else navigator.keyboard?.unlock?.()
+    } catch {
+      keyboardLocked = false
+    }
   }
   fullscreenButton.addEventListener('click', async () => {
     try {
@@ -1167,9 +1270,20 @@ export function mountViewer(el, options) {
   // Printable text arrives via `input` (dead keys, umlauts, IME), special keys and shortcuts
   // via `keydown`. Cmd/Ctrl+V pastes the *viewer's* clipboard as text.
 
+  // the Windows key of a non-Mac viewer: alone (pressed and released) it opens the presenter's start
+  // menu, held with another key it goes along as `win: true`
+  let winAlone = false
+  keys.addEventListener('keyup', (e) => {
+    if (isMac || tool !== 'control' || (e.key !== 'Meta' && e.key !== 'OS')) return
+    if (winAlone) send({ t: 'special', k: 'win', w: wm.active })
+    winAlone = false
+  })
   keys.addEventListener('keydown', (e) => {
+    if (!isMac && (e.key === 'Meta' || e.key === 'OS')) winAlone = !e.repeat || winAlone
+    else winAlone = false
     if (tool !== 'control' || e.isComposing || e.key === 'Dead' || e.key === 'Process' || MODIFIERS.includes(e.key)) return
     const cmd = isMac ? e.metaKey : e.ctrlKey
+    const win = !isMac && e.metaKey
     // each viewer's own shortcuts: ⌘C/⌘X on a Mac, Ctrl+C/Ctrl+X (or Ctrl+Insert / Shift+Delete) elsewhere
     const key = e.key.toLowerCase()
     if ((cmd && (key === 'c' || key === 'x')) || (!isMac && e.ctrlKey && key === 'insert') || (!isMac && e.shiftKey && key === 'delete')) {
@@ -1178,9 +1292,9 @@ export function mountViewer(el, options) {
     }
     // ⌘V / Ctrl+V / Shift+Insert: the browser's paste event follows
     if ((cmd && key === 'v') || (!isMac && e.shiftKey && key === 'insert')) return
-    if (!cmd && e.key.length === 1) return
+    if (!cmd && !win && e.key.length === 1) return
     e.preventDefault()
-    send({ t: 'key', key: e.key.length === 1 ? e.key.toLowerCase() : e.key, cmd, shift: e.shiftKey, alt: e.altKey, w: wm.active })
+    send({ t: 'key', key: e.key.length === 1 ? e.key.toLowerCase() : e.key, cmd, shift: e.shiftKey, alt: e.altKey, ...(win ? { win: true } : {}), w: wm.active })
   })
   const flushText = () => {
     const s = keys.value
@@ -1213,6 +1327,9 @@ export function mountViewer(el, options) {
       resetVideo()
       stageObserver.disconnect()
       window.removeEventListener('keydown', onGlobalKey)
+      window.removeEventListener('keydown', onSpecialKey, true)
+      document.removeEventListener('pointerdown', onSpecialPointer, true)
+      if (keyboardLocked) navigator.keyboard?.unlock?.()
       document.removeEventListener('fullscreenchange', syncFullscreen)
       document.removeEventListener('webkitfullscreenchange', syncFullscreen)
       if (fullscreenElement() === el) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document)

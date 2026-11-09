@@ -40,7 +40,8 @@ fn relays(app: &AppHandle) -> Vec<String> {
 /// Waiting rooms = permanent rooms with remote access that are not the running share's room.
 /// `restart`: rooms changed (PIN, apps …) – start them afresh.
 pub fn sync(app: &AppHandle, restart: bool) {
-    let rooms: Vec<Room> = crate::rooms::all(app).into_iter().filter(|r| r.remote).collect();
+    // a link the PeekaView service keeps reachable waits there, not in the app as well
+    let rooms: Vec<Room> = crate::rooms::all(app).into_iter().filter(|r| r.remote && !crate::unattended::served_by_service(r)).collect();
     let active = session::active_secret(app);
     let mut lobbies = LOBBIES.lock().unwrap();
     lobbies.retain(|l| {
@@ -162,6 +163,14 @@ impl Lobby {
             }
             Some("pin") if msg["to"] == "host" => {
                 let result = self.admission.lock().unwrap().pin(&from, msg["response"].as_str().unwrap_or(""));
+                if crate::unattended::helper() {
+                    let event = match &result {
+                        PinResult::Ok(_) => "PIN richtig",
+                        PinResult::Wrong { .. } => "PIN falsch",
+                        PinResult::Locked => "PIN gesperrt",
+                    };
+                    crate::unattended::log::event(&self.room.name, &crate::unattended::log::viewer("", &from), event);
+                }
                 match result {
                     PinResult::Ok(_) => {
                         session::announce_requests(app);

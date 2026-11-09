@@ -5,6 +5,10 @@
 //!
 //! A shared window is captured on its own: other windows, the desktop and notifications are never
 //! part of the picture. All COM objects live on one thread.
+//!
+//! The SYSTEM helper of the PeekaView service captures screens with DXGI Desktop Duplication
+//! instead (`dxgi.rs`): only that reaches the sign-in screen, the lock screen and UAC prompts.
+//! `PEEKAVIEW_DXGI=1` picks it for screens in the normal app as well (for testing).
 
 use std::{
     mem::ManuallyDrop,
@@ -105,13 +109,21 @@ impl Drop for Video {
 
 // ---------------------------------------------------------------------------------------------
 
+/// Where the frames come from.
+enum Grab {
+    Wgc { winrt_device: IDirect3DDevice, pool: Direct3D11CaptureFramePool, session: GraphicsCaptureSession, pool_size: SizeInt32 },
+    Dxgi(super::dxgi::Duplication),
+}
+
+/// Desktop Duplication for this source?
+fn use_dxgi(source: &Source) -> bool {
+    matches!(source, Source::Screen(_)) && (crate::unattended::helper() || std::env::var("PEEKAVIEW_DXGI").is_ok_and(|v| v == "1"))
+}
+
 struct Pipeline {
     device: ID3D11Device,
     context: ID3D11DeviceContext,
-    winrt_device: IDirect3DDevice,
-    pool: Direct3D11CaptureFramePool,
-    session: GraphicsCaptureSession,
-    pool_size: SizeInt32,
+    grab: Grab,
     converter: Option<Converter>,
     /// the GPU gets the colors wrong (startup check): frames are converted on the CPU instead
     cpu: Option<CpuConverter>,
@@ -175,28 +187,34 @@ fn capture_item(source: &Source) -> Result<GraphicsCaptureItem> {
 impl Pipeline {
     fn new(source: &Source, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self> {
         let (device, context) = create_device()?;
-        let dxgi: IDXGIDevice = device.cast().map_err(err("DXGI"))?;
-        let winrt_device: IDirect3DDevice = unsafe { CreateDirect3D11DeviceFromDXGIDevice(&dxgi) }
-            .map_err(err("WinRT-Gerät"))?
-            .cast()
-            .map_err(err("WinRT-Gerät"))?;
-        let item = capture_item(source)?;
-        let pool_size = item.Size().map_err(err("Größe"))?;
-        let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&winrt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, pool_size)
-            .map_err(err("Frame-Pool"))?;
-        let session = pool.CreateCaptureSession(&item).map_err(err("Capture-Sitzung"))?;
-        // our own pointer and annotations are sent separately; no yellow border (Windows 11)
-        let _ = session.SetIsCursorCaptureEnabled(false);
-        let _ = session.SetIsBorderRequired(false);
-        session.StartCapture().map_err(err("Aufnahme starten"))?;
+        let grab = match source {
+            Source::Screen(m) if use_dxgi(source) => {
+                let monitor = HMONITOR(m.id().map_err(|e| e.to_string())? as usize as *mut _);
+                Grab::Dxgi(super::dxgi::Duplication::new(&device, monitor)?)
+            }
+            _ => {
+                let dxgi: IDXGIDevice = device.cast().map_err(err("DXGI"))?;
+                let winrt_device: IDirect3DDevice = unsafe { CreateDirect3D11DeviceFromDXGIDevice(&dxgi) }
+                    .map_err(err("WinRT-Gerät"))?
+                    .cast()
+                    .map_err(err("WinRT-Gerät"))?;
+                let item = capture_item(source)?;
+                let pool_size = item.Size().map_err(err("Größe"))?;
+                let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(&winrt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, pool_size)
+                    .map_err(err("Frame-Pool"))?;
+                let session = pool.CreateCaptureSession(&item).map_err(err("Capture-Sitzung"))?;
+                // our own pointer and annotations are sent separately; no yellow border (Windows 11)
+                let _ = session.SetIsCursorCaptureEnabled(false);
+                let _ = session.SetIsBorderRequired(false);
+                session.StartCapture().map_err(err("Aufnahme starten"))?;
+                Grab::Wgc { winrt_device, pool, session, pool_size }
+            }
+        };
         let cpu_colors = !gpu_colors_right(&device, &context);
         Ok(Pipeline {
             device,
             context,
-            winrt_device,
-            pool,
-            session,
-            pool_size,
+            grab,
             converter: None,
             cpu: None,
             cpu_colors,
@@ -214,27 +232,7 @@ impl Pipeline {
         let frame_interval = Duration::from_millis(1000 / FPS as u64);
         while !stop.load(Ordering::Relaxed) {
             // newest captured frame → NV12 (GPU)
-            while let Ok(frame) = self.pool.TryGetNextFrame() {
-                let size = frame.ContentSize().map_err(err("Frame"))?;
-                if size.Width <= 0 || size.Height <= 0 {
-                    continue;
-                }
-                if size.Width != self.pool_size.Width || size.Height != self.pool_size.Height {
-                    // the window was resized: new pool size, the next frame has the new size
-                    self.pool_size = size;
-                    self.pool
-                        .Recreate(&self.winrt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size)
-                        .map_err(err("Frame-Pool"))?;
-                    continue;
-                }
-                let texture: ID3D11Texture2D = unsafe {
-                    frame.Surface().map_err(err("Frame"))?.cast::<IDirect3DDxgiInterfaceAccess>().map_err(err("Frame"))?.GetInterface()
-                }
-                .map_err(err("Frame"))?;
-                self.convert(&texture, size)?;
-                self.dirty = true;
-                self.have_frame = true;
-            }
+            self.grab_frames()?;
 
             let want_key = self.shared.need_key.load(Ordering::Relaxed) && self.last_key.elapsed() >= KEY_GAP;
             // static picture but a keyframe is wanted: encode the last frame again
@@ -255,8 +253,47 @@ impl Pipeline {
             }
             thread::sleep(Duration::from_millis(2));
         }
-        let _ = self.session.Close();
-        let _ = self.pool.Close();
+        if let Grab::Wgc { session, pool, .. } = &self.grab {
+            let _ = session.Close();
+            let _ = pool.Close();
+        }
+        Ok(())
+    }
+
+    fn grab_frames(&mut self) -> Result<()> {
+        if let Grab::Dxgi(dup) = &mut self.grab {
+            if let Some((texture, (w, h))) = dup.frame(&self.device, &self.context) {
+                self.convert(&texture, SizeInt32 { Width: w as i32, Height: h as i32 })?;
+                self.dirty = true;
+                self.have_frame = true;
+            }
+            return Ok(());
+        }
+        let (winrt_device, pool) = match &self.grab {
+            Grab::Wgc { winrt_device, pool, .. } => (winrt_device.clone(), pool.clone()),
+            Grab::Dxgi(_) => return Ok(()),
+        };
+        while let Ok(frame) = pool.TryGetNextFrame() {
+            let size = frame.ContentSize().map_err(err("Frame"))?;
+            if size.Width <= 0 || size.Height <= 0 {
+                continue;
+            }
+            if let Grab::Wgc { pool_size, .. } = &mut self.grab {
+                if size.Width != pool_size.Width || size.Height != pool_size.Height {
+                    // the window was resized: new pool size, the next frame has the new size
+                    *pool_size = size;
+                    pool.Recreate(&winrt_device, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, size).map_err(err("Frame-Pool"))?;
+                    continue;
+                }
+            }
+            let texture: ID3D11Texture2D = unsafe {
+                frame.Surface().map_err(err("Frame"))?.cast::<IDirect3DDxgiInterfaceAccess>().map_err(err("Frame"))?.GetInterface()
+            }
+            .map_err(err("Frame"))?;
+            self.convert(&texture, size)?;
+            self.dirty = true;
+            self.have_frame = true;
+        }
         Ok(())
     }
 

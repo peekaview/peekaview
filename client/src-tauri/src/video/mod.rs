@@ -19,6 +19,8 @@ mod vt;
 pub use mac::Video;
 
 #[cfg(target_os = "windows")]
+mod dxgi;
+#[cfg(target_os = "windows")]
 mod win;
 #[cfg(target_os = "windows")]
 pub use win::Video;

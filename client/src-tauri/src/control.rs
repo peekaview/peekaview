@@ -10,7 +10,11 @@
 //!   clipboard and the platform's own paste shortcut is pressed (⌘V / Ctrl+V); for copy the
 //!   platform's copy shortcut is pressed and the result goes back to the viewer's clipboard.
 //!   Everybody keeps their own shortcuts – the viewer sends "paste" / "copy", not keys.
-//! * Combos that switch apps or open system UI (app switcher, Spotlight, …) are dropped.
+//! * Combos that switch apps or open system UI (app switcher, Spotlight, …) are dropped while a
+//!   window is shared; with a whole screen shared they go through, like the special keys from the
+//!   viewer's menu ("special": Strg+Alt+Entf, Windows key, Alt+Tab, lock …).
+//! * The SYSTEM helper of the PeekaView service follows the input desktop before every input, so
+//!   it reaches the sign-in screen and UAC prompts as well.
 
 use std::{
     sync::{atomic::Ordering, mpsc, Arc},
@@ -162,6 +166,11 @@ impl Controller {
         if from == 0 {
             return;
         }
+        // the helper of the service: input goes to the desktop that receives input right now
+        #[cfg(target_os = "windows")]
+        if crate::unattended::helper() && crate::unattended::desk::win::follow_input_desktop() {
+            self.enigo = None;
+        }
         // the window the message is about; a drag stays in the window it started in
         let pressed_by_sender = self.pressed.is_some_and(|(id, ..)| id == from);
         let stream = match self.pressed.filter(|_| pressed_by_sender) {
@@ -228,6 +237,7 @@ impl Controller {
                 }
             }
             "paste" => self.paste(from, target, v),
+            "special" => self.special(from, target, v["k"].as_str().unwrap_or("")),
             "copy" => self.copy(from, target, v),
             "text" => {
                 let text: String = v["s"].as_str().unwrap_or("").chars().take(MAX_TEXT).collect();
@@ -244,8 +254,10 @@ impl Controller {
             "key" => {
                 let name = v["key"].as_str().unwrap_or("");
                 let (cmd, shift, alt) = (v["cmd"] == true, v["shift"] == true, v["alt"] == true);
+                // Windows key held (a viewer on Windows / Linux, with the keyboard lock in fullscreen)
+                let win = v["win"] == true;
                 // app switcher, Spotlight / start menu, force quit … would leave the shared window
-                if (cmd || alt) && matches!(name, "Tab" | "Escape" | " ") {
+                if app_switch_dropped(target.is_some(), cmd || alt || win, name) {
                     return;
                 }
                 let Some(key) = key_of(name) else { return };
@@ -261,6 +273,9 @@ impl Controller {
                 }
                 if alt {
                     mods.push(Key::Alt);
+                }
+                if win {
+                    mods.push(Key::Meta);
                 }
                 self.injected();
                 if let Some(rec) = self.shared.recorder() {
@@ -285,7 +300,88 @@ impl Controller {
     }
 }
 
+/// A shortcut that would leave a shared *window* (app switcher, start menu / Spotlight, …): dropped
+/// for windows, allowed when a whole screen is shared.
+fn app_switch_dropped(window: bool, modified: bool, key: &str) -> bool {
+    window && modified && matches!(key, "Tab" | "Escape" | " ")
+}
+
+fn special_key(k: crate::unattended::special::K) -> Key {
+    use crate::unattended::special::K;
+    match k {
+        K::Ctrl => Key::Control,
+        K::Alt => Key::Alt,
+        K::Shift => Key::Shift,
+        K::Meta => Key::Meta,
+        K::Tab => Key::Tab,
+        K::F4 => Key::F4,
+        K::Escape => Key::Escape,
+        K::Space => Key::Space,
+        K::Q => Key::Unicode('q'),
+    }
+}
+
 impl Controller {
+    /// An entry of the viewer's "Sondertasten" menu – only for a shared screen (they would leave a
+    /// shared window).
+    fn special(&mut self, from: u64, target: Target, k: &str) {
+        use crate::unattended::special::{self, Action};
+        let Some(action) = special::parse(k, cfg!(target_os = "macos")) else { return };
+        let fail = |c: &Self, error: &str| c.shared.send(json!({ "t": "special-error", "to": from, "k": k, "error": error }));
+        if target.is_some() {
+            return fail(self, "Sondertasten gehen nur, wenn der ganze Bildschirm geteilt wird.");
+        }
+        let link = self.shared.remote.as_ref().map(|r| r.name.clone()).unwrap_or_default();
+        let result: Result<(), String> = match action {
+            Action::Sas => {
+                #[cfg(target_os = "windows")]
+                {
+                    if crate::unattended::helper() {
+                        crate::unattended::client::sas()
+                    } else {
+                        Err("Strg+Alt+Entf geht nur über den PeekaView-Dienst („Auch ohne Anmeldung“ beim festen Link).".into())
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                Err("Strg+Alt+Entf gibt es nur unter Windows.".into())
+            }
+            Action::Lock => {
+                #[cfg(target_os = "windows")]
+                {
+                    if unsafe { windows_sys::Win32::System::Shutdown::LockWorkStation() } != 0 {
+                        Ok(())
+                    } else {
+                        Err("Der Rechner ließ sich nicht sperren.".into())
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                Err("Sperren geht hier nicht.".into())
+            }
+            Action::Keys(keys) => {
+                self.injected();
+                match self.enigo() {
+                    Some(e) => {
+                        for k in &keys {
+                            let _ = e.key(special_key(*k), Direction::Press);
+                        }
+                        for k in keys.iter().rev() {
+                            let _ = e.key(special_key(*k), Direction::Release);
+                        }
+                        Ok(())
+                    }
+                    None => Err("Eingaben lassen sich gerade nicht senden.".into()),
+                }
+            }
+        };
+        if crate::unattended::helper() {
+            let outcome = if result.is_ok() { "" } else { " (fehlgeschlagen)" };
+            crate::unattended::log::event(&link, &format!("Teilnehmer {from}"), &format!("{}{outcome}", special::label(k)));
+        }
+        if let Err(e) = result {
+            fail(self, &e);
+        }
+    }
+
     /// The platform's own shortcut with the primary modifier (⌘ on macOS, Ctrl elsewhere).
     fn shortcut(&mut self, key: char) {
         let modifier = if cfg!(target_os = "macos") { Key::Meta } else { Key::Control };
@@ -302,7 +398,8 @@ impl Controller {
         if !self.keyboard_allowed(from, target) {
             return;
         }
-        let ids: Vec<&str> = v["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str()).collect();
+        // the SYSTEM helper puts no files from the network on the clipboard
+        let ids: Vec<&str> = if crate::unattended::helper() { vec![] } else { v["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str()).collect() };
         let items: Vec<_> = ids.iter().filter_map(|id| self.shared.clip.get(id)).collect();
         // long text comes as a clipboard transfer
         let text_item = v["textItem"].as_str().and_then(|id| self.shared.clip.get(id)).and_then(|(_, p)| std::fs::read_to_string(p).ok());
@@ -440,4 +537,19 @@ fn key_of(name: &str) -> Option<Key> {
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::app_switch_dropped;
+
+    #[test]
+    fn app_switching_is_dropped_only_for_shared_windows() {
+        for key in ["Tab", "Escape", " "] {
+            assert!(app_switch_dropped(true, true, key), "{key:?} in a window");
+            assert!(!app_switch_dropped(false, true, key), "{key:?} on a shared screen");
+            assert!(!app_switch_dropped(true, false, key), "{key:?} without modifier");
+        }
+        assert!(!app_switch_dropped(true, true, "a"));
+    }
 }

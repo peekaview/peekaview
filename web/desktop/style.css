@@ -322,6 +322,11 @@ input.switch:focus-visible { outline: 2px solid rgba(239, 68, 68, .5); outline-o
 .pin-state { display: inline-flex; align-items: center; gap: 5px; margin-right: 4px; color: #86efac; font-size: 12px; font-weight: 600; }
 .room-apps .set-row { padding-left: 28px; }
 .room-apps .set-row + .set-row { border-top: 0; padding-top: 2px; }
+.room-unattended { border-top: 1px solid var(--line); }
+.room-unattended .unattended-service { border-top: 0; padding-top: 0; }
+.room-unattended .unattended-hint { color: #fca5a5; }
+.room-unattended .unattended-state { color: var(--fg); }
+input.switch:disabled { opacity: .4; cursor: default; }
 .tags { display: flex; gap: 6px; }
 .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--muted); font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
 .tag.pin { background: rgba(234, 179, 8, .14); color: #fde68a; }

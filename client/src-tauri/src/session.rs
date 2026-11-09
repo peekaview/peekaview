@@ -218,6 +218,10 @@ impl Shared {
             "resize": crate::settings::allow_resize(),
             // the presenter's screen is locked (in a room with remote access viewers may unlock it)
             "locked": crate::lock::locked(),
+            // which special keys the viewer offers
+            "os": if cfg!(target_os = "macos") { "macos" } else if cfg!(target_os = "windows") { "windows" } else { "linux" },
+            // sign-in screen, lock screen, UAC prompt (Windows)
+            "desk": desk(),
         })
     }
 
@@ -487,7 +491,7 @@ pub fn route_local(app: &AppHandle, shared: &Shared, ctrl: &std_mpsc::Sender<Cmd
             to_overlay(app, raw);
             let _ = ctrl.send(Cmd::Input(v.clone()));
         }
-        "mouse" | "wheel" | "key" | "text" | "copy" | "paste" => {
+        "mouse" | "wheel" | "key" | "text" | "copy" | "paste" | "special" => {
             let _ = ctrl.send(Cmd::Input(v.clone()));
         }
         _ => {}
@@ -753,6 +757,10 @@ fn overlay_label(slot: u8) -> String {
 
 /// The click-through window with the red frame (and annotations) on top of a shared window.
 fn create_overlay(app: &AppHandle, slot: u8) -> tauri::Result<()> {
+    // the service's helper runs as SYSTEM without any WebView
+    if crate::unattended::helper() {
+        return Ok(());
+    }
     let label = overlay_label(slot);
     if app.get_webview_window(&label).is_some() {
         return Ok(());
@@ -907,6 +915,14 @@ mod tests {
 
 pub(crate) fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
     app.state::<SessionState>().0.lock().unwrap().as_ref().map(|s| s.shared.clone()).ok_or_else(|| "Keine laufende Freigabe".into())
+}
+
+/// What the console shows (Windows): "normal" | "login" | "locked" | "secure".
+fn desk() -> &'static str {
+    #[cfg(target_os = "windows")]
+    return crate::unattended::desk::win::current().as_str();
+    #[cfg(not(target_os = "windows"))]
+    crate::unattended::desk::Desk::Normal.as_str()
 }
 
 /// Latest participant list (for windows opened later, e.g. the clipboard panel).
@@ -1158,6 +1174,15 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
         live["remote"] = json!(room.name);
     }
     let _ = app.emit_to("toolbar", "live", live_info(app));
+    // the service's helper shares the whole desktop right away (nobody can start applications)
+    if crate::unattended::helper() {
+        let app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(e) = launch(&app, "desktop") {
+                crate::log(&format!("helper: cannot share the desktop: {e}"));
+            }
+        });
+    }
     Ok(())
 }
 

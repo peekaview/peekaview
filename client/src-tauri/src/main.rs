@@ -23,6 +23,7 @@ mod session;
 mod settings;
 mod sources;
 mod tray;
+mod unattended;
 mod transcripts;
 mod video;
 mod viewers;
@@ -159,6 +160,9 @@ static MAIN_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool
 static MAIN_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn show_main(app: &AppHandle) {
+    if unattended::helper() {
+        return;
+    }
     MAIN_REQUESTED.store(true, std::sync::atomic::Ordering::SeqCst);
     if !permissions::ready() {
         permissions::request(app, "screen");
@@ -340,6 +344,9 @@ fn toolbar_dock_move(window: tauri::WebviewWindow, dy: f64, done: bool) -> Resul
 /// The toolbar of a running share: a small frameless bar at the top edge of the screen, always on
 /// top. It shows itself once it knows its size (`toolbar_resize`) and goes when the share ends.
 pub fn open_toolbar(app: &AppHandle) {
+    if unattended::helper() {
+        return;
+    }
     if app.get_webview_window("toolbar").is_some() {
         return;
     }
@@ -441,31 +448,39 @@ fn rooms_changed(app: &AppHandle) {
 
 #[tauri::command]
 fn room_save(app: AppHandle, room: serde_json::Value) -> Result<serde_json::Value, String> {
+    let before = rooms::all(&app);
     let saved = rooms::save(&app, &room)?;
     rooms_changed(&app);
+    unattended::links_changed(&app, &before);
     Ok(saved.view())
 }
 
 #[tauri::command]
 async fn room_pin(app: AppHandle, id: String, pin: Option<String>) -> Result<(), String> {
+    let before = rooms::all(&app);
     // PBKDF2 takes a moment
     let a = app.clone();
     tauri::async_runtime::spawn_blocking(move || rooms::set_pin(&a, &id, pin.as_deref())).await.map_err(|e| e.to_string())??;
     rooms_changed(&app);
+    unattended::links_changed(&app, &before);
     Ok(())
 }
 
 #[tauri::command]
 fn room_renew(app: AppHandle, id: String) -> Result<(), String> {
+    let before = rooms::all(&app);
     rooms::renew(&app, &id)?;
     rooms_changed(&app);
+    unattended::links_changed(&app, &before);
     Ok(())
 }
 
 #[tauri::command]
 fn room_delete(app: AppHandle, id: String) -> Result<(), String> {
+    let before = rooms::all(&app);
     rooms::delete(&app, &id)?;
     rooms_changed(&app);
+    unattended::links_changed(&app, &before);
     Ok(())
 }
 
@@ -762,7 +777,42 @@ fn stop_share(app: AppHandle) {
     session::stop(&app, None, true);
 }
 
+/// The app's configuration and embedded web assets (one copy for both the app and the helper).
+fn context() -> tauri::Context<tauri::Wry> {
+    tauri::generate_context!()
+}
+
+/// The SYSTEM helper of the PeekaView service: Tauri without any window, tray or deep links –
+/// waits in the links handed to the service and shares the whole desktop.
+fn run_helper() {
+    let mut context = context();
+    context.config_mut().app.windows.clear();
+    tauri::Builder::default()
+        .manage(session::SessionState::default())
+        .manage(invite::PendingInvite::default())
+        .setup(|app| {
+            unattended::helper::start(app.handle());
+            Ok(())
+        })
+        .build(context)
+        .expect("error while building the PeekaView helper")
+        .run(|_, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+            }
+        });
+}
+
 fn main() {
+    // service, helper or the elevated setup step: picked from exact flags only
+    let role = unattended::role_from_args(&std::env::args().skip(1).collect::<Vec<_>>());
+    unattended::set_role(role.clone());
+    if let Some(code) = unattended::run_role(&role) {
+        std::process::exit(code);
+    }
+    if unattended::helper() {
+        return run_helper();
+    }
     tauri::Builder::default()
         // a second launch (e.g. by a deep link on Windows/Linux) hands its URL to the running app
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
@@ -924,7 +974,9 @@ fn main() {
             env_key_status,
             start_recording,
             recording_audio,
-            stop_recording])
+            stop_recording,
+            unattended::unattended_status,
+            unattended::unattended_set])
         .on_window_event(|window, event| {
             if in_dock(window.label()) && matches!(event, WindowEvent::Focused(_) | WindowEvent::Destroyed | WindowEvent::CloseRequested { .. }) {
                 sync_dock(window.app_handle());
@@ -952,7 +1004,7 @@ fn main() {
                 _ => {}
             }
         })
-        .build(tauri::generate_context!())
+        .build(context())
         .expect("error while building PeekaView")
         .run(|app, event| {
             // quit by the OS (e.g. "Beenden & erneut öffnen" after granting a permission):
