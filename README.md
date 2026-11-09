@@ -120,7 +120,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
   - App-switching shortcuts go through (see "Special keys and the keyboard in fullscreen").
   - A dropped click or keystroke tells the viewer why.
   - Viewers see a "Steuerung pausiert" hint while the window is covered completely.
-- **macOS limitation:** macOS blocks synthetic keystrokes while any password field is focused ("Secure Input").
+- **macOS limitation:** macOS blocks synthetic keystrokes while any password field is focused ("Secure Input"). For the login window and the lock screen see "Access without sign-in (macOS)".
 
 ## Desktop client
 
@@ -186,20 +186,49 @@ Normally PeekaView runs as an app of the signed-in user, so the sign-in screen, 
 - **Security:**
   - The pipe `\\.\pipe\peekaview-service` admits only SYSTEM, administrators and interactive users, and refuses remote clients. Messages are length-prefixed JSON of at most 64 KB, parsed strictly (unknown types and fields are rejected). Strg+Alt+Entf is only done for SYSTEM clients.
   - What viewers send reaches a SYSTEM process: only known message types are accepted, special keys come from a fixed list, numbers are clamped as before, no applications are started, and no files are taken.
-- macOS (privileged helper for the login window; FileVault after a restart) follows in a later milestone.
+
+## Access without sign-in (macOS)
+
+The same switch exists on the Mac: **Auch ohne Anmeldung (Mac-Dienst)** for a permanent link with **Fernzugriff** and a **PIN**. The link then stays reachable at the login window, while the screen is locked and after a restart.
+
+- **Setting it up:** switching it on asks for an administrator's password (`osascript … with administrator privileges`, the same approach as RustDesk). The step runs `PeekaView --install-service <app data dir>` as root:
+  - It copies the signed app with `ditto` to `/Library/Application Support/PeekaView/PeekaView.app` (root:wheel, not writable for users). Same bundle id and signature, so the permissions for screen recording and accessibility apply to the copy too.
+  - The links go to `/Library/Application Support/PeekaView/unattended.json` (root only, `0600`), cut down like on Windows: only links with remote access, a PIN and the switch; no applications; always the whole desktop.
+  - It writes two launchd jobs, both pointing to the copy, never to `/Applications` or a home folder:
+    - **Daemon** `/Library/LaunchDaemons/de.limtec.peekaview.service.plist` (`--service`, root, `RunAtLoad`, `KeepAlive`).
+    - **Agent** `/Library/LaunchAgents/de.limtec.peekaview.agent.plist` (`--helper`, `LimitLoadToSessionType` = `LoginWindow` + `Aqua`, `KeepAlive`). launchd starts it at the login window (as root) and in every user session (as that user). The step also starts it right away in the session on the screen.
+  - Changing the PIN, renewing or deleting such a link hands the links over again (password prompt). Switching off the last one runs `--uninstall-service`: both jobs, the copy and the links are removed; the log stays.
+  - `SMAppService` is not used: it cannot register agents for the login window ("Service cannot load in requested session"), and the app is distributed as a zip, not as a `.pkg`.
+- **How it runs:**
+  - The **daemon** does no capture and no input. It holds the links, writes the access log and restarts the Mac. It listens on the Unix socket `/var/run/de.limtec.peekaview.sock`.
+  - The **agent** is the helper: Tauri without any WebView, no Dock icon. It fetches the links from the daemon every 5 seconds and waits in them (Nostr, PIN, WebRTC). Only the agent of the session that is **on the screen** (`kCGSessionOnConsoleKey`) serves them; with fast user switching the others keep still. When somebody signs in at the login window, launchd ends the login-window agent and the user session's agent takes over; viewers reconnect and enter the PIN again.
+  - **Capture:** ScreenCaptureKit first. If it is not available, or delivers no frame within 3 seconds (the login window before macOS 14.4, and reportedly some macOS 15 systems), the agent switches to **CGDisplayStream** (`video/cgstream.rs`), feeding the same VideoToolbox encoder. `PEEKAVIEW_CGSTREAM=1` picks CGDisplayStream in the normal app too, for testing.
+  - **Input:** `CGEventPost` through enigo, as before. Unlocking the lock screen uses the existing password field in the viewer (typed into the lock screen).
+  - While the app's own link and the service's link are the same, only the agent waits in it.
+- **Permissions (TCC):** the agent needs **Bildschirmaufnahme** and **Bedienungshilfen**, granted on site once. MDM cannot force screen recording (a PPPC profile can only allow standard users to grant it), but can allow accessibility. It is not verified yet whether a grant also covers the agent at the login window on every macOS version; Apple points to the restricted entitlement `com.apple.developer.persistent-content-capture` for VNC-like apps, which PeekaView does not have.
+- **Secure Input:** at the login window and the lock screen, macOS has Secure Input on for the password field. Synthetic key events from the root agent do reach it in general, but on macOS 15 and 26 the first keystroke is reported to get lost at times (RustDesk issue 11802). If the password does not arrive, click into the field and type again, or use the viewer's unlock field.
+- **Restart and FileVault:** the special keys menu has **Neustart …** while connected through the agent.
+  - Without FileVault the Mac restarts (`shutdown -r now`); the daemon and the login-window agent come back by themselves and viewers reconnect (PIN again).
+  - With **FileVault**, a Mac stops after a restart at the FileVault unlock, before any software runs – PeekaView too. Remote access is then impossible until somebody enters the password on site. The restart dialog says so. It also offers name and password of a FileVault user: the daemon hands them on stdin to `fdesetup authrestart -delayminutes -1 -inputplist` (one restart without the FileVault prompt), then restarts. A wrong password is reported to the viewer. The password is never stored or logged.
+  - The link settings show the FileVault hint as well.
+- **On site:** while somebody is connected, a red bar at the top of the main screen says "Fernzugriff aktiv: <Namen>", with **Trennen** (AppKit panel above everything, also at the login window; `canBecomeVisibleWithoutLogin`). ScreenCaptureKit leaves it out of the picture; with CGDisplayStream viewers see it too.
+- **Log:** `/Library/Application Support/PeekaView/Fernzugriff.log` (root only), written by the daemon – also for the agent, which may run as a user who cannot write there. Same entries as on Windows, plus restarts. Never keystrokes, PINs or passwords.
+- **Security:**
+  - The socket is created by root in `/var/run`. Everybody may connect, but every request is checked by the peer's **audit token** (`LOCAL_PEERTOKEN`): `Status` for everybody; `Reload` only for root; the links (with keys and PIN hashes), log entries and restarts only for the **agent on the screen** – a process whose code signature satisfies the daemon's own designated requirement (`SecCodeCopyGuestWithAttributes` + `SecCodeCheckValidity`; Developer ID: same team and bundle id, ad-hoc builds: the same binary), that runs from the installed copy, and whose user owns `/dev/console`. Same framing and strict parsing as the Windows pipe.
+  - The agent keeps nothing in the app data of the user it runs as (settings, recent viewers, resume, contacts), takes no files, starts no applications, and shares only the whole screen.
 
 ## Special keys and the keyboard in fullscreen
 
 With **Steuern**, the viewer's toolbar has a **Sondertasten** menu:
 - **Windows host:** Strg+Alt+Entf, Windows-Taste, Alt+Tab, Alt+F4, Strg+Umschalt+Esc, Sperren. Strg+Alt+Entf only works through the service ("Auch ohne Anmeldung"); otherwise the viewer gets a message.
-- **Mac host:** Cmd+Tab, Cmd+Leertaste.
+- **Mac host:** Cmd+Tab, Cmd+Leertaste, Cmd+Q, Sofort beenden (Cmd+Alt+Esc), Sperren (Ctrl+Cmd+Q; if that does not lock, `SACLockScreenImmediate` from login.framework). Connected through the Mac service, also **Neustart …** (see above).
 - They only work while a whole screen is shared. A shared window refuses them, because they would leave the window.
 
 In fullscreen with Steuern, the viewer asks for the **Keyboard Lock** (`navigator.keyboard.lock()`, Chromium browsers). The Windows key, Alt+Tab and Esc then go to the host instead of the viewer's own computer; holding Esc leaves fullscreen. On a viewer running Windows or Linux, the Windows key on its own opens the host's start menu, and held with another key it is sent along (e.g. Win+E).
 
 While a whole screen is shared, app-switching shortcuts (Alt+Tab, Cmd+Tab, Cmd+Space, Ctrl+Esc) go through. With a shared window they are still dropped.
 
-The viewer shows a small hint when the host's console shows the sign-in screen, is locked, or shows a UAC prompt. The picture stays usable.
+The viewer shows a small hint when the host's console shows the sign-in screen, is locked, or shows a UAC prompt (on a Mac: the login window, or locked). The picture stays usable.
 
 ## Shared clipboard
 
@@ -435,6 +464,7 @@ peekaview://share?room=<secret>&name=Anna&color=%23ef4444&ice=<json>&relays=<jso
 
 - Windows: test on real hardware (Intel, NVIDIA, AMD; DPI scaling; input guard).
 - Access without sign-in (Windows): run on real hardware – the service, the helper, Desktop Duplication, `SendSAS` and the bar on site have only been compiled so far. Known gaps: the mouse pointer is not part of the DXGI picture; computers with two GPUs may need the device created on the adapter of the output; RDP sessions are not followed; after a session switch, viewers enter the PIN again; links of contacts (room service) are not served yet.
+- Access without sign-in (macOS): run at the login window, the lock screen and after a restart (with and without FileVault) on real Macs with macOS 14, 15 and 26 – see the PR for what was tested. Open questions: ScreenCaptureKit / CGDisplayStream at the login window on macOS 15+, Secure Input at the login window, `fdesetup authrestart` on Apple Silicon. Agents of other users' sessions keep running after uninstalling until they sign out. Remote restart for the Windows service.
 - Linux: Wayland portals (ScreenCast, RemoteDesktop) and VA-API.
 - Popup menus of a shared *window* are separate OS windows. Viewers don't see them, and clicks on them are refused.
 - Code signing / notarization, auto-update.

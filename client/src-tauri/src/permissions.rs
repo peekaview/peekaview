@@ -120,6 +120,11 @@ pub fn dismiss(app: &AppHandle, kind: &str) {
 /// follows the window), opens the pane of each missing permission in turn and goes once all are
 /// granted. Accessibility is required only when remote control was requested.
 pub fn request(app: &AppHandle, kind: &str) {
+    // the service's helper / agent has no windows: the permission is granted in the app
+    if crate::unattended::helper() {
+        crate::log(&format!("helper: permission missing: {kind}"));
+        return;
+    }
     #[cfg(target_os = "macos")]
     {
         if let Some(existing) = app.get_webview_window(HELPER) {

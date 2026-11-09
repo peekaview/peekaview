@@ -11,7 +11,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde_json::Value;
 use windows_service::{
     service::{
         ServiceAccess, ServiceAction, ServiceActionType, ServiceErrorControl, ServiceFailureActions, ServiceFailureResetPeriod, ServiceInfo, ServiceStartType,
@@ -49,19 +48,6 @@ pub fn installed() -> bool {
     ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
         .and_then(|m| m.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS))
         .is_ok()
-}
-
-/// The links of the user's app (rooms.json and settings.json in `dir`) → the service's store.
-fn read_links(dir: &Path) -> Result<store::Store, String> {
-    let rooms: Vec<crate::rooms::Room> = serde_json::from_slice(&std::fs::read(dir.join("rooms.json")).map_err(|e| format!("rooms.json: {e}"))?).map_err(|e| e.to_string())?;
-    let settings: Value = std::fs::read(dir.join("settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
-    let relays: Vec<String> = match &settings["relays"] {
-        Value::Array(a) => a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect(),
-        Value::String(s) => s.split_whitespace().map(str::to_string).collect(),
-        _ => vec![],
-    };
-    let name = settings["name"].as_str().map(str::to_string).or_else(|| std::env::var("COMPUTERNAME").ok()).unwrap_or_default();
-    Ok(store::sanitize(&name, &relays, rooms))
 }
 
 fn secure_dir(dir: &Path) -> Result<(), String> {
@@ -115,7 +101,7 @@ fn stop(manager: &ServiceManager) {
 /// `--install-service <dir>`: installs or updates the service with the links marked
 /// "Auch ohne Anmeldung" in the user's app data `dir`.
 pub fn install(dir: &Path) -> Result<(), String> {
-    let links = read_links(dir)?;
+    let links = store::from_app_dir(dir)?;
     if links.rooms.is_empty() {
         return uninstall();
     }

@@ -30,7 +30,7 @@ const LIGHT_CONTROL = 'Steuern geht hier nicht: Die Freigabe läuft im Browser. 
 const SPECIAL_KEYS = {
   windows: [['cad', 'Strg+Alt+Entf'], ['win', 'Windows-Taste'], ['alt-tab', 'Alt+Tab'], ['alt-f4', 'Alt+F4'], ['ctrl-shift-esc', 'Strg+Umschalt+Esc'], ['lock', 'Sperren']],
   linux: [['win', 'Windows-Taste'], ['alt-tab', 'Alt+Tab'], ['alt-f4', 'Alt+F4'], ['ctrl-shift-esc', 'Strg+Umschalt+Esc'], ['lock', 'Sperren']],
-  macos: [['cmd-tab', 'Cmd+Tab'], ['cmd-space', 'Cmd+Leertaste']],
+  macos: [['cmd-tab', 'Cmd+Tab'], ['cmd-space', 'Cmd+Leertaste'], ['cmd-q', 'Cmd+Q'], ['force-quit', 'Sofort beenden (Cmd+Alt+Esc)'], ['lock', 'Sperren (Ctrl+Cmd+Q)']],
 }
 // the presenter's Windows desktop (Windows service): sign-in screen, lock screen, UAC prompt
 const DESKS = {
@@ -38,6 +38,15 @@ const DESKS = {
   locked: 'Der Rechner ist gesperrt.',
   secure: 'Windows zeigt eine Administrator-Abfrage.',
 }
+// … and the Mac (macOS service)
+const MAC_DESKS = {
+  login: 'Der Mac zeigt das Anmeldefenster.',
+  locked: 'Der Mac ist gesperrt.',
+}
+// restart through the macOS service ("Neustart" in the special keys)
+const RESTART_TEXT = 'PeekaView verbindet sich nach dem Neustart von selbst wieder. Die PIN brauchst du dann noch einmal.'
+const RESTART_FILEVAULT =
+  'FileVault ist an: Ohne Passwort wartet der Mac nach dem Neustart auf das FileVault-Passwort – Fernzugriff geht dann erst wieder, wenn es jemand vor Ort eingibt. Mit Nutzername und Passwort eines FileVault-Nutzers startet der Mac einmalig ohne diese Abfrage.'
 
 const CSS = `
 .pv-viewer:fullscreen { width: 100%; height: 100%; background: var(--pv-bg); }
@@ -122,6 +131,12 @@ const CSS = `
 .pv-special { position: absolute; z-index: 100001; display: flex; flex-direction: column; gap: 2px; min-width: 190px; padding: 5px; border-radius: 12px; }
 .pv-special button { display: flex; align-items: center; height: 32px; padding: 0 11px; border: 0; border-radius: 8px; background: transparent; color: var(--pv-fg); text-align: left; white-space: nowrap; cursor: pointer; }
 .pv-special button:hover, .pv-special button:focus-visible { background: rgba(255, 255, 255, .1); outline: none; }
+.pv-restart { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100002; width: min(420px, calc(100% - 32px)); padding: 16px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pv-restart b { font-size: 15px; }
+.pv-restart > small { color: var(--pv-muted); line-height: 1.45; }
+.pv-restart .pv-pin { border-top: 0; padding-top: 0; }
+.pv-restart .pv-pin input { flex-basis: 100%; letter-spacing: normal; }
+.pv-restart .pv-pin button.secondary { margin-left: auto; background: transparent; border: 1px solid var(--pv-line); color: var(--pv-fg); }
 .pv-desk { position: absolute; left: 50%; top: calc(var(--pv-toolbar-bottom, 0px) + 8px); transform: translateX(-50%); z-index: 99999; max-width: calc(100% - 24px); padding: 5px 11px; border-radius: 999px; color: #fde68a; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .pv-keys { position: absolute; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
 @keyframes pv-spin { to { transform: rotate(360deg); } }
@@ -149,6 +164,17 @@ export function mountViewer(el, options) {
     <div class="pv-stats pv-glass" hidden></div>
     <div class="pv-desk pv-glass" role="status" hidden></div>
     <div class="pv-special pv-glass" role="menu" aria-label="Sondertasten" hidden></div>
+    <div class="pv-restart pv-glass" role="dialog" aria-label="Neustart" hidden>
+      <b>Mac neu starten?</b>
+      <small class="pv-restart-text"></small>
+      <form class="pv-pin pv-restart-form">
+        <input name="user" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nutzername (FileVault)" hidden>
+        <input name="password" type="password" autocomplete="off" placeholder="Passwort (FileVault)" hidden>
+        <button type="button" class="secondary" data-cancel>Abbrechen</button>
+        <button data-restart>Neu starten</button>
+        <small class="pv-pin-error" hidden></small>
+      </form>
+    </div>
     <div class="pv-chip pv-glass pv-toast" hidden>${icon('control', 15)}<span></span></div>
     <div class="pv-dock pv-glass">
       <div class="pv-status">
@@ -510,6 +536,7 @@ export function mountViewer(el, options) {
     lightNoticed = false
     state = { mode: 'view' }
     syncKeyboardLock()
+    closeRestart()
     voice.setEnabled(false)
     resetVideo()
     wm.setWindows([])
@@ -583,6 +610,13 @@ export function mountViewer(el, options) {
         return
       case 'special-error':
         toast(m.error || 'Die Sondertaste ist fehlgeschlagen.', 5000)
+        return
+      case 'restart-error':
+        restartError(m.error || 'Der Neustart ist fehlgeschlagen.')
+        return
+      case 'restarting':
+        closeRestart()
+        toast('Der Mac startet neu – PeekaView verbindet sich danach von selbst wieder.', 10000)
         return
       case 'unlocked':
         unlockError(m.ok ? '' : m.error || 'Entsperren fehlgeschlagen.')
@@ -818,8 +852,9 @@ export function mountViewer(el, options) {
     q('[data-clear]').hidden = !allowed.length
     specialButton.hidden = !me || !hostPresent || state.mode !== 'control' || lightShare
     if (specialButton.hidden && !specialMenu.hidden) closeSpecial()
+    if ((specialButton.hidden || !state.restart) && !restartDialog.hidden) closeRestart()
     const desk = q('.pv-desk')
-    desk.textContent = (hostPresent && DESKS[state.desk]) || ''
+    desk.textContent = (hostPresent && (state.os === 'macos' ? MAC_DESKS : DESKS)[state.desk]) || ''
     desk.hidden = !desk.textContent
     q('.pv-tools-sep').hidden = !allowed.length || !me
     q('[data-voice]').hidden = !voiceEnabled || state.voice_enabled !== true || !me
@@ -895,16 +930,18 @@ export function mountViewer(el, options) {
   const specialButton = q('[data-special]')
   function openSpecial() {
     const os = state.os === 'macos' || state.os === 'linux' ? state.os : 'windows'
+    const entries = [...SPECIAL_KEYS[os], ...(state.restart ? [['restart', 'Neustart …']] : [])]
     specialMenu.replaceChildren(
-      ...SPECIAL_KEYS[os].map(([k, label]) => {
+      ...entries.map(([k, label]) => {
         const b = document.createElement('button')
         b.type = 'button'
         b.setAttribute('role', 'menuitem')
         b.dataset.k = k
         b.textContent = label
         b.addEventListener('click', () => {
-          send({ t: 'special', k, w: wm.active })
           closeSpecial()
+          if (k === 'restart') openRestart()
+          else send({ t: 'special', k, w: wm.active })
         })
         return b
       }),
@@ -947,6 +984,51 @@ export function mountViewer(el, options) {
     if (!specialMenu.hidden && !specialMenu.contains(e.target) && !specialButton.contains(e.target)) closeSpecial()
   }
   window.addEventListener('keydown', onSpecialKey, true)
+
+  // ------------------------------------------------------------ restart (macOS service)
+  // FileVault: name and password go over the encrypted data channel to the presenter's service,
+  // which hands them to `fdesetup authrestart` only (never stored or logged)
+  const restartDialog = q('.pv-restart')
+  const restartForm = q('.pv-restart-form')
+  function restartError(text) {
+    const e = restartForm.querySelector('.pv-pin-error')
+    e.textContent = text ?? ''
+    e.hidden = !text
+    restartForm.querySelector('[data-restart]').disabled = false
+  }
+  function openRestart() {
+    const filevault = state.filevault === true
+    q('.pv-restart-text').textContent = filevault ? RESTART_FILEVAULT : RESTART_TEXT
+    for (const input of restartForm.querySelectorAll('input')) {
+      input.hidden = !filevault
+      input.value = ''
+    }
+    restartError()
+    restartDialog.hidden = false
+    ;(filevault ? restartForm.querySelector('input') : restartForm.querySelector('[data-restart]')).focus({ preventScroll: true })
+  }
+  function closeRestart() {
+    if (restartDialog.hidden) return
+    restartDialog.hidden = true
+    for (const input of restartForm.querySelectorAll('input')) input.value = ''
+    if (tool === 'control') keys.focus({ preventScroll: true })
+  }
+  restartForm.querySelector('[data-cancel]').addEventListener('click', closeRestart)
+  restartForm.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const user = restartForm.elements.user.value.trim()
+    const password = restartForm.elements.password.value
+    if (state.filevault === true && !!user !== !!password) return restartError('Bitte Nutzername und Passwort angeben – oder beides leer lassen.')
+    restartError()
+    restartForm.querySelector('[data-restart]').disabled = true
+    if (!send({ t: 'restart', ...(user && password ? { user, password } : {}) })) restartError('Keine Verbindung zur Freigabe.')
+    restartForm.elements.password.value = ''
+  })
+  restartDialog.addEventListener('keydown', (e) => {
+    // typing here is not for the presenter
+    e.stopPropagation()
+    if (e.key === 'Escape') closeRestart()
+  })
   document.addEventListener('pointerdown', onSpecialPointer, true)
   // full screen: on a phone the whole display for the shared windows (controlling with a finger)
   const fullscreenButton = q('[data-fullscreen]')

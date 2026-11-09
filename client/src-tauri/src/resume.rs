@@ -11,6 +11,10 @@ use tauri::{AppHandle, Manager};
 const MAX_AGE_SECS: u64 = 180;
 
 fn path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    // the service's helper / agent keeps nothing in the app data of the user it runs as
+    if crate::unattended::helper() {
+        return None;
+    }
     let dir = app.path().app_data_dir().ok()?;
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir.join("resume.json"))

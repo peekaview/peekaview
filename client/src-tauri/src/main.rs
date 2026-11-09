@@ -782,7 +782,8 @@ fn context() -> tauri::Context<tauri::Wry> {
     tauri::generate_context!()
 }
 
-/// The SYSTEM helper of the PeekaView service: Tauri without any window, tray or deep links –
+/// The helper of the PeekaView service (Windows: SYSTEM in the console session; macOS: the
+/// LaunchAgent): Tauri without any window, tray or deep links –
 /// waits in the links handed to the service and shares the whole desktop.
 fn run_helper() {
     let mut context = context();
@@ -791,6 +792,9 @@ fn run_helper() {
         .manage(session::SessionState::default())
         .manage(invite::PendingInvite::default())
         .setup(|app| {
+            // macOS agent: no Dock icon, no menu bar
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             unattended::helper::start(app.handle());
             Ok(())
         })

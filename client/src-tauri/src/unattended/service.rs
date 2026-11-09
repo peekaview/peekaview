@@ -361,6 +361,8 @@ fn serve_client(pipe: HANDLE) {
             helper: HELPER_RUNNING.load(Ordering::Relaxed),
             session: HELPER_SESSION.load(Ordering::Relaxed),
             rooms: store::get().rooms.len() as u32,
+            filevault: false,
+            authrestart: false,
         },
         Ok(Request::Reload {}) => {
             store::reload();
@@ -374,6 +376,8 @@ fn serve_client(pipe: HANDLE) {
             Err(message) => Response::Error { message },
         },
         Ok(Request::Sas {}) => Response::Error { message: "Nicht erlaubt.".into() },
+        // the macOS daemon's requests
+        Ok(Request::Links {} | Request::Log { .. } | Request::Restart { .. }) => Response::Error { message: "Nicht unterstützt.".into() },
         Err(e) => {
             crate::log(&format!("service pipe: bad request ({e})"));
             Response::Error { message: "Ungültige Anfrage.".into() }

@@ -220,8 +220,11 @@ impl Shared {
             "locked": crate::lock::locked(),
             // which special keys the viewer offers
             "os": if cfg!(target_os = "macos") { "macos" } else if cfg!(target_os = "windows") { "windows" } else { "linux" },
-            // sign-in screen, lock screen, UAC prompt (Windows)
+            // sign-in screen, lock screen, UAC prompt (Windows); login window, locked (macOS)
             "desk": desk(),
+            // the macOS agent can restart the Mac (and says whether FileVault will stop it)
+            "restart": crate::unattended::restart_available(),
+            "filevault": crate::unattended::restart_filevault(),
         })
     }
 
@@ -918,10 +921,12 @@ pub(crate) fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
 }
 
 /// What the console shows (Windows): "normal" | "login" | "locked" | "secure".
-fn desk() -> &'static str {
+pub(crate) fn desk() -> &'static str {
     #[cfg(target_os = "windows")]
     return crate::unattended::desk::win::current().as_str();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    return if crate::unattended::helper() { crate::unattended::desk::mac_current() } else { crate::unattended::desk::Desk::Normal }.as_str();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     crate::unattended::desk::Desk::Normal.as_str()
 }
 

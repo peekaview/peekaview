@@ -1,5 +1,6 @@
-//! Access without sign-in (Windows): a service (LocalSystem) keeps a helper running in the active
-//! console session. The helper is this same program started with `--helper`: it waits in the
+//! Access without sign-in. macOS: see `mac` (LaunchDaemon + LaunchAgent for the login window and
+//! the user sessions; the agent is the helper). Windows: a service (LocalSystem) keeps a helper
+//! running in the active console session. The helper is this same program started with `--helper`: it waits in the
 //! permanent links marked "Auch ohne Anmeldung", captures the whole desktop with DXGI Desktop
 //! Duplication and injects input as SYSTEM, so the sign-in screen, the lock screen and UAC prompts
 //! can be used from afar. Strg+Alt+Entf goes through the service (SendSAS).
@@ -13,6 +14,7 @@
 pub mod desk;
 pub mod helper;
 pub mod log;
+pub mod mac;
 pub mod protocol;
 pub mod special;
 pub mod store;
@@ -30,6 +32,10 @@ use std::{path::PathBuf, sync::OnceLock};
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
+
+/// Windows or macOS: the platforms with a service.
+pub const AVAILABLE: bool = cfg!(any(target_os = "windows", target_os = "macos"));
+const UNAVAILABLE: &str = "Zugriff ohne Anmeldung gibt es nur unter Windows und macOS.";
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub const SERVICE_NAME: &str = "PeekaViewService";
@@ -84,7 +90,9 @@ pub fn privileged() -> bool {
 pub fn data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     return PathBuf::from(std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".into())).join("PeekaView");
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    return PathBuf::from(mac::SUPPORT);
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     std::env::temp_dir().join("peekaview-unattended")
 }
 
@@ -106,7 +114,24 @@ pub fn run_role(role: &Role) -> Option<i32> {
             }
         })
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        let result = match role {
+            Role::Service => mac::service::run(),
+            Role::Install(dir) => mac::install::install(dir),
+            Role::Uninstall => mac::install::uninstall(),
+            Role::App | Role::Helper => return None,
+        };
+        Some(match result {
+            Ok(()) => 0,
+            Err(e) => {
+                crate::log(&format!("{role:?}: {e}"));
+                eprintln!("PeekaView: {e}");
+                1
+            }
+        })
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         match role {
             Role::App | Role::Helper => None,
@@ -115,6 +140,7 @@ pub fn run_role(role: &Role) -> Option<i32> {
     }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 /// Pause before the service starts its helper again after `failures` failed starts or crashes.
 pub fn backoff(failures: u32) -> std::time::Duration {
     std::time::Duration::from_secs(if failures == 0 { 0 } else { (1u64 << failures.min(6)).min(60) })
@@ -133,20 +159,76 @@ pub struct Status {
 pub fn status() -> Status {
     #[cfg(target_os = "windows")]
     return client::status();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    return mac::client::status().0;
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     Status::default()
+}
+
+/// macOS: (FileVault on, authenticated restart possible) as the daemon sees it.
+fn filevault() -> (bool, bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let (_, on, auth) = mac::client::status();
+        (on, auth)
+    }
+    #[cfg(not(target_os = "macos"))]
+    (false, false)
+}
+
+/// The macOS agent may restart the Mac (through the daemon).
+pub fn restart_available() -> bool {
+    cfg!(target_os = "macos") && helper()
+}
+
+/// macOS agent: is FileVault on (a restart then stops at the unlock unless authenticated)?
+/// Asked of the daemon at most once a minute (the share's state is sent often).
+pub fn restart_filevault() -> bool {
+    if !restart_available() {
+        return false;
+    }
+    static CACHE: std::sync::Mutex<Option<(std::time::Instant, bool)>> = std::sync::Mutex::new(None);
+    let mut cache = CACHE.lock().unwrap();
+    if let Some((at, on)) = *cache {
+        if at.elapsed() < std::time::Duration::from_secs(60) {
+            return on;
+        }
+    }
+    let on = filevault().0;
+    *cache = Some((std::time::Instant::now(), on));
+    on
+}
+
+/// The macOS agent asks the daemon to restart the Mac (`user`/`password`: authenticated restart
+/// with FileVault). Blocking.
+pub fn restart(user: Option<String>, password: Option<String>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if !helper() {
+            return Err("Neustart geht nur über den PeekaView-Dienst („Auch ohne Anmeldung“ beim festen Link).".into());
+        }
+        mac::client::restart(user, password)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (user, password);
+        Err("Neustart aus der Ferne gibt es bisher nur auf dem Mac.".into())
+    }
 }
 
 /// Does the running service take care of the link (then the app does not wait in it as well)?
 pub fn served_by_service(room: &crate::rooms::Room) -> bool {
-    room.unattended && cfg!(target_os = "windows") && !helper() && status().running
+    room.unattended && AVAILABLE && !helper() && status().running
 }
 
 #[tauri::command]
 pub async fn unattended_status() -> Value {
-    let s = tauri::async_runtime::spawn_blocking(status).await.unwrap_or_default();
+    let (s, (filevault, authrestart)) = tauri::async_runtime::spawn_blocking(|| (status(), filevault())).await.unwrap_or_default();
     json!({
-        "available": cfg!(target_os = "windows"),
+        "available": AVAILABLE,
+        "os": if cfg!(target_os = "macos") { "macos" } else { "windows" },
+        "filevault": filevault,
+        "authrestart": authrestart,
         "installed": s.installed,
         "running": s.running,
         "version": s.version,
@@ -158,8 +240,8 @@ pub async fn unattended_status() -> Value {
 /// setup step (UAC) hands the links over to the service – or removes it when none is left.
 #[tauri::command]
 pub async fn unattended_set(app: AppHandle, id: String, on: bool) -> Result<(), String> {
-    if !cfg!(target_os = "windows") {
-        return Err("Zugriff ohne Anmeldung gibt es bisher nur unter Windows.".into());
+    if !AVAILABLE {
+        return Err(UNAVAILABLE.into());
     }
     let room = crate::rooms::get(&app, &id).ok_or("Link nicht gefunden.")?;
     if on && (!room.remote || room.pin.is_none()) {
@@ -183,7 +265,7 @@ pub async fn unattended_set(app: AppHandle, id: String, on: bool) -> Result<(), 
 /// what the service serves, hand the links over again (UAC prompt) – the service must never keep
 /// serving a link that was switched off.
 pub fn links_changed(app: &AppHandle, before: &[crate::rooms::Room]) {
-    if !cfg!(target_os = "windows") || helper() {
+    if !AVAILABLE || helper() {
         return;
     }
     let after = crate::rooms::all(app);
@@ -220,8 +302,16 @@ fn setup(any: bool, dir: &std::path::Path) -> Result<(), String> {
         }
         client::elevate(&args)
     }
-    #[cfg(not(target_os = "windows"))]
-    Err("Zugriff ohne Anmeldung gibt es bisher nur unter Windows.".into())
+    #[cfg(target_os = "macos")]
+    {
+        let args = if any { vec!["--install-service".to_string(), dir.display().to_string()] } else { vec!["--uninstall-service".to_string()] };
+        if !any && !status().installed {
+            return Ok(());
+        }
+        mac::client::elevate(&args)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    Err(UNAVAILABLE.into())
 }
 
 #[cfg(test)]

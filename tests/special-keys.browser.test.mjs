@@ -1,4 +1,4 @@
-// "Sondertasten" menu and the Windows desktop hint of the actual viewer; only incoming
+// "Sondertasten" menu (Windows and macOS hosts, restart through the macOS service) and the desktop hint of the actual viewer; only incoming
 // data-channel messages are simulated.
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -78,8 +78,54 @@ test('special keys menu follows mode and host OS; desk hint follows state.desk',
   // macOS host
   await receive(state({os:'macos'}))
   await browser('click','[data-special]')
-  assert.deepEqual(await evaluate(items),['Cmd+Tab','Cmd+Leertaste'])
+  const macItems=['Cmd+Tab','Cmd+Leertaste','Cmd+Q','Sofort beenden (Cmd+Alt+Esc)','Sperren (Ctrl+Cmd+Q)']
+  assert.deepEqual(await evaluate(items),macItems)
+  await evaluate('qa.sent=[];true')
+  await browser('click','.pv-special [data-k="force-quit"]')
+  assert.deepEqual(await evaluate("qa.sent.filter(m=>m.t==='special')"),[{t:'special',k:'force-quit',w:0}])
+
+  // the macOS service's agent can restart the Mac
+  await receive(state({os:'macos',restart:true,filevault:false}))
+  await browser('click','[data-special]')
+  assert.deepEqual(await evaluate(items),[...macItems,'Neustart …'])
+  await browser('click','.pv-special [data-k="restart"]')
+  assert.equal(await visible('.pv-restart'),true,'restart asks first')
+  assert.equal(await visible('.pv-restart input[name=password]'),false,'no password without FileVault')
+  assert.match(await evaluate("document.querySelector('.pv-restart-text').textContent"),/von selbst wieder/)
+  await evaluate('qa.sent=[];true')
+  await browser('click','.pv-restart [data-cancel]')
+  assert.equal(await visible('.pv-restart'),false)
+  assert.deepEqual(await evaluate("qa.sent"),[],'cancel sends nothing')
+  // FileVault: optional name and password for fdesetup authrestart
+  await receive(state({os:'macos',restart:true,filevault:true}))
+  await browser('click','[data-special]')
+  await browser('click','.pv-special [data-k="restart"]')
+  assert.equal(await visible('.pv-restart input[name=password]'),true)
+  assert.match(await evaluate("document.querySelector('.pv-restart-text').textContent"),/FileVault ist an/)
+  await evaluate("(()=>{const f=document.querySelector('.pv-restart-form');f.elements.user.value='anna';f.requestSubmit();return true})()")
+  assert.match(await evaluate("document.querySelector('.pv-restart .pv-pin-error').textContent"),/Nutzername und Passwort/,'both or neither')
+  // the dialog's typing stays in the viewer
+  await evaluate("(()=>{const f=document.querySelector('.pv-restart-form');f.elements.password.dispatchEvent(new KeyboardEvent('keydown',{key:'x',bubbles:true}));f.elements.password.value='geheim';f.requestSubmit();return true})()")
+  assert.deepEqual(await evaluate("qa.sent.filter(m=>m.t!=='viewport')"),[{t:'restart',user:'anna',password:'geheim'}])
+  assert.equal(await evaluate("document.querySelector('.pv-restart-form').elements.password.value"),'','password field cleared')
+  await receive({t:'restart-error',error:'FileVault hat Nutzername oder Passwort nicht angenommen.'})
+  assert.equal(await evaluate("document.querySelector('.pv-restart .pv-pin-error').textContent"),'FileVault hat Nutzername oder Passwort nicht angenommen.')
+  await evaluate('qa.sent=[];true')
+  await evaluate("(()=>{const f=document.querySelector('.pv-restart-form');f.elements.user.value='';f.requestSubmit();return true})()")
+  assert.deepEqual(await evaluate("qa.sent.filter(m=>m.t!=='viewport')"),[{t:'restart'}],'empty fields: plain restart')
+  await receive({t:'restarting'})
+  assert.equal(await visible('.pv-restart'),false)
+  assert.match(await evaluate("document.querySelector('.pv-toast span').textContent"),/startet neu/)
+  // not offered without the agent
+  await receive(state({os:'macos'}))
+  await browser('click','[data-special]')
+  assert.deepEqual(await evaluate(items),macItems)
   await browser('press','Escape')
+  // desk hints of a Mac
+  await receive(state({os:'macos',desk:'login'}))
+  assert.equal(await evaluate("document.querySelector('.pv-desk').textContent"),'Der Mac zeigt das Anmeldefenster.')
+  await receive(state({os:'macos',desk:'locked'}))
+  assert.equal(await evaluate("document.querySelector('.pv-desk').textContent"),'Der Mac ist gesperrt.')
 
   // leaving control mode hides button and menu
   await browser('click','[data-special]')

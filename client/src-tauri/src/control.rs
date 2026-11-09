@@ -306,6 +306,38 @@ fn app_switch_dropped(window: bool, modified: bool, key: &str) -> bool {
     window && modified && matches!(key, "Tab" | "Escape" | " ")
 }
 
+/// Ctrl+Cmd+Q did not lock (no keyboard attached, shortcut changed …): login.framework.
+fn mac_lock_fallback() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        for _ in 0..6 {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if crate::lock::locked() {
+                return Ok(());
+            }
+        }
+        type Lock = unsafe extern "C" fn() -> i32;
+        unsafe {
+            let lib = libc::dlopen(c"/System/Library/PrivateFrameworks/login.framework/Versions/Current/login".as_ptr(), libc::RTLD_LAZY);
+            if !lib.is_null() {
+                let f = libc::dlsym(lib, c"SACLockScreenImmediate".as_ptr());
+                if !f.is_null() {
+                    let lock: Lock = std::mem::transmute(f);
+                    lock();
+                }
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if crate::lock::locked() {
+            Ok(())
+        } else {
+            Err("Der Mac ließ sich nicht sperren.".into())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("Sperren geht hier nicht.".into())
+}
+
 fn special_key(k: crate::unattended::special::K) -> Key {
     use crate::unattended::special::K;
     match k {
@@ -356,6 +388,19 @@ impl Controller {
                 }
                 #[cfg(not(target_os = "windows"))]
                 Err("Sperren geht hier nicht.".into())
+            }
+            Action::MacLock => {
+                self.injected();
+                if let Some(e) = self.enigo() {
+                    for k in [Key::Control, Key::Meta] {
+                        let _ = e.key(k, Direction::Press);
+                    }
+                    let _ = e.key(Key::Unicode('q'), Direction::Click);
+                    for k in [Key::Meta, Key::Control] {
+                        let _ = e.key(k, Direction::Release);
+                    }
+                }
+                mac_lock_fallback()
             }
             Action::Keys(keys) => {
                 self.injected();

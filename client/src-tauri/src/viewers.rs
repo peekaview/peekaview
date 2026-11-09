@@ -35,6 +35,10 @@ impl Recent {
 static RECENT: Mutex<Option<Vec<Recent>>> = Mutex::new(None);
 
 fn file(app: &AppHandle) -> Option<PathBuf> {
+    // the service's helper / agent keeps nothing in the app data of the user it runs as
+    if crate::unattended::helper() {
+        return None;
+    }
     let dir = app.path().app_data_dir().ok()?;
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir.join("recent.json"))

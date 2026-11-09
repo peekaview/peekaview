@@ -595,6 +595,22 @@ impl Hub {
                     }
                 });
             }
+            // the macOS service's agent: restart the Mac (FileVault: name and password for an
+            // authenticated restart – handed to the daemon, never stored or logged)
+            "restart" if mode == Mode::Control && self.shared.remote.is_some() && crate::unattended::restart_available() => {
+                let text = |k: &str, max: usize| v[k].as_str().map(|s| s.chars().take(max).collect::<String>()).filter(|s| !s.is_empty());
+                let (user, password) = (text("user", 64), text("password", 1024));
+                let who = self.viewers.lock().unwrap().get(&id).map(|v| crate::unattended::log::viewer(&v.name, &v.peer)).unwrap_or_default();
+                let link = self.shared.remote.as_ref().map(|r| r.name.clone()).unwrap_or_default();
+                let shared = self.shared.clone();
+                std::thread::spawn(move || {
+                    crate::unattended::log::event(&link, &who, if password.is_some() { "Neustart angefordert (mit FileVault-Passwort)" } else { "Neustart angefordert" });
+                    match crate::unattended::restart(user, password) {
+                        Ok(()) => shared.send(json!({ "t": "restarting", "to": id })),
+                        Err(e) => shared.send(json!({ "t": "restart-error", "to": id, "error": e })),
+                    }
+                });
+            }
             // remote access: the viewer unlocks the presenter's lock screen with the password
             "unlock" if mode == Mode::Control && self.shared.remote.is_some() => {
                 let (password, shared) = (v["password"].as_str().unwrap_or("").to_string(), self.shared.clone());

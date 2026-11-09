@@ -24,7 +24,7 @@ use super::{
 use super::StreamCtl;
 use crate::guard::Rect;
 
-struct EncState {
+pub(super) struct EncState {
     encoder: Option<VtEncoder>,
     /// last captured frame, re-encoded as keyframe when a viewer joins while nothing moves
     last: Option<RetainedBuffer>,
@@ -39,6 +39,17 @@ struct EncState {
 }
 
 impl EncState {
+    /// A captured frame (a CVPixelBuffer): the same picture again (equal fingerprint) is not encoded.
+    pub(super) fn frame(&mut self, pb: *const c_void) {
+        let fingerprint = unsafe { VtEncoder::fingerprint(pb) };
+        let unchanged = fingerprint.is_some() && fingerprint == self.fingerprint && self.last.is_some();
+        self.fingerprint = fingerprint;
+        self.last = Some(unsafe { RetainedBuffer::new(pb) });
+        if !unchanged {
+            self.encode(pb, false);
+        }
+    }
+
     fn encode(&mut self, pb: *const c_void, mut key: bool) {
         let (w, h) = unsafe { VtEncoder::buffer_size(pb) };
         if self.encoder.as_ref().is_none_or(|e| (e.width, e.height) != (w, h)) {
@@ -97,23 +108,34 @@ impl SCStreamOutputTrait for Handler {
         }
         // Capturing a window's area delivers every frame as "complete", also when nothing
         // changed: the same picture again (equal fingerprint) is not encoded
-        let fingerprint = unsafe { VtEncoder::fingerprint(pb) };
-        let mut state = self.0.lock().unwrap();
-        let unchanged = fingerprint.is_some() && fingerprint == state.fingerprint && state.last.is_some();
-        state.fingerprint = fingerprint;
-        state.last = Some(unsafe { RetainedBuffer::new(pb) });
-        if !unchanged {
-            state.encode(pb, false);
-        }
+        self.0.lock().unwrap().frame(pb);
     }
 }
 
 /// a static picture is repeated this often
 const HEARTBEAT: Duration = Duration::from_secs(1);
 
+/// ScreenCaptureKit, or CGDisplayStream for a whole display where ScreenCaptureKit delivers
+/// nothing (the service's agent at the login window).
+enum Backend {
+    Sck(SCStream),
+    // kept alive: the stream stops when dropped
+    Cg(#[allow(dead_code)] super::cgstream::CgStream),
+}
+
+/// Waiting this long for ScreenCaptureKit's first frame before the agent tries CGDisplayStream.
+const FIRST_FRAME: Duration = Duration::from_secs(3);
+
+fn cgstream_wanted() -> bool {
+    std::env::var("PEEKAVIEW_CGSTREAM").is_ok_and(|v| v == "1")
+}
+
 pub struct Video {
-    stream: SCStream,
+    backend: Backend,
     state: Arc<Mutex<EncState>>,
+    /// a whole display (for switching to CGDisplayStream) and when the capture started
+    display: Option<u32>,
+    started: Instant,
     size: (u32, u32),
     /// a shared window: its app (filter) and the display the area is cut from
     window: Option<WindowArea>,
@@ -193,8 +215,39 @@ fn config(size: (u32, u32), crop: Option<Rect>) -> Result<SCStreamConfiguration,
 impl Video {
     pub fn start(source: Source, rect: Rect, shared: Arc<StreamCtl>, frames: mpsc::Sender<Vec<u8>>) -> Result<Self, String> {
         let err = |e: SCError| format!("Bildschirmaufnahme nicht möglich ({e}). Bitte Bildschirmaufnahme in den Systemeinstellungen erlauben.");
-        let content = SCShareableContent::get().map_err(err)?;
         let mut area: Option<WindowArea> = None;
+        let display_id = match &source {
+            Source::Screen(m) => Some(m.id().map_err(|e| e.to_string())?),
+            Source::Window(_) => None,
+        };
+        let scale = scale_at(rect);
+        let size = super::fit_width(output_size(rect.w as f64 * scale, rect.h as f64 * scale), shared.want_w.load(Ordering::Relaxed));
+        let state = Arc::new(Mutex::new(EncState {
+            encoder: None,
+            last: None,
+            last_key: Instant::now() - KEY_GAP,
+            last_frame: Instant::now(),
+            frames,
+            shared: shared.clone(),
+            submitted: Arc::default(),
+            fingerprint: None,
+        }));
+        if let (Some(id), true) = (display_id, cgstream_wanted()) {
+            let cg = super::cgstream::CgStream::start(id, size, state.clone())?;
+            return Ok(Video { backend: Backend::Cg(cg), state, display: display_id, started: Instant::now(), size, window: None });
+        }
+        let content = match SCShareableContent::get() {
+            Ok(c) => c,
+            // the agent at the login window: ScreenCaptureKit may not work there at all
+            Err(e) => match display_id.filter(|_| crate::unattended::helper()) {
+                Some(id) => {
+                    crate::log(&format!("capture: ScreenCaptureKit unavailable ({e}), CGDisplayStream"));
+                    let cg = super::cgstream::CgStream::start(id, size, state.clone())?;
+                    return Ok(Video { backend: Backend::Cg(cg), state, display: display_id, started: Instant::now(), size, window: None });
+                }
+                None => return Err(err(e)),
+            },
+        };
         let filter = match &source {
             Source::Screen(m) => {
                 let id = m.id().map_err(|e| e.to_string())?;
@@ -222,22 +275,10 @@ impl Video {
         }
         .map_err(err)?;
 
-        let scale = scale_at(rect);
-        let size = super::fit_width(output_size(rect.w as f64 * scale, rect.h as f64 * scale), shared.want_w.load(Ordering::Relaxed));
-        let state = Arc::new(Mutex::new(EncState {
-            encoder: None,
-            last: None,
-            last_key: Instant::now() - KEY_GAP,
-            last_frame: Instant::now(),
-            frames,
-            shared: shared.clone(),
-            submitted: Arc::default(),
-            fingerprint: None,
-        }));
         let mut stream = SCStream::new(&filter, &config(size, area.as_ref().map(|a| a.crop))?).map_err(err)?;
         stream.add_output_handler(Handler(state.clone()), SCStreamOutputType::Screen).map_err(err)?;
         stream.start_capture().map_err(err)?;
-        Ok(Video { stream, state, size, window: area })
+        Ok(Video { backend: Backend::Sck(stream), state, display: display_id, started: Instant::now(), size, window: area })
     }
 
     /// The shared area moved or was resized.
@@ -249,12 +290,29 @@ impl Video {
         // never more pixels than the viewers display
         let want_w = self.state.lock().unwrap().shared.want_w.load(Ordering::Relaxed);
         let size = super::fit_width(output_size(rect.w as f64 * scale, rect.h as f64 * scale), want_w);
+        let stream = match &self.backend {
+            Backend::Sck(stream) => stream,
+            Backend::Cg(_) => {
+                // CGDisplayStream has a fixed size: start it afresh
+                if size != self.size {
+                    if let Some(id) = self.display {
+                        // the old stream must stop before the new one feeds the same encoder state
+                        self.backend = Backend::Cg(match super::cgstream::CgStream::start(id, size, self.state.clone()) {
+                            Ok(cg) => cg,
+                            Err(e) => return crate::log(&format!("capture: {e}")),
+                        });
+                        self.size = size;
+                    }
+                }
+                return;
+            }
+        };
         // a shared window: follow it on its display (and to another display)
         let mut crop_now = None;
         if let Some(area) = self.window.as_mut() {
             if !area.display.contains(rect.x + rect.w / 2, rect.y + rect.h / 2) {
                 if let Ok((filter, display)) = window_filter(area.id, rect, &area.excepted) {
-                    if self.stream.update_content_filter(&filter).is_ok() {
+                    if stream.update_content_filter(&filter).is_ok() {
                         area.display = display;
                     }
                 }
@@ -267,7 +325,7 @@ impl Video {
         }
         if size != self.size || crop_now.is_some() {
             if let Ok(cfg) = config(size, self.window.as_ref().map(|a| a.crop)) {
-                if self.stream.update_configuration(&cfg).is_ok() {
+                if stream.update_configuration(&cfg).is_ok() {
                     self.size = size;
                 }
             }
@@ -277,14 +335,28 @@ impl Video {
     /// Called periodically: answers keyframe requests while the picture is static, and keeps
     /// newly opened windows of the app out of the picture.
     pub fn tick(&mut self) {
+        // the agent: ScreenCaptureKit started, but delivers nothing (login window) – CGDisplayStream
+        if let (Backend::Sck(_), Some(id)) = (&self.backend, self.display) {
+            if crate::unattended::helper() && self.started.elapsed() > FIRST_FRAME && self.state.lock().unwrap().last.is_none() {
+                crate::log("capture: no frames from ScreenCaptureKit, CGDisplayStream");
+                if let Backend::Sck(stream) = &self.backend {
+                    let _ = stream.stop_capture();
+                }
+                match super::cgstream::CgStream::start(id, self.size, self.state.clone()) {
+                    Ok(cg) => self.backend = Backend::Cg(cg),
+                    Err(e) => crate::log(&format!("capture: {e}")),
+                }
+                self.started = Instant::now();
+            }
+        }
         if let Some(area) = self.window.as_mut().filter(|a| a.checked.elapsed() > Duration::from_secs(2)) {
             area.checked = Instant::now();
             let excepted = crate::guard::foreign_windows_of_app(area.id);
             let toolbar = toolbar_known();
             if excepted != area.excepted || toolbar != area.toolbar {
                 let rect = Rect { x: area.display.x + area.crop.x, y: area.display.y + area.crop.y, w: area.crop.w, h: area.crop.h };
-                if let Ok((filter, _)) = window_filter(area.id, rect, &excepted) {
-                    if self.stream.update_content_filter(&filter).is_ok() {
+                if let (Ok((filter, _)), Backend::Sck(stream)) = (window_filter(area.id, rect, &excepted), &self.backend) {
+                    if stream.update_content_filter(&filter).is_ok() {
                         area.excepted = excepted;
                         area.toolbar = toolbar;
                     }
@@ -314,6 +386,8 @@ impl Video {
 
 impl Drop for Video {
     fn drop(&mut self) {
-        let _ = self.stream.stop_capture();
+        if let Backend::Sck(stream) = &self.backend {
+            let _ = stream.stop_capture();
+        }
     }
 }
