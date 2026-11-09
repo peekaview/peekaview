@@ -173,6 +173,16 @@
             <span class="text"><b>Gesamter Desktop</b><small>Zuschauer können auch den ganzen Bildschirm teilen lassen.</small></span>
             <input type="checkbox" class="switch" data-desktop>
           </label>
+        </div>
+        <div class="room-unattended" hidden>
+          <label class="set-row">
+            <span class="text"><b>Auch ohne Anmeldung (Windows-Dienst)</b><small>Hält den Link auch am Anmeldebildschirm, nach einem Neustart und bei Administrator-Abfragen erreichbar. Zum Einschalten fragt Windows nach Administratorrechten.</small><small class="unattended-hint" hidden>Braucht Fernzugriff und eine PIN.</small></span>
+            <input type="checkbox" class="switch" data-unattended>
+          </label>
+          <div class="set-row unattended-service" hidden>
+            <span class="text"><small class="unattended-state"></small></span>
+            <button class="pill secondary" data-service-update hidden>Dienst aktualisieren</button>
+          </div>
         </div>`
       const q = (s) => el.querySelector(s)
       q('.room-name').value = room.name
@@ -212,6 +222,41 @@
       remote.addEventListener('change', () => save(room, { remote: remote.checked }))
       q('[data-desktop]').checked = room.desktop
       q('[data-desktop]').addEventListener('change', (e) => save(room, { desktop: e.target.checked }))
+      // Windows: a service keeps the link reachable at the sign-in screen and at UAC prompts
+      const service = unattended
+      q('.room-unattended').hidden = !service?.available
+      if (service?.available) {
+        const box = q('[data-unattended]')
+        const possible = !!(room.remote && room.pin)
+        box.checked = !!room.unattended
+        // (switching it off stays possible when PIN or remote access went away meanwhile)
+        box.disabled = !possible && !room.unattended
+        q('.unattended-hint').hidden = possible
+        const toggle = (on, button) => {
+          box.disabled = true
+          if (button) button.disabled = true
+          return invoke('unattended_set', { id: room.id, on })
+            .then(() => toast(on ? 'Windows-Dienst eingeschaltet' : 'Windows-Dienst ausgeschaltet'))
+            .catch((e) => {
+              box.checked = !!room.unattended
+              fail(e)
+            })
+            .finally(() => {
+              box.disabled = !possible && !room.unattended
+              if (button) button.disabled = false
+              refreshUnattended()
+            })
+        }
+        box.addEventListener('change', () => toggle(box.checked))
+        const installedService = !!service.installed
+        q('.unattended-service').hidden = !installedService
+        if (installedService) {
+          q('.unattended-state').textContent = service.running ? 'Windows-Dienst läuft' : 'Windows-Dienst ist installiert, läuft aber nicht'
+          const update = q('[data-service-update]')
+          update.hidden = !service.outdated
+          update.addEventListener('click', () => toggle(true, update))
+        }
+      }
       const add = document.createElement('button')
       add.className = 'app-chip add'
       add.innerHTML = `${icon('window', 13)}Anwendung hinzufügen`
@@ -269,8 +314,19 @@
       if (pickingFor) pickingFor = rooms.find((r) => r.id === pickingFor.id) ?? null
       render()
     })
+    // {available, installed, running, version, outdated} – available only on Windows
+    let unattended = null
+    async function refreshUnattended() {
+      try {
+        unattended = (await invoke('unattended_status')) ?? null
+      } catch {
+        unattended = null
+      }
+      render()
+    }
     rooms = await invoke('rooms_list')
     render()
+    refreshUnattended()
 
     // ------------------------------------------------------------ pages
     function selectPage(tab) {

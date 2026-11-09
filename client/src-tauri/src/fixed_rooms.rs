@@ -180,6 +180,7 @@ fn remote_room(policy: Access, id: &str, name: &str) -> crate::rooms::Room {
         apps: policy.apps,
         desktop: false,
         screens: policy.screens,
+        unattended: false,
     }
 }
 pub fn remote_for_resume(

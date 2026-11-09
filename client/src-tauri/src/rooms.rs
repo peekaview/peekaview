@@ -90,6 +90,9 @@ pub struct Room {
     pub desktop: bool,
     #[serde(default)]
     pub screens: Vec<Screen>,
+    /// Windows: the PeekaView service keeps the link reachable without sign-in (needs a PIN)
+    #[serde(default)]
+    pub unattended: bool,
 }
 
 impl Room {
@@ -104,6 +107,7 @@ impl Room {
         json!({
             "id": self.id, "name": self.name, "link": format!("{}/#{}", crate::settings::VIEWER_SITE, self.fragment()),
             "pin": self.pin.is_some(), "remote": self.remote, "apps": self.apps, "desktop": self.desktop,
+            "unattended": self.unattended,
         })
     }
 
@@ -127,6 +131,10 @@ fn file(app: &AppHandle) -> Option<PathBuf> {
 }
 
 pub fn all(app: &AppHandle) -> Vec<Room> {
+    // the SYSTEM helper serves only the links handed over to the service
+    if crate::unattended::helper() {
+        return crate::unattended::store::get().rooms;
+    }
     let mut rooms = ROOMS.lock().unwrap();
     if rooms.is_none() {
         *rooms = Some(file(app).and_then(|f| std::fs::read(f).ok()).and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default());
@@ -144,6 +152,9 @@ pub fn by_secret(app: &AppHandle, secret: &str) -> Option<Room> {
 }
 
 fn store(app: &AppHandle, rooms: Vec<Room>) -> Result<(), String> {
+    if crate::unattended::helper() {
+        return Err("Der Dienst ändert keine Links.".into());
+    }
     if let Some(f) = file(app) {
         std::fs::write(f, serde_json::to_vec_pretty(&rooms).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     }
@@ -162,6 +173,7 @@ fn new_room(name: &str) -> Room {
         apps: vec![],
         desktop: false,
         screens: vec![],
+        unattended: false,
     }
 }
 
@@ -210,6 +222,17 @@ pub fn set_pin(app: &AppHandle, id: &str, pin: Option<&str>) -> Result<(), Strin
         Some(p) => Some(Pin::new(p)),
         None => None,
     };
+    if room.pin.is_none() {
+        room.unattended = false;
+    }
+    store(app, rooms)
+}
+
+/// "Auch ohne Anmeldung" (the service is set up separately, see `unattended`).
+pub fn set_unattended(app: &AppHandle, id: &str, on: bool) -> Result<(), String> {
+    let mut rooms = all(app);
+    let room = rooms.iter_mut().find(|r| r.id == id).ok_or("Raum nicht gefunden")?;
+    room.unattended = on;
     store(app, rooms)
 }
 
@@ -276,6 +299,10 @@ pub fn installed() -> Vec<Value> {
 
 /// Starts an application (or brings it to the front if it runs already).
 pub fn launch(path: &str) -> Result<(), String> {
+    // the helper runs as SYSTEM: an application started from there would run as SYSTEM too
+    if crate::unattended::helper() {
+        return Err("Ohne Anmeldung lassen sich keine Anwendungen starten.".into());
+    }
     let p = Path::new(path);
     if !p.exists() {
         return Err("Anwendung nicht gefunden".into());

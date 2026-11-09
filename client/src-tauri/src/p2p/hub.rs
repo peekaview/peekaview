@@ -486,6 +486,7 @@ impl Hub {
         if let Some(v) = self.viewers.lock().unwrap().get_mut(&id) {
             v.connected_at = Some(Instant::now());
             self.failed.lock().unwrap().remove(&v.peer);
+            self.access_log(&v.name, &v.peer, "verbunden");
         }
         let senders: Vec<_> = self.viewers.lock().unwrap().get(&id).map(|v| v.tracks.iter().map(|t| t.sender.clone()).collect()).unwrap_or_default();
         for (slot, sender) in senders.into_iter().enumerate() {
@@ -501,6 +502,7 @@ impl Hub {
 
     pub async fn remove(&self, id: u32) {
         let Some(viewer) = self.viewers.lock().unwrap().remove(&id) else { return };
+        self.access_log(&viewer.name, &viewer.peer, "getrennt");
         let _ = self.ctrl.send(Cmd::Input(json!({ "t": "left", "id": id })));
         self.broadcast(&json!({ "t": "left", "id": id }), None).await;
         session::route_local(&self.app, &self.shared, &self.ctrl, &json!({ "t": "left", "id": id }));
@@ -670,7 +672,7 @@ impl Hub {
                 self.broadcast(&v, Some(id)).await;
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
-            "mouse" | "wheel" | "key" | "text" if mode == Mode::Control => {
+            "mouse" | "wheel" | "key" | "text" | "special" if mode == Mode::Control => {
                 session::route_local(&self.app, &self.shared, &self.ctrl, &v);
             }
             _ => {}
@@ -920,7 +922,20 @@ impl Hub {
 
     /// The viewer's file channel: uploads arrive as `{t:'put', …}` followed by binary chunks;
     /// `{t:'get', id, req}` asks for an item, served in order by [`serve`](Self::serve).
+    /// The access log of the service's helper (who came in through which link).
+    fn access_log(&self, name: &str, peer: &str, event: &str) {
+        if crate::unattended::helper() {
+            let link = self.shared.remote.as_ref().map(|r| r.name.as_str()).unwrap_or("");
+            crate::unattended::log::event(link, &crate::unattended::log::viewer(name, peer), event);
+        }
+    }
+
     async fn files(self: Arc<Self>, id: u32, dc: Arc<dyn DataChannel>) {
+        // the SYSTEM helper takes no files from the network
+        if crate::unattended::helper() {
+            let _ = dc.close().await;
+            return;
+        }
         let (get_tx, get_rx) = mpsc::unbounded_channel::<Value>();
         tauri::async_runtime::spawn(self.clone().serve(dc.clone(), get_rx));
         // current upload: item id, hidden (a transfer for remote paste)

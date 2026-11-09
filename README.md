@@ -117,7 +117,7 @@ Cursors and strokes appear for every viewer. They also appear on the presenter's
 - PeekaView's own windows are left out of the picture and take no viewer input – except the share's toolbar: it is in the picture, and with "Steuern" viewers may use it. Viewers see it tinted and framed red, named "PeekaView der teilenden Person", so nobody takes it for their own.
   - Drags are clamped to the window.
   - Keystrokes go through only while it has the focus. A viewer's click into the window gives it the focus.
-  - Shortcuts that switch apps are dropped.
+  - App-switching shortcuts go through (see "Special keys and the keyboard in fullscreen").
   - A dropped click or keystroke tells the viewer why.
   - Viewers see a "Steuerung pausiert" hint while the window is covered completely.
 - **macOS limitation:** macOS blocks synthetic keystrokes while any password field is focused ("Secure Input").
@@ -165,6 +165,41 @@ PeekaView keeps running in the tray / menu bar. Ending a share or closing the to
   - Starting one launches it on this computer, or brings it forward if it runs already, and shares its window. The session ends a minute after the last viewer left.
 
 Sharing from the picker can also go into a permanent link ("Fester Link: …").
+
+## Access without sign-in (Windows)
+
+Normally PeekaView runs as an app of the signed-in user, so the sign-in screen, the lock screen, UAC prompts and Strg+Alt+Entf are out of reach. A permanent link with **Fernzugriff** and a **PIN** can additionally get **Auch ohne Anmeldung (Windows-Dienst)** in the link settings. Then the link stays reachable after a restart, at the sign-in screen and while the computer is locked.
+
+- **Setting it up:** switching it on asks for administrator rights (UAC). The elevated step copies `peekaview.exe` to `%ProgramFiles%\PeekaView\Dienst\`, where users cannot replace it, and sets up the service **PeekaView Fernzugriff** (LocalSystem, automatic start, restarts after failures). It also sets the policy `SoftwareSASGeneration` for Strg+Alt+Entf.
+  - The links go to `%ProgramData%\PeekaView\unattended.json`, which only SYSTEM and administrators may read or write. Only links with remote access, a PIN and the switch are handed over. Applications are dropped, because they would run as SYSTEM, so the whole desktop is always shared.
+  - Changing the PIN, renewing or deleting such a link hands the links over again (UAC prompt). Switching off the last one, or uninstalling PeekaView, removes the service.
+  - The app installs per user and does not update the service. When versions differ, the link settings offer **Dienst aktualisieren**.
+- **How it runs:**
+  - The service keeps a **helper** running in the active console session: the same exe with `--helper`, as SYSTEM, started with `CreateProcessAsUser`. When the console session changes (fast user switching), the helper moves to the new session. Signing in within the same session needs no restart.
+  - The helper waits in the links like the app does (Nostr, PIN, WebRTC), but without any WebView: no toolbar, no overlays, no voice, no recording, no shared clipboard files.
+  - It follows the **input desktop** (Default ↔ Winlogon). The capture and input threads switch with `SetThreadDesktop` before every frame and every input.
+  - **Capture:** DXGI Desktop Duplication, because Windows.Graphics.Capture does not work on the secure desktop. The frames go through the same D3D11 video processor and Media Foundation encoder. After a desktop switch, the output is duplicated again and the next frame is a keyframe.
+  - **Input:** `SendInput` as SYSTEM, so it also reaches the sign-in screen and elevated windows (no UIPI block). Strg+Alt+Entf: the helper asks the service over its named pipe, and the service calls `SendSAS`. Sperren calls `LockWorkStation`.
+  - While the app's own link and the service's link are the same, only the service waits in it.
+- **On site:** while somebody is connected, a red bar at the top of the screen says "Fernzugriff aktiv: <Namen>", with **Trennen**. It shows on the sign-in screen and UAC prompts too.
+- **Log:** `%ProgramData%\PeekaView\Fernzugriff.log` records service start and stop, PIN right or wrong, connected and disconnected (name and start of the viewer's key), special keys, and disconnects on site. It never records keystrokes, PINs or passwords.
+- **Security:**
+  - The pipe `\\.\pipe\peekaview-service` admits only SYSTEM, administrators and interactive users, and refuses remote clients. Messages are length-prefixed JSON of at most 64 KB, parsed strictly (unknown types and fields are rejected). Strg+Alt+Entf is only done for SYSTEM clients.
+  - What viewers send reaches a SYSTEM process: only known message types are accepted, special keys come from a fixed list, numbers are clamped as before, no applications are started, and no files are taken.
+- macOS (privileged helper for the login window; FileVault after a restart) follows in a later milestone.
+
+## Special keys and the keyboard in fullscreen
+
+With **Steuern**, the viewer's toolbar has a **Sondertasten** menu:
+- **Windows host:** Strg+Alt+Entf, Windows-Taste, Alt+Tab, Alt+F4, Strg+Umschalt+Esc, Sperren. Strg+Alt+Entf only works through the service ("Auch ohne Anmeldung"); otherwise the viewer gets a message.
+- **Mac host:** Cmd+Tab, Cmd+Leertaste.
+- They only work while a whole screen is shared. A shared window refuses them, because they would leave the window.
+
+In fullscreen with Steuern, the viewer asks for the **Keyboard Lock** (`navigator.keyboard.lock()`, Chromium browsers). The Windows key, Alt+Tab and Esc then go to the host instead of the viewer's own computer; holding Esc leaves fullscreen. On a viewer running Windows or Linux, the Windows key on its own opens the host's start menu, and held with another key it is sent along (e.g. Win+E).
+
+While a whole screen is shared, app-switching shortcuts (Alt+Tab, Cmd+Tab, Cmd+Space, Ctrl+Esc) go through. With a shared window they are still dropped.
+
+The viewer shows a small hint when the host's console shows the sign-in screen, is locked, or shows a UAC prompt. The picture stays usable.
 
 ## Shared clipboard
 
@@ -399,6 +434,7 @@ peekaview://share?room=<secret>&name=Anna&color=%23ef4444&ice=<json>&relays=<jso
 ## Not done yet / next steps
 
 - Windows: test on real hardware (Intel, NVIDIA, AMD; DPI scaling; input guard).
+- Access without sign-in (Windows): run on real hardware – the service, the helper, Desktop Duplication, `SendSAS` and the bar on site have only been compiled so far. Known gaps: the mouse pointer is not part of the DXGI picture; computers with two GPUs may need the device created on the adapter of the output; RDP sessions are not followed; after a session switch, viewers enter the PIN again; links of contacts (room service) are not served yet.
 - Linux: Wayland portals (ScreenCast, RemoteDesktop) and VA-API.
 - Popup menus of a shared *window* are separate OS windows. Viewers don't see them, and clicks on them are refused.
 - Code signing / notarization, auto-update.
