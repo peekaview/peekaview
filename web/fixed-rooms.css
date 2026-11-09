@@ -100,6 +100,13 @@
 .pv-footer a { padding: 6px 2px; color: #a1a1aa; text-decoration: none; }
 .pv-footer a:hover, .pv-footer a[aria-current="page"] { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
 .pv-footer-owner { padding: 6px 2px; color: #71717a; }
+/* the website's language (i18n.js) */
+.pv-footer .pv-lang { padding: 6px 2px; border: 0; background: none; color: #a1a1aa; font: inherit; cursor: pointer; }
+.pv-footer .pv-lang:hover { color: #fafafa; text-decoration: underline; text-underline-offset: 3px; }
+.pv-lang-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; background: rgba(24,24,27,.8); color: #d4d4d8; font: 650 12px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .03em; cursor: pointer; }
+.pv-lang-toggle:hover { border-color: rgba(255,255,255,.3); color: #fafafa; }
+.pv-lang-toggle:focus-visible { outline: 2px solid #fafafa; outline-offset: 2px; }
+.pv-lang-toggle svg { flex: none; }
 .fr-device-choice a { color: #fafafa; font-weight: 600; text-underline-offset: 3px; }
 .fr-or { text-align: center; }
 .fixed-rooms .fr-push { align-self: flex-start; }

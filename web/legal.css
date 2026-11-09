@@ -1,6 +1,8 @@
 /* Impressum, Datenschutz, Sicherheit: as pages of their own (body.legal-page) and inside the
    footer's dialog on the other pages (legal.js) – the text itself is styled by .pv-legal. */
 body.legal-page { margin: 0; background: #09090b; color: #fafafa; -webkit-font-smoothing: antialiased; }
+/* the language switch top right of a page of its own (i18n.js) */
+body.legal-page .pv-page-top { position: absolute; top: 18px; right: 16px; }
 body.legal-page main { box-sizing: border-box; width: min(720px, calc(100% - 32px)); margin: 6vh auto 0; }
 .pv-legal { color: #fafafa; font: 500 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .pv-legal .back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 26px; color: #fafafa; font-size: 15px; font-weight: 650; text-decoration: none; }

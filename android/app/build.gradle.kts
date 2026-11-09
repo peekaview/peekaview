@@ -8,6 +8,11 @@ plugins {
 
 val scrcpyVersion = "5.0.1"
 
+// Release signing: the key comes from the environment (in CI from the repository's secrets
+// ANDROID_KEYSTORE_*, see .github/workflows/build.yml) and never lives in the repository.
+// Without it, a release build stays unsigned; the debug build works as before.
+val releaseKeystore = System.getenv("PEEKAVIEW_KEYSTORE")?.takeIf { it.isNotBlank() }?.let(::file)
+
 android {
     namespace = "de.limtec.peekaview"
     compileSdk = 35
@@ -16,15 +21,28 @@ android {
         applicationId = "de.limtec.peekaview"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        // every published build must count up, or Android refuses it as an update (CI: run number)
+        versionCode = System.getenv("PEEKAVIEW_VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = "2.0.0"
         buildConfigField("String", "SCRCPY_VERSION", "\"$scrcpyVersion\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("PEEKAVIEW_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("PEEKAVIEW_KEY_ALIAS")
+                keyPassword = System.getenv("PEEKAVIEW_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

@@ -8,10 +8,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 const web = resolve(here, '../web')
 const dist = resolve(here, 'dist')
 const files = [
-  'index.html', 'viewer.js', 'windows.js', 'signal.js', 'annotate.js',
+  'index.html', 'start.js', 'download.js', 'page.js', 'fixed-rooms-page.js', 'share-page.js', 'share-helper.js', 'viewer.js', 'windows.js', 'signal.js', 'annotate.js',
   'icons.js', 'home-scene.js', 'word-code.js', 'voice.js', 'clipboard.js', 'vendor/noble-schnorr.js',
   'fixed-rooms.html', 'fixed-rooms.js', 'fixed-rooms.css', 'room-sw.js', 'download.html',
-  'impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'legal.css', 'legal.js',
+  'impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'preise.html', 'legal.css', 'legal.js', 'i18n.js',
   'room-pcm-worklet.js',
   // "Bildschirmfreigabe light": sharing from the browser
   'share.html', 'share-helper.html', 'light-host.js', 'light-geometry.js', 'light-locate.js',

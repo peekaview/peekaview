@@ -3,77 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PeekaView Desktop herunterladen</title>
+  <title data-en="Download PeekaView Desktop">PeekaView Desktop herunterladen</title>
+  <link rel="icon" type="image/png" href="room-icon.png">
   <link rel="stylesheet" href="fixed-rooms.css">
   <link rel="stylesheet" href="legal.css">
   <style>
-    body{margin:0;background:#09090b;color:#fafafa;font:500 14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-    main{max-width:460px;margin:9vh auto;padding:24px}
-    h1{font-size:24px;margin:0}
-    p{color:#a1a1aa}
-    .download{display:block;margin:24px 0 8px;padding:15px;background:#ef4444;color:white;text-align:center;text-decoration:none;font-weight:700;font-size:16px;border-radius:14px;box-shadow:0 10px 30px rgba(239,68,68,.35)}
-    .download:hover{background:#dc2626}
-    .meta{margin:0 0 20px;text-align:center;font-size:12.5px;color:#71717a}
-    .steps{padding-left:20px;color:#d4d4d8}
-    .steps li{margin:12px 0}
-    .note{padding:12px 14px;border-radius:12px;background:#18181b;border:1px solid rgba(255,255,255,.08);color:#d4d4d8}
-    .others{margin-top:28px;padding-top:18px;border-top:1px solid #27272a}
-    .others h2{margin:0 0 8px;font-size:14px;color:#a1a1aa}
-    .others a{display:block;padding:8px 0;color:#fafafa;text-underline-offset:3px}
-    [hidden]{display:none!important}
+    /* the start page's look: its header, the card with the red edge */
+    html, body { margin: 0; background: #09090b; color: #fafafa; }
+    body { display: flex; flex-direction: column; min-height: 100vh; font: 500 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    [hidden] { display: none !important; }
+    #topbar { display: flex; align-items: center; gap: 14px; box-sizing: border-box; width: min(1180px, calc(100% - 32px)); margin: 22px auto 0; }
+    #topbar .home { display: flex; align-items: center; gap: 10px; color: #fafafa; font-size: 22px; font-weight: 800; letter-spacing: -.02em; text-decoration: none; }
+    #topbar i { display: flex; }
+    #topbar .back { margin-left: auto; color: #a1a1aa; font-size: 14px; font-weight: 600; text-decoration: none; }
+    #topbar .back:hover { color: #fafafa; }
+    @media (max-width: 400px) { #topbar .back { display: none; } #topbar .pv-lang-toggle { margin-left: auto; } }
+    main { box-sizing: border-box; width: min(520px, calc(100% - 32px)); margin: 6vh auto 0; padding: 28px; border-radius: 20px; border: 1px solid rgba(239,68,68,.35); background: linear-gradient(180deg, #232327 0%, #1a1a1d 100%); box-shadow: 0 0 0 4px rgba(239,68,68,.06), 0 30px 80px rgba(0,0,0,.55), 0 0 90px rgba(239,68,68,.14); }
+    h1 { margin: 0; font-size: 24px; letter-spacing: -.015em; }
+    main > p { margin: 6px 0 0; color: #a1a1aa; font-size: 15px; }
+    .download { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 24px 0 8px; padding: 15px; border-radius: 14px; background: #ef4444; color: white; text-decoration: none; font-weight: 700; font-size: 16px; }
+    .download:hover { background: #dc2626; }
+    .download svg { width: 20px; height: 20px; }
+    .meta { margin: 0 0 18px; text-align: center; font-size: 12.5px; color: #71717a; }
+    .steps { margin: 0 0 14px; padding-left: 20px; color: #d4d4d8; }
+    .steps li { margin: 10px 0; }
+    .note { margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: #09090b; border: 1px solid rgba(255,255,255,.08); color: #d4d4d8; font-size: 13.5px; }
+    .others { margin-top: 24px; padding-top: 18px; border-top: 1px solid #27272a; }
+    .others h2 { margin: 0 0 10px; font-size: 14px; color: #a1a1aa; }
+    .others ul { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .others a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: #09090b; color: #fafafa; text-decoration: none; }
+    .others a:hover { border-color: rgba(255,255,255,.2); }
+    .others svg { flex: none; width: 20px; height: 20px; color: #ef4444; }
+    .others b { display: block; font-weight: 650; }
+    .others small { display: block; color: #a1a1aa; font-size: 12px; }
+    .others p { margin: 12px 0 0; color: #71717a; font-size: 12.5px; }
+    .pv-footer { margin-top: auto; padding-top: 36px; }
   </style>
 </head>
-<body><main>
-  <h1>PeekaView Desktop</h1>
-  <p>Bildschirme und Anwendungen teilen – kostenlos.</p>
+<body>
+<header id="topbar"><a class="home" href="./"><i id="top-logo"></i>PeekaView</a><a class="back" href="./" data-en="← Back to the start page">← Zur Startseite</a></header>
+<main>
+  <h1 id="download-title">PeekaView Desktop</h1>
+  <p data-en="Share screens and windows, get remote help and talk to each other – free of charge.">Bildschirme und Fenster teilen, fernsteuern lassen und miteinander sprechen – kostenlos.</p>
 
   <!-- the download for this computer comes first; the others stay below -->
   <section data-system="windows" hidden>
-    <a class="download" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe">Für Windows herunterladen</a>
-    <p class="meta">Windows 10 und 11 (64 Bit)</p>
+    <a class="download" data-icon="winlogo" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe"><span data-en="Download for Windows">Für Windows herunterladen</span></a>
+    <p class="meta" data-en="Windows 10 and 11 (64-bit)">Windows 10 und 11 (64 Bit)</p>
     <ol class="steps">
-      <li>Die heruntergeladene Datei <b>PeekaView-Windows-x64-Setup.exe</b> öffnen und installieren.</li>
-      <li>Am Ende „PeekaView starten“ wählen. Später findest du es im Startmenü.</li>
+      <li data-en-html="Open the downloaded file &lt;b&gt;PeekaView-Windows-x64-Setup.exe&lt;/b&gt; and install it.">Die heruntergeladene Datei <b>PeekaView-Windows-x64-Setup.exe</b> öffnen und installieren.</li>
+      <li data-en="At the end, choose “Launch PeekaView”. Later you will find it in the Start menu.">Am Ende „PeekaView starten“ wählen. Später findest du es im Startmenü.</li>
     </ol>
-    <p class="note">Zeigt Windows „Der Computer wurde durch Windows geschützt“? Auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“ klicken.</p>
+    <p class="note" data-en="Windows says “Windows protected your PC”? Click “More info”, then “Run anyway”.">Zeigt Windows „Der Computer wurde durch Windows geschützt“? Auf „Weitere Informationen“ und dann auf „Trotzdem ausführen“ klicken.</p>
   </section>
 
   <section data-system="mac" hidden>
-    <a class="download" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip">Für Mac herunterladen</a>
-    <p class="meta">Mac mit Apple-Chip (M1 und neuer)</p>
+    <a class="download" data-icon="apple" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip"><span data-en="Download for Mac">Für Mac herunterladen</span></a>
+    <p class="meta" data-en="Mac with Apple silicon (M1 and later)">Mac mit Apple-Chip (M1 und neuer)</p>
     <ol class="steps">
-      <li>Die ZIP-Datei öffnen und PeekaView in den Ordner „Programme“ ziehen.</li>
-      <li>PeekaView einmal starten.</li>
+      <li data-en="Open the ZIP file and drag PeekaView into the Applications folder.">Die ZIP-Datei öffnen und PeekaView in den Ordner „Programme“ ziehen.</li>
+      <li data-en="Start PeekaView once.">PeekaView einmal starten.</li>
     </ol>
   </section>
 
-  <section data-system="phone" hidden>
-    <p class="note">Zum Zuschauen brauchst du auf dem Handy nichts zu installieren – öffne einfach den Link, den du bekommen hast. PeekaView Desktop gibt es für Windows und Mac.</p>
+  <section data-system="android" hidden>
+    <a class="download" data-icon="android" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Android.apk"><span data-en="Download the Android app">Android-App herunterladen</span></a>
+    <p class="meta" data-en="Android 8 and later · watch and share the phone's screen">Android 8 und neuer · zuschauen und den Bildschirm des Handys teilen</p>
+    <ol class="steps">
+      <li data-en-html="Open the downloaded file &lt;b&gt;PeekaView-Android.apk&lt;/b&gt;.">Die heruntergeladene Datei <b>PeekaView-Android.apk</b> öffnen.</li>
+      <li data-en="If Android asks, allow installing apps from this source (browser or file manager), then tap “Install”.">Falls Android fragt: Installation aus dieser Quelle (Browser oder Dateimanager) erlauben, dann „Installieren“ tippen.</li>
+    </ol>
+    <p class="note" data-en="To just watch you need not install anything – opening the link you were sent in the browser is enough.">Nur zum Zuschauen brauchst du nichts zu installieren – den Link, den du bekommen hast, einfach im Browser öffnen.</p>
   </section>
 
-  <p data-from-invitation class="note">Kommst du von einer Bestätigungsseite? Nach der Installation dorthin zurückkehren und „PeekaView Desktop öffnen“ wählen.</p>
+  <section data-system="phone" hidden>
+    <p class="note" data-en="To watch on an iPhone or iPad you need not install anything – just open the link you were sent. PeekaView is available for Windows, Mac and Android.">Zum Zuschauen auf iPhone oder iPad brauchst du nichts zu installieren – öffne einfach den Link, den du bekommen hast. PeekaView gibt es für Windows, Mac und Android.</p>
+  </section>
+
+  <p data-from-invitation class="note" data-en="Coming from a confirmation page? After installing, go back there and choose “Open PeekaView Desktop”.">Kommst du von einer Bestätigungsseite? Nach der Installation dorthin zurückkehren und „PeekaView Desktop öffnen“ wählen.</p>
 
   <section class="others">
     <h2 data-others-title>Andere Systeme</h2>
-    <a data-other="windows" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe">Windows 10 und 11 (64 Bit)</a>
-    <a data-other="mac" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip">Mac mit Apple-Chip (M1 und neuer)</a>
-    <p>Für Linux gibt es noch keinen Download.</p>
+    <ul>
+      <li data-other="windows"><a data-icon="winlogo" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Windows-x64-Setup.exe"><span><b>Windows</b><small data-en="Windows 10 and 11 (64-bit)">Windows 10 und 11 (64 Bit)</small></span></a></li>
+      <li data-other="mac"><a data-icon="apple" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-macOS-Apple-Silicon.zip"><span><b>macOS</b><small data-en="Mac with Apple silicon (M1 and later)">Mac mit Apple-Chip (M1 und neuer)</small></span></a></li>
+      <li data-other="android"><a data-icon="android" href="https://github.com/peekaview/peekaview/releases/download/desktop-latest/PeekaView-Android.apk"><span><b>Android</b><small data-en="Android 8 and later · watch and share the phone's screen">Android 8 und neuer · zuschauen und den Bildschirm des Handys teilen</small></span></a></li>
+    </ul>
+    <p data-en="There is no download yet for Macs with an Intel processor or for Linux.">Für Macs mit Intel-Prozessor und für Linux gibt es noch keinen Download.</p>
   </section>
 </main>
-<footer class="pv-footer"><a href="warum.html">Warum machen wir das?</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="sicherheit.html">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
-<script>
-  // which download fits this computer (phones and tablets get no desktop app)
-  const ua = navigator.userAgent
-  const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''
-  const system = /Android|iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1)
-    ? 'phone'
-    : /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows' : /Mac/i.test(platform) || /Mac OS X/i.test(ua) ? 'mac' : 'other'
-  const own = document.querySelector(`[data-system="${system}"]`)
-  if (own) own.hidden = false
-  for (const link of document.querySelectorAll('[data-other]')) link.hidden = link.dataset.other === system
-  document.querySelector('[data-others-title]').textContent = system === 'other' || system === 'phone' ? 'PeekaView Desktop herunterladen' : 'Andere Systeme'
-  document.querySelector('[data-from-invitation]').hidden = system === 'phone'
-</script>
-<script type="module" src="legal.js"></script>
+<footer class="pv-footer"><a href="preise" data-en="Pricing">Preise</a><a href="warum" data-en="About PeekaView">Über PeekaView</a><a href="impressum">Impressum</a><a href="datenschutz" data-en="Privacy">Datenschutz</a><a href="sicherheit" data-en="Security">Sicherheit</a><span class="pv-footer-owner">© 2026 in42 GmbH</span></footer>
+<script type="module" src="download.js"></script>
 </body>
 </html>

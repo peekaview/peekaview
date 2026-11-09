@@ -1,8 +1,8 @@
 name: build
 
 # desktop client (Windows, macOS) and Android app; the installers / APK are workflow artifacts.
-# Every master build also publishes the Windows installer and the notarized Mac app to the
-# release "desktop-latest" under fixed names – the download page links there.
+# Every master build also publishes the Windows installer, the notarized Mac app and the signed
+# Android APK to the release "desktop-latest" under fixed names – the download page links there.
 on:
   push:
     branches: [master]
@@ -207,9 +207,25 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      # no release signing key yet: the debug build is the installable one
       - name: Build APK
         run: ./gradlew --no-daemon assembleDebug
+
+      # master only: the release APK, signed with the key from the repository's secrets (the same
+      # key every time, so installed apps take it as an update), published as PeekaView-Android.apk
+      - name: Build signed release APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PEEKAVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PEEKAVIEW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PEEKAVIEW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export PEEKAVIEW_KEYSTORE="$RUNNER_TEMP/peekaview-release.jks"
+          trap 'rm -f "$PEEKAVIEW_KEYSTORE"' EXIT
+          printf %s "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$PEEKAVIEW_KEYSTORE"
+          PEEKAVIEW_VERSION_CODE="$GITHUB_RUN_NUMBER" ./gradlew --no-daemon assembleRelease
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk | grep -i 'SHA-256 digest'
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -224,10 +240,17 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        with:
+          name: peekaview-android-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
   # the download page links to these fixed names in the release "desktop-latest"
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [windows, macos]
+    needs: [windows, macos, android]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -245,7 +268,8 @@ jobs:
           mkdir -p upload
           cp artifacts/PeekaView-Windows-x64-Setup.exe upload/
           cp artifacts/PeekaView-macos-arm64.zip upload/PeekaView-macOS-Apple-Silicon.zip
-          notes="Aktuelle Version von PeekaView Desktop (Stand ${GITHUB_SHA::7}). Wird bei jeder Änderung neu gebaut. Download: https://peekaview.de/download.html"
+          cp artifacts/app-release.apk upload/PeekaView-Android.apk
+          notes="Aktuelle Version von PeekaView Desktop und der Android-App (Stand ${GITHUB_SHA::7}). Wird bei jeder Änderung neu gebaut. Download: https://peekaview.de/download"
           if gh release view desktop-latest --repo "$REPO" >/dev/null 2>&1; then
             gh api -X PATCH "repos/$REPO/git/refs/tags/desktop-latest" -f sha="$GITHUB_SHA" -F force=true >/dev/null
             gh release edit desktop-latest --repo "$REPO" --notes "$notes" --latest=false
