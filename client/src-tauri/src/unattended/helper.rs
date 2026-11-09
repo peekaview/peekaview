@@ -14,7 +14,12 @@ use super::{log, store};
 
 pub fn start(app: &AppHandle) {
     let links = store::get();
-    crate::log(&format!("helper: {} links", links.rooms.len()));
+    crate::log(&format!(
+        "helper: {} links, screen recording: {}, accessibility: {}",
+        links.rooms.len(),
+        crate::permissions::granted("screen"),
+        crate::permissions::granted("accessibility")
+    ));
     apply_settings(app, &links);
     crate::p2p::lobby::sync(app, false);
     let app = app.clone();

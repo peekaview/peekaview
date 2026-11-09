@@ -136,6 +136,7 @@ mod tests {
         assert!(!p.signed_like_us(), "nc must not pass as PeekaView");
         assert_eq!(p.path().unwrap(), std::path::PathBuf::from("/usr/bin/nc"));
         let _ = child.kill();
+        let _ = child.wait();
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -37,7 +37,13 @@ pub const OVERLAY_TITLE: &str = "PeekaView Overlay";
 pub fn log(line: &str) {
     use std::io::Write;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(std::env::temp_dir().join("peekaview.log")) {
+    // root (the Mac service's daemon, its agent at the login window, the setup step) must not
+    // create a root-owned file in a user's temp folder
+    #[cfg(target_os = "macos")]
+    let path = if unsafe { libc::geteuid() } == 0 { std::path::PathBuf::from("/Library/Logs/PeekaView.log") } else { std::env::temp_dir().join("peekaview.log") };
+    #[cfg(not(target_os = "macos"))]
+    let path = std::env::temp_dir().join("peekaview.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(f, "{stamp} {line}");
     }
 }

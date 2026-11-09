@@ -10,7 +10,6 @@ const UTF8: u32 = 0x0800_0100;
 
 #[link(name = "CoreFoundation", kind = "framework")]
 extern "C" {
-    pub static kCFBooleanTrue: CFTypeRef;
     pub static kCFTypeDictionaryKeyCallBacks: u8;
     pub static kCFTypeDictionaryValueCallBacks: u8;
     pub fn CFRelease(cf: CFTypeRef);
@@ -25,8 +24,14 @@ extern "C" {
         value_callbacks: *const u8,
     ) -> CFTypeRef;
     pub fn CFDataCreate(alloc: CFTypeRef, bytes: *const u8, len: isize) -> CFTypeRef;
-    fn CFEqual(a: CFTypeRef, b: CFTypeRef) -> bool;
+    fn CFGetTypeID(cf: CFTypeRef) -> usize;
+    fn CFBooleanGetTypeID() -> usize;
+    fn CFBooleanGetValue(b: CFTypeRef) -> bool;
+    fn CFNumberGetTypeID() -> usize;
+    fn CFNumberGetValue(n: CFTypeRef, kind: isize, out: *mut c_void) -> bool;
 }
+
+const CF_NUMBER_SINT64: isize = 4;
 
 /// An owned CF object, released on drop.
 pub struct Owned(pub CFTypeRef);
@@ -47,12 +52,24 @@ pub fn string(s: &CStr) -> Owned {
     Owned(unsafe { CFStringCreateWithCString(std::ptr::null(), s.as_ptr(), UTF8) })
 }
 
-/// `dict[key] == kCFBooleanTrue` (a missing key is false).
+/// `dict[key]` as a flag: a CFBoolean, or a CFNumber other than 0 (the session dictionary uses
+/// both). A missing key is false.
 ///
 /// # Safety
 /// `dict` must be a CFDictionary.
 pub unsafe fn dict_bool(dict: CFTypeRef, key: &CStr) -> bool {
     let key = string(key);
     let v = CFDictionaryGetValue(dict, key.0);
-    !v.is_null() && CFEqual(v, kCFBooleanTrue)
+    if v.is_null() {
+        return false;
+    }
+    let kind = CFGetTypeID(v);
+    if kind == CFBooleanGetTypeID() {
+        return CFBooleanGetValue(v);
+    }
+    if kind == CFNumberGetTypeID() {
+        let mut n = 0i64;
+        return CFNumberGetValue(v, CF_NUMBER_SINT64, (&mut n as *mut i64).cast()) && n != 0;
+    }
+    false
 }

@@ -225,6 +225,8 @@ impl Shared {
             // the macOS agent can restart the Mac (and says whether FileVault will stop it)
             "restart": crate::unattended::restart_available(),
             "filevault": crate::unattended::restart_filevault(),
+            // the service's helper could not share the screen (missing permission …)
+            "error": crate::unattended::share_error(),
         })
     }
 
@@ -1183,8 +1185,14 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
     if crate::unattended::helper() {
         let app = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = launch(&app, "desktop") {
+            let result = launch(&app, "desktop");
+            if let Err(e) = &result {
                 crate::log(&format!("helper: cannot share the desktop: {e}"));
+            }
+            // viewers see why there is no picture (instead of "start something in the toolbar")
+            crate::unattended::set_share_error(result.err());
+            if let Ok(shared) = running(&app) {
+                shared.send_state();
             }
         });
     }

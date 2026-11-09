@@ -26,7 +26,7 @@ pub fn current() -> Console {
         Console {
             signed_in: dict_bool(dict.0, c"kCGSessionLoginDoneKey"),
             locked: dict_bool(dict.0, c"CGSSessionScreenIsLocked"),
-            on_console: dict_bool(dict.0, c"kCGSessionOnConsoleKey"),
+            on_console: dict_bool(dict.0, c"kCGSSessionOnConsoleKey"),
         }
     }
 }
@@ -34,4 +34,18 @@ pub fn current() -> Console {
 /// Is this process root (an agent in the login window session runs as root)?
 pub fn root() -> bool {
     unsafe { libc::geteuid() == 0 }
+}
+
+#[cfg(test)]
+mod tests {
+    /// This test runs in a signed-in session on the screen (a developer's Mac or CI's GUI session).
+    #[test]
+    fn the_test_session_is_signed_in_and_on_screen() {
+        let c = super::current();
+        if c == super::Console::default() {
+            return; // no window server session (headless CI)
+        }
+        assert!(c.signed_in, "{c:?}");
+        assert!(c.on_console, "{c:?}");
+    }
 }

@@ -177,6 +177,18 @@ impl Controller {
             Some((_, _, slot)) => self.shared.stream(slot),
             None => self.shared.stream_of(v),
         };
+        // the service's helper: the first input of each kind goes to the log (input is the part
+        // that fails silently without the accessibility permission)
+        if crate::unattended::helper() {
+            use std::sync::Mutex;
+            static SEEN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+            let kind = v["t"].as_str().unwrap_or("").to_string();
+            let mut seen = SEEN.lock().unwrap();
+            if !seen.contains(&kind) && seen.len() < 32 {
+                crate::log(&format!("control: first {kind} (stream: {}, accessibility: {})", stream.as_ref().map(|s| s.visible()).unwrap_or(false), guard::accessibility()));
+                seen.push(kind);
+            }
+        }
         let Some(stream) = stream.filter(|s| s.visible()) else {
             self.release();
             return;

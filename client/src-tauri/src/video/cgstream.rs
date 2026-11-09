@@ -90,7 +90,7 @@ impl CgStream {
             CFRelease(props);
             if stream.is_null() {
                 dispatch_release(queue);
-                return Err("Bildschirmaufnahme nicht möglich (CGDisplayStream).".into());
+                return Err("Bildschirmaufnahme nicht möglich. Beim Mac fehlt die Freigabe „Bildschirmaufnahme“ für PeekaView.".into());
             }
             if CGDisplayStreamStart(stream) != 0 {
                 CFRelease(stream);

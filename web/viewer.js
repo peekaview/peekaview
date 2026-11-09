@@ -808,7 +808,8 @@ export function mountViewer(el, options) {
       waiting: 'Noch keine Bildschirmfreigabe aktiv.',
       admission: 'Warte, bis die teilende Person dich hereinlässt …',
       busy: 'Gerade nicht verfügbar – auf diesem Computer läuft schon eine andere Freigabe.',
-      pick: 'Fernzugriff: Starte oben in der Leiste ein Programm oder den ganzen Desktop.',
+      // the host's service could not share the screen: say why
+      pick: state.error || 'Fernzugriff: Starte oben in der Leiste ein Programm oder den ganzen Desktop.',
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',

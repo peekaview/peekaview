@@ -86,6 +86,7 @@ pub fn install(dir: &Path) -> Result<(), String> {
     // users must reach the app copy inside; the store file itself is root only
     std::fs::set_permissions(support, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
     write_file(&store::path(), &serde_json::to_vec_pretty(&links).map_err(|e| e.to_string())?, 0o600)?;
+    let _ = std::fs::set_permissions(support.join("Fernzugriff.log"), std::fs::Permissions::from_mode(0o600));
 
     // the app copy (unless this already is the copy: "Dienst aktualisieren" from the copy)
     if bundle != target {

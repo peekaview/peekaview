@@ -176,6 +176,17 @@ fn filevault() -> (bool, bool) {
     (false, false)
 }
 
+static SHARE_ERROR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// The helper could not share the screen: why (for the viewers), or `None` when it worked.
+pub fn set_share_error(error: Option<String>) {
+    *SHARE_ERROR.lock().unwrap() = error;
+}
+
+pub fn share_error() -> Option<String> {
+    SHARE_ERROR.lock().unwrap().clone()
+}
+
 /// The macOS agent may restart the Mac (through the daemon).
 pub fn restart_available() -> bool {
     cfg!(target_os = "macos") && helper()

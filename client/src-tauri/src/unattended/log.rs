@@ -64,7 +64,12 @@ pub fn event(link: &str, viewer: &str, event: &str) {
     }
     use std::io::Write;
     let path = super::data_dir().join("Fernzugriff.log");
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).append(true);
+    // only root (macOS) – Windows protects the folder with its ACL
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    if let Ok(mut f) = options.open(path) {
         let _ = writeln!(f, "{text}");
     }
 }

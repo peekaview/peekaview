@@ -126,6 +126,11 @@ test('special keys menu follows mode and host OS; desk hint follows state.desk',
   assert.equal(await evaluate("document.querySelector('.pv-desk').textContent"),'Der Mac zeigt das Anmeldefenster.')
   await receive(state({os:'macos',desk:'locked'}))
   assert.equal(await evaluate("document.querySelector('.pv-desk').textContent"),'Der Mac ist gesperrt.')
+  // the service could not share the screen: the viewer says why instead of "start something"
+  await receive(state({os:'macos',remote:'Büro',windows:[],error:'Bildschirmaufnahme nicht möglich. Beim Mac fehlt die Freigabe „Bildschirmaufnahme“ für PeekaView.'}))
+  assert.match(await evaluate("document.querySelector('.pv-notice-text').textContent"),/fehlt die Freigabe/)
+  await receive(state({os:'macos',remote:'Büro',windows:[]}))
+  assert.match(await evaluate("document.querySelector('.pv-notice-text').textContent"),/Starte oben/)
 
   // leaving control mode hides button and menu
   await browser('click','[data-special]')
