@@ -13,6 +13,9 @@ test('public build includes all viewer modules and excludes private and desktop 
   const files = await readdir(dist, { recursive: true })
   assert.ok(files.includes('index.html'))
   assert.ok(files.includes('download.html'))
+  // the picture of the start page's link preview is published with it
+  const preview = (await readFile(resolve(dist, 'index.html'), 'utf8')).match(/property="og:image" content="https:\/\/peekaview\.de\/([^"]+)"/)
+  assert.ok(preview && files.includes(preview[1]), 'og:image')
   assert.ok(files.includes('home-scene.js'))
   assert.ok(files.includes('word-code.js'))
   for (const page of ['impressum.html', 'datenschutz.html', 'sicherheit.html', 'warum.html', 'preise.html', 'legal.css', 'legal.js']) assert.ok(files.includes(page), page)

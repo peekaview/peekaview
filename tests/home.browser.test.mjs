@@ -43,6 +43,8 @@ test('home gives usable entry points, remembers the choice and requests identity
     }
     assert.deepEqual(await evaluate("Array.from(document.querySelectorAll('#footer a'),a=>a.textContent)"),['Preise','Über PeekaView','Impressum','Datenschutz','Sicherheit'])
     assert.equal(await evaluate("document.querySelector('#trust').textContent"),'P2P · Ende-zu-Ende verschlüsselt')
+    // a sent link shows what it is: title, text and picture of its preview
+    assert.deepEqual(await evaluate("['og:title','og:description','og:image'].map(p=>!!document.querySelector('meta[property=\"'+p+'\"]')?.content).concat(!!document.querySelector('meta[name=description]').content,document.title.startsWith('PeekaView – '))"),[true,true,true,true,true])
     // the legal pages open over the start page, which stays where it is
     await browser('click','#footer a[href="impressum"]')
     await browser('wait','.pv-legal-dialog[open] h1')
