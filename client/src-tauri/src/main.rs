@@ -431,7 +431,14 @@ fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
 
 #[tauri::command]
 fn rooms_list(app: AppHandle) -> Vec<serde_json::Value> {
-    rooms::all(&app).iter().map(|r| r.view()).collect()
+    rooms::all(&app)
+        .iter()
+        .map(|r| {
+            let mut view = r.view();
+            view["locked"] = pin_guard::locked(&r.id).into();
+            view
+        })
+        .collect()
 }
 
 fn rooms_changed(app: &AppHandle) {

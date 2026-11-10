@@ -104,7 +104,6 @@ impl Room {
         json!({
             "id": self.id, "name": self.name, "link": format!("{}/#{}", crate::settings::VIEWER_SITE, self.fragment()),
             "pin": self.pin.is_some(), "remote": self.remote, "apps": self.apps, "desktop": self.desktop,
-            "locked": crate::pin_guard::locked(&self.id),
         })
     }
 
