@@ -98,7 +98,7 @@ impl Lobby {
     fn start(app: &AppHandle, room: Room) -> Arc<Lobby> {
         let key = session::parse_key(&room.key).unwrap_or_else(super::signal::new_signing_key);
         let (signaling, mut incoming) = Signaling::open(&room.secret, &relays(app), key);
-        let lobby = Arc::new(Lobby { admission: Mutex::new(Admission::new(room.pin.clone(), [])), room, signaling, stop: AtomicBool::new(false) });
+        let lobby = Arc::new(Lobby { admission: Mutex::new(Admission::new(room.pin.clone(), []).for_room(Some(&room.id))), room, signaling, stop: AtomicBool::new(false) });
         crate::log(&format!("lobby: waiting in \"{}\"", lobby.room.name));
         let (me, app2) = (lobby.clone(), app.clone());
         tauri::async_runtime::spawn(async move {
@@ -142,6 +142,7 @@ impl Lobby {
                 match decision {
                     Hello::Invite => self.open(app, from),
                     Hello::Denied => self.signaling.send(&json!({ "type": "denied", "from": "host", "to": from })),
+                    Hello::Locked => self.signaling.send(&json!({ "type": "locked", "from": "host", "to": from })),
                     Hello::Waiting { new, reply } => {
                         self.signaling.send(&reply);
                         if new {
@@ -167,13 +168,19 @@ impl Lobby {
                         session::announce_requests(app);
                         self.open(app, from);
                     }
-                    PinResult::Wrong { left } => {
-                        self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "left": left }));
+                    PinResult::Wrong { left, wait } => {
+                        self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "left": left, "wait": wait }));
                         if left == 0 {
                             session::announce_requests(app);
                         }
                     }
-                    PinResult::Locked => self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "locked": true })),
+                    PinResult::Wait(wait) => self.signaling.send(&json!({ "type": "pin-wait", "from": "host", "to": from, "wait": wait })),
+                    PinResult::Locked { now } => {
+                        self.signaling.send(&json!({ "type": "locked", "from": "host", "to": from }));
+                        if now {
+                            session::announce_requests(app);
+                        }
+                    }
                 }
             }
             _ => {}

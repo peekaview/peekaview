@@ -239,6 +239,8 @@ export function mountViewer(el, options) {
   let denied = false
   // the room has a PIN: {salt, rounds, nonce} of the latest challenge
   let pinChallenge = null
+  // the room is locked after too many wrong PINs – only the presenter's computer can unlock it
+  let roomLocked = false
   let busy = false
   // who we are on the signaling channel: the public half of our signing key – the presenter only
   // takes messages from us signed by it (the offer comes addressed to it); kept for this tab and
@@ -284,6 +286,11 @@ export function mountViewer(el, options) {
     if (m.type === 'waiting') {
       busy = false
       pinChallenge = m.pin ?? null
+      // unlocked again on the presenter's computer
+      if (roomLocked) {
+        roomLocked = false
+        update()
+      }
       if (!admission && !dc) {
         admission = true
         update()
@@ -297,7 +304,22 @@ export function mountViewer(el, options) {
       }
       return
     }
+    if (m.type === 'locked') {
+      if (!roomLocked) {
+        roomLocked = true
+        admission = false
+        pinChallenge = null
+        update()
+      }
+      return
+    }
+    if (m.type === 'pin-wait') {
+      pinHold(m.wait)
+      pinError('Bitte warte kurz und versuch es dann noch einmal.')
+      return
+    }
     if (m.type === 'pin-wrong') {
+      pinHold(m.wait)
       pinError(m.locked ? 'Zu viele falsche Versuche – bitte später noch einmal.' : m.left ? `PIN falsch – noch ${m.left} ${m.left === 1 ? 'Versuch' : 'Versuche'}.` : 'PIN falsch.')
       // a fresh challenge comes with the next answer to our hello
       signaling.send({ type: 'hello', from: peerId, name, color, ...callDevice })
@@ -582,11 +604,20 @@ export function mountViewer(el, options) {
   // PBKDF2 of the PIN as key, HMAC of the host's one-time challenge as answer: the PIN never travels
 
   const pinForm = q('.pv-pin')
+  // after a wrong PIN the presenter takes the next try only after a short, growing wait
+  let pinReadyAt = 0
+  function pinHold(seconds) {
+    const ms = Math.min(60, Math.max(0, Number(seconds) || 0)) * 1000
+    if (!ms) return
+    pinReadyAt = Date.now() + ms
+    pinForm.querySelector('button').disabled = true
+    setTimeout(() => Date.now() >= pinReadyAt && (pinForm.querySelector('button').disabled = false), ms + 50)
+  }
   function pinError(text) {
     const e = pinForm.querySelector('.pv-pin-error')
     e.textContent = text ?? ''
     e.hidden = !text
-    pinForm.querySelector('button').disabled = false
+    pinForm.querySelector('button').disabled = Date.now() < pinReadyAt
   }
   pinForm.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -604,7 +635,7 @@ export function mountViewer(el, options) {
       const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(pinChallenge.nonce)))
       signaling.send({ type: 'pin', from: peerId, to: 'host', response: Array.from(mac, (b) => b.toString(16).padStart(2, '0')).join('') })
       input.value = ''
-      setTimeout(() => (pinForm.querySelector('button').disabled = false), 1500)
+      setTimeout(() => Date.now() >= pinReadyAt && (pinForm.querySelector('button').disabled = false), 1500)
     } catch {
       pinError('Das hat nicht geklappt.')
     }
@@ -722,6 +753,8 @@ export function mountViewer(el, options) {
       forced ??
       (denied
         ? 'denied'
+        : roomLocked && !me
+          ? 'roomlocked'
         : blocked && !me
           ? 'blocked'
           : !me
@@ -752,6 +785,7 @@ export function mountViewer(el, options) {
       busy: 'Gerade nicht verfügbar – auf diesem Computer läuft schon eine andere Freigabe.',
       pick: 'Fernzugriff: Starte oben in der Leiste ein Programm oder den ganzen Desktop.',
       denied: 'Die teilende Person hat den Beitritt abgelehnt.',
+      roomlocked: 'Dieser Raum ist gesperrt. Er kann nur am Rechner selbst wieder freigegeben werden.',
       loading: 'Warte auf Bild …',
       paused: 'Freigabe pausiert – das geteilte Fenster ist gerade nicht sichtbar.',
       locked: state.remote && state.mode === 'control'

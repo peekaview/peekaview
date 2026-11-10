@@ -326,6 +326,9 @@ input.switch:focus-visible { outline: 2px solid rgba(239, 68, 68, .5); outline-o
 .tag { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, .07); color: var(--muted); font: 600 10.5px/1.5 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; }
 .tag.pin { background: rgba(234, 179, 8, .14); color: #fde68a; }
 .tag.remote { background: rgba(239, 68, 68, .14); color: #fca5a5; }
+.tag.locked { background: rgba(239, 68, 68, .28); color: #fecaca; }
+.room-locked { background: rgba(239, 68, 68, .12); }
+.room-locked b { display: inline-flex; align-items: center; gap: 5px; color: #fca5a5; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .app-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: var(--raised); font-size: 12px; }
 .app-chip button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }

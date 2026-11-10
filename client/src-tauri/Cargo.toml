@@ -39,6 +39,7 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-notification = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "11", features = ["macos_14_2"] }
