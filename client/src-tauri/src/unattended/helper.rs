@@ -18,7 +18,7 @@ pub fn start(app: &AppHandle) {
         "helper: {} links, screen recording: {}, accessibility: {}",
         links.rooms.len(),
         crate::permissions::granted("screen"),
-        crate::permissions::granted("accessibility")
+        crate::permissions::describe_accessibility()
     ));
     apply_settings(app, &links);
     crate::p2p::lobby::sync(app, false);

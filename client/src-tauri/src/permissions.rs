@@ -22,7 +22,31 @@ mod sys {
     extern "C" {
         pub fn CGPreflightScreenCaptureAccess() -> bool;
         pub fn AXIsProcessTrusted() -> bool;
+        pub fn CGPreflightPostEventAccess() -> bool;
+        pub fn CGEventSourceCreate(state: i32) -> *const std::ffi::c_void;
+        pub fn CFRelease(cf: *const std::ffi::c_void);
     }
+}
+
+/// For the log: what macOS says about posting input here – the accessibility permission (two
+/// answers) and which event sources it hands out (private -1, combined session 0, HID system 1).
+pub fn describe_accessibility() -> String {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        let sources: Vec<String> = [-1, 0, 1]
+            .iter()
+            .map(|&state| {
+                let source = sys::CGEventSourceCreate(state);
+                if !source.is_null() {
+                    sys::CFRelease(source);
+                }
+                format!("{state}: {}", !source.is_null())
+            })
+            .collect();
+        format!("AXIsProcessTrusted {}, CGPreflightPostEventAccess {}, event sources {}", sys::AXIsProcessTrusted(), sys::CGPreflightPostEventAccess(), sources.join(" "))
+    }
+    #[cfg(not(target_os = "macos"))]
+    String::from("not needed")
 }
 
 pub fn status() -> Status {

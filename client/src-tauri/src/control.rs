@@ -69,6 +69,13 @@ pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
                     if c.shared.mode() != Mode::Control || c.shared.stop.load(Ordering::Relaxed) {
                         c.release();
                     } else {
+                        // the service's agent on the Mac: enigo looks key codes up in the keyboard
+                        // layout (HIToolbox), which the login window allows on the main thread only
+                        #[cfg(target_os = "macos")]
+                        if crate::unattended::helper() {
+                            on_main(|| c.handle(&v));
+                            continue;
+                        }
                         c.handle(&v);
                     }
                 }
@@ -79,11 +86,63 @@ pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
     tx
 }
 
+/// enigo with a private event source; where macOS refuses that (the service's agent at the login
+/// window runs as root without a user session) one that shares the session's keyboard state.
+pub(crate) fn new_enigo() -> Result<Enigo, enigo::NewConError> {
+    let settings = Settings { open_prompt_to_get_permissions: false, ..Default::default() };
+    Enigo::new(&settings).or_else(|e| {
+        #[cfg(target_os = "macos")]
+        if matches!(e, enigo::NewConError::EstablishCon(_)) {
+            return Enigo::new(&Settings { independent_of_keyboard_state: false, ..settings });
+        }
+        Err(e)
+    })
+}
+
+/// Types `text`. The service's agent on the Mac presses a key per character (key codes from the
+/// keyboard layout): password fields with secure input – the login window, the lock screen – drop
+/// the Unicode strings `Enigo::text` sends.
+fn type_text(e: &mut Enigo, text: &str) {
+    #[cfg(target_os = "macos")]
+    if crate::unattended::helper() {
+        for c in text.chars() {
+            let result = match c {
+                '\n' | '\r' => e.key(Key::Return, Direction::Click),
+                '\t' => e.key(Key::Tab, Direction::Click),
+                c => e.key(Key::Unicode(c), Direction::Click).or_else(|_| e.text(&c.to_string())),
+            };
+            if let Err(err) = result {
+                crate::log(&format!("control: cannot type ({err})"));
+                return;
+            }
+        }
+        return;
+    }
+    let _ = e.text(text);
+}
+
+/// Runs `f` on the main thread and waits for it (libdispatch; never called from the main thread).
+#[cfg(target_os = "macos")]
+fn on_main<F: FnOnce()>(f: F) {
+    use std::ffi::c_void;
+    extern "C" {
+        static _dispatch_main_q: c_void;
+        fn dispatch_sync_f(queue: *const c_void, context: *mut c_void, work: extern "C" fn(*mut c_void));
+    }
+    extern "C" fn trampoline<F: FnOnce()>(context: *mut c_void) {
+        if let Some(f) = unsafe { &mut *(context as *mut Option<F>) }.take() {
+            f();
+        }
+    }
+    let mut f = Some(f);
+    unsafe { dispatch_sync_f(&raw const _dispatch_main_q, (&mut f as *mut Option<F>).cast(), trampoline::<F>) };
+}
+
 impl Controller {
     fn enigo(&mut self) -> Option<&mut Enigo> {
         if self.enigo.is_none() {
             // a missing accessibility permission is handled by our own helper window
-            self.enigo = match Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }) {
+            self.enigo = match new_enigo() {
                 Ok(e) => Some(e),
                 Err(e) => {
                     crate::log(&format!("control: cannot simulate input ({e}) – accessibility permission missing?"));
@@ -256,7 +315,7 @@ impl Controller {
                 if !text.is_empty() && self.keyboard_allowed(from, target) {
                     self.injected();
                     if let Some(e) = self.enigo() {
-                        let _ = e.text(&text);
+                        type_text(e, &text);
                     }
                     if let Some(rec) = self.shared.recorder() {
                         rec.typed(rec.name(from));
