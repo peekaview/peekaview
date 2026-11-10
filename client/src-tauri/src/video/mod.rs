@@ -1,6 +1,7 @@
 //! Video pipeline: capture → H.264 → relay. Viewers decode with WebCodecs (hardware).
 //!
-//! * macOS: ScreenCaptureKit (GPU frames, zero copy) → VideoToolbox hardware encoder
+//! * macOS: ScreenCaptureKit (GPU frames, zero copy) → VideoToolbox hardware encoder; the service's
+//!   agent falls back to CGDisplayStream where ScreenCaptureKit delivers nothing (login window)
 //! * Windows: Windows.Graphics.Capture → D3D11 video processor → Media Foundation (the GPU's
 //!   hardware encoder, Windows' software encoder as fallback)
 //! * Linux: xcap → openh264 (software)
@@ -15,6 +16,8 @@
 mod mac;
 #[cfg(target_os = "macos")]
 mod vt;
+#[cfg(target_os = "macos")]
+mod cgstream;
 #[cfg(target_os = "macos")]
 pub use mac::Video;
 

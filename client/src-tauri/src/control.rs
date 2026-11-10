@@ -47,9 +47,13 @@ pub enum Cmd {
     Release,
 }
 
+/// What simulates input: enigo, or at the Mac's login window `Legacy` (see `unattended::mac::legacy`).
+trait Device: Keyboard + Mouse {}
+impl<T: Keyboard + Mouse> Device for T {}
+
 struct Controller {
     shared: Arc<Shared>,
-    enigo: Option<Enigo>,
+    enigo: Option<Box<dyn Device>>,
     /// viewer id + button currently held down on their behalf + the window (slot) it is in
     pressed: Option<(u64, Button, u8)>,
     /// last "blocked" notice per viewer (at most one every NOTICE_GAP)
@@ -69,6 +73,13 @@ pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
                     if c.shared.mode() != Mode::Control || c.shared.stop.load(Ordering::Relaxed) {
                         c.release();
                     } else {
+                        // the service's agent on the Mac: enigo looks key codes up in the keyboard
+                        // layout (HIToolbox), which the login window allows on the main thread only
+                        #[cfg(target_os = "macos")]
+                        if crate::unattended::helper() {
+                            on_main(|| c.handle(&v));
+                            continue;
+                        }
                         c.handle(&v);
                     }
                 }
@@ -79,19 +90,78 @@ pub fn spawn(shared: Arc<Shared>) -> mpsc::Sender<Cmd> {
     tx
 }
 
+/// enigo with a private event source; where macOS refuses that (the service's agent at the login
+/// window runs as root without a user session) one that shares the session's keyboard state.
+pub(crate) fn new_enigo() -> Result<Enigo, enigo::NewConError> {
+    let settings = Settings { open_prompt_to_get_permissions: false, ..Default::default() };
+    Enigo::new(&settings).or_else(|e| {
+        #[cfg(target_os = "macos")]
+        if matches!(e, enigo::NewConError::EstablishCon(_)) {
+            return Enigo::new(&Settings { independent_of_keyboard_state: false, ..settings });
+        }
+        Err(e)
+    })
+}
+
+/// Types `text`. The service's agent on the Mac presses a key per character (key codes from the
+/// keyboard layout): password fields with secure input – the login window, the lock screen – drop
+/// the Unicode strings `Enigo::text` sends.
+fn type_text(e: &mut dyn Device, text: &str) {
+    #[cfg(target_os = "macos")]
+    if crate::unattended::helper() {
+        for c in text.chars() {
+            let result = match c {
+                '\n' | '\r' => e.key(Key::Return, Direction::Click),
+                '\t' => e.key(Key::Tab, Direction::Click),
+                c => e.key(Key::Unicode(c), Direction::Click).or_else(|_| e.text(&c.to_string())),
+            };
+            if let Err(err) = result {
+                crate::log(&format!("control: cannot type ({err})"));
+                return;
+            }
+        }
+        return;
+    }
+    let _ = e.text(text);
+}
+
+/// Runs `f` on the main thread and waits for it (libdispatch; never called from the main thread).
+#[cfg(target_os = "macos")]
+fn on_main<F: FnOnce()>(f: F) {
+    use std::ffi::c_void;
+    extern "C" {
+        static _dispatch_main_q: c_void;
+        fn dispatch_sync_f(queue: *const c_void, context: *mut c_void, work: extern "C" fn(*mut c_void));
+    }
+    extern "C" fn trampoline<F: FnOnce()>(context: *mut c_void) {
+        if let Some(f) = unsafe { &mut *(context as *mut Option<F>) }.take() {
+            f();
+        }
+    }
+    let mut f = Some(f);
+    unsafe { dispatch_sync_f(&raw const _dispatch_main_q, (&mut f as *mut Option<F>).cast(), trampoline::<F>) };
+}
+
 impl Controller {
-    fn enigo(&mut self) -> Option<&mut Enigo> {
+    fn enigo(&mut self) -> Option<&mut (dyn Device + 'static)> {
         if self.enigo.is_none() {
+            // the service's agent at the login window (root): macOS ignores CGEventPost there
+            #[cfg(target_os = "macos")]
+            if crate::unattended::helper() && crate::unattended::mac::console::root() {
+                crate::log("control: login window, input through the legacy event functions");
+                self.enigo = Some(Box::new(crate::unattended::mac::legacy::Legacy::new()));
+                return self.enigo.as_deref_mut();
+            }
             // a missing accessibility permission is handled by our own helper window
-            self.enigo = match Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }) {
-                Ok(e) => Some(e),
+            self.enigo = match new_enigo() {
+                Ok(e) => Some(Box::new(e)),
                 Err(e) => {
                     crate::log(&format!("control: cannot simulate input ({e}) – accessibility permission missing?"));
                     None
                 }
             };
         }
-        self.enigo.as_mut()
+        self.enigo.as_deref_mut()
     }
 
     fn release(&mut self) {
@@ -177,6 +247,18 @@ impl Controller {
             Some((_, _, slot)) => self.shared.stream(slot),
             None => self.shared.stream_of(v),
         };
+        // the service's helper: the first input of each kind goes to the log (input is the part
+        // that fails silently without the accessibility permission)
+        if crate::unattended::helper() {
+            use std::sync::Mutex;
+            static SEEN: Mutex<Vec<String>> = Mutex::new(Vec::new());
+            let kind = v["t"].as_str().unwrap_or("").to_string();
+            let mut seen = SEEN.lock().unwrap();
+            if !seen.contains(&kind) && seen.len() < 32 {
+                crate::log(&format!("control: first {kind} (stream: {}, accessibility: {})", stream.as_ref().map(|s| s.visible()).unwrap_or(false), guard::accessibility()));
+                seen.push(kind);
+            }
+        }
         let Some(stream) = stream.filter(|s| s.visible()) else {
             self.release();
             return;
@@ -244,7 +326,7 @@ impl Controller {
                 if !text.is_empty() && self.keyboard_allowed(from, target) {
                     self.injected();
                     if let Some(e) = self.enigo() {
-                        let _ = e.text(&text);
+                        type_text(e, &text);
                     }
                     if let Some(rec) = self.shared.recorder() {
                         rec.typed(rec.name(from));
@@ -306,6 +388,38 @@ fn app_switch_dropped(window: bool, modified: bool, key: &str) -> bool {
     window && modified && matches!(key, "Tab" | "Escape" | " ")
 }
 
+/// Ctrl+Cmd+Q did not lock (no keyboard attached, shortcut changed …): login.framework.
+fn mac_lock_fallback() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        for _ in 0..6 {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if crate::lock::locked() {
+                return Ok(());
+            }
+        }
+        type Lock = unsafe extern "C" fn() -> i32;
+        unsafe {
+            let lib = libc::dlopen(c"/System/Library/PrivateFrameworks/login.framework/Versions/Current/login".as_ptr(), libc::RTLD_LAZY);
+            if !lib.is_null() {
+                let f = libc::dlsym(lib, c"SACLockScreenImmediate".as_ptr());
+                if !f.is_null() {
+                    let lock: Lock = std::mem::transmute(f);
+                    lock();
+                }
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if crate::lock::locked() {
+            Ok(())
+        } else {
+            Err("Der Mac ließ sich nicht sperren.".into())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("Sperren geht hier nicht.".into())
+}
+
 fn special_key(k: crate::unattended::special::K) -> Key {
     use crate::unattended::special::K;
     match k {
@@ -356,6 +470,19 @@ impl Controller {
                 }
                 #[cfg(not(target_os = "windows"))]
                 Err("Sperren geht hier nicht.".into())
+            }
+            Action::MacLock => {
+                self.injected();
+                if let Some(e) = self.enigo() {
+                    for k in [Key::Control, Key::Meta] {
+                        let _ = e.key(k, Direction::Press);
+                    }
+                    let _ = e.key(Key::Unicode('q'), Direction::Click);
+                    for k in [Key::Meta, Key::Control] {
+                        let _ = e.key(k, Direction::Release);
+                    }
+                }
+                mac_lock_fallback()
             }
             Action::Keys(keys) => {
                 self.injected();

@@ -133,6 +133,13 @@ pub mod win {
     }
 }
 
+/// macOS: the agent's session (login window: nobody signed in) and the lock screen.
+#[cfg(target_os = "macos")]
+pub fn mac_current() -> Desk {
+    let c = super::mac::console::current();
+    classify("", c.signed_in, c.locked)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +154,9 @@ mod tests {
         assert_eq!(classify("winlogon", true, false), Desk::Secure, "UAC prompt");
         assert_eq!(classify("Screen-saver", true, false), Desk::Normal);
         assert_eq!(Desk::Secure.as_str(), "secure");
+        // macOS has no input desktop name
+        assert_eq!(classify("", false, false), Desk::Login);
+        assert_eq!(classify("", true, true), Desk::Locked);
+        assert_eq!(classify("", true, false), Desk::Normal);
     }
 }

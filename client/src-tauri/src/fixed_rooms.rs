@@ -269,6 +269,9 @@ pub fn mark_automatic(room: &str, call: &str) {
 }
 
 fn config_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    if crate::unattended::helper() {
+        return Err("Der Dienst nutzt keine Kontakte.".into());
+    }
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("fixed-rooms.json"))

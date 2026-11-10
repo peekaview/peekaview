@@ -21,6 +21,8 @@ pub enum Action {
     Sas,
     /// lock the workstation (Windows: LockWorkStation)
     Lock,
+    /// macOS: lock the screen – Ctrl+Cmd+Q, if that does not lock: login.framework
+    MacLock,
     /// press these keys in order, release them in reverse
     Keys(Vec<K>),
 }
@@ -31,13 +33,15 @@ pub fn parse(k: &str, mac: bool) -> Option<Action> {
     Some(match (k, mac) {
         ("cad", false) => Action::Sas,
         ("lock", false) => Action::Lock,
-        ("lock", true) => Action::Keys(vec![Ctrl, Meta, Q]),
+        ("lock", true) => Action::MacLock,
         ("win", false) => Action::Keys(vec![Meta]),
         ("alt-tab", false) => Action::Keys(vec![Alt, Tab]),
         ("alt-f4", false) => Action::Keys(vec![Alt, F4]),
         ("ctrl-shift-esc", false) => Action::Keys(vec![Ctrl, Shift, Escape]),
         ("cmd-tab", true) => Action::Keys(vec![Meta, Tab]),
         ("cmd-space", true) => Action::Keys(vec![Meta, Space]),
+        ("cmd-q", true) => Action::Keys(vec![Meta, Q]),
+        ("force-quit", true) => Action::Keys(vec![Meta, Alt, Escape]),
         _ => return None,
     })
 }
@@ -53,6 +57,8 @@ pub fn label(k: &str) -> &'static str {
         "ctrl-shift-esc" => "Strg+Umschalt+Esc",
         "cmd-tab" => "Cmd+Tab",
         "cmd-space" => "Cmd+Leertaste",
+        "cmd-q" => "Cmd+Q",
+        "force-quit" => "Sofort beenden",
         _ => "unbekannt",
     }
 }
@@ -76,7 +82,11 @@ mod tests {
     fn mac_entries() {
         assert_eq!(parse("cmd-tab", true), Some(Action::Keys(vec![Meta, Tab])));
         assert_eq!(parse("cmd-space", true), Some(Action::Keys(vec![Meta, Space])));
-        assert_eq!(parse("lock", true), Some(Action::Keys(vec![Ctrl, Meta, Q])));
+        assert_eq!(parse("lock", true), Some(Action::MacLock));
+        assert_eq!(parse("cmd-q", true), Some(Action::Keys(vec![Meta, Q])));
+        assert_eq!(parse("force-quit", true), Some(Action::Keys(vec![Meta, Alt, Escape])));
+        assert_eq!(parse("force-quit", false), None, "a Mac entry on Windows");
+        assert_eq!(label("force-quit"), "Sofort beenden");
         assert_eq!(parse("cad", true), None, "no Strg+Alt+Entf on a Mac");
     }
 

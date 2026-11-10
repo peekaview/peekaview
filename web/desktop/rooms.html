@@ -176,7 +176,7 @@
         </div>
         <div class="room-unattended" hidden>
           <label class="set-row">
-            <span class="text"><b>Auch ohne Anmeldung (Windows-Dienst)</b><small>Hält den Link auch am Anmeldebildschirm, nach einem Neustart und bei Administrator-Abfragen erreichbar. Zum Einschalten fragt Windows nach Administratorrechten.</small><small class="unattended-hint" hidden>Braucht Fernzugriff und eine PIN.</small></span>
+            <span class="text"><b class="unattended-title">Auch ohne Anmeldung (Windows-Dienst)</b><small class="unattended-text">Hält den Link auch am Anmeldebildschirm, nach einem Neustart und bei Administrator-Abfragen erreichbar. Zum Einschalten fragt Windows nach Administratorrechten.</small><small class="unattended-hint" hidden>Braucht Fernzugriff und eine PIN.</small><small class="unattended-filevault" hidden>FileVault ist an: Nach einem Neustart wartet der Mac auf das FileVault-Passwort, bevor PeekaView startet. Zuschauer können beim Neustart aus der Ferne Nutzername und Passwort eines FileVault-Nutzers angeben, dann startet der Mac einmalig ohne diese Abfrage.</small></span>
             <input type="checkbox" class="switch" data-unattended>
           </label>
           <div class="set-row unattended-service" hidden>
@@ -226,6 +226,14 @@
       const service = unattended
       q('.room-unattended').hidden = !service?.available
       if (service?.available) {
+        const mac = service.os === 'macos'
+        const kind = mac ? 'Mac-Dienst' : 'Windows-Dienst'
+        if (mac) {
+          q('.unattended-title').textContent = 'Auch ohne Anmeldung (Mac-Dienst)'
+          q('.unattended-text').textContent =
+            'Hält den Link auch am Anmeldefenster, bei gesperrtem Bildschirm und nach einem Neustart erreichbar. Zum Einschalten fragt macOS nach dem Passwort eines Administrators. PeekaView braucht dafür die Freigaben „Bildschirmaufnahme“ und „Bedienungshilfen“.'
+          q('.unattended-filevault').hidden = !service.filevault || !room.unattended
+        }
         const box = q('[data-unattended]')
         const possible = !!(room.remote && room.pin)
         box.checked = !!room.unattended
@@ -236,7 +244,7 @@
           box.disabled = true
           if (button) button.disabled = true
           return invoke('unattended_set', { id: room.id, on })
-            .then(() => toast(on ? 'Windows-Dienst eingeschaltet' : 'Windows-Dienst ausgeschaltet'))
+            .then(() => toast(on ? `${kind} eingeschaltet` : `${kind} ausgeschaltet`))
             .catch((e) => {
               box.checked = !!room.unattended
               fail(e)
@@ -251,7 +259,7 @@
         const installedService = !!service.installed
         q('.unattended-service').hidden = !installedService
         if (installedService) {
-          q('.unattended-state').textContent = service.running ? 'Windows-Dienst läuft' : 'Windows-Dienst ist installiert, läuft aber nicht'
+          q('.unattended-state').textContent = service.running ? `${kind} läuft` : `${kind} ist installiert, läuft aber nicht`
           const update = q('[data-service-update]')
           update.hidden = !service.outdated
           update.addEventListener('click', () => toggle(true, update))

@@ -67,6 +67,32 @@ pub fn parse(bytes: &[u8]) -> Result<Store, String> {
     Ok(sanitize(&s.name, &s.relays, s.rooms))
 }
 
+/// The links of the user's app (rooms.json and settings.json in `dir`) → what the service serves.
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
+pub fn from_app_dir(dir: &std::path::Path) -> Result<Store, String> {
+    use serde_json::Value;
+    let rooms: Vec<Room> = serde_json::from_slice(&std::fs::read(dir.join("rooms.json")).map_err(|e| format!("rooms.json: {e}"))?).map_err(|e| e.to_string())?;
+    let settings: Value = std::fs::read(dir.join("settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    let relays: Vec<String> = match &settings["relays"] {
+        Value::Array(a) => a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect(),
+        Value::String(s) => s.split_whitespace().map(str::to_string).collect(),
+        _ => vec![],
+    };
+    let name = settings["name"].as_str().map(str::to_string).filter(|n| !n.trim().is_empty()).unwrap_or_else(computer_name);
+    Ok(sanitize(&name, &relays, rooms))
+}
+
+fn computer_name() -> String {
+    #[cfg(target_os = "macos")]
+    if let Ok(out) = std::process::Command::new("/usr/sbin/scutil").args(["--get", "ComputerName"]).output() {
+        let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !name.is_empty() {
+            return name;
+        }
+    }
+    std::env::var("COMPUTERNAME").unwrap_or_default()
+}
+
 pub fn path() -> std::path::PathBuf {
     super::data_dir().join("unattended.json")
 }
@@ -76,13 +102,27 @@ static CACHE: Mutex<Option<Store>> = Mutex::new(None);
 /// The links (read once, again after [`reload`]).
 pub fn get() -> Store {
     let mut cache = CACHE.lock().unwrap();
+    // the macOS agent gets the links from the daemon (see `helper`), never from the file
+    if cfg!(target_os = "macos") && super::helper() {
+        return cache.clone().unwrap_or_default();
+    }
     if cache.is_none() {
         *cache = Some(std::fs::read(path()).ok().and_then(|b| parse(&b).map_err(|e| crate::log(&format!("unattended store: {e}"))).ok()).unwrap_or_default());
     }
     cache.clone().unwrap_or_default()
 }
 
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+/// macOS agent: the links as the daemon handed them over (checked once more). Returns whether they changed.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub fn set(store: Store) -> bool {
+    let store = sanitize(&store.name, &store.relays, store.rooms);
+    let mut cache = CACHE.lock().unwrap();
+    let key = |s: &Store| serde_json::to_string(s).unwrap_or_default();
+    let changed = cache.as_ref().map(key) != Some(key(&store));
+    *cache = Some(store);
+    changed
+}
+
 pub fn reload() {
     *CACHE.lock().unwrap() = None;
 }

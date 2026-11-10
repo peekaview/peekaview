@@ -1,6 +1,7 @@
 //! Access log of the service and its helper: who came in through which link, when, and what they
 //! did that matters (Strg+Alt+Entf, locking, disconnected on site). Keystrokes, PINs and passwords
-//! are never written. One line per event, in `%ProgramData%\PeekaView\Fernzugriff.log`.
+//! are never written. One line per event, in `%ProgramData%\PeekaView\Fernzugriff.log` (Windows) or
+//! `/Library/Application Support/PeekaView/Fernzugriff.log` (macOS, written by the daemon).
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,12 +53,23 @@ pub fn event(link: &str, viewer: &str, event: &str) {
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let text = line(secs, link, viewer, event);
     crate::log(&format!("access: {text}"));
+    // the macOS agent may run as the signed-in user: the daemon (root) writes the log
+    #[cfg(target_os = "macos")]
+    if super::helper() {
+        super::mac::client::log(link, viewer, event);
+        return;
+    }
     if !super::privileged() {
         return;
     }
     use std::io::Write;
     let path = super::data_dir().join("Fernzugriff.log");
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).append(true);
+    // only root (macOS) – Windows protects the folder with its ACL
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    if let Ok(mut f) = options.open(path) {
         let _ = writeln!(f, "{text}");
     }
 }

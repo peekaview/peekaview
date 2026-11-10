@@ -37,7 +37,13 @@ pub const OVERLAY_TITLE: &str = "PeekaView Overlay";
 pub fn log(line: &str) {
     use std::io::Write;
     let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(std::env::temp_dir().join("peekaview.log")) {
+    // root (the Mac service's daemon, its agent at the login window, the setup step) must not
+    // create a root-owned file in a user's temp folder
+    #[cfg(target_os = "macos")]
+    let path = if unsafe { libc::geteuid() } == 0 { std::path::PathBuf::from("/Library/Logs/PeekaView.log") } else { std::env::temp_dir().join("peekaview.log") };
+    #[cfg(not(target_os = "macos"))]
+    let path = std::env::temp_dir().join("peekaview.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(f, "{stamp} {line}");
     }
 }
@@ -782,7 +788,8 @@ fn context() -> tauri::Context<tauri::Wry> {
     tauri::generate_context!()
 }
 
-/// The SYSTEM helper of the PeekaView service: Tauri without any window, tray or deep links –
+/// The helper of the PeekaView service (Windows: SYSTEM in the console session; macOS: the
+/// LaunchAgent): Tauri without any window, tray or deep links –
 /// waits in the links handed to the service and shares the whole desktop.
 fn run_helper() {
     let mut context = context();
@@ -791,6 +798,9 @@ fn run_helper() {
         .manage(session::SessionState::default())
         .manage(invite::PendingInvite::default())
         .setup(|app| {
+            // macOS agent: no Dock icon, no menu bar
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             unattended::helper::start(app.handle());
             Ok(())
         })

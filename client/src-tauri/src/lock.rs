@@ -50,7 +50,7 @@ pub fn unlock(password: &str) -> Result<(), String> {
 mod imp {
     use std::time::Duration;
 
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+    use enigo::{Direction, Key, Keyboard};
     use objc2_core_foundation::{CFBoolean, CFString};
     use objc2_core_graphics::CGSessionCopyCurrentDictionary;
 
@@ -65,7 +65,7 @@ mod imp {
         // wake the display, then a harmless key brings up the password field
         let _ = std::process::Command::new("caffeinate").args(["-u", "-t", "2"]).spawn();
         std::thread::sleep(Duration::from_millis(700));
-        let mut enigo = Enigo::new(&Settings { open_prompt_to_get_permissions: false, ..Default::default() }).map_err(|e| e.to_string())?;
+        let mut enigo = crate::control::new_enigo().map_err(|e| e.to_string())?;
         let _ = enigo.key(Key::Shift, Direction::Click);
         std::thread::sleep(Duration::from_millis(600));
         // characters, not key codes: independent of the keyboard layout (no y/z swaps)

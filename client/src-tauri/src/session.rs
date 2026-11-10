@@ -220,8 +220,13 @@ impl Shared {
             "locked": crate::lock::locked(),
             // which special keys the viewer offers
             "os": if cfg!(target_os = "macos") { "macos" } else if cfg!(target_os = "windows") { "windows" } else { "linux" },
-            // sign-in screen, lock screen, UAC prompt (Windows)
+            // sign-in screen, lock screen, UAC prompt (Windows); login window, locked (macOS)
             "desk": desk(),
+            // the macOS agent can restart the Mac (and says whether FileVault will stop it)
+            "restart": crate::unattended::restart_available(),
+            "filevault": crate::unattended::restart_filevault(),
+            // the service's helper could not share the screen (missing permission …)
+            "error": crate::unattended::share_error(),
         })
     }
 
@@ -918,10 +923,12 @@ pub(crate) fn running(app: &AppHandle) -> Result<Arc<Shared>, String> {
 }
 
 /// What the console shows (Windows): "normal" | "login" | "locked" | "secure".
-fn desk() -> &'static str {
+pub(crate) fn desk() -> &'static str {
     #[cfg(target_os = "windows")]
     return crate::unattended::desk::win::current().as_str();
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    return if crate::unattended::helper() { crate::unattended::desk::mac_current() } else { crate::unattended::desk::Desk::Normal }.as_str();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     crate::unattended::desk::Desk::Normal.as_str()
 }
 
@@ -1178,8 +1185,14 @@ pub async fn start_remote(app: &AppHandle, room: Room, peer: String) -> Result<(
     if crate::unattended::helper() {
         let app = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = launch(&app, "desktop") {
+            let result = launch(&app, "desktop");
+            if let Err(e) = &result {
                 crate::log(&format!("helper: cannot share the desktop: {e}"));
+            }
+            // viewers see why there is no picture (instead of "start something in the toolbar")
+            crate::unattended::set_share_error(result.err());
+            if let Ok(shared) = running(&app) {
+                shared.send_state();
             }
         });
     }

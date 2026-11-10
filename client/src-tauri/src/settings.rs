@@ -20,6 +20,10 @@ pub const VIEWER_SITE: &str = "https://peekaview.de";
 const KEYS: [&str; 8] = ["name", "relays", "turn_urls", "turn_secret", "keep_link", "allow_resize", "voice_enabled", "transcript_enabled"];
 
 fn file(app: &AppHandle) -> Option<std::path::PathBuf> {
+    // the service's helper / agent keeps nothing in the app data of the user it runs as
+    if crate::unattended::helper() {
+        return None;
+    }
     let dir = app.path().app_data_dir().ok()?;
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir.join("settings.json"))
