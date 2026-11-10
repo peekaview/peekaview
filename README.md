@@ -157,7 +157,8 @@ PeekaView keeps running in the tray / menu bar. Ending a share or closing the to
 **Permanent links** (*feste Links*) never change unless you renew them. You can have as many as you like, each with:
 - **PIN (optional):** viewers wait for approval as usual, and below that they get a PIN field. If you are not at your desk, they can come in with the PIN instead.
   - The PIN never travels: the viewer answers a one-time challenge with HMAC(PBKDF2(PIN)).
-  - After 5 wrong tries a viewer is turned away. After 20 wrong tries in 10 minutes the PIN is locked for everybody.
+  - After 5 wrong tries a viewer is turned away.
+  - **Lock after 10 wrong PINs:** wrong PINs are counted per link, across all viewers, and the count survives restarts (`pin_guard.json` in the app data folder). A right PIN starts counting afresh. After every wrong PIN the next try is taken only after a short wait that grows by a second per wrong PIN (1 s, 2 s, …). The 10th wrong PIN locks the link: no PIN tries and nobody gets in, not even viewers let in before. Viewers only see "Dieser Raum ist gesperrt. Er kann nur am Rechner selbst wieder freigegeben werden." PeekaView shows a system notification, and under Feste Links the link shows "Gesperrt nach zu vielen falschen PINs" with **Entsperren**. Unlocking works only there, on this computer, never over a connection. Viewers still waiting get in again on their own after unlocking.
   - Only the PBKDF2 key is stored.
 - **Fernzugriff:** the link waits for viewers even while nothing is shared. A viewer who is let in (or knows the PIN) gets:
   - a session in that room with remote control on;

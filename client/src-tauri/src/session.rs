@@ -398,7 +398,8 @@ pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, Stri
     let ctrl = control::spawn(shared.clone());
     let host_color = opts.color.clone().unwrap_or_else(|| "#ffffff".into());
     let hub = Hub::start(app.clone(), shared.clone(), ctrl.clone(), &secret, signing_key, &relays, ice.clone(), (opts.name.clone(), host_color), out_rx, frame_rx, {
-        let mut admission = Admission::new(crate::rooms::by_secret(&app, &secret).and_then(|r| r.pin), opts.admitted.clone());
+        let room = crate::rooms::by_secret(&app, &secret);
+        let mut admission = Admission::new(room.as_ref().and_then(|r| r.pin.clone()), opts.admitted.clone()).for_room(room.as_ref().map(|r| r.id.as_str()));
         admission.allow_devices(call_devices);
         admission
     });

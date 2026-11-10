@@ -44,7 +44,7 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let links: Vec<MenuItem<Wry>> = rooms
         .iter()
         .map(|r| {
-            let label = format!("{}{}{}", r.name, if r.pin.is_some() { " · PIN" } else { "" }, if r.remote { " · Fernzugriff" } else { "" });
+            let label = format!("{}{}{}{}", r.name, if r.pin.is_some() { " · PIN" } else { "" }, if r.remote { " · Fernzugriff" } else { "" }, if crate::pin_guard::locked(&r.id) { " · gesperrt" } else { "" });
             MenuItem::with_id(app, format!("copy:{}", r.id), label, true, None::<&str>)
         })
         .collect::<tauri::Result<_>>()?;

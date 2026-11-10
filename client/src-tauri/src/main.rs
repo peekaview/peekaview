@@ -10,6 +10,7 @@ mod invite;
 mod local_network;
 mod lock;
 mod p2p;
+mod pin_guard;
 #[cfg(target_os = "macos")]
 mod macos;
 mod permissions;
@@ -430,7 +431,14 @@ fn set_settings(app: AppHandle, patch: serde_json::Value) -> serde_json::Value {
 
 #[tauri::command]
 fn rooms_list(app: AppHandle) -> Vec<serde_json::Value> {
-    rooms::all(&app).iter().map(|r| r.view()).collect()
+    rooms::all(&app)
+        .iter()
+        .map(|r| {
+            let mut view = r.view();
+            view["locked"] = pin_guard::locked(&r.id).into();
+            view
+        })
+        .collect()
 }
 
 fn rooms_changed(app: &AppHandle) {
@@ -462,9 +470,35 @@ fn room_renew(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Unlocks a room locked after too many wrong PINs – only from this computer's settings window
+/// (viewer windows have no IPC; nothing over a connection reaches this).
+#[tauri::command]
+fn room_unlock(app: AppHandle, id: String) -> Result<(), String> {
+    let room = rooms::get(&app, &id).ok_or("Raum nicht gefunden")?;
+    pin_guard::reset(&room.id);
+    log(&format!("pin_guard: room {} unlocked on this computer", room.id));
+    rooms_changed(&app);
+    Ok(())
+}
+
+/// A room just locked after too many wrong PINs: notification, settings window, tray.
+fn room_locked(app: &AppHandle, id: &str) {
+    use tauri_plugin_notification::NotificationExt;
+    let name = rooms::get(app, id).map(|r| r.name).unwrap_or_default();
+    let _ = app
+        .notification()
+        .builder()
+        .title("PeekaView: Link gesperrt")
+        .body(format!("„{name}“ ist nach {} falschen PINs gesperrt. Entsperren kannst du ihn unter Feste Links.", pin_guard::MAX_FAILURES))
+        .show();
+    tray::refresh(app);
+    let _ = app.emit("rooms", rooms_list(app.clone()));
+}
+
 #[tauri::command]
 fn room_delete(app: AppHandle, id: String) -> Result<(), String> {
     rooms::delete(&app, &id)?;
+    pin_guard::reset(&id);
     rooms_changed(&app);
     Ok(())
 }
@@ -772,10 +806,16 @@ fn main() {
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(session::SessionState::default())
         .manage(invite::PendingInvite::default())
         .setup(|app| {
             settings::get(app.handle());
+            // wrong PINs per permanent room, kept across restarts
+            if let Ok(dir) = app.path().app_data_dir() {
+                let handle = app.handle().clone();
+                pin_guard::init(&dir.join("pin_guard.json"), move |id| room_locked(&handle, id));
+            }
             // macOS asks for local network access right away, not when a phone tries to connect
             local_network::start(app.handle());
             p2p::turn::prefetch();
@@ -900,6 +940,7 @@ fn main() {
             rooms_list,
             room_save,
             room_pin,
+            room_unlock,
             room_renew,
             room_delete,
             room_keys,

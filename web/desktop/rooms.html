@@ -151,6 +151,10 @@
           <span class="tags"></span>
           <button class="icon-btn" data-delete title="Link löschen">${icon('trash', 16)}</button>
         </div>
+        <div class="set-row room-locked" hidden>
+          <span class="text"><b>${icon('lock', 13)}Gesperrt nach zu vielen falschen PINs</b><small>Niemand kommt über diesen Link herein, bis du ihn hier entsperrst.</small></span>
+          <button class="pill primary" data-unlock>Entsperren</button>
+        </div>
         <div class="room-link"><code></code>
           <button class="pill secondary" data-copy>${icon('copy', 15)}Kopieren</button>
           <button class="icon-btn" data-renew title="Neuer Link – der bisherige funktioniert dann nicht mehr">${icon('refresh', 16)}</button>
@@ -178,7 +182,9 @@
       q('.room-name').value = room.name
       q('.room-name').addEventListener('change', () => save(room, { name: q('.room-name').value }))
       q('.room-name').addEventListener('keydown', (e) => e.key === 'Enter' && e.target.blur())
-      q('.tags').innerHTML = (room.pin ? tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN') : '') + (room.remote ? tag('remote', 'Fernzugriff', 'Fernzugriff') : '')
+      q('.tags').innerHTML = (room.pin ? tag('pin', `${icon('lock', 10)}PIN`, 'Eintritt auch mit PIN') : '') + (room.remote ? tag('remote', 'Fernzugriff', 'Fernzugriff') : '') + (room.locked ? tag('locked', `${icon('lock', 10)}Gesperrt`, 'Gesperrt nach zu vielen falschen PINs') : '')
+      q('.room-locked').hidden = !room.locked
+      q('[data-unlock]').addEventListener('click', () => invoke('room_unlock', { id: room.id }).then(() => toast('Link entsperrt')).catch(fail))
       q('code').textContent = room.link
       q('[data-copy]').addEventListener('click', () => navigator.clipboard.writeText(room.link).then(() => toast('Link kopiert')).catch(fail))
       twice(q('[data-renew]'), 'Der bisherige Link funktioniert dann nicht mehr.', () => invoke('room_renew', { id: room.id }).catch(fail))

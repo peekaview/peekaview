@@ -292,6 +292,7 @@ impl Hub {
                             }
                         }
                         Hello::Denied => self.signaling.send(&json!({ "type": "denied", "from": "host", "to": from })),
+                        Hello::Locked => self.signaling.send(&json!({ "type": "locked", "from": "host", "to": from })),
                         // the presenter decides (or the viewer enters the room's PIN)
                         Hello::Waiting { new, reply } => {
                             self.signaling.send(&reply);
@@ -312,13 +313,19 @@ impl Hub {
                                 crate::log(&format!("p2p: invite failed: {e}"));
                             }
                         }
-                        PinResult::Wrong { left } => {
-                            self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "left": left }));
+                        PinResult::Wrong { left, wait } => {
+                            self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "left": left, "wait": wait }));
                             if left == 0 {
                                 session::announce_requests(&self.app);
                             }
                         }
-                        PinResult::Locked => self.signaling.send(&json!({ "type": "pin-wrong", "from": "host", "to": from, "locked": true })),
+                        PinResult::Wait(wait) => self.signaling.send(&json!({ "type": "pin-wait", "from": "host", "to": from, "wait": wait })),
+                        PinResult::Locked { now } => {
+                            self.signaling.send(&json!({ "type": "locked", "from": "host", "to": from }));
+                            if now {
+                                session::announce_requests(&self.app);
+                            }
+                        }
                     }
                 }
                 // a viewer's start page asks whether this room is online – no join request
