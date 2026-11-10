@@ -23,6 +23,8 @@ pub mod install;
 #[cfg(target_os = "macos")]
 pub mod peer;
 #[cfg(target_os = "macos")]
+pub mod legacy;
+#[cfg(target_os = "macos")]
 pub mod service;
 
 use std::path::{Path, PathBuf};

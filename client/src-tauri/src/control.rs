@@ -47,9 +47,13 @@ pub enum Cmd {
     Release,
 }
 
+/// What simulates input: enigo, or at the Mac's login window `Legacy` (see `unattended::mac::legacy`).
+trait Device: Keyboard + Mouse {}
+impl<T: Keyboard + Mouse> Device for T {}
+
 struct Controller {
     shared: Arc<Shared>,
-    enigo: Option<Enigo>,
+    enigo: Option<Box<dyn Device>>,
     /// viewer id + button currently held down on their behalf + the window (slot) it is in
     pressed: Option<(u64, Button, u8)>,
     /// last "blocked" notice per viewer (at most one every NOTICE_GAP)
@@ -102,7 +106,7 @@ pub(crate) fn new_enigo() -> Result<Enigo, enigo::NewConError> {
 /// Types `text`. The service's agent on the Mac presses a key per character (key codes from the
 /// keyboard layout): password fields with secure input – the login window, the lock screen – drop
 /// the Unicode strings `Enigo::text` sends.
-fn type_text(e: &mut Enigo, text: &str) {
+fn type_text(e: &mut dyn Device, text: &str) {
     #[cfg(target_os = "macos")]
     if crate::unattended::helper() {
         for c in text.chars() {
@@ -139,18 +143,25 @@ fn on_main<F: FnOnce()>(f: F) {
 }
 
 impl Controller {
-    fn enigo(&mut self) -> Option<&mut Enigo> {
+    fn enigo(&mut self) -> Option<&mut (dyn Device + 'static)> {
         if self.enigo.is_none() {
+            // the service's agent at the login window (root): macOS ignores CGEventPost there
+            #[cfg(target_os = "macos")]
+            if crate::unattended::helper() && crate::unattended::mac::console::root() {
+                crate::log("control: login window, input through the legacy event functions");
+                self.enigo = Some(Box::new(crate::unattended::mac::legacy::Legacy::new()));
+                return self.enigo.as_deref_mut();
+            }
             // a missing accessibility permission is handled by our own helper window
             self.enigo = match new_enigo() {
-                Ok(e) => Some(e),
+                Ok(e) => Some(Box::new(e)),
                 Err(e) => {
                     crate::log(&format!("control: cannot simulate input ({e}) – accessibility permission missing?"));
                     None
                 }
             };
         }
-        self.enigo.as_mut()
+        self.enigo.as_deref_mut()
     }
 
     fn release(&mut self) {
