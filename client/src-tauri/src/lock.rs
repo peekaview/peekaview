@@ -46,8 +46,15 @@ pub fn unlock(password: &str) -> Result<(), String> {
     Err("Entsperren fehlgeschlagen – Passwort falsch?".into())
 }
 
+/// Locks the presenter's screen, as "Bildschirm sperren" in the Apple menu does. A share in which
+/// a viewer unlocked the screen ends with this: nobody finds the computer open afterwards.
+pub fn lock() {
+    imp::lock()
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
+    use std::ffi::{c_char, c_int, c_void};
     use std::time::Duration;
 
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
@@ -75,6 +82,63 @@ mod imp {
         }
         enigo.key(Key::Return, Direction::Click).map_err(|e| e.to_string())
     }
+
+    extern "C" {
+        fn dlopen(path: *const c_char, mode: c_int) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    }
+    const RTLD_LAZY: c_int = 1;
+
+    /// loginwindow's "lock now" – macOS has no public call for it. Looked up at run time: a
+    /// system without it leaves the screen as it is instead of keeping PeekaView from starting.
+    fn lock_now() -> Option<unsafe extern "C" fn()> {
+        let call = unsafe {
+            let login = dlopen(c"/System/Library/PrivateFrameworks/login.framework/Versions/Current/login".as_ptr(), RTLD_LAZY);
+            if login.is_null() {
+                return None;
+            }
+            dlsym(login, c"SACLockScreenImmediate".as_ptr())
+        };
+        (!call.is_null()).then(|| unsafe { std::mem::transmute::<*mut c_void, unsafe extern "C" fn()>(call) })
+    }
+
+    pub fn lock() {
+        if locked() {
+            return;
+        }
+        let Some(lock_now) = lock_now() else { return crate::log("lock: not available on this system") };
+        unsafe { lock_now() };
+        // the call only asks loginwindow – note it if the screen stays open
+        std::thread::spawn(|| {
+            for _ in 0..12 {
+                std::thread::sleep(Duration::from_millis(250));
+                if locked() {
+                    return;
+                }
+            }
+            crate::log("lock: the screen did not lock");
+        });
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn lock_call_exists() {
+        assert!(lock_now().is_some());
+    }
+
+    /// Really locks this Mac's screen: `cargo test -p peekaview -- --ignored locks_the_screen`.
+    #[cfg(test)]
+    #[test]
+    #[ignore]
+    fn locks_the_screen() {
+        assert!(!locked(), "unlock the screen first");
+        lock();
+        let locked_now = (0..12).any(|_| {
+            std::thread::sleep(Duration::from_millis(250));
+            locked()
+        });
+        assert!(locked_now);
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -82,6 +146,9 @@ mod imp {
     pub fn locked() -> bool {
         false
     }
+
+    // nothing unlocks a screen here, so there is nothing to lock again
+    pub fn lock() {}
 
     pub fn type_password(_: &str) -> Result<(), String> {
         Err("Entsperren aus der Ferne gibt es nur am Mac.".into())

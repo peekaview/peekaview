@@ -84,6 +84,10 @@ werden (kommasepariert; Desktop und Android benötigen zusätzlich ihre in
   während der Veröffentlichung verwendbar bleiben.
 - Gruppen-PINs haben mindestens sechs Zeichen und werden ausschließlich als
   Argon2id-Hash gespeichert. Ein PIN-Wechsel beendet laufende Gruppenanrufe.
+  Nach fünf falschen Eingaben in zehn Minuten wird ein Gerät abgewiesen, nach
+  zwanzig ist die PIN der Gruppe für alle gesperrt – jeweils bis die zehn Minuten
+  um sind oder eine neue PIN gesetzt wird. Die richtige PIN löscht die
+  Fehlversuche des Geräts; eine Anfrage ohne PIN zählt nicht.
   Unbeaufsichtigter Zugriff gilt je Gerät und benötigt eine Gruppen-PIN sowie
   eine dort ausdrücklich gespeicherte Auswahl erlaubter Bildschirme/Anwendungen.
   Der Anrufer muss die PIN eingeben; andere Geräte werden dadurch nicht aktiviert.

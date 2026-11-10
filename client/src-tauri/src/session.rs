@@ -131,6 +131,8 @@ pub struct Shared {
     /// a remote session in a permanent room: viewers may start its applications
     pub remote: Option<Room>,
     pub fixed_call: Option<String>,
+    /// a viewer unlocked the presenter's screen: it is locked again when the share ends
+    pub unlocked: AtomicBool,
 }
 
 impl Shared {
@@ -386,6 +388,7 @@ pub async fn start(app: AppHandle, mut opts: StartOptions) -> Result<Value, Stri
         secret: secret.clone(),
         remote: opts.remote.clone(),
         fixed_call: opts.fixed_call.clone(),
+        unlocked: AtomicBool::new(false),
     });
 
     let mut videos = Vec::new();
@@ -649,6 +652,11 @@ pub fn stop(app: &AppHandle, reason: Option<&str>, forget: bool) {
         resume::clear(app);
     }
     let Some(session) = app.state::<SessionState>().0.lock().unwrap().take() else { return };
+    // Whoever ends it, and also before a restart: a screen that a viewer unlocked is not left
+    // open. Viewers can end the share themselves (the toolbar is theirs to use).
+    if session.shared.unlocked.load(Ordering::Relaxed) {
+        crate::lock::lock();
+    }
     if let Some(rec) = session.shared.recorder.lock().unwrap().take() {
         let app = app.clone();
         std::thread::spawn(move || {

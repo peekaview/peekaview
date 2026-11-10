@@ -597,7 +597,11 @@ impl Hub {
             "unlock" if mode == Mode::Control && self.shared.remote.is_some() => {
                 let (password, shared) = (v["password"].as_str().unwrap_or("").to_string(), self.shared.clone());
                 std::thread::spawn(move || {
+                    let was_locked = crate::lock::locked();
                     let result = crate::lock::unlock(&password);
+                    if was_locked && result.is_ok() {
+                        shared.unlocked.store(true, Ordering::Relaxed);
+                    }
                     crate::log(&format!("unlock: {}", if result.is_ok() { "ok" } else { "failed" }));
                     shared.send(json!({ "t": "unlocked", "to": id, "ok": result.is_ok(), "error": result.err() }));
                     shared.send_state();
