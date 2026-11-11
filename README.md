@@ -163,6 +163,7 @@ PeekaView keeps running in the tray / menu bar. Ending a share or closing the to
   - a session in that room with remote control on;
   - the room's chosen **applications** in the dock, marked as such, and **Gesamter Desktop** if enabled.
   - Starting one launches it on this computer, or brings it forward if it runs already, and shares its window. The session ends a minute after the last viewer left.
+  - a password field while this Mac's screen is locked: the password is typed into the lock screen, never stored or logged. A session in which a viewer unlocked the screen locks it again when it ends.
 
 Sharing from the picker can also go into a permanent link ("Fester Link: …").
 

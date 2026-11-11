@@ -142,9 +142,25 @@ $limited=$service->mutate($ad,'rooms/create',['name'=>'PIN-Limit'])['id'];
 $service->mutate($ad,'rooms/add-device',['room'=>$limited,'device'=>$bd['id']]);
 $service->mutate($ad,'rooms/settings',['room'=>$limited,'pin_enabled'=>true,'pin'=>'Test!6']);
 $attempt=$service->mutate($ad,'calls/start',['room'=>$limited,'pin'=>'Test!6']);
-for($i=0;$i<6;$i++)denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Falsch']),403);
-denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Falsch']),429);
-$service->mutate($ad,'calls/leave',['call'=>$attempt['id']]);
+$tries=fn(string $key):int=>(int)$db->query("SELECT COALESCE(SUM(count),0) FROM limits WHERE key='$key'")->fetchColumn();
+$wrong=fn(int $times,int $status=403)=>array_map(fn()=>denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Falsch']),$status),range(1,$times));
+for($i=0;$i<8;$i++)denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id']]),403);
+check($tries("pin:$limited")===0,'Ohne PIN wird kein Versuch verbraucht');
+$wrong(4);
+$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Test!6']);
+check($tries("pin:$limited:{$bd['id']}")===0 && $tries("pin:$limited")===4,'Die richtige PIN vergisst die falschen Eingaben dieses Geräts');
+$wrong(5);
+denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Test!6']),429);
+check($tries("pin:$limited")===9,'Ein abgewiesenes Gerät zählt nicht weiter gegen die Gruppe');
+// Further devices are stood in for by forgetting this one's own count.
+foreach([5,5,1] as $times){$db->exec("DELETE FROM limits WHERE key LIKE 'pin:$limited:%'");$wrong($times);}
+$db->exec("DELETE FROM limits WHERE key LIKE 'pin:$limited:%'");
+denied(fn()=>$service->mutate($bd,'calls/join',['call'=>$attempt['id'],'pin'=>'Test!6']),429);
+check($tries("pin:$limited:{$bd['id']}")===0,'Die Gruppensperre verbraucht keinen Versuch des Geräts');
+$service->mutate($ad,'rooms/settings',['room'=>$limited,'pin_enabled'=>true,'pin'=>'Neu!67']);
+$unlocked=$service->mutate($bd,'calls/start',['room'=>$limited,'pin'=>'Neu!67']);
+check($tries("pin:$limited")===0,'Eine neue PIN hebt die Sperre auf');
+$service->mutate($bd,'calls/leave',['call'=>$unlocked['id']]);
 $approvalRoom=$service->mutate($ad,'rooms/create',['name'=>'Aufnahme bestätigen'])['id'];
 $service->mutate($ad,'rooms/add-device',['room'=>$approvalRoom,'device'=>$bd['id']]);
 $approvalCall=$service->mutate($ad,'calls/start',['room'=>$approvalRoom])['id'];

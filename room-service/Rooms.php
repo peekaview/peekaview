@@ -111,11 +111,15 @@ final class Rooms
         return [['urls' => $list, 'username' => $username, 'credential' => base64_encode(hash_hmac('sha1', $username, $secret, true))]];
     }
 
-    public function limit(string $key, int $max, int $seconds): void
+    public function limit(string $key, int $max, int $seconds, string $message = 'Zu viele Versuche. Bitte später erneut versuchen.'): void
     {
         $this->run('INSERT INTO limits(key,count,start) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN start < ? THEN 1 ELSE count+1 END, start=CASE WHEN start < ? THEN excluded.start ELSE start END', [$key, time(), time()-$seconds, time()-$seconds]);
-        if ((int)$this->rows('SELECT count FROM limits WHERE key=?', [$key])[0]['count'] > $max) throw new Problem(429, 'Zu viele Versuche. Bitte später erneut versuchen.');
+        if ((int)$this->rows('SELECT count FROM limits WHERE key=?', [$key])[0]['count'] > $max) throw new Problem(429, $message);
     }
+    /** Wrong PINs in ten minutes before a device is turned away / the PIN is locked for the whole group. */
+    private const PIN_TRIES = 5;
+    private const PIN_TRIES_GROUP = 20;
+    private const PIN_WINDOW = 600;
     public function device(string $token): array
     {
         $d = $this->rows('SELECT id,email,name,platform FROM devices WHERE token_hash=?', [hash('sha256', $token)])[0] ?? null;
@@ -333,9 +337,20 @@ final class Rooms
     {
         $policy=$this->rows('SELECT pin_hash,version FROM group_settings WHERE room=?',[$room])[0] ?? [];
         if (empty($policy['pin_hash'])) return null;
-        $this->limit('pin:'.$room.':'.$d['id'],6,60);
         $pin=$body['pin'] ?? '';
-        if (!is_string($pin) || strlen($pin)>512 || !password_verify($pin,$policy['pin_hash'])) throw new Problem(403,'Die Gruppen-PIN ist falsch.');
+        // No PIN at all is no guess: it is turned away without using up a try.
+        if (!is_string($pin) || $pin==='' || strlen($pin)>512) throw new Problem(403,'Die Gruppen-PIN ist falsch.');
+        $own='pin:'.$room.':'.$d['id']; $all='pin:'.$room;
+        $locked='Zu viele falsche PIN-Eingaben. Bitte in 10 Minuten erneut versuchen.';
+        // Every try is counted before the slow hash check, so parallel guesses cannot outrun the
+        // limits. A device that is turned away no longer counts against the group.
+        $this->limit($own,self::PIN_TRIES,self::PIN_WINDOW,$locked);
+        try { $this->limit($all,self::PIN_TRIES_GROUP,self::PIN_WINDOW,$locked); }
+        catch (Problem $e) { $this->run('UPDATE limits SET count=count-1 WHERE key=?',[$own]); throw $e; }
+        if (!password_verify($pin,$policy['pin_hash'])) throw new Problem(403,'Die Gruppen-PIN ist falsch.');
+        // The right PIN gives its try back and forgets this device's wrong ones.
+        $this->run('DELETE FROM limits WHERE key=?',[$own]);
+        $this->run('UPDATE limits SET count=count-1 WHERE key=?',[$all]);
         return $policy['version'];
     }
     private function deleteCalls(string $where, array $args): void
@@ -419,6 +434,8 @@ final class Rooms
                 if (!$hash && $this->rows('SELECT device FROM group_access WHERE room=? AND enabled=1 LIMIT 1',[$room])) throw new Problem(400,'Unbeaufsichtigter Zugriff benötigt eine PIN.');
                 $this->run('INSERT INTO group_settings(room,pin_hash,version) VALUES(?,?,?) ON CONFLICT(room) DO UPDATE SET pin_hash=excluded.pin_hash,version=excluded.version',[$room,$hash,$version]);
                 if (($old['version'] ?? null)!==$version) {
+                    // Wrong tries were guesses at the old PIN.
+                    $this->run('DELETE FROM limits WHERE key=? OR key LIKE ?',['pin:'.$room,'pin:'.$room.':%']);
                     $this->run("UPDATE call_members SET status='left',voice=0,stream=NULL WHERE call IN (SELECT id FROM calls WHERE room=? AND ended IS NULL)",[$room]);
                     $this->run('UPDATE calls SET ended=? WHERE room=? AND ended IS NULL',[time(),$room]);
                 }
